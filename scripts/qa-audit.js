@@ -18,12 +18,12 @@ const REPORT_DIR = './reports';
 // All pages discovered in public/
 const PAGES = [
   '/',
-  '/agent-leaderboard.html',
-  '/agent-status.html',
+  
+  
   '/changelog.html',
   '/courtney.html',
   '/create.html',
-  '/dream-chat.html',
+  
   '/dream-journal/',
   '/entry.html',
   '/flourishing.html',
@@ -33,14 +33,14 @@ const PAGES = [
   '/observer-mesh-cube.html',
   '/outreach.html',
   '/pricing.html',
-  '/proof.html',
-  '/rag-house.html',
+  
+  
   '/settings/providers.html',
   '/trader-dashboard.html',
   '/trading.html',
   '/trading-news.html',
   '/upgrade-lab.html',
-  '/wish-door.html',
+  '/wish-door.html'
 ];
 
 // Selectors for clickable elements
@@ -54,7 +54,7 @@ const CLICKABLE_SELECTORS = [
   '.card-action',
   '.menu-item',
   '.toolbar-button',
-  '[onclick]',
+  '[onclick]'
 ];
 
 class QAAudit {

@@ -135,6 +135,30 @@ function _userHeaders(ctx) {
   return ctx && ctx.userId ? { "x-keystone-user": encodeURIComponent(String(ctx.userId)) } : null;
 }
 
+/**
+ * Does this caller's PLAN include `capability` (lib/plan-matrix)?
+ *
+ * user_safe tools reach per-user stores directly, bypassing the route-level
+ * entitlement gate in server.js — so a plan-gated feature must re-check here or
+ * chat becomes a way around the plan matrix. Role comes from the session when the
+ * caller passed it, else from the stored profile. Operators (loopback/admin box)
+ * pass. Fails CLOSED: any error or unknown role means "no".
+ */
+function _hasCapability(ctx, capability) {
+  try {
+    if (ctx && ctx.operator) return true;
+    let role = ctx && ctx.role;
+    if (!role && ctx && ctx.userId) {
+      const p = require("./user-profiles").getProfile(ctx.userId);
+      role = p && p.role;
+    }
+    if (!role) return false;
+    return require("./plan-matrix").roleHasCapability(role, capability);
+  } catch (_e) {
+    return false;
+  }
+}
+
 // ── portfolio-tool formatting (portfolio_analysis / portfolio_whatif /
 // propose_rebalance) — shared so all three speak the same evidence language. ──
 function _pfPct(x, dp = 1) {
@@ -296,7 +320,10 @@ function _thumbMarkdown(entry) {
 const REGISTRY = {
   Read: {
     policy: "read", desc: "Read a file from the filesystem (repo-relative).",
-    schema: { type: "object", properties: { file_path: { type: "string" }, limit: { type: "integer" } }, required: ["file_path"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to the file, e.g. apps/lantern-garage/server.js" },
+      limit: { type: "integer", description: "How many lines to return from the top of the file. Default 80, maximum 400." },
+    }, required: ["file_path"] },
     run(i) {
       const p = _safe(i.file_path);
       if (!fs.statSync(p).isFile()) return `[not a file: ${i.file_path}]`;
@@ -306,7 +333,7 @@ const REGISTRY = {
   },
   LS: {
     policy: "read", desc: "List the entries of a directory (repo-relative).",
-    schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+    schema: { type: "object", properties: { path: { type: "string", description: "Repo-relative directory to list, e.g. apps/lantern-garage/lib" } }, required: ["path"] },
     run(i) {
       const p = _safe(i.path || ".");
       if (!fs.statSync(p).isDirectory()) return `[not a directory: ${i.path}]`;
@@ -316,7 +343,10 @@ const REGISTRY = {
   },
   Glob: {
     policy: "read", desc: "Find files matching a glob pattern (e.g. **/*.js).",
-    schema: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string" } }, required: ["pattern"] },
+    schema: { type: "object", properties: {
+      pattern: { type: "string", description: "Glob such as **/*.js — matched against each repo-relative path AND its bare filename. Searches subdirectories." },
+      path: { type: "string", description: "Repo-relative directory to search from. Defaults to the repo root." },
+    }, required: ["pattern"] },
     run(i) {
       const re = _globToRe(i.pattern || "*");
       const hits = [];
@@ -334,7 +364,10 @@ const REGISTRY = {
   },
   Grep: {
     policy: "read", desc: "Search file contents for a regular expression.",
-    schema: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string" } }, required: ["pattern"] },
+    schema: { type: "object", properties: {
+      pattern: { type: "string", description: "Regular expression. Always case-insensitive." },
+      path: { type: "string", description: "Repo-relative file OR directory. A directory scans only the files directly inside it — it does NOT recurse, so use Glob first to locate files in nested folders. Defaults to the repo root." },
+    }, required: ["pattern"] },
     run(i) {
       const re = new RegExp(String(i.pattern || ""), "i");
       const out = [];
@@ -346,23 +379,34 @@ const REGISTRY = {
     },
   },
   Bash: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "shell", desc: "Run an allowlisted shell command (git/tests/file-reads). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead; only allowlisted repo commands run here.",
-    schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+    schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   PowerShell: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "shell", desc: "Run an allowlisted command (same allowlist as Bash). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead.",
-    schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+    schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   Write: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "mutating", desc: "Write a file (repo-relative), overwriting it. Operator only.",
-    schema: { type: "object", properties: { file_path: { type: "string" }, content: { type: "string" } }, required: ["file_path", "content"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to write. Parent directories must already exist." },
+      content: { type: "string", description: "Full new file contents — this REPLACES the whole file, so include everything you want kept." },
+    }, required: ["file_path", "content"] },
     run(i) { const p = _safe(i.file_path); fs.writeFileSync(p, String(i.content == null ? "" : i.content), "utf8"); return `wrote ${i.file_path} (${String(i.content || "").length} bytes)`; },
   },
   Edit: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "mutating", desc: "Replace an exact unique string in a file (repo-relative). Operator only.",
-    schema: { type: "object", properties: { file_path: { type: "string" }, old_string: { type: "string" }, new_string: { type: "string" } }, required: ["file_path", "old_string", "new_string"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to edit." },
+      old_string: { type: "string", description: "Exact text to replace, including indentation. Must occur EXACTLY once in the file — the edit is rejected if it is missing or ambiguous, so include surrounding lines to make it unique." },
+      new_string: { type: "string", description: "Replacement text." },
+    }, required: ["file_path", "old_string", "new_string"] },
     run(i) {
       const p = _safe(i.file_path);
       const src = fs.readFileSync(p, "utf8");
@@ -402,11 +446,22 @@ const REGISTRY = {
       const results = payload.results || [];
       if (!results.length) return `[no results for: ${query}]`;
       const lines = [`web_search("${query}") — ${results.length} result(s)${payload.source && payload.source !== "mcp" ? ` (${payload.source} fallback)` : ""}:\n`];
+      // Surface every field the source actually gave us, each on its own labelled line, so
+      // the model can cite a real publisher and date and can render an image when one
+      // exists — instead of receiving title+snippet and answering "per USA Today" with no
+      // link. Fields are only emitted when present, so a thin source stays compact.
       results.forEach((r, idx) => {
         lines.push(`[${idx + 1}] ${r.title || "(untitled)"}`);
         lines.push(`    url: ${r.url || ""}`);
+        if (r.published) lines.push(`    published: ${r.published}`);
+        if (r.publisher || r.source) lines.push(`    publisher: ${r.publisher || r.source}`);
+        // Google News links are opaque redirects; the publisher's own domain is the
+        // citable one, so give it to the model explicitly.
+        if (r.publisherUrl) lines.push(`    publisher_url: ${r.publisherUrl}`);
+        if (r.image) lines.push(`    image: ${r.image}`);
         if (r.snippet) lines.push(`    snippet: ${r.snippet}`);
       });
+      lines.push(`\nCite sources as Markdown links. When a result has an image, you may show it with ![title](image). Use publisher_url when the url is a redirect.`);
       return lines.join("\n");
     },
   },
@@ -449,6 +504,7 @@ const REGISTRY = {
   // The assistant PROPOSES; a human APPROVES via the approvals surface — the model
   // never applies a repo change itself. Operator-only (policy: mutating).
   propose_coding_change: {
+    needsApproval: true,   // #3070 — mutates repository code
     policy: "mutating",
     desc:
       "Propose a change to a repository's EXISTING code using the accountable coding backend. Use only when the user asked for a repo change — never to write example/new code the user just wants to see (answer that directly in your reply). Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
@@ -535,6 +591,7 @@ const REGISTRY = {
   // this tool natively, and the returned Markdown image auto-embeds in chat. Never fabricates
   // a URL — returns a clear error the model must relay if generation is unavailable.
   generate_image: {
+    needsApproval: true,   // #3070 — spends real API credit
     policy: "read",
     guest_safe: true,
     desc: "Generate an image from a text description and return a Markdown image link that renders inline in the chat. Use this whenever the user asks you to draw, paint, sketch, illustrate, or generate a picture/image of something — decide on your own initiative, don't wait to be told to 'use a tool'. Pass the subject to depict as `prompt`. On success you MUST include the returned ![...](url) Markdown in your reply so the user actually sees the image. If it reports generation is unavailable, tell the user plainly — never invent an image URL.",
@@ -877,7 +934,7 @@ const REGISTRY = {
   workspace_read: {
     policy: "read",
     desc: "Read a file from the user workspace (~/.keystone/workspace/). Use for user-owned artifacts: resumes, exports, generated docs.",
-    schema: { type: "object", properties: { file_path: { type: "string" } }, required: ["file_path"] },
+    schema: { type: "object", properties: { file_path: { type: "string", description: "Path relative to the user workspace root (~/.keystone/workspace/), e.g. notes/todo.md" } }, required: ["file_path"] },
     run(i) {
       const p = _safeWs(i.file_path);
       if (!fs.existsSync(p)) throw _codedError(`workspace file not found: ${i.file_path}`, "not_found");
@@ -890,7 +947,10 @@ const REGISTRY = {
     desc: "Write a file to the user workspace (~/.keystone/workspace/). Creates intermediate directories. Never writes to the repo.",
     schema: {
       type: "object",
-      properties: { file_path: { type: "string" }, content: { type: "string" } },
+      properties: {
+        file_path: { type: "string", description: "Path relative to the user workspace root (~/.keystone/workspace/). Missing parent directories are created." },
+        content: { type: "string", description: "Full file contents — replaces the whole file." },
+      },
       required: ["file_path", "content"],
     },
     run(i) {
@@ -904,7 +964,7 @@ const REGISTRY = {
   workspace_list: {
     policy: "read",
     desc: "List files in the user workspace (~/.keystone/workspace/) under an optional subdirectory.",
-    schema: { type: "object", properties: { path: { type: "string" } } },
+    schema: { type: "object", properties: { path: { type: "string", description: "Sub-directory of the user workspace to list. Defaults to the workspace root." } } },
     run(i) {
       _ensureWorkspace();
       const dir = _safeWs(i.path || ".");
@@ -921,7 +981,7 @@ const REGISTRY = {
       type: "object",
       properties: {
         filename: { type: "string", description: "Workspace-relative path, e.g. 'resume-2026.md'" },
-        content: { type: "string" },
+        content: { type: "string", description: "Document body. Markdown headings, lists and tables are converted to real formatting." },
         format: { type: "string", enum: ["markdown", "text"], description: "File format hint (default: markdown)" },
       },
       required: ["filename", "content"],
@@ -943,6 +1003,7 @@ const REGISTRY = {
   // forbidden. Probes the endpoint before running; returns a blocked receipt
   // if unavailable. OPERATOR policy (shell execution).
   local_eval_keystone_run: {
+    needsApproval: true,   // #3070 — runs the eval harness
     policy: "shell",
     desc: "Run the unisona.ai eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
     schema: {
@@ -1146,7 +1207,7 @@ const REGISTRY = {
 
   creator_job_status: {
     policy: "read", desc: "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + the project thumbnail (markdown image — relay it so it renders inline).",
-    schema: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
+    schema: { type: "object", properties: { jobId: { type: "string", description: "Job id returned when the creator job was submitted." } }, required: ["jobId"] },
     run(i) {
       const { jobQueue, repoRoot } = _creatorCtx();
       const job = jobQueue.getJob((i.jobId || "").trim());
@@ -1238,6 +1299,94 @@ const REGISTRY = {
         ].join("\n");
       } catch (e) {
         return `[trader_quote error: ${e.message}]`;
+      }
+    },
+  },
+
+  // ── #3331: the assistant sees what the intraday trader sees ────────────────
+  // The Advisor tab used to be the place you went for "what should I do". Advice is
+  // a conversation, so these three give chat the trader's OWN inputs rather than a
+  // second opinion built from different data: the user's list, the engine's
+  // per-symbol verdict, and the alerts they set. All read-only — none of them can
+  // size, place, or cancel an order, and that is deliberate (ADR-0020 keeps Act
+  // behind the trading guard).
+
+  trader_watchlist: {
+    policy: "read", // operator-only: the watchlist is per-user state
+    desc: "Get the user's OWN trader watchlist — their symbols, in their order, with live price and day change, plus the engine's current read on each (direction, confidence, and whether a position is open). Use this before answering anything about 'my watchlist', 'my symbols', 'what am I watching', or any 'what looks good today' question, so the answer is about THEIR list rather than a generic one. It is also how you notice the user has added or removed symbols.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const h = _userHeaders(ctx);
+        const [wl, zx] = await Promise.all([
+          _localTradingGet("/api/trading/watchlist-prices", 9000, h).catch(() => null),
+          _localTradingGet("/api/trading/zones", 9000, h).catch(() => null),
+        ]);
+        const rows = Array.isArray(wl) ? wl : (wl && wl.prices) || [];
+        if (!rows.length) return "[trader_watchlist: the watchlist is empty or unavailable. Say so rather than assuming a default list.]";
+        const zones = (zx && zx.zones) || {};
+        const out = rows.map((r) => {
+          const z = zones[r.ticker] || {};
+          const px = r.price == null ? "?" : Number(r.price).toFixed(2);
+          const chg = r.chg_pct == null ? "" : ` ${r.chg_pct >= 0 ? "+" : ""}${r.chg_pct}%`;
+          const dir = z.direction ? ` · engine ${z.direction}${z.confidence != null ? ` ${z.confidence}%` : ""}` : "";
+          const pos = z.position ? " · POSITION OPEN" : "";
+          return `  ${r.ticker} $${px}${chg}${dir}${pos}`;
+        });
+        return [`Watchlist (${rows.length} symbols, in the user's order):`, ...out,
+          "Prices are live from the trader's feed — cite them, and note that the engine read is the same one driving the autopilot."].join("\n");
+      } catch (e) {
+        return `[trader_watchlist error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_signal: {
+    policy: "read",
+    guest_safe: true, // the engine's public read on a symbol; carries no account data
+    desc: "Get the intraday trader's OWN analysis of one ticker — the same signal the autopilot acts on: direction and confidence, setup quality and structure, the reasons it gives, entry price, the stop/target plan, the Σ₀ convergence verdict (ENTER/HOLD with p_win and expected R), RSI, ATR, relative volume, and the nearest support and resistance. Works for ANY ticker, on the watchlist or not. Use this — not your own charting intuition — whenever the user asks whether to buy, sell, hold, or trim something, so your advice and the autopilot's cannot silently disagree.",
+    schema: {
+      type: "object",
+      properties: { ticker: { type: "string", description: "Ticker symbol, e.g. SPY or NVDA" } },
+      required: ["ticker"],
+    },
+    async run(i, ctx) {
+      const t = String(i.ticker || "").trim().toUpperCase();
+      if (!t) return "[trader_signal error: a ticker is required]";
+      try {
+        const zx = await _localTradingGet("/api/trading/zones", 9000, _userHeaders(ctx));
+        // The endpoint distinguishes "the scan has no data yet" from "this symbol
+        // isn't watched", and so must we: reporting a cold cache as "the autopilot
+        // is not watching SPY" is a false statement about the user's own setup, in
+        // the one tool whose whole job is not contradicting the autopilot.
+        if (zx && zx.available === false) {
+          return `[trader_signal: the trader has no scan data loaded right now${zx.reason ? ` (${zx.reason})` : ""}. This is about the ENGINE, not ${t} — do not tell the user ${t} is unwatched. Use trader_quote for price and technicals, and say the engine's own read is unavailable at the moment.]`;
+        }
+        const z = (zx && zx.zones && zx.zones[t]) || null;
+        if (!z) {
+          return `[trader_signal: the engine is scanning, but has no read on ${t} — it only scans the watchlist. For an off-list symbol use trader_quote for price/technicals and say plainly that the autopilot is not watching it.]`;
+        }
+        const s = z.last_signal || {};
+        const c = s.convergence || {};
+        const p = s.plan || {};
+        const n = (v, d = 2) => (v == null ? "?" : Number(v).toFixed(d));
+        const lines = [
+          `${t} — the trader's current read`,
+          `  Direction: ${z.direction || "none"}${z.confidence != null ? ` (confidence ${z.confidence}%)` : ""}`,
+          `  Setup: quality ${s.quality || "?"}, structure ${s.structure || "?"}`,
+          s.reasons ? `  Why: ${s.reasons}` : null,
+          `  Price now: $${n(s.entry_price)} · support $${n(s.support)} · resistance $${n(s.resistance)}`,
+          (p.stop != null || p.target1 != null)
+            ? `  Plan: stop $${n(p.stop)}, target1 $${n(p.target1)}${p.target2 != null ? `, target2 $${n(p.target2)}` : ""}${p.hold_days != null ? `, hold ~${p.hold_days}d` : ""}` : null,
+          c.decision ? `  Σ₀ verdict: ${c.decision}${c.p_win != null ? ` (p_win ${(c.p_win * 100).toFixed(1)}%` : ""}${c.ev_r != null ? `, EV ${n(c.ev_r)}R)` : c.p_win != null ? ")" : ""}` : null,
+          `  RSI ${s.rsi ?? "?"} · ATR ${n(s.atr)} · rel volume ${s.volume_ratio ?? "?"}x`,
+          s.news && s.news.n ? `  News: ${s.news.label} (${s.news.n} items)` : null,
+          z.position ? "  NOTE: the user already holds a position in this symbol." : null,
+          "This is the engine's evidence, not a recommendation to trade — present it as such, with its confidence.",
+        ].filter(Boolean);
+        return lines.join("\n");
+      } catch (e) {
+        return `[trader_signal error: ${e.message}]`;
       }
     },
   },
@@ -1508,7 +1657,14 @@ const REGISTRY = {
         // #2869: chat spirals use the real failure cache — known-failed approaches
         // for this task signature are avoided up front; unsolved runs record back.
         const failureCache = require("./spiral-failure-cache");
-        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify, maxTurns, onStep: line, failureCache });
+        // #2999: with >=2 tests, the LAST is held out — selection runs on the visible
+        // split, the returned answer is the holdout-best, and a visible "solved"
+        // that breaks the held-out test does not count.
+        const { splitHoldout } = require("./spiral-tiers");
+        const split = splitHoldout(i.tests, 1);
+        const verifyVisible = split.visible.length ? makeVerifier({ language, tests: split.visible }) : verify;
+        const holdoutVerify = split.holdout.length ? makeVerifier({ language, tests: split.holdout }) : null;
+        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify: verifyVisible, maxTurns, onStep: line, failureCache, holdoutVerify });
         const head = r.solved
           ? `Spiral SOLVED in ${r.turns} turn(s)`
           : `Spiral did not solve (${r.haltReason}) after ${r.turns} turn(s)`;
@@ -1638,6 +1794,255 @@ const REGISTRY = {
       }
     },
   },
+
+  // ── The desk, readable from chat ────────────────────────────────────────────
+  // Users expect the assistant to know its OWN trading system, not just the market.
+  // These expose the autopilot's config + arming state, its realized record, what it
+  // DECLINED (the skip log — the thing an import-based journal can never have), and
+  // the user's alert rules; plus three NON-FINANCIAL capabilities (create/delete an
+  // alert, pause the trader).
+  //
+  // The money boundary is unchanged and deliberate: nothing here places, sizes, or
+  // ARMS an order — Act stays behind lib/trading-guard.js + the ADR-0020 gates. Note
+  // `trader_pause` is intentionally ONE-WAY: chat can stop the machine, never start
+  // it. Stopping is risk-reducing and wants to be sayable fast; arming is a
+  // deliberate, gated act that keeps its own UI + approval path.
+  trader_config: {
+    policy: "read",
+    user_safe: true, // signed-in: the active book is read for THEIR uid; the rest is the
+                     // strategy contract that governs their account (public in the guide)
+    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing. YOUR OWN LIMITS, state them rather than offering what you cannot do: you can START the autopilot (trader_start, Pilot only) and PAUSE it (trader_pause), but you can NEVER change any risk knob above — sizing, caps, stops, brakes and the server-side real-money arming live only in Settings and server config, by deliberate human action. Never infer results from the arming state; read the journal for that.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const mode = require("./trader-mode").get(uid);
+        const c = require("./auto-trader").cfg();
+        const halt = require("./trading-guard").haltFile();
+        const autoExec = process.env.TRADER_AUTO_EXECUTE === "1";
+        const live = process.env.TRADER_LIVE === "1";
+        const mins = (ms) => Math.round((Number(ms) || 0) / 60000);
+        const book = mode === "off"
+          ? "OFF — the autopilot opens nothing and closes nothing; positions and their broker stops are the user's to manage"
+          : mode === "champion"
+            ? "Champion — the diversified allocation book, rebalanced on a schedule (the intraday trader is paused while this runs)"
+            : "Intraday — washout entries and zone-ladder exits on liquid ETFs";
+        const sizing = c.riskPct > 0
+          ? `${c.riskPct}% of equity risked per trade (qty = equity x riskPct / (entry - stop))`
+          : `${c.positionPct}% average position size (notional sizing)`;
+        return [
+          `ACTIVE BOOK: ${book}`,
+          `ARMING: autonomous execution ${autoExec ? "ARMED (TRADER_AUTO_EXECUTE=1)" : "OFF — it decides and journals, but places nothing"} - real-money orders ${live ? "ARMED (TRADER_LIVE=1)" : "DRY RUN (TRADER_LIVE unset, so no real order can reach a broker)"}.`,
+          halt ? `HALT FILE PRESENT (${halt}) — every order is refused while it exists.` : "No kill-switch or pause file present.",
+          `SIZING: ${sizing}. Hard caps: ${c.maxPositionPct}% per position, ${c.maxGrossPct}% gross exposure (the remainder stays in cash), max ${c.maxConcurrent} concurrent positions, max ${c.maxNewPerScan} new entries per scan.`,
+          `STOPS: ${c.atrStops ? `ATR-based from the signal's own trade plan, clamped to ${c.atrStopMinPct}-${c.atrStopMaxPct}%` : `flat ${c.stopPct}%`}, placed at the broker on entry - ${c.maxLossPct}% hard max-loss backstop - ${c.zoneExit ? "zone-ladder exits armed" : "zone-ladder exits off"}.`,
+          `BRAKES: halts NEW entries at -${c.maxDailyLossPct}% day P&L - ${mins(c.cooldownMs)}min re-entry cooldown per symbol (${c.stopCooldownDays} trading day after a stop fill; ${c.stopBreaker} stop fills in a day trips the breaker) - ${mins(c.minHoldMs)}min minimum hold before a signal exit - ${c.requirePersist ? `a direction must hold ${c.persistScans} consecutive scans` : "no persistence filter"} - ${c.allowShorts ? "SHORTS ENABLED" : "longs only (a bearish signal can only close a long, never open a short)"}.`,
+        ].join("\n");
+      } catch (e) {
+        return `[trader_config error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_journal: {
+    policy: "read",
+    user_safe: true, // per-user since #3275 — the ledger stamps the account each row
+                     // was traded for, and this reads ONLY ctx.userId's rows
+    desc: "Read the autopilot's REALIZED record from its append-only exit ledger: total realized P&L, the daily curve's max drawdown with its dates, win rate (both the headline and the honest risk-exit-only number), expectancy per trade, profit factor, average MFE/MAE, and the per-exit-path breakdown. Use when the user asks how the trader is doing, how their week/month went, which exits make or lose money, or whether the stops are too tight. HONESTY CONTRACT, relay it: numbers are broker-CONFIRMED fills only; profit-taking exit paths can only ever close winners so their ~100% win rates are structural (never quote them as skill); and the disclosures line (collapsed re-decisions, excluded rejected attempts, externally-closed positions valued at the last mark) must be passed on, not hidden.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const rec = require("./track-record").getTrackRecord(undefined, uid);
+        const book = (rec.books && rec.books.intraday) || {};
+        const s = book.stats || {};
+        if (!s.trades) return "[trader_journal: THIS USER'S ledger holds no broker-confirmed round-trips yet — say so honestly; nothing is withheld, their autopilot simply has not closed a trade. Do not substitute anyone else's results.]";
+        const dd = book.maxDrawdown || {};
+        const ex = s.excursions || {};
+        const money = (n) => (typeof n === "number" ? `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}` : "n/a");
+        const reasons = Object.entries(book.byReason || {})
+          .sort((a, b) => b[1].trades - a[1].trades)
+          .map(([k, r]) => `  ${k}: ${r.trades} trades, ${r.winRate}% win${r.profitOnly ? " (STRUCTURAL — this path only closes winners)" : ""}, ${money(r.pnl)}`)
+          .join("\n");
+        const d = book.disclosures || {};
+        return [
+          `Window: ${String(book.firstExitAt || "").slice(0, 10)} to ${String(book.lastExitAt || "").slice(0, 10)} - ${s.trades} confirmed round-trips.`,
+          `Realized: ${money(s.totalRealized)} - expectancy ${money(s.expectancy)}/trade - profit factor ${s.profitFactor === null ? "infinite" : s.profitFactor}.`,
+          `Max drawdown: ${money(-(dd.amount || 0))}${dd.peakDate ? ` (${dd.peakDate} to ${dd.troughDate})` : ""} — report this beside the profit, never after it.`,
+          `Win rate: ${s.winRate}% overall; ${s.riskExitWinRate}% over the ${s.riskExitTrades} exits that COULD have lost — the second number is the honest one.`,
+          ex.nMfe ? `Average excursion while open: +${ex.avgMfePct}% best / ${ex.avgMaePct}% worst (n=${ex.nMfe}).` : "Excursion (MFE/MAE) data is still accruing — do not invent it.",
+          `Exit paths:\n${reasons}`,
+          `Disclosures: ${d.duplicateExitsCollapsed || 0} re-decision rows collapsed, ${d.failedAttemptsExcluded || 0} broker-rejected attempts excluded (they realized nothing), ${d.estimatedTrades || 0} external closes valued at the last observed mark.`,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[trader_journal error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_skips: {
+    policy: "read",
+    user_safe: true, // per-user since #3275, same as trader_journal
+    desc: "Read the SKIP LOG — every opportunity the autopilot DECLINED and why, grouped by decline reason with counts and how many distinct symbols each touched (numbers in a reason are normalized, so '81% > cap 80%' and '83% > cap 80%' are one family). Use when the user asks why the trader isn't trading, why it passed on a symbol, or what its risk rules are actually blocking — most 'it isn't working' is the trader correctly declining. These are COUNTS ONLY: never imply a skipped trade would have made or lost money, because it was never priced.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const sk = require("./trader-scorecard").breakdown("skip", undefined, uid);
+        const groups = Object.entries(sk.groups || {});
+        if (!groups.length) return "[trader_skips: nothing declined on THIS USER'S account in the recorded window.]";
+        // Grouping normalizes digits to '#' so "81% > cap 80%" and "83% > cap 80%"
+        // collapse into one family; render that as N so the reason reads as English.
+        const rows = groups.slice(0, 12)
+          .map(([k, g]) => `  ${g.count}x - ${String(k).replace(/#/g, "N")} (${g.symbols} symbol${g.symbols === 1 ? "" : "s"})`)
+          .join("\n");
+        return `The autopilot declined ${sk.totalSkips} opportunities in the recorded window:\n${rows}\n(Counts only — a declined trade was never priced, so no P&L can be claimed for it either way.)`;
+      } catch (e) {
+        return `[trader_skips error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alerts: {
+    policy: "read",
+    user_safe: true, // strictly per-user: every read is keyed by ctx.userId
+    desc: "List the user's watchlist alert RULES (symbol, condition, quiet window, enabled) and the most recent alerts that have FIRED. Rule types: 'signal' (the engine emitted bullish/bearish), 'zone' (price came within a chosen % of the computed support/resistance), 'washout' (the engine's ENTER verdict). Use when the user asks what alerts they have set, whether anything fired, or why they did or did not get told about a move.",
+    schema: { type: "object", properties: { limit: { type: "number", description: "how many fired alerts to show (default 10, max 50)" } } },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "price_alerts")) return "[trader_alerts: price alerts are part of the Pro plan — say so plainly and point at /pricing.html rather than inventing rules.]";
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const rules = store.listRules(uid);
+        const feed = store.readFeed(uid, Math.min(Math.max(Number(i && i.limit) || 10, 1), 50));
+        const rl = rules.length
+          ? rules.map((r) => {
+            const when = r.type === "signal" ? `${String(r.direction || "any").toLowerCase()} signal`
+              : r.type === "zone" ? `within ${r.proximityPct}% of ${r.zone}`
+                : "washout confirmed (ENTER verdict)";
+            return `  ${r.symbol}: ${when} - ${r.cooldownMin}min quiet${r.enabled === false ? " - DISABLED" : ""} (id ${r.id})`;
+          }).join("\n")
+          : "  (none set)";
+        const fl = feed.length
+          ? feed.map((a) => `  ${String(a.ts).slice(0, 16).replace("T", " ")} - ${a.message}`).join("\n")
+          : "  (nothing has fired yet)";
+        return `Alert rules (${rules.length} of ${store.MAX_RULES_PER_USER}):\n${rl}\n\nRecently fired:\n${fl}`;
+      } catch (e) {
+        return `[trader_alerts error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alert_create: {
+    policy: "action", // creates a per-user alert rule — reversible, touches no money
+    user_safe: true,  // written under ctx.userId; plan-gated on price_alerts below
+    desc: "Create a watchlist alert rule for the user. Types: 'signal' (fires when the engine emits a direction — set direction BULLISH/BEARISH/ANY), 'zone' (fires when price comes within proximityPct of the computed support or resistance), 'washout' (fires on the engine's ENTER verdict). cooldownMin is the quiet window after it fires (5-1440, default 60). This places NO orders and moves no money — it only asks to be told when something happens. Confirm the symbol and condition back to the user in plain words after creating it.",
+    schema: {
+      type: "object",
+      required: ["symbol", "type"],
+      properties: {
+        symbol: { type: "string", description: "ticker, e.g. SPY" },
+        type: { type: "string", enum: ["signal", "zone", "washout"], description: "rule type" },
+        direction: { type: "string", enum: ["BULLISH", "BEARISH", "ANY"], description: "signal rules only (default ANY)" },
+        zone: { type: "string", enum: ["support", "resistance"], description: "zone rules only (default support)" },
+        proximityPct: { type: "number", description: "zone rules only: how close, in % (0.1-5, default 0.5)" },
+        cooldownMin: { type: "number", description: "quiet window in minutes after firing (5-1440, default 60)" },
+      },
+    },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "price_alerts")) return "[trader_alert_create refused: price alerts are part of the Pro plan. Tell the user plainly and point at /pricing.html — do NOT pretend the alert was created.]";
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const r = store.saveRule(uid, i || {});
+        if (!r.ok) return `[trader_alert_create refused: ${r.error}${r.cap ? ` (limit ${r.cap} rules)` : ""} — relay the refusal honestly, do not retry blindly.]`;
+        const w = r.rule.type === "signal" ? `a ${String(r.rule.direction).toLowerCase()} signal`
+          : r.rule.type === "zone" ? `price within ${r.rule.proximityPct}% of ${r.rule.zone}`
+            : "a confirmed washout (ENTER verdict)";
+        return `Alert created: ${r.rule.symbol} — ${w}, quiet for ${r.rule.cooldownMin} minutes after it fires (id ${r.rule.id}). It is evaluated on the live scan; nothing is traded by it.`;
+      } catch (e) {
+        return `[trader_alert_create error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alert_delete: {
+    policy: "action", // removes one of the user's own rules — reversible, no money
+    user_safe: true,  // deletes only within ctx.userId's own store
+    desc: "Delete one of the user's alert rules by its id (get ids from trader_alerts). Removes only the rule — no positions, orders, or money are touched.",
+    schema: { type: "object", required: ["id"], properties: { id: { type: "string", description: "the rule id from trader_alerts" } } },
+    async run(i, ctx) {
+      try {
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const ok = store.deleteRule(uid, (i && i.id) || "");
+        return ok ? `Alert rule ${i.id} deleted.` : `[trader_alert_delete: no rule with id ${i && i.id} — list them with trader_alerts rather than guessing.]`;
+      } catch (e) {
+        return `[trader_alert_delete error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_start: {
+    policy: "action", // ARMS the user's own autopilot book (operator decision, 2026-08-12)
+    user_safe: true,  // sets only ctx.userId's own book; capability-gated on ai_trader
+    desc: "ARM the autopilot on the user's own account by selecting which book runs: 'intraday' (washout entries + zone-ladder exits on liquid ETFs) or 'champion' (the diversified allocation book, rebalanced on a schedule). One account runs ONE book; selecting one pauses the other. Use only on an EXPLICIT, unambiguous instruction to start/turn on/arm the trader — never infer it from interest, a question, or a hypothetical. Before calling, tell the user in plain words what will happen: the autopilot will open and close positions on their connected account from the next scan, sized by the risk rules, with a protective stop placed at the broker on every entry. After calling, relay the returned state verbatim, INCLUDING whether real-money orders are actually armed server-side — selecting a book does not by itself make orders real. They can stop it any time with trader_pause.",
+    schema: {
+      type: "object",
+      required: ["book"],
+      properties: { book: { type: "string", enum: ["intraday", "champion"], description: "which book to run on this account" } },
+    },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "ai_trader")) return "[trader_start refused: the autonomous trader is part of the Pilot plan. Say so plainly and point at /pricing.html — do NOT claim the trader was started.]";
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const want = String((i && i.book) || "").toLowerCase();
+        // The tool's vocabulary is the product's ('intraday'), the store's is
+        // historical ('stock') — map rather than leak the internal name.
+        const mode = want === "champion" ? "champion" : want === "intraday" ? "stock" : null;
+        if (!mode) return "[trader_start refused: book must be 'intraday' or 'champion'. Ask which one rather than picking for them.]";
+        const traderMode = require("./trader-mode");
+        const before = traderMode.get(uid);
+        if (!traderMode.set(uid, mode)) return "[trader_start: the mode switch refused the change — report the failure honestly rather than claiming it started.]";
+        const live = process.env.TRADER_LIVE === "1";
+        const autoExec = process.env.TRADER_AUTO_EXECUTE === "1";
+        const halt = require("./trading-guard").haltFile();
+        const label = mode === "champion" ? "Champion (diversified allocation book)" : "Intraday (washout entries, zone-ladder exits)";
+        return [
+          `Autopilot ARMED on this account: ${label}${before === "off" ? "" : ` (was: ${before})`}. It begins acting on the next scan, within about a minute, and places a protective stop at the broker on every entry.`,
+          halt
+            ? `BUT a halt file is present (${halt}) — while it exists every order is refused, so nothing will actually be placed. Say this plainly.`
+            : autoExec && live
+              ? "Autonomous execution and real-money orders are both armed server-side, so these will be REAL orders."
+              : `Server-side arming is incomplete — autonomous execution is ${autoExec ? "ON" : "OFF"} and real-money orders are ${live ? "ON" : "OFF"}, so it will decide and journal but ${live ? "" : "NOT "}place real orders. Do not tell the user real money is at stake unless both are ON.`,
+          "They can stop it at any time by asking to pause the trader.",
+        ].join("\n");
+      } catch (e) {
+        return `[trader_start error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_pause: {
+    policy: "action", // the safety direction: always available, never plan-gated
+    user_safe: true,  // sets only ctx.userId's own book; NOT capability-gated on
+                      // purpose — stopping is risk-reducing and must never be
+                      // withheld from someone whose account is being traded
+    desc: "PAUSE the autopilot — set the active book to OFF so it opens no new positions and closes nothing further. Use when the user says stop/pause/turn it off/halt trading. Always available: unlike starting it (trader_start, which is a Pilot capability), stopping is never gated, because someone whose account is being traded must always be able to stop it. Existing positions and their broker-side protective stops REMAIN in place and become the user's to manage — say that explicitly. Takes effect on the next scan, within about a minute.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const traderMode = require("./trader-mode");
+        const before = traderMode.get(uid);
+        if (before === "off") return "The autopilot is already OFF — it is opening and closing nothing. Existing positions and their broker stops are unchanged and remain yours to manage.";
+        if (!traderMode.set(uid, "off")) return "[trader_pause: the mode switch refused the change — report the failure honestly rather than claiming it stopped.]";
+        return `Autopilot PAUSED (was: ${before}). It will open no new positions and will not close anything further; this takes effect on the next scan, within about a minute. Open positions and their broker-side protective stops stay in place and are now yours to manage — pausing does NOT flatten anything. Ask to start it again whenever you want.`;
+      } catch (e) {
+        return `[trader_pause error: ${e.message}]`;
+      }
+    },
+  },
 };
 
 const TOOL_NAMES = Object.keys(REGISTRY);
@@ -1660,7 +2065,11 @@ function capabilityManifest({
         description: entry.desc,
         input_schema: entry.schema,
         policy: entry.policy,
-        operator_required: entry.policy !== "read",
+        // The REAL access tier, matching the runTool gate — not a policy proxy.
+        // (A user_safe action tool is available to any signed-in user, so the old
+        // `policy !== "read"` reading of it would have been wrong.)
+        access: entry.guest_safe === true ? "guest" : entry.user_safe === true ? "signed_in" : "operator",
+        operator_required: entry.guest_safe !== true && entry.user_safe !== true,
         surface_availability: {
           dream_chat: true,
           mcp: true,
@@ -1684,6 +2093,10 @@ function _outcome(status, tool, details = {}) {
     policy: details.policy || null,
     ...(details.result !== undefined ? { result: details.result } : {}),
     ...(details.error ? { error: details.error } : {}),
+    // #3070 — the approval challenge for a gated call: { token, tool, input }. Explicitly
+    // whitelisted (this builder deliberately drops unknown fields) so the UI can render an
+    // approve control and echo the token back on the next turn.
+    ...(details.approval ? { approval: details.approval } : {}),
     receipt: {
       schema_version: RECEIPT_SCHEMA_VERSION,
       tool,
@@ -1752,6 +2165,194 @@ function _validateArgs(schema, input) {
   return errs.length ? errs.join("; ") : null;
 }
 
+// ── Tool-call argument REPAIR (#3068) ────────────────────────────────────────
+// _validateArgs (#2753) rejects a malformed call, which costs the model a whole step to
+// discover a mistake that is usually mechanical and unambiguous: args sent as a JSON
+// STRING, a number sent as "5", a key cased/snake-cased differently than the schema, a
+// single value where an array is wanted. The AI SDK's answer (experimental_repairToolCall)
+// re-prompts the model; that is a second round-trip for a fix we can make deterministically.
+// So: repair what is UNAMBIGUOUS, re-validate, and only reject what we genuinely cannot fix.
+// Every repair is reported (never silent) so it stays observable in the tool log.
+
+// "max_results" / "maxResults" / "Max-Results" → "maxresults" for schema-key matching.
+function _normKey(k) { return String(k).toLowerCase().replace(/[_\-\s]/g, ""); }
+
+function _coerceScalar(want, v) {
+  const t = Array.isArray(v) ? "array" : typeof v;
+  if (want === "string" && (t === "number" || t === "boolean")) return String(v);
+  if ((want === "number" || want === "integer") && t === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+    const n = Number(v);
+    if (want === "integer") return Number.isInteger(n) ? n : Math.trunc(n);
+    return n;
+  }
+  if (want === "boolean" && t === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  // A JSON string where an object/array is wanted — the single most common wire mistake.
+  if ((want === "array" || want === "object") && t === "string") {
+    try {
+      const parsed = JSON.parse(v);
+      const pt = Array.isArray(parsed) ? "array" : typeof parsed;
+      if (pt === want) return parsed;
+    } catch { /* not JSON — fall through */ }
+  }
+  // A lone value where a list is wanted.
+  if (want === "array" && (t === "string" || t === "number" || t === "boolean")) return [v];
+  return undefined;   // no unambiguous repair
+}
+
+/**
+ * Best-effort, deterministic repair of tool-call arguments against a JSON schema.
+ * Returns { input, repairs[] } — `input` unchanged and `repairs` empty when nothing applied.
+ * Never throws; never guesses semantics (unknown keys and ambiguous cases are left alone).
+ */
+function _repairArgs(schema, rawInput) {
+  const repairs = [];
+  let input = rawInput;
+
+  // (a) The whole argument blob arrived as a JSON string.
+  if (typeof input === "string") {
+    try {
+      const parsed = JSON.parse(input);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        input = parsed;
+        repairs.push("parsed JSON-string arguments");
+      }
+    } catch { /* leave it — validation will report */ }
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { input: rawInput, repairs: [] };
+  if (!schema || schema.type !== "object") return { input, repairs };
+
+  const props = schema.properties || {};
+  const propKeys = Object.keys(props);
+  if (!propKeys.length) return { input, repairs };
+
+  // (b) Args wrapped in a redundant envelope: {input:{…}} / {args:{…}} / {arguments:{…}},
+  // but only when the wrapper's contents actually look like this tool's arguments.
+  const inKeys = Object.keys(input);
+  if (inKeys.length === 1 && ["input", "args", "arguments", "parameters", "params"].includes(_normKey(inKeys[0]))) {
+    const inner = input[inKeys[0]];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)
+        && Object.keys(inner).some((k) => propKeys.some((p) => _normKey(p) === _normKey(k)))) {
+      input = inner;
+      repairs.push(`unwrapped '${inKeys[0]}' envelope`);
+    }
+  }
+
+  const out = { ...input };
+
+  // (c) Key casing / snake-vs-camel mismatches → the schema's exact key. Skipped whenever
+  // it would be ambiguous (two input keys normalizing onto one schema key, or the correct
+  // key already present).
+  for (const k of Object.keys(out)) {
+    if (props[k]) continue;                                   // already exact
+    const matches = propKeys.filter((p) => _normKey(p) === _normKey(k));
+    if (matches.length !== 1) continue;                       // no match, or ambiguous
+    const target = matches[0];
+    if (out[target] !== undefined) continue;                  // don't clobber a real value
+    const collisions = Object.keys(out).filter((o) => _normKey(o) === _normKey(k));
+    if (collisions.length !== 1) continue;                    // two aliases for one key
+    out[target] = out[k];
+    delete out[k];
+    repairs.push(`renamed '${k}' → '${target}'`);
+  }
+
+  // (d) Type coercions for values that are unambiguously the right thing in the wrong shape.
+  for (const [k, v] of Object.entries(out)) {
+    const want = props[k] && props[k].type;
+    if (!want || v === undefined || v === null) continue;
+    const t = Array.isArray(v) ? "array" : typeof v;
+    const already = want === "integer" ? (t === "number" && Number.isInteger(v))
+      : want === "object" ? (t === "object" && !Array.isArray(v))
+      : t === want;
+    if (already) continue;
+    const fixed = _coerceScalar(want, v);
+    if (fixed !== undefined) {
+      out[k] = fixed;
+      repairs.push(`coerced '${k}' to ${want}`);
+    }
+  }
+
+  return { input: out, repairs };
+}
+
+// ── Human-in-the-loop approval for side-effectful tools (#3070) ──────────────
+// Tool execution is ON by default now, so the model can reach for a repo-mutating, shell or
+// money-spending tool without anyone having said yes to that specific action. Operator-gating
+// answers "who may use this tool at all"; it does NOT answer "did a human agree to THIS call".
+// Vercel v6 (needsApproval), assistant-ui and Jan all pause the loop for exactly that.
+//
+// Shape chosen to fit an SSE stream, which is one-directional and cannot block mid-turn for
+// input: a gated call is NOT executed. It returns a coded `approval_required` outcome that
+// carries a token, the model reports what it wants to do, and the UI renders an approve
+// control. Re-sending the turn with that token in `approvals` executes it. Nothing is held
+// open, and a refused/ignored approval simply never runs.
+//
+// The token binds tool name AND arguments, so approving "Write to notes.md" can never be
+// replayed to authorise "Write to server.js".
+function approvalToken(name, input) {
+  const canonical = JSON.stringify(input === undefined ? {} : input, Object.keys(input || {}).sort());
+  // require("crypto") explicitly: the bare global `crypto` in modern Node is WebCrypto,
+  // which has no createHash(). "\u0000" is an explicit domain separator so a tool name
+  // and an argument blob can never concatenate into the same string as a different pair.
+  return require("crypto").createHash("sha256")
+    .update(String(name) + "\u0000" + canonical).digest("hex").slice(0, 16);
+}
+
+function _grantedTokens(ctx) {
+  const g = ctx && ctx.approvals;
+  if (!g) return [];
+  if (Array.isArray(g)) return g.map(String);
+  if (g instanceof Set) return [...g].map(String);
+  if (typeof g === "string") return g.split(/[,\s]+/).filter(Boolean);
+  return [];
+}
+
+// NOTE: there is deliberately ONE approval path — the pending store below. An earlier
+// version also matched a token directly against freshly-computed args, which quietly made
+// approvals reusable: identical args re-derive the same token every turn, so that path could
+// never be consumed. Everything now goes through the consumable store.
+
+// Pending gated calls, keyed by token. A model asked to retry a call rarely reproduces
+// byte-identical arguments (it rephrases a prompt, reorders a sentence), so a purely
+// arg-bound token would almost never match on the approving turn — the user would click
+// Approve and be asked again. Worse, matching loosely would let the model swap in different
+// arguments after a human had already said yes.
+//
+// So the approved call is remembered here and REPLAYED verbatim: the user authorises exactly
+// the call they were shown, and that is exactly what runs, whatever the model re-emits.
+// In-memory only (approvals must not outlive the process), TTL-bounded and size-capped.
+const _PENDING_APPROVALS = new Map();
+const _APPROVAL_TTL_MS = 15 * 60 * 1000;
+const _APPROVAL_MAX = 200;
+
+function _rememberPending(token, name, input) {
+  const now = Date.now();
+  for (const [k, v] of _PENDING_APPROVALS) if (now - v.at > _APPROVAL_TTL_MS) _PENDING_APPROVALS.delete(k);
+  if (_PENDING_APPROVALS.size >= _APPROVAL_MAX) _PENDING_APPROVALS.delete(_PENDING_APPROVALS.keys().next().value);
+  _PENDING_APPROVALS.set(token, { tool: name, input, at: now });
+}
+
+/**
+ * The approved arguments for *name*, if the caller holds a live token for it.
+ * ONE-SHOT: the entry is consumed, so one approval authorises one execution. Without that,
+ * a token echoed on every subsequent turn would let the same side-effectful call re-run
+ * indefinitely off a single click.
+ */
+function _approvedInputFor(name, ctx) {
+  for (const t of _grantedTokens(ctx)) {
+    const e = _PENDING_APPROVALS.get(t);
+    // Same tool only — a token for generate_image can never authorise a Write.
+    if (e && e.tool === name && Date.now() - e.at <= _APPROVAL_TTL_MS) {
+      _PENDING_APPROVALS.delete(t);
+      return e.input;
+    }
+  }
+  return undefined;
+}
+
 // Is `name` gated for this run? (#2777) The gate set is the union of the env
 // CHAT_EVAL_GATED_TOOLS (comma/space-separated) and ctx.gatedTools (array or set),
 // case-insensitive. Used to enforce per-faculty measurement validity in capability
@@ -1803,19 +2404,40 @@ async function runTool(name, input, ctx = {}) {
     return result;
   }
 
-  // Non-operators (e.g. public-server guests) may run ONLY guest_safe tools —
-  // the web-only set. This is the enforcement boundary behind the advertised-set
-  // filter: even a crafted call to a read-policy filesystem tool (Read/Grep/
-  // workspace_read/…) is denied for guests, so the public chat can't enumerate or
-  // read local files. Operators (loopback/admin) are unrestricted. (#1213)
-  if (!ctx.operator && entry.guest_safe !== true) {
-    const result = _outcome("denied", name, {
-      reason_code: "operator_required",
-      policy: entry.policy,
-      error: `'${name}' (${entry.policy}) requires operator access`,
-    });
-    await _logToolExecution(name, input, "denied", "operator_required", startTime, ctx);
-    return result;
+  // THREE ACCESS TIERS (#1213, extended for hosted users).
+  //
+  //   guest_safe  — anyone, signed in or not (the web-only set)
+  //   user_safe   — a SIGNED-IN user, and only over their OWN per-user state
+  //   (neither)   — operator only (loopback / operator token)
+  //
+  // The middle tier exists because the hosted site has no operators: `operator`
+  // means un-proxied loopback or the operator token, so on unisona.ai every real
+  // customer was denied every non-guest tool — including tools about their own
+  // account. A tool may only be marked `user_safe` when the data it returns is
+  // scoped by ctx.userId; anything reading a SHARED store (e.g. the autopilot's
+  // single un-attributed trade ledger) must stay operator-only, or one user's
+  // question would answer with another's book.
+  //
+  // Plan entitlements are NOT enforced here — a tool whose feature is plan-gated
+  // checks its own capability (see _hasCapability), so chat can never become a
+  // way around the plan matrix.
+  if (!ctx.operator) {
+    const signedIn = Boolean(ctx.userId);
+    const allowed = entry.guest_safe === true || (entry.user_safe === true && signedIn);
+    if (!allowed) {
+      // A user_safe tool refused purely for want of a session gets the honest
+      // reason (sign in), not the misleading "operator access" one.
+      const reasonCode = entry.user_safe === true ? "sign_in_required" : "operator_required";
+      const result = _outcome("denied", name, {
+        reason_code: reasonCode,
+        policy: entry.policy,
+        error: reasonCode === "sign_in_required"
+          ? `'${name}' needs you to be signed in — it reads your own account state`
+          : `'${name}' (${entry.policy}) requires operator access`,
+      });
+      await _logToolExecution(name, input, "denied", reasonCode, startTime, ctx);
+      return result;
+    }
   }
 
   // Per-faculty tool gating for capability evals (#2777). Burnell et al. §4.3: if a
@@ -1835,7 +2457,23 @@ async function runTool(name, input, ctx = {}) {
 
   // Validate arguments against the tool's own schema (#2753) — reject with a coded,
   // model-facing error rather than running the tool with silently-dropped args.
-  const argErr = _validateArgs(entry.schema, input);
+  // #3068: before rejecting, try a deterministic repair of the mechanical mistakes
+  // (JSON-string args, "5" for 5, key casing, scalar-for-array). A repair is only accepted
+  // when it makes the call actually VALID, and what was changed is reported in the log —
+  // so this fixes wasted steps without ever silently changing what the model asked for.
+  let argErr = _validateArgs(entry.schema, input);
+  if (argErr) {
+    const { input: repaired, repairs } = _repairArgs(entry.schema, input);
+    if (repairs.length) {
+      const afterErr = _validateArgs(entry.schema, repaired);
+      if (!afterErr) {
+        input = repaired;
+        argErr = null;
+        console.warn(`[ToolRunner] repaired arguments for '${name}': ${repairs.join(", ")}`);
+        try { ctx && typeof ctx.onArgRepair === "function" && ctx.onArgRepair(name, repairs); } catch { /* observer must not break the call */ }
+      }
+    }
+  }
   if (argErr) {
     const result = _outcome("unavailable", name, {
       reason_code: "invalid_arguments",
@@ -1844,6 +2482,31 @@ async function runTool(name, input, ctx = {}) {
     });
     await _logToolExecution(name, input, "unavailable", "invalid_arguments", startTime, ctx);
     return result;
+  }
+
+  // Human-in-the-loop gate (#3070). Deliberately AFTER argument repair/validation, so the
+  // token is computed over the exact arguments that would run — a human approves the real
+  // call, not a malformed version of it that repair would later rewrite.
+  if (entry.needsApproval) {
+    // Holding a live token for this tool means the user already approved a call the model is
+    // now retrying (usually with rephrased arguments). Replay the APPROVED arguments — what
+    // the human saw is what runs — rather than asking again or trusting the new ones.
+    const approvedInput = _approvedInputFor(name, ctx);   // one-shot: consumes the approval
+    if (approvedInput !== undefined) {
+      input = approvedInput;
+    } else {
+      const token = approvalToken(name, input);
+      _rememberPending(token, name, input);
+      const result = _outcome("unavailable", name, {
+        reason_code: "approval_required",
+        policy: entry.policy,
+        approval: { token, tool: name, input },
+        error: `'${name}' needs the user's approval before it runs. Nothing has been executed. `
+          + `Tell the user exactly what you intend to do and ask them to approve it.`,
+      });
+      await _logToolExecution(name, input, "unavailable", "approval_required", startTime, ctx);
+      return result;
+    }
   }
 
   try {
@@ -1874,6 +2537,16 @@ async function runTool(name, input, ctx = {}) {
   }
 }
 
+// Which tools a caller may SEE. Mirrors the runTool gate exactly (guest_safe →
+// anyone; user_safe → signed in; otherwise operator), so the advertised surface
+// never offers a model a tool its own execution gate would refuse. (#1213 tiers)
+function _visibleToolNames({ operator = false, signedIn = false } = {}) {
+  return TOOL_NAMES.filter((name) => {
+    const e = REGISTRY[name];
+    return operator || e.guest_safe === true || (e.user_safe === true && signedIn);
+  });
+}
+
 // ── native Anthropic tool schemas (same single source of truth as the preamble) ──
 // Renders the registry as `tools` for the Messages API. Cloud models (Haiku/Sonnet)
 // emit native `tool_use` blocks, so they don't need the free-text preamble — they get
@@ -1881,9 +2554,8 @@ async function runTool(name, input, ctx = {}) {
 // (web-only) tools so a public-server guest's model never even sees the filesystem/
 // shell/mutating tools (runTool still enforces guest_safe regardless — this just keeps
 // the advertised surface honest). (#1213)
-function anthropicTools({ operator = false } = {}) {
-  return TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+function anthropicTools({ operator = false, signedIn = false } = {}) {
+  return _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       name,
       description: REGISTRY[name].desc,
@@ -1895,9 +2567,8 @@ function anthropicTools({ operator = false } = {}) {
 // (chat/completions `tools`). OpenAI-compatible providers (GPT, Grok) emit native
 // `tool_calls`, so they use this instead of the free-text preamble. Operator filter
 // matches anthropicTools — runTool still enforces policy regardless.
-function openaiTools({ operator = false } = {}) {
-  return TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+function openaiTools({ operator = false, signedIn = false } = {}) {
+  return _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       type: "function",
       function: {
@@ -1912,7 +2583,7 @@ function openaiTools({ operator = false } = {}) {
 // accepts an OpenAPI-subset schema; our schemas are already that subset, but we strip
 // any keys Gemini rejects (e.g. additionalProperties) defensively. One element with all
 // declarations, matching Gemini's expected shape.
-function geminiTools({ operator = false } = {}) {
+function geminiTools({ operator = false, signedIn = false } = {}) {
   const clean = (schema) => {
     if (!schema || typeof schema !== "object") return schema;
     const { additionalProperties, $schema, ...rest } = schema;
@@ -1923,8 +2594,7 @@ function geminiTools({ operator = false } = {}) {
     }
     return rest;
   };
-  const functionDeclarations = TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+  const functionDeclarations = _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       name,
       description: REGISTRY[name].desc,
@@ -2052,4 +2722,8 @@ module.exports = {
   TOOL_NAMES,
   CAPABILITY_SCHEMA_VERSION,
   RECEIPT_SCHEMA_VERSION,
+  // Exposed for unit testing the pre-execution arg guard (#2753 validate / #3068 repair).
+  _validateArgs,
+  approvalToken,
+  _repairArgs,
 };

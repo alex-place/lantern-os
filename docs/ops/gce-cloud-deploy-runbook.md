@@ -4,10 +4,27 @@ Operational record of the live single-tenant cloud deployment of `master` on Goo
 Compute Engine, fronted by Cloudflare. This is the first concrete instance of the
 [ADR-0018](../adr/0018-web-tier-split-and-cloud-multi-tenancy.md) GCE origin decision.
 
-> **Status: manual deploy, no CI/CD.** The VM is a one-time `git clone`; merges to
-> `master` do **not** reach it automatically. Update it with the steps in
-> [Updating the running app](#updating-the-running-app). Provider secrets live in
-> systemd drop-ins on the box, never in the repo.
+> **Status: release-gated self-update.** The VM does **not** track `master` — merges
+> alone never reach it. It moves when a **GitHub Release is published**: a
+> `systemd` timer polls `releases/latest` every 15 minutes, checks out the new tag,
+> reinstalls deps and restarts `lantern.service`. So shipping a change to prod
+> means cutting a release (`/release`), not merging. See
+> [`ops/gce/README.md`](../../ops/gce/README.md) for the mechanism and
+> [Updating the running app](#updating-the-running-app) for the manual override.
+>
+> Provider secrets live in systemd drop-ins on the box, never in the repo, and are
+> untouched by the tag checkout.
+>
+> Verified on the box 2026-07-31: `lantern-release-deploy.timer` is `enabled` +
+> `active` (15-minute cadence), and a forced run rolled prod v1.14.0 → v1.14.1.
+> (This block previously read "manual deploy, no CI/CD … one-time git clone",
+> which contradicted `ops/gce/README.md` and is what #3119 flagged.)
+
+**Force a deploy now** instead of waiting for the timer:
+
+```bash
+gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48   --command="sudo systemctl start lantern-release-deploy.service"
+```
 
 ## What's running
 
@@ -89,11 +106,62 @@ guaranteed 404 and this box had no working chat fallback at all.
 | `google.conf` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | `providers.conf` | `PATREON_CLIENT_ID`, `PATREON_CLIENT_SECRET`, `PATREON_CAMPAIGN_ID` |
 | `discord.conf` | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` |
+| `mail.conf` | `RESEND_API_KEY`, `MAIL_FROM`, `PUBLIC_BASE_URL` — see [Transactional email](#transactional-email-resend) |
 
 Values were copied from the operator's `lantern-os-stable/.env.local`. `SESSION_SECRET`
 is required because the app fail-closes when bound beyond loopback without one.
 
 After editing any drop-in: `sudo systemctl daemon-reload && sudo systemctl restart lantern.service`.
+
+## Transactional email (Resend)
+
+Signup confirmation and password-reset mail goes out via **Resend's HTTPS API**, not SMTP —
+cloud hosts (GCE included) throttle SMTP egress, which is a classic silent cause of
+"the confirmation email never arrived". `lib/mailer.js` picks Resend whenever
+`RESEND_API_KEY` is set, falls back to SMTP, and finally to a dev outbox.
+
+**The dev fallback is the failure mode to watch for.** With no provider configured the
+mailer does not error — it appends to `data/mail-outbox.jsonl` and the signup path
+*auto-admits accounts without proving email ownership* (#2065). A prod box with no
+`mail.conf` therefore looks healthy while silently sending nothing.
+
+```bash
+sudo tee /etc/systemd/system/lantern.service.d/mail.conf >/dev/null <<EOF
+[Service]
+Environment="RESEND_API_KEY=re_..."
+Environment="MAIL_FROM=unisona.ai <no-reply@unisona.ai>"
+Environment="PUBLIC_BASE_URL=https://unisona.ai"
+EOF
+sudo chmod 600 /etc/systemd/system/lantern.service.d/mail.conf
+sudo systemctl daemon-reload && sudo systemctl restart lantern.service
+```
+
+- **`MAIL_FROM` must be on a domain verified in the Resend dashboard.** Check with
+  `curl -H "Authorization: Bearer $RESEND_API_KEY" https://api.resend.com/domains` — the
+  domain needs `"status":"verified"` and `"sending":"enabled"`. `unisona.ai` was verified
+  2026-07-28. An unverified sender fails the send, not the signup, so it surfaces only in
+  the journal.
+- **`PUBLIC_BASE_URL` is required here, not optional.** Without it `lib/base-url.js` builds
+  verification and password-reset links from the request `Host` header, which is spoofable —
+  a forged Host points a genuine confirmation email at an attacker's domain (#2604). It
+  belongs in prod only; loopback dev is handled natively and setting it locally would aim
+  dev links at production.
+
+### Verifying
+
+`scripts/test-email.mjs` reads `.env`/`.env.local` and will **not** see the systemd
+environment, so it reports `dev` on this box and is not a valid prod check. Test the app
+instead — a real signup at `https://unisona.ai/auth.html` with an address you can read:
+
+```bash
+sudo journalctl -u lantern.service -n 50 --no-pager | grep -i mailer
+```
+
+A correctly configured box logs nothing there; a broken key or unverified sender logs
+`[mailer] resend send failed to …` with Resend's reason (never the key). The signup
+response itself is the other tell: `202 pendingVerification` with `"emailDelivery":"sent"`
+and no `devVerifyLink` means the hard gate is active (#3021), whereas `201` means the box
+fell through to the no-mailer auto-admit path.
 
 ### OAuth redirect URIs (register on each provider)
 
@@ -167,9 +235,51 @@ sudo chmod 600 /etc/systemd/system/cloudflared-unisona.service
 sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-unisona
 ```
 
+## When production is deliberately offline
+
+`ops/production-status.json` is the switch. Set `"paused": true` (with a reason and a
+date) and the **hourly** `deployment-verify` schedule stops running; release runs and
+manual `workflow_dispatch` runs are never paused, because there someone is explicitly
+asserting that a host should be serving.
+
+This exists because an alarm that is permanently red is not an alarm. On 2026-08-14 the
+GCP project was suspended for billing, production went dark, and the hourly check failed
+every hour for four days — correctly, and to no one. If the host is going to stay down
+(local-only piloting, a planned migration, a cost pause), pause the schedule and say why,
+rather than letting the red become background noise people learn to scroll past.
+
+```bash
+# pause                       # then commit — the reason and date are the point
+python -c "import json;p='ops/production-status.json';d=json.load(open(p));d['paused']=True;json.dump(d,open(p,'w'),indent=2)"
+```
+
+Unpause by flipping it back to `false`; the next hourly tick resumes.
+
 ## Updating the running app
 
-No auto-deploy. To ship `master` (or a merged PR) to the box:
+**The box self-updates on published Releases — but *only* on Releases.** A systemd
+timer (`lantern-release-deploy.timer`, `enabled` + `active`, every 15 min) polls
+`releases/latest`; when the tag changes it checks it out, installs prod deps, and
+restarts `lantern.service`. Canonical units live in [`ops/gce/`](../../ops/gce/);
+the running script is `/usr/local/bin/lantern-release-deploy.sh` and the
+last-deployed tag is `/var/lib/lantern/deployed-release.tag`.
+
+Consequences worth knowing before you publish anything:
+
+- **Publishing a GitHub Release *is* a production deploy.** Prod rolls within ~15
+  minutes, unattended. Cut a prerelease tag (any tag with a hyphen, e.g.
+  `v1.16.0-rc1`) if you want artifacts without moving prod — those never become
+  `latest`.
+- **Merging to `master` does *not* move the box.** Only a published Release does.
+  So the manual pull below is still how you ship an unreleased `master` to prod.
+
+```bash
+# Check what the box thinks it is running, and when it next polls:
+gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48 \
+  --command='cat /var/lib/lantern/deployed-release.tag; systemctl list-timers lantern-release-deploy.timer --no-pager'
+```
+
+To ship `master` (or a merged PR) to the box ahead of a Release:
 
 ```bash
 export CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
@@ -186,6 +296,59 @@ Notes:
 - Static assets (`public/`) are served from disk — no restart needed for HTML/JS/CSS-only changes.
 - Live hotfixes applied directly to `/opt/lantern-os/...` will conflict with a pull
   until the same change lands in `master`. Prefer landing a PR, then pulling.
+- **The server writes to tracked files** (bar caches, `data/csf_memory/raw.jsonl`), so a
+  checkout can fight live data. `sudo git stash push -m "runtime state"` before switching
+  and `sudo git stash pop` after — force-checking-out discards real data.
+- Deploying a **tag** instead of `master` leaves the clone in detached HEAD; that is normal
+  (`sudo git fetch --tags origin && sudo git checkout vX.Y.Z`).
+- Run `npm install` only when dependencies actually changed:
+  `git diff <old-tag>..<new-tag> -- package.json apps/lantern-garage/package.json`.
+
+## Verifying a deploy — do not skip this
+
+A green build says the code is correct. It says **nothing** about whether this machine is
+serving. On 2026-08-14 the host ran with **zero AI providers configured** — every chat turn
+fell through to the offline reply — while CI was green the entire time, because every other
+suite boots its own server with correct test env and is structurally incapable of catching a
+broken deployment.
+
+Run the deployment suite against the live host after every deploy:
+
+```bash
+DEPLOY_BASE_URL=https://unisona.ai \
+DEPLOY_EXPECT_LIVE=1 \
+DEPLOY_EXPECT_VERSION=1.15.3 \
+npm run test:deploy
+```
+
+It asserts the host names its own build, **at least one provider is actually usable** (that
+outage, in one line), the key surfaces serve real content, and per-account trading data still
+refuses an anonymous caller. `.github/workflows/deployment-verify.yml` runs the same suite
+hourly and after every release tag, so the next one is found by us rather than by a user.
+
+Manual equivalents:
+
+```bash
+curl -s https://unisona.ai/api/version | head -c 200
+curl -s https://unisona.ai/api/providers/status | python3 -m json.tool | head -30
+```
+
+### "Feature X is dead in production" — check in this order
+
+1. `/api/version` — is it serving, and is it the tag you think?
+2. `/api/providers/status` — `summary.available: 0` means chat has no model. This is a
+   **configuration** problem on the host, not a code regression.
+3. `sudo systemctl show lantern.service -p Environment --no-pager | tr ' ' '\n'` — is the
+   config actually present? Remember there is **no `.env` file**; everything comes from the
+   drop-ins above.
+4. `sudo journalctl -u lantern.service -n 100 --no-pager` — erroring on start?
+5. Only then suspect the code.
+
+> Gemini reports `hasKey` from either wire (an AI-Studio key **or** `GEMINI_USE_VERTEX` +
+> `VERTEX_PROJECT`). Before v1.15.3 the status page only understood the key wire, so this
+> keyless host reported `no_key` for a provider that dispatched fine — a working provider
+> reading as a broken one. If you see that pattern on an older build, check the deployed tag
+> before chasing the provider.
 
 ## Provisioning from scratch
 
@@ -193,7 +356,7 @@ If the VM is lost, recreate it: create an `e2-medium` Debian-12 instance with
 `--service-account=843848914143-compute@developer.gserviceaccount.com --scopes=cloud-platform`,
 a startup script that installs Node 20 + git, clones `master`
 (`GIT_LFS_SKIP_SMUDGE=1`), `npm install`, and installs `lantern.service`. Then:
-grant `roles/aiplatform.user` to the SA, recreate the four env drop-ins, install **both**
+grant `roles/aiplatform.user` to the SA, recreate the five env drop-ins, install **both**
 cloudflared connectors — `cloudflared` for tunnel `lantern-cloud` (credentials from the
 operator's `~/.cloudflared/`) and `cloudflared-unisona` for the `ff492ab2…` unisona.ai
 tunnel (see [the cutover section](#unisonaai-tunnel-cutover-2026-07-10)) — and

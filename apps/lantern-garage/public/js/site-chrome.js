@@ -24,7 +24,29 @@
     { href: "/chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
     { href: "/work.html", label: "Work" },
+    // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
+    // fronted duplicates the Trader surface, and its only unique job was the
+    // quick-links footer. /explore.html still resolves; it just isn't nav-level.
+    // The Knowledge Center takes the freed slot: before #3107 it had no depth-1
+    // entry at all, leaving the docs surface two clicks deep and effectively
+    // undiscoverable from the home page. Labelled "Guide" (was "Docs", #3332):
+    // the page is a beginner walkthrough of what unisona is and how to use it
+    // now, not a documentation index, and "Docs" sent people looking for API
+    // reference. The href is unchanged, so every existing link still resolves.
+    { href: "/knowledgecenter.html", label: "Guide" },
+  ];
+
+  // Footer-only entries: real surfaces that don't earn a slot in the top nav but
+  // must stay click-reachable. Create used to hang off kalshi-terminal.html's
+  // hand-rolled footer; when the four per-page footers were folded into this one
+  // it would otherwise have been orphaned outright. Budget joined them (operator,
+  // 2026-08-16, #3328): the personal-budget tool is a side utility, not one of the
+  // four things the product is about, so it lost its top-nav slot — the page and
+  // its route are untouched, so /budget.html and any saved link still work.
+  var FOOTER_EXTRA_LINKS = [
+    { href: "/create.html", label: "Create" },
     { href: "/explore.html", label: "Explore" },
+    { href: "/budget.html", label: "Budget" },
   ];
 
   function navHtml() {
@@ -55,7 +77,7 @@
   }
 
   function footerHtml() {
-    var links = NAV_LINKS.map(function (l) {
+    var links = NAV_LINKS.concat(FOOTER_EXTRA_LINKS).map(function (l) {
       return '<a href="' + l.href + '">' + l.label + "</a>";
     }).join("\n    ");
     return (
@@ -72,6 +94,11 @@
       '    <span class="sep">·</span>\n' +
       '    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>\n' +
       '    <span class="visually-hidden" id="status-label">connecting…</span>\n' +
+      '    <span class="sep">·</span>\n' +
+      // Edition · version · running commit. Carried here (rather than in each
+      // page's own footer) so the four hand-rolled copies could be deleted —
+      // startVersionUpdater() below fills these the way index.html used to.
+      '    <span class="footer-meta"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></span>\n' +
       "  </div>\n" +
       "</footer>"
     );
@@ -135,6 +162,43 @@
     setInterval(apply, 30000);
   }
 
+  // Fill the footer's edition · version · commit line. Mirrors the loader that
+  // used to live inline in index.html: prefer the live git semver (reflects the
+  // running commit) over the committed /version.json, which routinely lags.
+  function startVersionUpdater() {
+    var meta = document.querySelector(".site-footer .footer-meta");
+    if (!meta) return;
+
+    function getJson(url) {
+      return fetch(url, { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });
+    }
+
+    Promise.all([getJson("/api/version"), getJson("/version.json")]).then(
+      function (res) {
+        var git = res[0] && res[0].version;
+        var version = res[1];
+        var v = (git && git.semver) || (version && version.version) || "unknown";
+        var parts = [
+          git && git.branch,
+          git && git.commit ? git.commit.slice(0, 7) : "—",
+          git && git.date ? new Date(git.date).toLocaleDateString() : "",
+        ].filter(Boolean);
+
+        var gitEl = document.getElementById("hero-git");
+        if (gitEl) gitEl.textContent = parts.join(" · ");
+
+        document.querySelectorAll("[data-version-badge]").forEach(function (el) {
+          el.textContent = (el.dataset.versionBadge || "") + "v" + v;
+          el.style.cursor = "pointer";
+          el.title = "View changelog";
+          el.onclick = function () { window.open("/changelog.html", "_blank"); };
+        });
+      }
+    );
+  }
+
   function injectChrome() {
     var body = document.body;
     if (!body) return;
@@ -166,6 +230,7 @@
     // only touch footers WE injected.
     if (footerInjected && !window.__ownStatusUpdater) {
       startStatusUpdater();
+      startVersionUpdater();
     }
 
     // Per-page extra action buttons (e.g. trading's settings, the terminal's skin toggle):

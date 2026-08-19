@@ -109,6 +109,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/swebench_verifier_harness.py` | registered here (docs: BENCHMARKS.md) | `python scripts/swebench_verifier_harness.py` |
 | `scripts/eval_paired_diff.py` | registered here (docs: BENCHMARKS.md) | `python scripts/eval_paired_diff.py` |
 | `scripts/eval_dashboard.py` | registered here — generates the tracked eval-dashboard artifact | `python scripts/eval_dashboard.py` |
+| `scripts/eval_cadence.py` | registered here (#2766) — ranks the next eval run (unsaturated + most-stale first) and stamps `docs/BENCHMARKS.md` | `python scripts/eval_cadence.py --stamp` |
 | `scripts/measure_drift_equivalence.py` | `tests/test_drift_equivalence.py` | `python scripts/measure_drift_equivalence.py` |
 | `scripts/serve_minicheck.py` | registered here — MiniCheck groundedness provider (PROVIDERS.md; wire a launcher or retire, audit §3) | `python scripts/serve_minicheck.py` |
 
@@ -133,6 +134,8 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/fetch_taco.py` | registered here — VTD Phase-1 scale corpus (TACO-verified, Apache lineage; stdio problems); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_taco.py --difficulty EASY` |
 | `scripts/train_qlora_qwen_coder.py` | registered here — VTD Phase-1 tiny-coder QLoRA trainer (ADR-0030) | `.venv-train python scripts/train_qlora_qwen_coder.py` |
 | `scripts/eval_qwen_coder.py` | registered here — VTD Phase-1 held-out lift eval (ADR-0030) | `.venv-train python scripts/eval_qwen_coder.py` |
+| `scripts/spiral_build_self_train.py` | registered here — builds the replay-balanced, reward-weighted SFT set from the spiral escalation corpus (`data/eval/spiral/*.jsonl` → `self-train/`); consumes the `spiral-harness.js` sink | `python scripts/spiral_build_self_train.py` (`--dry-run` for report only) |
+| `scripts/spiral_oracle_ceiling.py` | registered here (#2998 slice 3) — replays `data/eval/cascade/*.jsonl` to measure the oracle-router ceiling (rented-frontier calls a perfect router would save) before building a learned router | `python scripts/spiral_oracle_ceiling.py` |
 | `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/convert_fc_dataset.py` | `scripts/retrain-combined.ps1` | via launcher |
 | `scripts/extract-session-pairs.py` | `scripts/continual-train.ps1` | via launcher |

@@ -53,6 +53,13 @@ function cfg() {
     optionLadder: String(process.env.OVERNIGHT_OPTION_LADDER || '0.25,0.5,1,1.5,2')
       .split(',').map((x) => parseFloat(x)).filter((x) => Number.isFinite(x) && x > 0),
     optionQty: Math.max(1, Math.min(10, n('OVERNIGHT_OPTION_QTY', 1))),
+    // RESTING PROTECTIVE EXIT (2026-07-29 post-mortem): the engine's exit lives in
+    // this process, so a dead process = a position with no exit (a 0-DTE ladder
+    // expired worthless, -$2,006). At entry each leg now also rests a GTC SELL
+    // LIMIT at +protectTargetPct% on the BROKER, which survives the process
+    // entirely. It is a safety net, NOT the strategy: the 09:31 window is still
+    // the primary exit and cancels the resting order before selling. 0 disables.
+    protectTargetPct: n('OVERNIGHT_PROTECT_TARGET_PCT', 50),
     // "Find the edge BEFORE entering" (operator rule): even when ARMED, a sleeve may
     // only place real orders after its OWN live ledger shows positive expectancy over
     // ≥ edgeMinN nights — until then that sleeve keeps trading dry, building the
@@ -189,6 +196,21 @@ function _append(rec) {
   try { fs.mkdirSync(path.dirname(LEDGER), { recursive: true }); fs.appendFileSync(LEDGER, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + '\n'); }
   catch (_e) { /* ledger must never break the tick */ }
 }
+// One heartbeat row per ET day: proof the scheduler reached the engine at all.
+// Cheap (deduped by date) and the difference between "declined" and "never ran".
+function _heartbeat(state) {
+  try {
+    const { today } = _etParts();
+    _appendOnce('hb_' + today + '_' + state, { phase: 'heartbeat', date: today, state });
+  } catch (_e) { /* never break the tick */ }
+}
+// Append a row at most once per key for the life of the process.
+const _seenKeys = new Set();
+function _appendOnce(key, rec) {
+  if (_seenKeys.has(key)) return;
+  _seenKeys.add(key);
+  _append(rec);
+}
 function _readState() { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (_e) { return {}; } }
 function _writeState(st) { try { fs.mkdirSync(path.dirname(STATE), { recursive: true }); fs.writeFileSync(STATE, JSON.stringify(st)); } catch (_e) { /* */ } }
 function _etNow() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); }
@@ -235,12 +257,58 @@ function _readLedger() {
 /** One scheduler tick — called from the autoscan loop (fail-soft). */
 async function tick({ bridge } = {}) {
   const c = cfg();
-  if (!c.enabled || !bridge) return;
+  if (!c.enabled || !bridge) {
+    // Even a disabled/bridge-less tick is worth one line per day: silence is
+    // indistinguishable from a dead scheduler (2026-07-29: the process died
+    // before the exit window and the position expired worthless — nobody knew
+    // until the next morning).
+    _heartbeat(!c.enabled ? 'disabled' : 'no_bridge');
+    return;
+  }
   const { dow, hm, today } = _etParts();
   const st = _readState();
+  _heartbeat('alive');
+
+  // WINDOW EVALUATED — the entry window must ALWAYS record its verdict. It
+  // previously logged only when it entered or when a gate failed, so a window
+  // that never ran and a window that correctly declined looked identical in the
+  // ledger (operator, 2026-07-30: an entry window produced no row at all).
+  if (dow >= 1 && dow <= 4 && hm >= 1545 && hm <= 1559) {
+    const already = st.lastEnterDate === today;
+    const holding = !!st.open;
+    if (already || holding) {
+      _appendOnce('window_' + today, {
+        phase: 'window', date: today, entered: already, holding,
+        why: already ? 'already entered today' : 'still holding a prior night — no new entry',
+      });
+    }
+  }
 
   // EXIT WINDOW (09:31–09:50 ET): flatten last night's legs at ≈the open.
-  if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
+  //
+  // CATCH-UP TO 15:55 (2026-07-29 post-mortem): this used to be the ONLY exit
+  // path, gated to a 20-minute window. The process was down across that window,
+  // nothing ran, and a 10-leg 0-DTE call ladder EXPIRED WORTHLESS — a −$2,006
+  // total loss on a position that was never given an exit. The server was back
+  // by 15:38 ET, still inside the session, so a late exit would have sold them.
+  // A missed window must degrade to a worse fill, never to no exit at all: any
+  // tick that finds a position from a PRIOR date now exits it for the rest of
+  // the session, flagged `late` so the ledger separates catch-ups from clean
+  // 09:31 exits and the measured expectancy isn't quietly polluted by them.
+  const staleOpen = !!(st.open && st.open.date !== today);
+  const inExitWindow = hm >= 931 && hm <= 950;
+  const inCatchUp = hm > 950 && hm <= 1555;      // rest of the session, before the close
+  if (staleOpen && (inExitWindow || inCatchUp)) {
+    const lateExit = !inExitWindow;
+    if (lateExit) {
+      _appendOnce('late_' + today, {
+        phase: 'late_exit_start', date: today, opened: st.open.date, hm,
+        why: 'position survived past the 09:31-09:50 window (engine down or stalled) — exiting now rather than letting it ride/expire',
+      });
+    }
+    // Legs we could NOT safely close this pass (e.g. the naked-short guard) stay
+    // in state so the next tick retries them instead of losing track of them.
+    const remainingLegs = [];
     const { brokerFacadeFor } = require('./broker-facade');
     const yahoo = require('./market-data-yahoo');
     const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
@@ -266,13 +334,37 @@ async function tick({ bridge } = {}) {
         const bid = (q && q.bid) || 0;
         const pl = leg.ref_close > 0 ? +(((bid - leg.ref_close) / leg.ref_close) * 100).toFixed(2) : null;
         let status = 'dry';
+        // RETIRE THE RESTING PROTECTIVE SELL FIRST. A resting sell that outlives
+        // its position goes NAKED SHORT on its next fill, so this is ordered and
+        // guarded: if the cancel fails we do NOT sell — better to leave the
+        // protective order working (it can still take profit) than to risk two
+        // sells against one long. A 404 means it already filled or expired, which
+        // is a successful outcome: nothing is resting.
+        let protectRetired = true;
+        if (leg.placed && leg.protect_order_id) {
+          const cr = await ox.cancelPaperOrder(leg.protect_order_id).catch((e) => ({ error: e.message }));
+          protectRetired = !!(cr && cr.ok);
+          if (cr && cr.alreadyGone) {
+            // The net caught it: the take-profit filled while we were away.
+            _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: leg.protect_target,
+              pl_pct_est: leg.ref_close > 0 ? +(((leg.protect_target - leg.ref_close) / leg.ref_close) * 100).toFixed(2) : null,
+              status: 'protective_fill', dry: false, late: lateExit });
+            continue;
+          }
+          if (!protectRetired) {
+            _append({ phase: 'exit_blocked', date: st.open.date, ...leg, status: 'protect_cancel_failed',
+              why: 'could not cancel the resting protective sell — refusing to sell twice (naked-short guard); it stays working' });
+            remainingLegs.push(leg);
+            continue;
+          }
+        }
         if (leg.placed) {
           const r = bid > 0
             ? await ox.placePaperOrder({ contract: leg.contract, side: 'sell', qty: leg.qty, limit: bid }).catch((e) => ({ error: e.message }))
             : { error: 'no bid — leg left to expire worthless' };
           status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
         }
-        _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: bid, pl_pct_est: pl, status, dry: !leg.placed });
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: bid, pl_pct_est: pl, status, dry: !leg.placed, late: lateExit });
         continue;
       }
       const exitRef = openBySym[leg.symbol] || null;
@@ -281,9 +373,9 @@ async function tick({ bridge } = {}) {
         const sellQty = Math.min(leg.qty, heldQty[leg.symbol] || 0);
         if (sellQty > 0) {
           const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: leg.symbol, side: 'sell', qty: sellQty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: sellQty, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false });
+          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: sellQty, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false, late: lateExit });
         } else {
-          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: 0, exit_ref_open: exitRef, pl_pct_est: pl, status: 'already_flat', dry: false });
+          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: 0, exit_ref_open: exitRef, pl_pct_est: pl, status: 'already_flat', dry: false, late: lateExit });
         }
         // Cancel any resting protective SELL-STOP on this symbol (the intraday
         // re-protect pass attaches one to every naked long). An orphaned GTC stop on
@@ -299,10 +391,19 @@ async function tick({ bridge } = {}) {
           }
         } catch (_e) { /* fail-soft */ }
       } else {
-        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, dry: true });
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, dry: true, late: lateExit });
       }
     }
-    st.open = null; _writeState(st);
+    if (remainingLegs.length) {
+      // Some legs are still open (guarded). Keep them — with their original date so
+      // they stay "stale" and the catch-up path retries on the next tick.
+      st.open = { ...st.open, legs: remainingLegs };
+      _append({ phase: 'exit_partial', date: st.open.date, remaining: remainingLegs.length,
+        why: 'legs left open by a safety guard — will retry next tick' });
+    } else {
+      st.open = null;
+    }
+    _writeState(st);
     return;
   }
 
@@ -316,7 +417,7 @@ async function tick({ bridge } = {}) {
     }
     const sleeves = selectSleeves(closesBySym);
     st.lastEnterDate = today;
-    if (!sleeves.length) { _writeState(st); _append({ phase: 'skip', date: today, why: 'no sleeve gate passed' }); return; }
+    if (!sleeves.length) { _writeState(st); _append({ phase: 'skip', date: today, exec: c.exec, why: 'no sleeve gate passed — no symbol met an uptrend/capitulation/fade condition' }); return; }
 
     const { brokerFacadeFor } = require('./broker-facade');
     const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
@@ -351,7 +452,16 @@ async function tick({ bridge } = {}) {
     const legs = [];
     for (const s of sleeves) {
       const execSym = execMap[s.symbol] || s.symbol;
-      if ((preHeld[execSym] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: execSym, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
+      // NO-COMMINGLING applies to SHARE execution only, and only to positions THIS
+      // book opened. Two fixes (2026-07-27, from the first live session):
+      //  • OPTIONS tier: holding QQQ *shares* cannot make a QQQ *call* exit ambiguous
+      //    — different instruments, different symbols at the broker. A share position
+      //    blocked the QQQ capitulation sleeve's whole ladder for no reason.
+      //  • Unrelated/legacy holdings (another strategy's book, stale test positions)
+      //    are not this engine's business: it manages ONLY what it opened, so those
+      //    must not veto a signal. Only a leg still open in OUR OWN state counts.
+      const ownOpen = new Set(((st.open && st.open.legs) || []).map((l) => String(l.symbol).toUpperCase()));
+      if (c.exec !== 'options' && ownOpen.has(execSym)) { _append({ phase: 'skip_held', date: today, symbol: execSym, sleeve: s.sleeve, why: 'this book already holds the symbol from a prior night — not stacking' }); continue; }
       // DIRECTION LOCK: never enter against existing family exposure — e.g. the QQQ
       // capitulation long while the intraday engine holds SQQQ (the same downtrend
       // condition expressed opposite ways), or SH while the account is long SPY/SPXL.
@@ -379,8 +489,23 @@ async function tick({ bridge } = {}) {
             const r = await ox.placePaperOrder({ contract: l.contract, side: 'buy', qty: c.optionQty, limit: l.ask }).catch((e) => ({ error: e.message }));
             status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
           }
+          // Rest a GTC take-profit on the broker so a dead process can still be
+          // paid. Best-effort: a failure here must never block the entry — the
+          // leg simply has no net, exactly as before this existed.
+          const reallyPlaced = placeReal && status === 'placed';
+          let protectId = null; let protectLimit = null;
+          if (reallyPlaced && c.protectTargetPct > 0 && l.ask > 0) {
+            protectLimit = Math.max(0.01, Math.round(l.ask * (1 + c.protectTargetPct / 100) * 100) / 100);
+            const pr = await ox.placePaperOrder({ contract: l.contract, side: 'sell', qty: c.optionQty, limit: protectLimit, tif: 'gtc' })
+              .catch((e) => ({ error: e.message }));
+            protectId = (pr && pr.order_id) || null;
+            _append({ phase: 'protect', date: today, contract: l.contract, sleeve: s.sleeve,
+              qty: c.optionQty, entry_ask: l.ask, target: protectLimit, target_pct: c.protectTargetPct,
+              order_id: protectId, status: protectId ? 'resting' : `error:${(pr && pr.error) || 'unknown'}` });
+          }
           legs.push({ instrument: 'option', contract: l.contract, symbol: s.symbol, signal: s.symbol, sleeve: s.sleeve,
-            depth: l.depth, strike: l.strike, expiry, qty: c.optionQty, ref_close: l.ask, placed: placeReal && status === 'placed' });
+            depth: l.depth, strike: l.strike, expiry, qty: c.optionQty, ref_close: l.ask, placed: reallyPlaced,
+            protect_order_id: protectId, protect_target: protectLimit });
           _append({ phase: 'enter', date: today, instrument: 'option', contract: l.contract, symbol: s.symbol, signal: s.symbol,
             sleeve: s.sleeve, exec: 'options', depth: l.depth, strike: l.strike, expiry, spot_close: px,
             qty: c.optionQty, ref_close: l.ask, status, dry: !placeReal, edge_gate: gate.why });

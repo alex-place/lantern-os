@@ -1,0 +1,86 @@
+'use strict';
+
+/**
+ * routes/trading/alerts.js — per-user alert rules + fired-alert feed (#3248/#3250).
+ *
+ * Loop stage: Observe (the scan finally reaches the user when they're not
+ * looking at the page). Sits behind the standard trading gate in server.js
+ * (requireEntitlement('trade') — Pro+ by plan matrix, or a connected own
+ * broker), so there is NO public/demo variant of these endpoints: rules and
+ * fires are personal data.
+ *
+ *   GET    /api/trading/alerts/rules          → { rules, cap, prefs, email }
+ *   POST   /api/trading/alerts/rules          → create/update  { rule } | { error }
+ *   DELETE /api/trading/alerts/rules/<id>     → { ok }
+ *   POST   /api/trading/alerts/prefs          → { ok, prefs }   (#3249 delivery opt-in)
+ *   GET    /api/trading/alerts/feed?limit=50  → { alerts }
+ */
+
+const store = require('../../lib/alert-store');
+const { getEffectiveUserId } = require('../../lib/session-identity');
+const { internalUserId } = require('../../lib/request-auth');
+
+const userOf = (req) => getEffectiveUserId(req) || internalUserId(req) || null;
+
+/** Why email delivery would (not) work for this user — the UI explains itself. */
+function emailAvailability(userId) {
+  try {
+    const { mailerConfigured } = require('../../lib/mailer');
+    if (!mailerConfigured()) return { possible: false, why: 'mailer_unconfigured' };
+    const { getProfile } = require('../../lib/user-profiles');
+    const p = getProfile(userId);
+    if (!p || !String(p.email || '').includes('@')) return { possible: false, why: 'no_email' };
+    // Delivery refuses unverified addresses, so say so HERE rather than letting the
+    // UI offer a toggle that would silently never send (#3329 reconciled onto #3249).
+    if (!p.emailVerified) return { possible: false, why: 'email_unverified' };
+    return { possible: true };
+  } catch (_e) { return { possible: false, why: 'unknown' }; }
+}
+
+module.exports = async function alertsRoutes(req, res, url, ctx) {
+  if (!url.pathname.startsWith('/api/trading/alerts/')) return false;
+  const { sendJson, collectRequestBody } = ctx;
+  const userId = userOf(req);
+  if (!store.safeUid(userId)) { sendJson(res, { error: 'sign_in_required' }, 401); return true; }
+
+  try {
+    if (url.pathname === '/api/trading/alerts/rules' && req.method === 'GET') {
+      sendJson(res, {
+        rules: store.listRules(userId),
+        cap: store.MAX_RULES_PER_USER,
+        prefs: store.getPrefs(userId),
+        email: emailAvailability(userId),   // #3249: the UI explains why email is (un)available
+      }, 200);
+      return true;
+    }
+    if (url.pathname === '/api/trading/alerts/prefs' && req.method === 'POST') {
+      const body = await collectRequestBody(req, 2 * 1024);
+      let input;
+      try { input = JSON.parse(body || '{}'); } catch (_e) { sendJson(res, { error: 'invalid_json' }, 400); return true; }
+      const r = store.setPrefs(userId, input);
+      sendJson(res, r, r.ok ? 200 : 400);
+      return true;
+    }
+    if (url.pathname === '/api/trading/alerts/rules' && req.method === 'POST') {
+      const body = await collectRequestBody(req, 8 * 1024);
+      let input;
+      try { input = JSON.parse(body || '{}'); } catch (_e) { sendJson(res, { error: 'invalid_json' }, 400); return true; }
+      const r = store.saveRule(userId, input);
+      sendJson(res, r, r.ok ? 200 : 400);
+      return true;
+    }
+    const del = url.pathname.match(/^\/api\/trading\/alerts\/rules\/([a-z0-9]{6,24})$/);
+    if (del && req.method === 'DELETE') {
+      sendJson(res, { ok: store.deleteRule(userId, del[1]) }, 200);
+      return true;
+    }
+    if (url.pathname === '/api/trading/alerts/feed' && req.method === 'GET') {
+      sendJson(res, { alerts: store.readFeed(userId, url.searchParams.get('limit')) }, 200);
+      return true;
+    }
+  } catch (e) {
+    sendJson(res, { error: 'alerts_failed', message: e.message }, 500);
+    return true;
+  }
+  return false;
+};

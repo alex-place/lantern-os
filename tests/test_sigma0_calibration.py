@@ -13,6 +13,7 @@ Covers:
 """
 import json
 import os
+import re
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -197,12 +198,33 @@ def test_claim_registry_is_valid():
 
 # ── 10. CIO-SDE not imported by server-side Node code ────────────────────────
 
+# Directories this fence must not descend into. node_modules is the load-bearing one:
+# without it the walk covered 52,215 js/ts files of which 51,864 (99.3%) were vendor
+# code, and since every match is READ in full the test never finished — it stalled the
+# whole Python suite at ~83% (#3103). Pruning is also more CORRECT, not merely faster:
+# the fence is about OUR server code, and a dependency that happens to contain the
+# string "cio_sde" would otherwise fail the build for no reason.
+_FENCE_SKIP_DIRS = {"node_modules", ".git", "dist", "build", "coverage", ".next", ".cache"}
+
+# Line and block comments. The fence must test CODE, not prose: three first-party files
+# (collapse-canary.js, council-review.js, exec-verify.js) legitimately cite
+# `src/cio_sde/question.py` in explanatory comments to say what the JS is mirroring.
+# A JS module cannot import a Python one anyway, so a bare substring match over raw text
+# was only ever able to catch documentation. Stripping comments keeps the fence honest:
+# it still fires on any executable reference (a require, a spawn, a path used at
+# runtime) while allowing the codebase to explain itself.
+_COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
+
+
 def test_cio_sde_not_imported_by_server():
     """Architectural fence: src/cio_sde must not appear in apps/lantern-garage."""
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     server_dir = os.path.join(repo_root, "apps", "lantern-garage")
     violations = []
-    for dirpath, _dirs, files in os.walk(server_dir):
+    for dirpath, dirs, files in os.walk(server_dir):
+        # Mutating `dirs` IN PLACE is what prunes the walk — os.walk documents this, and
+        # rebinding (dirs = [...]) would silently not work.
+        dirs[:] = [d for d in dirs if d not in _FENCE_SKIP_DIRS]
         for fname in files:
             if not fname.endswith((".js", ".ts")):
                 continue
@@ -211,7 +233,7 @@ def test_cio_sde_not_imported_by_server():
                 content = open(fpath, encoding="utf-8", errors="ignore").read()
             except OSError:
                 continue
-            if "src/cio_sde" in content or "cio_sde" in content:
+            if "cio_sde" in _COMMENT_RE.sub("", content):
                 violations.append(fpath)
     assert not violations, (
         f"CIO-SDE imported by server-side code (breaks architectural boundary): {violations}"

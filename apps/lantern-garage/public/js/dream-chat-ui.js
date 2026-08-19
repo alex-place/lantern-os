@@ -188,6 +188,76 @@ function buildToolCard(inner, partial) {
     + '<div class="tcc-result" style="display:none;border-top:1px solid var(--border,#2a2a3a);padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--muted,#9aa)"></div>'
     + '</details>';
 }
+// #3070 — approval prompt for a side-effectful tool call that was NOT executed.
+// Tokens granted this session, echoed back on the next turn so the server can run the
+// specific call the user allowed. Kept in memory only: approvals should not outlive the tab.
+window.__toolApprovals = window.__toolApprovals || [];
+
+function renderApprovalPrompt(slot, evt) {
+  const { token, tool, input } = evt.approval;
+  slot.textContent = '';
+  slot.style.display = 'block';
+  slot.style.opacity = '1';
+
+  // Tool cards are collapsed <details> by default. An approval the user has to go hunting
+  // for is an approval they never give — and the turn silently stalls. Force this one open.
+  const details = slot.closest('details');
+  if (details) details.open = true;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'border:1px solid #fbbf24;border-radius:10px;padding:9px 11px;background:rgba(251,191,36,.08)';
+
+  const head = document.createElement('div');
+  head.style.cssText = 'font-size:12.5px;font-weight:600;color:#fbbf24;margin-bottom:5px';
+  head.textContent = '⏸ Needs your approval — nothing has run yet';
+  wrap.appendChild(head);
+
+  // Show the EXACT call being approved. textContent throughout: tool arguments are model
+  // output and must never be interpreted as markup.
+  const detail = document.createElement('div');
+  detail.style.cssText = 'font-family:ui-monospace,monospace;font-size:11.5px;color:var(--text,#cdd);white-space:pre-wrap;word-break:break-word;max-height:130px;overflow:auto;margin-bottom:7px';
+  let argText = '';
+  try { argText = JSON.stringify(input || {}, null, 1); } catch { argText = String(input); }
+  detail.textContent = tool + '(' + (argText.length > 600 ? argText.slice(0, 600) + ' …' : argText) + ')';
+  wrap.appendChild(detail);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:7px;align-items:center';
+
+  const approve = document.createElement('button');
+  approve.type = 'button';
+  approve.textContent = 'Approve & run';
+  approve.style.cssText = 'border:1px solid #fbbf24;background:#fbbf24;color:#1a1a1a;font-weight:700;font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer';
+
+  const decline = document.createElement('button');
+  decline.type = 'button';
+  decline.textContent = 'Decline';
+  decline.style.cssText = 'border:1px solid var(--border,#444);background:transparent;color:var(--muted,#9aa);font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer';
+
+  const note = document.createElement('span');
+  note.style.cssText = 'font-size:11px;color:var(--muted,#9aa)';
+
+  approve.addEventListener('click', () => {
+    if (!window.__toolApprovals.includes(token)) window.__toolApprovals.push(token);
+    approve.disabled = decline.disabled = true;
+    approve.style.opacity = decline.style.opacity = '0.55';
+    note.textContent = 'approved — re-running…';
+    // Re-send the SAME request; the server now sees the token and executes this one call.
+    const retry = window.__lastUserMessage || ('Please continue and run ' + tool + '.');
+    if (typeof window.sendMessage === 'function') window.sendMessage({ text: retry });
+  });
+
+  decline.addEventListener('click', () => {
+    approve.disabled = decline.disabled = true;
+    approve.style.opacity = decline.style.opacity = '0.55';
+    note.textContent = 'declined — nothing ran';
+  });
+
+  row.appendChild(approve); row.appendChild(decline); row.appendChild(note);
+  wrap.appendChild(row);
+  slot.appendChild(wrap);
+}
+
 function fillToolSlot(slot, evt) {
   if (!slot) return;
   const card = slot.closest('.tool-call-card');
@@ -197,9 +267,15 @@ function fillToolSlot(slot, evt) {
     slot.style.color = 'var(--text,#cdd)';
     slot.style.opacity = '1';
     if (statusEl) { statusEl.textContent = ' ✓'; statusEl.style.color = '#4ade80'; }
+  } else if (evt.reason_code === 'approval_required' && evt.approval && evt.approval.token) {
+    // #3070 — the tool did NOT run. Show what it wants to do and let the user allow it.
+    // Approving re-sends the turn with this arg-bound token, which authorises this exact
+    // call only. Doing nothing is a decline: no state changes and nothing executes.
+    renderApprovalPrompt(slot, evt);
+    if (statusEl) { statusEl.textContent = ' ⏸'; statusEl.style.color = '#fbbf24'; }
   } else {
     const msg = ({
-      disabled: 'tool execution is off (set CHAT_TOOL_EXEC=1)',
+      disabled: 'tool execution is off (CHAT_TOOL_EXEC=0)',
       auth: 'this tool needs operator access',
       unsafe: 'command not allowlisted',
       unknown: 'unknown tool',
@@ -1232,6 +1308,9 @@ async function sendMessage(opts = {}) {
   } catch (_) { /* gate is best-effort; the server enforces limits regardless */ }
   const text = (overrideText != null ? overrideText : input.value).trim();
   if (!text || isSending) return;
+  // #3070 — remembered so an "Approve & run" click can re-send the SAME request, now
+  // carrying the approval token, instead of asking the user to retype it.
+  window.__lastUserMessage = text;
 
   // Image attachment → vision: the user uploaded an image via "+" to ask about it. The image
   // is sent to a vision model (Claude / GPT-4o) so the chat can actually SEE it. Sticky, so
@@ -1308,9 +1387,15 @@ async function sendMessage(opts = {}) {
   };
   const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const nativeToolCalls = [];  // cloud-model (Claude/OpenAI/Gemini) tool *calls* — they emit no <tool_call> text, so we synthesize the cards at finalize
-  const requestedProvider = document.getElementById('provider-select')?.value || '';
-  // The #1127 model pin (`requestedModel` from #model-select) was removed (#2476):
-  // its markup was cut, so the value was always '' and no model was ever sent.
+  // The model picker's value is either a bare provider ('gemini') or a pinned
+  // sub-model ('gemini::gemini-2.5-pro'). Split into the provider bucket + optional
+  // model id; the server honours `model` only when it's on the provider-models
+  // allowlist (isAllowedModel), so a stray/retired id can never hijack routing
+  // (#1127 pin re-wired after the Gemini sub-picker was restored).
+  const _pickerValue = document.getElementById('provider-select')?.value || '';
+  const _pinSep = _pickerValue.indexOf('::');
+  const requestedProvider = _pinSep === -1 ? _pickerValue : _pickerValue.slice(0, _pinSep);
+  const requestedModel = _pinSep === -1 ? '' : _pickerValue.slice(_pinSep + 2);
 
   try {
     const provider = requestedProvider;
@@ -1330,6 +1415,12 @@ async function sendMessage(opts = {}) {
         message: text,
         user: 'dream-chat',
         provider,
+        // Pinned sub-model (e.g. gemini-2.5-pro); empty ⇒ provider default / Auto.
+        // Server gates it against the provider-models allowlist before honouring.
+        model: requestedModel || undefined,
+        // #3070 — approvals the user granted for side-effectful tool calls. Each token is
+        // bound to one tool + exact args, so this can only authorise those specific calls.
+        approvals: (window.__toolApprovals && window.__toolApprovals.length) ? window.__toolApprovals : undefined,
         attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
@@ -1976,17 +2067,15 @@ document.getElementById('input').addEventListener('input', e => {
   // dropdown value → { label, bucket } where bucket is the /api/providers/status key.
   // keystone-ft is a local fine-tune served through ollama, so it shares that bucket
   // (and is only offered when a matching tag is actually being served).
+  // Mirrors the home page's PROVIDER_CATALOG (public/index.html) so the two model pickers
+  // stay consistent: local-first order (on-device models lead), same curated provider set.
   const CATALOG = [
-    { value: 'claude',      label: 'Claude',      bucket: 'anthropic'  },
-    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'     },
-    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'     },
-    { value: 'grok',        label: 'Grok',        bucket: 'xai'        },
-    { value: 'deepseek',    label: 'DeepSeek',    bucket: 'deepseek'   },
-    { value: 'mistral',     label: 'Mistral',     bucket: 'mistral'    },
-    { value: 'perplexity',  label: 'Perplexity',  bucket: 'perplexity' },
-    { value: 'cohere',      label: 'Cohere',      bucket: 'cohere'     },
-    { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama', local: true },
-    { value: 'keystone-ft', label: 'unisona.ai FT', bucket: 'ollama', local: true },
+    { value: 'ollama',      label: 'Local Σ₀',   bucket: 'ollama', local: true },
+    { value: 'keystone-ft', label: 'Unisona FT', bucket: 'ollama', local: true },
+    { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
+    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
+    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
+    { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
   ];
 
   function applyRequestedProvider() {
@@ -2017,8 +2106,18 @@ document.getElementById('input').addEventListener('input', e => {
     return null;
   }
 
+  // Per-provider pinnable model list for the sub-options (#1127). Best-effort: if the
+  // endpoint is down we still render provider-level rows (no sub-models), never nothing.
+  async function fetchModels() {
+    try {
+      const r = await fetch('/api/providers/models', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+      if (r.ok) return (await r.json()).providers || null;
+    } catch { /* models endpoint down — skip sub-models */ }
+    return null;
+  }
+
   async function build() {
-    const providers = await fetchStatus();
+    const [providers, models] = await Promise.all([fetchStatus(), fetchModels()]);
     select.innerHTML = '<option value="">Auto (pick best)</option>';
     for (const entry of CATALOG) {
       const p = providers && providers[entry.bucket];
@@ -2044,6 +2143,22 @@ document.getElementById('input').addEventListener('input', e => {
       const model = p && p.model;
       if (model && model !== 'auto') o.title = model; // concrete model id on hover
       select.appendChild(o);
+      // Gemini sub-models (#1127 re-wire): list each pinnable Gemini model beneath the
+      // provider row so a turn can be routed to a specific id. Value = "gemini::<id>";
+      // the send path splits it and the server allowlist (isAllowedModel) gates it.
+      // Scoped to Gemini per the request — drop the `=== 'gemini'` guard to extend to
+      // every provider the /api/providers/models endpoint returns options for.
+      const sub = entry.value === 'gemini' && models && models[entry.value];
+      if (sub && Array.isArray(sub.options) && sub.options.length) {
+        o.textContent = label + ' (Auto)';
+        for (const m of sub.options) {
+          const so = document.createElement('option');
+          so.value = entry.value + '::' + m.id;
+          so.textContent = m.label || m.id;
+          so.title = m.id;
+          select.appendChild(so);
+        }
+      }
     }
     applyRequestedProvider();
     if (typeof window.gateProviderOptions === 'function') window.gateProviderOptions();

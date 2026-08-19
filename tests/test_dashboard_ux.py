@@ -24,9 +24,14 @@ def test_landing_page_is_clean_sales_page() -> None:
     assert "unisona.ai" in html
     # CTA panels (chat surface renamed dream-chat.html → chat.html, #2751)
     assert "chat.html" in html
-    # The Patreon link was intentionally removed from the landing hero in 1be9d49f
-    # ("remove Patreon link"); it still ships site-wide via the shared nav/footer.
-    assert "github.com" in html
+    # The GitHub link ships in the SHARED footer, not the landing markup: the Patreon
+    # link went first (1be9d49f), then the footer itself became global via
+    # js/site-chrome.js (#3146). Assert it where it actually lives.
+    #
+    # Matched on the repo path rather than the host: a bare "github.com" substring test
+    # trips CodeQL's incomplete-url-substring-sanitization rule, and the repo path is the
+    # more specific assertion anyway.
+    assert "alex-place/lantern-os" in read("apps/lantern-garage/public/js/site-chrome.js")
     # No old inline journal UI
     assert 'id="entryForm"' not in html
     assert 'id="micBtn"' not in html
@@ -42,8 +47,9 @@ def test_landing_page_links_to_full_journal() -> None:
 
 
 def test_landing_page_has_server_status() -> None:
-    html = read("apps/lantern-garage/public/index.html")
-    assert "/api/health" in html
+    # The status probe moved into the shared chrome with the global footer (#3146),
+    # so every page gets it rather than the landing page alone.
+    assert "/api/health" in read("apps/lantern-garage/public/js/site-chrome.js")
 
 
 def test_markdown_links_use_formatted_reader() -> None:

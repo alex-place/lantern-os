@@ -1,0 +1,36 @@
+{
+ "n_skills": 8,
+ "reps": 6,
+ "acquisition": {
+  "slope_memory_on": 0.2286,
+  "slope_memory_off": 0.0,
+  "accuracy_memory_on": 0.6667,
+  "accuracy_memory_off": 0.0,
+  "curve_by_exposure": {
+   "0": 0.0,
+   "1": 0.0,
+   "2": 1.0,
+   "3": 1.0,
+   "4": 1.0,
+   "5": 1.0
+  },
+  "learned": true
+ },
+ "spacing": {
+  "window": 24,
+  "distributed": {
+   "spacing": "distributed",
+   "window": 24,
+   "retention_accuracy": 1.0,
+   "train_accuracy": 0.6667
+  },
+  "massed": {
+   "spacing": "massed",
+   "window": 24,
+   "retention_accuracy": 0.5,
+   "train_accuracy": 0.6667
+  }
+ },
+ "learner": "affine_learner_solve (reference; validates the instrument)",
+ "note": "Acquisition and retention are reported as SEPARATE axes (Burnell dissociation). Plug a real-model solve_fn in for the internal-mark row."
+}

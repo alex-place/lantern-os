@@ -512,8 +512,21 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
     # DEFECTIVE A, where the old eig + oblique-Riesz split was ill-conditioned / abstained.
     invariance_residual = 0.0
     rate, transient = 0.0, float("nan")
+    # A MISSING DEPENDENCY must not be indistinguishable from "the rate is zero".
+    # This import used to sit inside the broad `except Exception: pass` below, so on any
+    # box without scipy the function silently returned a certificate claiming
+    # active_decay_rate=0.0 and transient_bound=NaN — a provable bound that was never
+    # computed, presented as if it had been. That is the exact failure the certificate
+    # exists to prevent, so refuse instead of fabricating one.
     try:
         from scipy.linalg import schur, solve_continuous_lyapunov
+    except ImportError as exc:
+        raise RuntimeError(
+            "dichotomy_certificate requires scipy (scipy.linalg.schur + "
+            "solve_continuous_lyapunov) to compute the Lyapunov rate. Refusing to "
+            "return an uncomputed certificate. Install scipy, or guard the caller."
+        ) from exc
+    try:
         T, Z, sdim = schur(M, output="real", sort=lambda z: z.real < -delta)
         r = int(sdim)
         if 0 < r <= n:
@@ -526,7 +539,11 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
             if float(pe.min()) > 0:
                 rate = float(1.0 / (2.0 * pe.max()))            # finite-t Lyapunov rate
                 transient = float(np.sqrt(pe.max() / pe.min())) # √cond(P) overshoot
-    except Exception:
+    except (np.linalg.LinAlgError, ValueError):
+        # Genuine numerical failure (singular/ill-conditioned Lyapunov solve) — degrade
+        # to rate 0.0, which callers read as "no provable rate". Narrowed from a bare
+        # `except Exception` so a missing dependency or a coding error can no longer
+        # masquerade as an honest numerical abstention.
         pass
 
     # fate — decided purely by the slow block's abscissa β (no third option)
@@ -657,8 +674,16 @@ def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
 
     invariance_residual = float("nan")
     rate_factor, transient, kreiss = 0.0, float("nan"), float("nan")
+    # Same reasoning as the continuous certificate above: a missing dependency must not
+    # be reported as "rate_factor = 0.0", which reads as a computed result.
     try:
         from scipy.linalg import schur, solve_discrete_lyapunov
+    except ImportError as exc:
+        raise RuntimeError(
+            "discrete_dichotomy_certificate requires scipy (scipy.linalg.schur + "
+            "solve_discrete_lyapunov). Refusing to return an uncomputed certificate."
+        ) from exc
+    try:
         # ordered real Schur: active (|λ|<radius) eigenvalues to the top-left block.
         # Z orthonormal ⇒ leading sdim columns span the active invariant subspace
         # EXACTLY (block-triangular T ⇒ (I−BBᵀ)MB=0 to machine eps) — defective-safe.

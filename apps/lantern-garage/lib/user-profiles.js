@@ -6,12 +6,31 @@
 
 const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("./app-paths");
 const crypto = require("crypto");
 const { higherRole, STAFF_ROLES } = require("./role-hierarchy");
 const { effectiveRole } = require("./stripe-billing");
 
-// Data directory for user profiles
-const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
+// Data directory for user profiles. Rooted via app-paths (the #1946 G2 anchor:
+// <repoRoot>/data, or UNISONA_STATE_DIR) — NOT process.cwd() (#3088). The old
+// process.cwd()-relative path meant a `setUserRole` CLI run from apps/lantern-garage
+// wrote a DIFFERENT store than a server launched from the repo root read, so role
+// changes silently never took effect and profile data split across two roots.
+const PROFILES_DIR = dataPath("profiles");
+// #3088 migration aid: if the OLD cwd-relative location still holds data and differs
+// from the resolved store, say so at load so the operator can merge/remove it instead
+// of silently orphaning accounts. In the documented launch (cwd = repo root) the two
+// paths coincide and this is silent.
+try {
+  const _legacy = path.join(process.cwd(), "data", "profiles");
+  if (path.resolve(_legacy) !== path.resolve(PROFILES_DIR) &&
+      fs.existsSync(path.join(_legacy, "index.jsonl"))) {
+    console.warn(
+      `[profiles] store resolves to ${PROFILES_DIR}, but a legacy cwd-relative store still ` +
+      `holds data at ${_legacy} (#3088) — merge or remove it so no account is orphaned.`
+    );
+  }
+} catch { /* diagnostic only — never break load */ }
 const PROFILES_INDEX = path.join(PROFILES_DIR, "index.jsonl");
 const PROFILES_CSF = path.join(PROFILES_DIR, "profiles.csf");
 // Append-only Patreon-id <-> Discord-id link store (#697). Latest record wins,
@@ -448,13 +467,19 @@ function getProfileByIdentity(provider, providerId) {
  * email a provider has verified (`emailVerified === true` or a verified identity
  * with that email) — this is the gate that makes auto-linking safe (ADR-0016).
  */
-function getProfileByEmail(email, { verifiedOnly = false } = {}) {
+function getProfileByEmail(email, { verifiedOnly = false, rootOnly = false } = {}) {
   if (!email) return null;
   const needle = String(email).toLowerCase();
   let fallback = null;
   for (const p of allProfiles()) {
     const rootMatch = p.email && p.email.toLowerCase() === needle;
-    const idMatch = (p.identities || []).find((i) => i.email && i.email.toLowerCase() === needle);
+    // rootOnly: match ONLY the profile's root email, never a linked-identity
+    // email. Password reset needs this — matching an OAuth identity's address
+    // resolved the whole account and mailed the reset link to the profile's
+    // ROOT address instead of the one the user typed (2026-08-11: a reset
+    // requested for a linked gmail delivered founder@'s inbox — "wrong email
+    // to the wrong person"). Reset mail must go to the typed address or nowhere.
+    const idMatch = rootOnly ? null : (p.identities || []).find((i) => i.email && i.email.toLowerCase() === needle);
     if (!rootMatch && !idMatch) continue;
     const verified = p.emailVerified === true || (idMatch && idMatch.emailVerified === true);
     if (verified) return p; // strongest match wins immediately

@@ -100,16 +100,25 @@ function journeyFor(n) {
       const regBody = await reg.json();
       expect(regBody.pendingVerification).toBe(true);
 
-      // Hard email gate: the confirm link must be consumed before login works. On
-      // loopback with no SMTP the page surfaces the dev link; anywhere else this
-      // fails — the gate host must run without SMTP configured (see the doc).
-      const devLink = page.locator('#verify-dev-link');
-      await expect(devLink, 'dev verify link missing — SMTP is configured on this host; ' +
-        'unset SMTP_*/.env.local for the greenpath run (docs/GREENPATH-GATE.md)').toBeVisible();
-      await Promise.all([
-        page.waitForURL(/verify=1/),
-        devLink.click(),
+      // Hard email gate: the emailed CODE must be entered before login works. On
+      // loopback with no mail provider the page surfaces the dev code; anywhere else
+      // this fails — the gate host must run without a mailer configured (see the doc).
+      const devCode = page.locator('#verify-dev-code');
+      await expect(devCode, 'dev verify code missing — a mail provider is configured on this ' +
+        'host; unset RESEND_API_KEY/SMTP_* in .env.local for the greenpath run ' +
+        '(docs/GREENPATH-GATE.md)').toBeVisible();
+      const code = (await devCode.locator('strong').textContent() || '').trim();
+      expect(code, 'dev code should be 6 digits').toMatch(/^\d{6}$/);
+      // Typing the 6th digit auto-submits, so wait on the verify-code response rather
+      // than a navigation — confirming a code never leaves the page.
+      // Type into the segmented row exactly as a user would — focus box 1 and let
+      // auto-advance carry the rest. fill() would only populate a single box.
+      await page.locator('#verify-code-boxes .code-box').first().focus();
+      const [confirmed] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/auth/verify-code')),
+        page.keyboard.type(code),
       ]);
+      expect(confirmed.status(), 'the emailed code should confirm the address').toBe(200);
 
       // Now the real email+password login, typed into the form.
       await page.locator('#local-email').fill(email());
@@ -150,7 +159,15 @@ function journeyFor(n) {
     // ── s6: the Free→Pro gate renders, then the upgrade happens for real ───────
     step('s6', async () => {
       // (a) UI upgrade prompt: signed-in Free on the stock trader sees the tier CTA.
-      await page.goto('/stock-trader.html');
+      //
+      // Arrive the way a Free user actually does. Since #3039 ("route Free users to
+      // Watch"), a NON-deliberate landing on /stock-trader.html redirects to
+      // /watch.html?from=trader — so a bare goto() never renders the CTA and this step
+      // failed on a behaviour change, not a defect. A deliberate arrival (the in-page
+      // Trade tab, a pricing link, or a referrer from watch/options/pricing) still gets
+      // the explanatory CTA, which is the journey being validated here.
+      await page.goto('/watch.html');
+      await page.goto('/stock-trader.html?stay=1');
       const cta = page.locator('#signinCta');
       await expect(cta, 'Free account should see the upgrade CTA on stock-trader').toBeVisible();
       await expect(cta).toHaveText(/Upgrade to trade/);
@@ -165,7 +182,12 @@ function journeyFor(n) {
       expect(gatePage).toContain('needs an upgrade');
 
       // (d) Upgrade — the real staff endpoint stands in for the purchase webhook.
-      const up = await admin.post('/api/accounts/role', { data: { id: state.userId, role: 'deep_dreamer' } });
+      // A `reason` is REQUIRED to grant a paid tier by hand since #3100 (it is recorded
+      // on the account so a comp is distinguishable from a real subscription); without
+      // it the endpoint answers 400 reason_required.
+      const up = await admin.post('/api/accounts/role', {
+        data: { id: state.userId, role: 'deep_dreamer', reason: 'greenpath release gate — simulated purchase' },
+      });
       expect(up.ok(), 'staff role upgrade should succeed').toBe(true);
       const upBody = await up.json();
 
@@ -199,7 +221,7 @@ function journeyFor(n) {
 
     // ── s5: chat about the trade in the real UI; the reply must recall it ──────
     step('s5', async () => {
-      await page.goto('/dream-chat.html');
+      await page.goto('/chat.html');
       const first = await sendChat(page,
         `I just placed a paper trade on the Kalshi paper ledger: bought 1 YES contract of ` +
         `${ticker()} at 5 cents. Please acknowledge you noted it.`);
@@ -254,13 +276,43 @@ function journeyFor(n) {
       const res = await context.request.get('/api/broker/alpaca/status');
       expect(res.status(), 'alpaca status should be reachable for Pro').toBe(200);
       const body = await res.json();
-      if (!(body.connected === true || body.configured === true)) {
-        throw new Error('Alpaca test broker not available on this host — set paper server keys ' +
-          '(ALPACA_API_KEY_ID/ALPACA_API_SECRET_KEY) or the OAuth app ' +
-          '(ALPACA_OAUTH_CLIENT_ID/SECRET). Status: ' + JSON.stringify(body).slice(0, 200));
+      // Owner/OAuth boxes: already connected → surface is live, done.
+      if (body.connected === true) {
+        return `alpaca connected (via ${body.via || 'oauth'}, env ${body.env || 'paper'})`;
       }
-      return `alpaca ${body.connected ? 'connected' : 'configured'} ` +
-        `(via ${body.via || 'oauth'}, env ${body.env || 'paper'})`;
+      // Signed-in users get NO shared server account (#2546 — pooling was a privacy
+      // bug), so the REAL journey is bring-your-own-keys. Exercise that actual flow:
+      // paste keys → status connected via 'keys' → disconnect (cleanup, so the demo
+      // account is never left broker-linked). Test material: the host's own paper
+      // keys, read from the repo-root .env.local (the server validates them against
+      // Alpaca before storing — a dead key fails loudly here, which is the point).
+      const fs = require('fs');
+      const path = require('path');
+      let keyId = '', secretKey = '';
+      try {
+        const envTxt = fs.readFileSync(path.resolve(__dirname, '..', '..', '.env.local'), 'utf8');
+        keyId = (envTxt.match(/^ALPACA_API_KEY(?:_ID)?=(.*)$/m) || [])[1] || '';
+        secretKey = (envTxt.match(/^ALPACA_(?:API_)?SECRET(?:_KEY)?=(.*)$/m) || [])[1] || '';
+      } catch { /* no .env.local on this host */ }
+      if (!keyId || !secretKey) {
+        throw new Error('Alpaca test broker not available on this host — no connected account, ' +
+          'no OAuth app, and no paper keys in .env.local to exercise the BYOK connect flow. ' +
+          'Status: ' + JSON.stringify(body).slice(0, 200));
+      }
+      const conn = await context.request.post('/api/broker/alpaca/connect-keys', {
+        data: { keyId: keyId.trim(), secretKey: secretKey.trim(), env: 'paper' },
+      });
+      expect(conn.ok(), 'BYOK connect-keys should validate and store: ' +
+        (await conn.text()).slice(0, 200)).toBe(true);
+      const after = await (await context.request.get('/api/broker/alpaca/status')).json();
+      expect(after.connected, 'status should show connected after BYOK').toBe(true);
+      expect(after.via, 'BYOK connection reports via=keys').toBe('keys');
+      expect(after.env, 'BYOK defaults to the paper account').toBe('paper');
+      const off = await context.request.post('/api/broker/alpaca/disconnect');
+      expect(off.ok(), 'disconnect should remove the stored keys').toBe(true);
+      const final = await (await context.request.get('/api/broker/alpaca/status')).json();
+      expect(final.connected, 'demo account must not stay broker-linked').toBe(false);
+      return `alpaca BYOK journey: connect-keys → connected (via keys, paper, acct ${after.accountNumber || '?'}) → disconnected`;
     });
   });
 }

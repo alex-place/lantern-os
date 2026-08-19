@@ -19,7 +19,7 @@
   // STATUS panels; the control panels (keys, training, auto-pull) are hidden via
   // body.is-guest and their endpoints are admin-gated server-side. So it must not
   // bounce here either.
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/watch.html', '/options.html', '/orchestration.html', '/pricing.html', '/demo.html', '/contest.html'];
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/faq.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/budget.html', '/watch.html', '/options.html', '/orchestration.html', '/pricing.html', '/demo.html', '/contest.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/kalshi-terminal.html']; // /trading.html retired → redirects to /stock-trader.html (#2488)
   // Operator surfaces hidden from the header tabs + footer links for the guest
@@ -266,16 +266,16 @@
           }
         } catch (e) { /* no sessionStorage — skip */ }
       }
-      // First-visit gate: a not-signed-in visitor who hasn't made an entry choice yet is
-      // sent to /auth.html ONCE to decide. Signing in creates a session; "Continue without
-      // an account" sets ln_guest=1. Either way they're not prompted again — so the default
-      // is signed-OUT-and-asked, never silently signed in.
-      const guestChoice = document.cookie.split(/;\s*/).some((c) => c === 'ln_guest=1');
-      const onAuthPage = pathname === '/auth.html' || pathname === '/auth';
-      if (!gateOff && !authed && !guestChoice && !onAuthPage) {
-        location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
-        return;
-      }
+      // First-visit gate REMOVED (operator decision, 2026-07-31). A not-signed-in
+      // visitor is now assumed a GUEST and left where they landed, instead of being
+      // bounced to /auth.html once to make an entry choice. This mirrors the
+      // server-side removal in routes/pages.js — keep the two in lock-step.
+      //
+      // Note this gate applied to EVERY page, not just the home page as its
+      // server-side counterpart did, so it was the reason a first-time visitor
+      // bounced off public surfaces like /stock-trader.html and /contest.html.
+      // The ln_guest=1 cookie is still set by "Continue without an account" and is
+      // still read elsewhere; nothing now depends on its ABSENCE to prompt.
       if (!isPublic && !gateOff && !authed) {
         location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
       } else if (TRADE_PAGES.includes(pathname) && authed && !canTrade) {

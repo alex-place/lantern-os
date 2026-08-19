@@ -7,6 +7,27 @@
  * bindings arrive via the ctx object built in trading.js.
  */
 
+// SESSION STATE, ET (#3326). Manual orders were built as plain MARKET orders,
+// which simply do not execute outside regular hours — IBKR needs a LIMIT with
+// outsideRth. The ENGINE has known this since 2026-08-12 (its extended-hours
+// exits are marketable limits at ±0.2% with outsideRth:true); the manual paths
+// never learned it, so every operator Flatten placed pre-market sat until the
+// 09:30 auction, and the dust probe's "accepted" order went Inactive at the
+// broker instead of working. Same order, different fate, purely because a human
+// pressed the button.
+//   rth      weekday 09:30-16:00 — market orders are fine
+//   extended weekday 04:00-09:30 / 16:00-20:00 — LMT + outsideRth required
+//   closed   otherwise — nothing executes; the order queues to the next session
+function _sessionState(now = Date.now()) {
+  const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const dow = d.getDay();
+  const min = d.getHours() * 60 + d.getMinutes();
+  if (dow < 1 || dow > 5) return 'closed';
+  if (min >= 570 && min < 960) return 'rth';
+  if (min >= 240 && min < 1200) return 'extended';
+  return 'closed';
+}
+
 module.exports = async function ordersRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent, tradingMemory, tradingStore, getEffectiveUserId } = ctx;
 
@@ -26,24 +47,199 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         // verifying the order state on the broker afterward.)
         const id = m[1];
         const isAlpacaId = /[a-f0-9]{8}-[a-f0-9]{4}/i.test(id);
-        let ok = false; let broker = null;
-        const tryAlpaca = async () => {
+        let ok = false; let broker = null; let cancelUid = null;
+        // TRUTHY-OBJECT BUG (live 2026-08-14): bridge.cancelIBKROrder returns
+        // { ok:false } when the account has no broker/session — an OBJECT, which
+        // this route treated as a boolean. {ok:false} is truthy, so a FAILED
+        // own-account cancel reported success, the toast said "✓ Canceled", the
+        // operator fallback never ran, and the duplicate SPXS kept resting at
+        // IBKR. Every result is now normalized through okOf().
+        const okOf = (r) => r === true || !!(r && r.ok === true);
+        const tryAlpaca = async (u) => {
           const alpaca = require('../../lib/alpaca-adapter');
-          return alpaca.available(uid) ? alpaca.cancelOrder(uid, id).catch(() => false) : false;
+          return alpaca.available(u) ? okOf(await alpaca.cancelOrder(u, id).catch(() => false)) : false;
         };
-        const tryIbkr = async () => bridge ? bridge.cancelIBKROrder?.(uid, id).catch(() => false) : false;
-        if (isAlpacaId) { ok = await tryAlpaca(); broker = ok ? 'alpaca' : null; }
-        else { ok = await tryIbkr(); broker = ok ? 'ibkr' : null; }
+        const tryIbkr = async (u) => (bridge && bridge.cancelIBKROrder
+          ? okOf(await bridge.cancelIBKROrder(u, id).catch(() => false)) : false);
+        if (isAlpacaId) { ok = await tryAlpaca(uid); broker = ok ? 'alpaca' : null; }
+        else { ok = await tryIbkr(uid); broker = ok ? 'ibkr' : null; }
         if (!ok) { // cross-broker fallback, tried honestly
-          ok = isAlpacaId ? await tryIbkr() : await tryAlpaca();
+          ok = isAlpacaId ? await tryIbkr(uid) : await tryAlpaca(uid);
           if (ok) broker = isAlpacaId ? 'ibkr' : 'alpaca';
         }
-        sendJson(res, ok ? { ok: true, canceled: id, broker } : { ok: false, error: 'cancel_failed', order_id: id }, ok ? 200 : 502);
+        if (ok) cancelUid = uid;
+        // ADMIN OPERATOR-VIEW CANCEL FALLBACK (2026-08-14). The operator-view
+        // Orders tab lists the operator book's orders; its cancel button must be
+        // able to cancel them, or the tab shows a duplicate sell it cannot act
+        // on. Same admin-only pattern as placement; the adapters still refuse
+        // ids that do not belong to the resolved account.
+        if (!ok) {
+          try {
+            const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+            const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+            if (isAdminFn(req) && uid !== OPERATOR_UID) {
+              ok = await tryIbkr(OPERATOR_UID);
+              if (ok) broker = 'ibkr-operator';
+              else {
+                ok = await tryAlpaca(OPERATOR_UID);
+                if (ok) broker = 'alpaca-operator';
+              }
+              if (ok) cancelUid = OPERATOR_UID;
+            }
+          } catch (_e) { /* auth module absent → no fallback */ }
+        }
+        // VERIFY, don't trust (this route's own history: a cancel once "succeeded"
+        // against the wrong broker, "caught by verifying the order state on the
+        // broker afterward" — and today's truthy-object bug produced the same
+        // false toast by another road). A cancel only counts when the order is
+        // no longer WORKING on the account that canceled it. One retry covers
+        // IBKR's cancel-acknowledgement lag.
+        let verified = null;
+        if (ok && broker && /ibkr/.test(broker) && bridge && bridge.getIBKROpenOrders) {
+          const stillWorking = async () => {
+            const open = await bridge.getIBKROpenOrders(cancelUid).catch(() => null);
+            if (!Array.isArray(open)) return null;           // unreadable → unknown
+            const row = open.find((o) => String(o && o.orderId) === String(id));
+            return !!(row && /submit|presubmit|pending(?!cancel)|open|accepted|new|working|held/i.test(String(row.status || '')));
+          };
+          let w = await stillWorking();
+          if (w === true) { await new Promise((r2) => setTimeout(r2, 700)); w = await stillWorking(); }
+          verified = w === null ? null : !w;
+          if (verified === false) {
+            sendJson(res, { ok: false, error: 'cancel_not_confirmed', order_id: id, broker, detail: 'the broker accepted the cancel request but the order is still working — check the Orders tab and retry' }, 502);
+            return true;
+          }
+        }
+        sendJson(res, ok ? { ok: true, canceled: id, broker, ...(verified === null ? {} : { verified }) } : { ok: false, error: 'cancel_failed', order_id: id }, ok ? 200 : 502);
       } catch (error) {
         sendJson(res, { ok: false, error: error.message }, 500);
       }
       return true;
     }
+  }
+
+  // POST /api/trading/orders/dust-clear  { ticker }
+  //
+  // THE DUST PROBE (#3325). A sub-1-share remnant cannot be closed through the
+  // normal path: the bridge floors every quantity, so floor(0.8)=0 and the exit
+  // is unexpressible. That floor was inferred from 2026-07-28 (a 838.8 sell the
+  // broker cancelled 28 times) and has been treated as settled fact ever since —
+  // but the SAME ledger shows the account HOLDING fractional size, so fractional
+  // fills reached it somehow (paper-engine fill, or a corporate action; SOXS has
+  // reverse-split history). The floor makes that claim untestable by
+  // construction. This endpoint sends the EXACT held quantity, unfloored, and
+  // reports the broker's verdict verbatim — a measurement, not a workaround.
+  //
+  // Deliberately NOT a flag on /orders/place: this is the only way to set
+  // allowFractional, and it is boxed in on every side —
+  //   • SELL only, and only the position's own quantity (no caller-supplied qty)
+  //   • sub-1-share ONLY: >=1 is refused, so it can never become a general
+  //     fractional-order path or touch a real position
+  //   • verified against the live book first — no position, no order
+  //   • admin only, operator-driven; the engine never calls it
+  // Whatever IBKR answers is recorded either way, so the constraint stops being
+  // folklore and becomes evidence.
+  if (url.pathname === '/api/trading/orders/dust-clear' && req.method === 'POST') {
+    try {
+      const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+      if (!isAdminFn(req)) { sendJson(res, { ok: false, error: 'admin_only' }, 403); return true; }
+      const body = await collectRequestBody(req);
+      const { ticker } = body ? JSON.parse(body) : {};
+      if (!ticker) { sendJson(res, { ok: false, error: 'ticker required' }, 400); return true; }
+      const sym = String(ticker).toUpperCase();
+
+      // Resolve the holding on the account that actually owns it (admin → operator).
+      const uid = getEffectiveUserId(req);
+      const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+      let acct = uid;
+      let pos = (await bridge.getIBKRPositions(uid).catch(() => null)) || [];
+      let row = Array.isArray(pos) ? pos.find((p) => String(p && p.symbol).toUpperCase() === sym) : null;
+      if (!row && uid !== OPERATOR_UID) {
+        pos = (await bridge.getIBKRPositions(OPERATOR_UID).catch(() => null)) || [];
+        row = Array.isArray(pos) ? pos.find((p) => String(p && p.symbol).toUpperCase() === sym) : null;
+        if (row) acct = OPERATOR_UID;
+      }
+      if (!row) { sendJson(res, { ok: false, error: 'not_held', ticker: sym }, 404); return true; }
+
+      const held = Math.abs(Number(row.qty) || 0);
+      if (!(held > 0)) { sendJson(res, { ok: false, error: 'not_held', ticker: sym }, 404); return true; }
+      if (held >= 1) {
+        sendJson(res, { ok: false, error: 'not_dust', ticker: sym, held,
+          detail: 'this endpoint only ever sends sub-1-share remnants — use Flatten for a real position' }, 400);
+        return true;
+      }
+
+      // Same extended-hours conversion as /orders/place (#3326): the first probe
+      // returned "accepted" and then sat Inactive at the broker, because a market
+      // order outside RTH does not work. Price a marketable limit when we can.
+      const _dSess = _sessionState();
+      const _dOrder = { ticker: sym, side: 'sell', qty: held, type: 'market',
+        acceptWarnings: true,        // risk-reducing by construction
+        allowFractional: true };     // THE probe: unfloored
+      let _dNote = null;
+      if (_dSess !== 'rth') {
+        let px = 0;
+        try {
+          const q = await require('../../lib/market-data-yahoo').getQuotes([sym]);
+          px = Number(q && q[0] && q[0].price) || 0;
+        } catch (_e) { /* fall through to market */ }
+        if (px > 0 && _dSess === 'extended') {
+          _dOrder.type = 'limit';
+          _dOrder.limitPrice = Math.round(px * 0.998 * 100) / 100;
+          _dOrder.outsideRth = true;
+          _dNote = `extended hours: marketable limit @ ${_dOrder.limitPrice} with outsideRth`;
+        } else if (px > 0) {
+          // CLOSED MARKET NEEDS GTC (#3327). The previous note claimed the order
+          // "QUEUES until the next session" — it did not. The bridge defaults
+          // non-STP orders to TIF=DAY, and a DAY order placed on a day with no
+          // session EXPIRES at that day's end rather than surviving to the next
+          // open. Live proof: the 0.8-share SOXS dust order was accepted Saturday,
+          // reported as queued, and by Monday 11:38 the position was untouched
+          // with no order anywhere. A marketable GTC limit genuinely survives the
+          // weekend and executes at the open.
+          _dOrder.type = 'limit';
+          _dOrder.limitPrice = Math.round(px * 0.98 * 100) / 100;   // deeply marketable: fills at the open print
+          _dOrder.timeInForce = 'gtc';
+          _dNote = `market closed: GTC limit @ ${_dOrder.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
+        } else {
+          _dNote = 'market closed and no quote available to price a resting order — try again during market hours';
+        }
+      }
+      const r = await bridge.placeIBKROrder(acct, _dOrder)
+        .catch((e) => ({ status: 'error', reason: e.message }));
+
+      const placed = !!(r && r.status === 'placed');
+      // Recorded either way — the point is the evidence, not the fill.
+      try {
+        require('../../lib/trading-store').appendLogEntry({
+          ts: new Date().toISOString(), kind: 'dust_clear_probe', symbol: sym, qty: held,
+          account: acct === OPERATOR_UID ? 'operator' : 'self',
+          result: r && r.status, reason: (r && (r.reason || r.error)) || null,
+        });
+      } catch (_e) { /* logging must never break the probe */ }
+
+      // Record it like any other order, so it appears in the Orders tab instead
+      // of vanishing — the first probe was accepted by the broker and then had
+      // no row anywhere, which is indistinguishable from "nothing happened".
+      if (placed && r.order_id) {
+        try {
+          await tradingMemory.recordNewOrders([{
+            id: r.order_id, symbol: sym, side: 'sell', qty: held,
+            status: 'submitted', order_type: _dOrder.type,
+          }]);
+        } catch (_e) { /* the order is placed; bookkeeping must not fail it */ }
+      }
+      sendJson(res, {
+        ok: placed, ticker: sym, qty: held, order_id: (r && r.order_id) || null,
+        broker_status: (r && r.status) || null,
+        broker_says: (r && (r.reason || r.error)) || null,   // verbatim — this IS the finding
+        operator_account: acct === OPERATOR_UID && uid !== OPERATOR_UID,
+        session: _dSess, session_note: _dNote,
+      }, placed ? 200 : 502);
+    } catch (error) {
+      sendJson(res, { ok: false, error: error.message }, 500);
+    }
+    return true;
   }
 
   // GET /api/trading/orders
@@ -77,13 +273,36 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // Prefer the connected IBKR account's own orders (working + filled) so the
       // Orders / Order-history tabs reflect the autopilot's trades — the legacy
       // agent/ledger only knew manual orders, so history showed "None".
-      const ibkr = await bridge.getIBKROpenOrders(uid).catch(() => null);
+      let ibkr = await bridge.getIBKROpenOrders(uid).catch(() => null);
+      // ADMIN OPERATOR-VIEW READ FALLBACK (2026-08-14). Account, positions and
+      // PLACEMENT all fall back to the operator book for an admin with no linked
+      // broker — this read never did. Live consequence at 04:50: the operator's
+      // four flatten sells (including a DUPLICATE SPXS the resting-sell guard
+      // exists to catch) were resting at IBKR, and the Orders tab said "None" —
+      // the one screen that could cancel the duplicate showed nothing to cancel.
+      let _opView = false;
+      if (!(Array.isArray(ibkr) && ibkr.length)) {
+        try {
+          const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+          const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+          if (isAdminFn(req) && uid !== OPERATOR_UID) {
+            const op = await bridge.getIBKROpenOrders(OPERATOR_UID).catch(() => null);
+            if (Array.isArray(op) && op.length) { ibkr = op; _opView = true; }
+          }
+        } catch (_e) { /* auth module absent → no fallback */ }
+      }
       if (Array.isArray(ibkr) && ibkr.length) {
         const norm = (s) => {
           const x = String(s || '').toLowerCase();
           if (/fill/.test(x)) return 'filled';
           if (/cancel/.test(x)) return 'canceled';
-          if (/submit|presubmit|pending|inactive/.test(x)) return 'open';
+          // 'Inactive' is NOT working: IBKR parks an order there when it was never
+          // transmitted (e.g. it hit the order-warning gate and nothing confirmed it).
+          // Mapping it to 'open' made 972 inert orders look like live resting orders —
+          // it fooled a human reviewer into reporting a 25x oversell exposure that did
+          // not exist, and it is unactionable (cancel returns 'Order is inactive').
+          if (/inactive/.test(x)) return 'inactive';
+          if (/submit|presubmit|pending/.test(x)) return 'open';
           return x || 'unknown';
         };
         const tstr = (t) => { const n = Number(t); return n > 1e11 ? new Date(n).toISOString() : (t || ''); };
@@ -93,6 +312,9 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           limit_price: o.orderType === 'STP' || o.orderType === 'LMT' ? o.price : null,
           status: norm(o.status), filled_avg_price: o.avgPrice || 0,
           filled_at: tstr(o.time), created_at: tstr(o.time),
+          // Flagged like the account/positions fallback, so the UI can never
+          // silently present the operator book as the viewer's own orders.
+          ...(_opView ? { operator_account: true } : {}),
         }));
         sendJson(res, orders, 200);
         return true;
@@ -160,6 +382,60 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         sendJson(res, { status: 'error', error: 'ticker, side (buy/sell), and positive qty are required' }, 400);
         return true;
       }
+      // acceptWarnings (2026-08-14): IBKR raises disclosure/size warnings and the
+      // manual Flatten path dead-ended on them — the bridge supports the flag but
+      // this route never forwarded it, so the operator could not trim the 3x carry
+      // ("Couldn't flatten SOXS: re-submit with acceptWarnings:true").
+      // SELLS ONLY, always: a buy that draws warnings must keep surfacing them
+      // (P0-8), whether the engine or a person is driving.
+      const _isSell = String(side).toLowerCase() === 'sell';
+      let acceptWarnings = payload.acceptWarnings === true && _isSell;
+      let _autoAccepted = null;
+      // VERIFIED RISK-REDUCING SELLS AUTO-ACCEPT (2026-08-14, second pass). The
+      // first fix bounced every warned sell to a confirm popup, and the popup was
+      // asking the human to approve "IBKR returned order warnings" — no content,
+      // pure friction (operator: "i dont like this popup"). The engine's own
+      // exits already auto-accept (2026-07-27, after 13 stalled exits, one run to
+      // -18.9% waiting for a click); what that decision actually requires is not
+      // a human, it is PROOF the sell reduces risk. The engine proves it by
+      // reconciling qty to the held position — so this route now does the same:
+      // verify against the live book that qty <= |held|, and only then accept.
+      // Oversell stays impossible to auto-clear: unverifiable (feed down, symbol
+      // not held, qty too big) falls back to the explicit human confirm.
+      const _sellRiskReducing = async (uidX) => {
+        try {
+          const pos = await bridge.getIBKRPositions(uidX);
+          if (!Array.isArray(pos)) return false;
+          const p = pos.find((x) => String(x && x.symbol).toUpperCase() === String(ticker).toUpperCase());
+          const held = Math.abs(Number(p && p.qty) || 0);
+          if (held < 1) return false;
+          // RESTING SELLS COUNT AGAINST THE POSITION (live 2026-08-14 04:34).
+          // The operator flattened SPXS, the position list did not update
+          // (pre-market market orders REST until the auction), so they clicked
+          // again — and this check re-verified against the unchanged position
+          // and auto-accepted a DUPLICATE 2,467-share sell: an oversell in two
+          // installments. The engine's own exit path has exactly this guard
+          // (its workingSells set); the manual path now has it too. Protective
+          // STOPS deliberately do not count: every position always carries one,
+          // and counting it would make every flatten unverifiable.
+          let resting = 0;
+          const open = await bridge.getIBKROpenOrders(uidX);
+          for (const o of (Array.isArray(open) ? open : [])) {
+            if (String(o && o.symbol).toUpperCase() !== String(ticker).toUpperCase()) continue;
+            if (!/sell/i.test(o.side || '')) continue;
+            if (/stp|stop/i.test(o.orderType || o.type || '')) continue;
+            if (!/submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || '')) continue;
+            resting += Number(o.qty) || 0;
+          }
+          const available = Math.floor(held) - resting;
+          // FLOOR THE REQUEST TOO (same morning): the UI sends the position's
+          // raw fractional qty (SOXS 3057.8); the bridge floors it before
+          // placing, so verification must judge the sell that will actually be
+          // sent — floor(3057.8)=3057 against 3057 available is risk-reducing.
+          const wanted = Math.floor(Number(qty));
+          return wanted >= 1 && wanted <= available;
+        } catch (_e) { return false; }   // cannot verify -> cannot auto-accept
+      };
       if (stopLoss != null && Number(stopLoss) <= 0) {
         sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
         return true;
@@ -172,7 +448,47 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // one-click Alpaca account (ADR-0027), then the legacy env agent. First match
       // that isn't null wins. Every path is HARD-GATED inside its own placeOrder.
       const uid = getEffectiveUserId(req);
-      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
+      if (_isSell && !acceptWarnings && await _sellRiskReducing(uid)) {
+        acceptWarnings = true;
+        _autoAccepted = 'risk_reducing_sell';
+      }
+      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings };
+      // EXTENDED-HOURS CONVERSION (#3326). A MARKET order does not execute
+      // outside RTH, so a manual Flatten placed pre-market just sat there — the
+      // operator saw "✓ Flattened" and a position that never left. The engine
+      // already converts (marketable LMT + outsideRth); do the same here so a
+      // human's order behaves like the engine's. Marketable = cross the spread
+      // by 0.2% in the direction of the trade, matching auto-trader's constant.
+      let _sessionNote = null;
+      const _sess = _sessionState();
+      if (_sess !== 'rth' && String(type || 'market').toLowerCase() === 'market') {
+        let px = 0;
+        try {
+          const q = await require('../../lib/market-data-yahoo').getQuotes([ticker]);
+          px = Number(q && q[0] && q[0].price) || 0;
+        } catch (_e) { /* no quote → cannot price a limit */ }
+        if (px > 0 && _sess === 'extended') {
+          const isBuy = String(side).toLowerCase() === 'buy';
+          orderReq.type = 'limit';
+          orderReq.limitPrice = Math.round(px * (isBuy ? 1.002 : 0.998) * 100) / 100;
+          orderReq.outsideRth = true;
+          _sessionNote = `extended hours: sent as a marketable limit @ ${orderReq.limitPrice} with outsideRth (a market order would not execute until 09:30)`;
+        } else if (_sess === 'closed') {
+          // Same DAY-expiry trap as the dust path (#3327): "queues" was false —
+          // TIF=DAY on a closed day expires unfilled. Make it genuinely rest.
+          if (px > 0) {
+            const isBuy = String(side).toLowerCase() === 'buy';
+            orderReq.type = 'limit';
+            orderReq.limitPrice = Math.round(px * (isBuy ? 1.02 : 0.98) * 100) / 100;
+            orderReq.timeInForce = 'gtc';
+            _sessionNote = `market closed: GTC limit @ ${orderReq.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
+          } else {
+            _sessionNote = 'market closed and no quote available to price a resting order — this order may expire unfilled; place it during market hours';
+          }
+        } else {
+          _sessionNote = 'extended hours: no quote available to price a limit — sent as market, which will not fill until 09:30';
+        }
+      }
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
@@ -198,8 +514,43 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         result = await attempt().catch(() => null);
         if (result) break;                                  // connected broker answered → done
       }
+      // ADMIN OPERATOR-VIEW WRITE FALLBACK (2026-08-10). The dashboard's READ
+      // fallback shows an admin with no linked broker the operator book — but
+      // Flatten then failed "No broker connected" because this write path only
+      // resolved the admin's own (empty) uid. Mirror the read fallback: an
+      // ADMIN acting from the operator view acts on the operator account,
+      // flagged in the result so the UI can say whose account traded.
+      // Admin-only; non-admins keep the exact old behavior.
+      if (!result) {
+        try {
+          const { isAdmin } = require('../../lib/auth-middleware');
+          const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+          if (isAdmin(req) && uid !== OPERATOR_UID) {
+            // The order is going to the OPERATOR book, so the risk-reducing
+            // verification must be re-run against that book, not the admin's own
+            // (empty) account — otherwise operator-view flattens keep the popup.
+            const opReq = { ...orderReq };
+            if (_isSell && !opReq.acceptWarnings && await _sellRiskReducing(OPERATOR_UID)) {
+              opReq.acceptWarnings = true;
+              _autoAccepted = 'risk_reducing_sell';
+            }
+            for (const attempt of [() => bridge.placeIBKROrder(OPERATOR_UID, opReq), () => alpaca.placeOrder(OPERATOR_UID, opReq)]) {
+              result = await attempt().catch(() => null);
+              if (result) { result.operator_account = true; break; }
+            }
+          }
+        } catch (_e) { /* auth module absent → no fallback */ }
+      }
       result = result
         || { status: 'error', ticker, side, qty, reason: 'No broker connected. Add your Alpaca API keys in Settings → Connections to trade.' };
+      // Transparency: when warnings were cleared by position-verification rather
+      // than a human, the response says so — the journal and any audit can tell
+      // the two apart.
+      if (_autoAccepted) result.auto_warnings = _autoAccepted;
+      // The session caveat rides on the response so the toast can tell the truth
+      // about WHEN this order will act — "placed" and "will fill" are different
+      // claims, and conflating them is what made a pre-market Flatten look done.
+      if (_sessionNote) { result.session = _sess; result.session_note = _sessionNote; }
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,

@@ -1,5 +1,5 @@
 {
-  "built_at": 1784707078.1250587,
+  "built_at": 1785628484.30224,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -29,24 +29,39 @@
     "docs/loop/remember.md",
     "docs/KEYSTONE-LIMITATIONS.md",
     "docs/KEYSTONE-BRAND-GUIDELINES.md",
-    "docs/fallout-radio-backlog.md",
     "docs/loop/verify.md",
     "docs/ACCESSIBILITY.md",
     "docs/ACTION-POOLING-AND-BATCHING.md",
     "docs/CHAT-EVAL-RECIPE.md",
     "CODE_OF_CONDUCT.md",
-    "SCRIPTS.md",
     "UX_STANDARDS.md",
     "docs/CONVERGENCE-LOOP.md",
+    "docs/lore/CAST.md",
+    "docs/CHATGPT-CONNECTOR-SETUP.md",
+    "docs/CLAUDE-CHATGPT-MCP-SETUP.md",
+    "docs/GOOGLE-OAUTH.md",
+    "docs/mcp-client-setup.md",
+    "docs/PATREON-OAUTH.md",
+    "docs/KEYSTONE-MCP.md",
+    "docs/DREAM-JOURNAL-QUICKSTART.md",
+    "docs/MCP-CONNECTOR.md",
+    "docs/USER-PROFILES.md",
+    "docs/investing-2k-plan-collapse-certificate.md",
+    "docs/KALSHI-API-SPEC.md",
+    "docs/PORTFOLIO-SETUP.md",
+    "docs/trading-api-reference.md",
+    "docs/TRADER-ANALYSIS-2026-07.md",
+    "docs/UNISONA-SHARPE-CERTIFICATE.md",
     "docs/adr/0006-dual-boot-worktree-topology.md",
     "docs/ARXIV-CORPUS.md",
     "docs/convergence-core-mapping.md",
-    "docs/ROLLOVER.md",
     "docs/SURFACE-BOUNDARY.md",
     "docs/AGENT.md",
+    "THIRD-PARTY-NOTICES.md",
     "docs/KEYSTONE-IP-AND-BUILDOUT.md",
     "docs/KEYSTONE-COCKPIT.md",
     "docs/SIGMA0-MODEL-ADAPTER.md",
+    "docs/convergence-io/AAPF.md",
     "docs/adr/0001-record-architecture-decisions.md",
     "docs/adr/0002-single-convergence-core.md",
     "docs/adr/0003-one-canonical-csf-module.md",
@@ -68,10 +83,26 @@
     "docs/adr/0027-one-click-broker-oauth2.md",
     "docs/adr/0028-managed-strategy-sharpe-gate-tax-aware.md",
     "docs/adr/0029-ibkr-streaming-challenger-duel.md",
+    "docs/adr/0030-spiral-verified-cascade-harness.md",
+    "docs/adr/0031-spiral-coder-arc-agi2-efficiency-target.md",
+    "docs/adr/0032-real-money-trading-onboarding.md",
+    "docs/adr/0033-apex-max-acceptable-risk-trader.md",
+    "docs/adr/0034-moe-core-admission-switched-system-gate.md",
+    "docs/AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md",
+    "docs/convergence-io/CCF.md",
+    "docs/convergence-io/CEG.md",
     "docs/CONVERGENCE-ROUTING-ARCHITECTURE.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
+    "docs/convergence-io/DILATION.md",
+    "docs/convergence-io/DCF.md",
     "docs/adr/0010-verify-gated-continual-learning-last-resort.md",
+    "docs/caad/architecture/grounding/grounding-manifest.md",
     "docs/MCP-DREAM-CHAT-TOOL-PARITY.md",
+    "docs/convergence-io/NAP.md",
+    "docs/convergence-io/PCSF.md",
+    "docs/SIGMA0-LLM-WHITEPAPER.md",
+    "docs/PATENT-CORPUS.md",
+    "docs/SIGMA0-TECHNICAL-PAPER.md",
     "docs/adr/0008-end-product-personal-ai-wrapper.md",
     "docs/adr/0011-proprietary-sigma0-base-model.md",
     "docs/adr/0013-subsystem-register-one-loop-gate.md",
@@ -80,107 +111,42 @@
     "docs/adr/0017-surprise-gated-decoding.md",
     "docs/adr/0023-default-profile-foregrounds-the-loop.md",
     "docs/adr/0024-sigma0-frontier-training-program.md",
-    "docs/research/2026-06-29-csf-beating-zstd.md",
-    "docs/research/2026-07-08-cpu-only-serving-ternary-and-gguf.md",
-    "docs/research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md",
-    "docs/research/2026-07-21-csf-cosmological-frontier.md",
     "docs/research/gpu-training-pipeline-diagnosis-2026-06-25.md",
     "docs/ANTI-COLLAPSE-HARDENING.md",
-    "docs/research/2026-07-18-market-data-vendors-survivorship.md",
-    "docs/research/2026-06-30-surprise-leak-layer1-result.md",
-    "docs/research/2026-06-30-surprise-valve-opened.md",
-    "docs/research/2026-07-21-owned-math-conjectures.md",
-    "docs/research/2026-07-21-owned-math-proofs.md",
-    "docs/research/2026-06-19-kernel-model-frontier.md",
-    "docs/research/2026-07-21-tesseract-application-map.md",
     "docs/AGI-CONVERGENCE-BLUEPRINT.md",
-    "docs/research/2026-06-22-frozen-weights-grounding-loop.md",
-    "docs/research/2026-06-30-pumped-lossy-resonator.md",
     "docs/research/question-machine.md",
     "docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md",
-    "docs/research/2026-07-01-unisona-crystallization.md",
-    "docs/research/2026-06-19-convergence-core-agent-spine.md",
     "docs/SIGMA0-GROUNDING-LEDGER.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
     "docs/SIGMA0-COLLAPSE-EXPLAINER.md",
     "docs/SIGMA0-WORKLIST.md",
-    "docs/research/2026-06-29-best-in-slot-local-coder.md",
     "docs/research/CLAUDE-CODE-MULTI-AGENT-SPAWNING.md",
-    "docs/research/2026-07-17-control-engineering-tranche-analysis.md",
-    "docs/research/2026-07-10-tsar-cpu-ternary.md",
-    "docs/research/2026-07-10-forecastex-uhlga-settlement-and-klga-fit.md",
     "docs/FRONTIER-DIRECTIONS-2026-H2.md",
-    "docs/research/2026-07-08-gencast-g1-result.md",
     "docs/research/regulatory-oracle-grounding.md",
-    "docs/research/2026-07-10-grounding-v2-verdict.md",
-    "docs/research/2026-07-10-hneurons-probe.md",
-    "docs/research/2026-07-10-honesty-under-quantization.md",
     "docs/SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md",
-    "docs/research/2026-07-10-spectral-honesty.md",
     "docs/OSS-BASELINE.md",
-    "docs/research/2026-07-13-ouro-mbpp-distillation.md",
     "docs/research/PREDICTION-MARKET-GROUNDING-SURVEY.md",
-    "docs/research/2026-07-10-ptqtp-ternary.md",
-    "docs/research/2026-07-09-hardness-depth.md",
-    "docs/research/2026-07-10-ptqtp-lora-recovery.md",
-    "docs/research/2026-07-10-depth-value-n50.md",
-    "docs/research/2026-06-21-convergence-plan-refinement.md",
-    "docs/research/2026-07-04-serving-design-sota.md",
-    "docs/research/2026-07-07-rlvr-continual-learning-dreaming-weight-updates.md",
-    "docs/research/2026-07-05-halueval-surprise-gated.md",
-    "docs/research/2026-07-18-survivorship-backtest-tranche.md",
-    "docs/research/2026-07-10-swebench-verifier.md",
     "docs/CONVERGENCE-ORACLE-DESIGN.md",
     "docs/research/convergence-oracle.md",
-    "docs/research/2026-07-04-pr-outcome-signal.md",
-    "docs/research/2026-07-05-grounding-deadline.md",
-    "docs/research/2026-07-09-truth-probe-transfer.md",
-    "docs/research/2026-06-21-overfitted-brain-dreams-generalization.md",
     "docs/SIGMA0-T1-NONNORMAL-DICHOTOMY.md",
-    "docs/research/2026-07-09-honesty-calibration-adapter-trackB.md",
     "docs/SIGMA-THETA-ABC-HARNESS-SPEC.md",
     "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
     "docs/SIGMA0-FRONTIER-TRAIN-BRIEF.md",
     "docs/SIGMA0-HONESTY-BENCHMARK.md",
     "docs/SIGMA0-MODEL-DESIGN.md",
     "docs/SIGMA0-REAL-DATA-GROUNDING.md",
-    "docs/research/2026-06-21-sigma0-serving-validation.md",
     "docs/research/SIGMA0-ARXIV-READING-PACK-2026-07.md",
-    "docs/research/2026-06-30-sigma0-weather-oracle-kalshi-edge.md",
     "docs/SIGMA0-K1-KERNEL-SPEC.md",
     "docs/research/explore-content-machine.md",
-    "docs/research/2026-06-29-sigma0-nested-adaptive-reason.md",
-    "docs/research/2026-06-28-keystone-chat-frontier-stack.md",
     "docs/KEYSTONE-SIGMA0-SUSTAINED-WORK-DESIGN.md",
-    "docs/research/2026-06-21-sigma0-onnx-directml-spike.md",
     "docs/SIGMA0-V10-THEORY-GROUNDING.md",
-    "docs/convergence-io/AAPF.md",
-    "docs/convergence-io/CCF.md",
-    "docs/convergence-io/CEG.md",
-    "docs/convergence-io/DILATION.md",
-    "docs/convergence-io/DCF.md",
-    "docs/convergence-io/NAP.md",
-    "docs/convergence-io/PCSF.md",
-    "docs/research/2026-06-22-ouro-subquadratic-attention.md",
     "docs/SIGMA0-CONTINUAL-TRAINING.md",
     "docs/LANTERN-SIGMA0-CODER.md",
     "docs/OURO-MULTISOURCE-SESSION-DATASET.md",
-    "docs/research/2026-06-26-ouro-humaneval-training.md",
     "docs/SERVING-ARCHITECTURE-2026.md",
-    "docs/WEEKLY-TRAINING-SETUP.md",
     "docs/SERVING-DEEP-MODE-GUIDE.md",
     "docs/SIGMA0-AGENT-PORTFOLIO-UPDATE.md",
-    "docs/SIGMA0-CODER-DEVBOX-SETUP.md",
-    "docs/research/2026-06-21-fc-retraining-web-grounded-refinement.md",
-    "docs/research/2026-06-21-sigma0-serving-perf.md",
     "docs/SIGMA0-CONVERGENCE-ADAPTER.md",
-    "docs/SIGMA0-EB-L4-RUNBOOK.md",
-    "docs/investing-2k-plan-collapse-certificate.md",
-    "docs/KALSHI-API-SPEC.md",
-    "docs/PORTFOLIO-SETUP.md",
-    "docs/trading-api-reference.md",
-    "docs/TRADER-ANALYSIS-2026-07.md",
-    "docs/UNISONA-SHARPE-CERTIFICATE.md",
     "docs/creator-v10/learning-pipeline-research.md",
     "docs/creator-v10/editing-analysis-model-research.md",
     "docs/creator-v10/editing-discovery-engine.md",
@@ -193,454 +159,11 @@
     "docs/creator-v10/research-dataset-schema.md",
     "docs/creator-v10/safe-zone-v2.md",
     "docs/creator-v10/variant-engine-v2.md",
-    "docs/CHATGPT-CONNECTOR-SETUP.md",
-    "docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md",
-    "docs/CLAUDE-CHATGPT-MCP-SETUP.md",
-    "docs/convergence-router-deployment-guide.md",
-    "docs/GOOGLE-OAUTH.md",
-    "docs/mcp-client-setup.md",
-    "docs/MEDIA-HOSTING-R2.md",
-    "docs/PATREON-OAUTH.md",
-    "docs/TEST-AUTH.md",
-    "docs/KEYSTONE-MCP.md",
-    "docs/DREAM-JOURNAL-QUICKSTART.md",
-    "docs/MCP-CONNECTOR.md",
-    "docs/USER-PROFILES.md",
-    "docs/API-REFERENCE.md",
-    "docs/ADMIN-FEATURE-FLAGS.md",
-    "docs/BACKLOG-REVIEW-STANDARDS.md",
-    "docs/MESH-HUB.md",
-    "THIRD-PARTY-NOTICES.md",
-    "docs/ACCESSIBILITY-AUDIT-SYSTEM.md",
-    "docs/AGENT-ORCHESTRATION-OPERATOR-GUIDE.md",
-    "docs/DEV-SERVER-WORKTREE.md",
-    "docs/ops/gce-cloud-deploy-runbook.md",
-    "docs/HOOKS.md",
-    "docs/GREENPATH-GATE.md",
-    "docs/INNOVATOR-EVIDENCE-METHOD.md",
-    "docs/MONOWORKSTREAM.md",
-    "docs/PII-LOCAL-SCRUB-RUNBOOK.md",
-    "docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md",
-    "docs/runbooks/history-rewrite-condense.md",
-    "docs/V1-READINESS-GATES.md",
-    "docs/KNOWLEDGE-CENTER-AUDIT-2026-06-30.md",
-    "docs/EDITOR_LEARNING_AUDIT.md",
     "docs/memory-recall-benchmark.md",
-    "docs/caad/architecture/grounding/grounding-manifest.md",
-    "docs/research/2026-07-21-verified-fitness-swarm-merge-flywheel.md",
-    "docs/lore/CAST.md",
-    "hff/CONVERGENCE-EVIDENCE-REPORT.md",
-    "hff/LOCAL-LLM-STORAGE-FORMAT.md",
-    "hff/ORCHESTRATOR-CONVERGENCE-POLICY-v2.md",
-    "hff/ORCHESTRATOR-POLICY.md",
-    "hff/README.md",
-    "hff/UNIFIED-DEPLOYMENT-MANIFEST.md",
-    "hff/apps_bettersafe-pilot_bettersafe-feature-schema.md",
-    "hff/apps_bettersafe-pilot_bettersafe-local-first-architecture.md",
-    "hff/apps_bettersafe-pilot_social-services-registry-schema.md",
-    "hff/apps_lantern-discord-radio_README.md",
-    "hff/apps_rhythm-os_DEPLOYMENT.md",
-    "hff/apps_rhythm-os_README.md",
-    "hff/deploy_README.md",
-    "hff/docs_CLAIM-PACKET-SCIENTIFIC-RIGOR.md",
-    "hff/docs_CLAIM-PACKET-TEMPLATE.md",
-    "hff/docs_CONVERGENCE-LOOP.md",
-    "hff/docs_INNOVATOR-EVIDENCE-METHOD.md",
-    "hff/docs_LANTERN-ORCHESTRATOR-DEPENDENCY.md",
-    "hff/docs_MCP-CONNECTOR-REVIEW-2026-06-17.md",
-    "hff/docs_V1-READINESS-GATES.md",
-    "hff/docs_adr_ADR-1-EVENT-SOURCING.md",
-    "hff/docs_adr_ADR-2-BYZANTINE-CONSENSUS.md",
-    "hff/docs_adr_ADR-3-DISCORD-ARCHITECTURE.md",
-    "hff/docs_arc-reactor-mining-lab_README.md",
-    "hff/docs_bettersafe-capability-profile-views.md",
-    "hff/docs_internationalization-and-accessibility.md",
-    "hff/docs_live-polling-readiness.md",
-    "hff/docs_public-ux-baseline.md",
-    "hff/docs_repo-layout.md",
-    "hff/lantern_os_master_push_rag_house_plan.md",
-    "hff/lore_LANTERN-CHARACTERS-AND-REALMS.md",
-    "hff/lore_LORE.md",
-    "hff/manifests_dual-boot.md",
-    "hff/manifests_windows-surfaces.md"
+    "docs/research/INDEX.md"
   ],
-  "doc_meta": {
-    "hff/CONVERGENCE-EVIDENCE-REPORT.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/CONVERGENCE-EVIDENCE-REPORT.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "CONVERGENCE EVIDENCE REPORT",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/LOCAL-LLM-STORAGE-FORMAT.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/LOCAL-LLM-STORAGE-FORMAT.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Local LLM Storage Format \u2014 Permanent Archive & Mesh HDD Backup",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/ORCHESTRATOR-CONVERGENCE-POLICY-v2.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/ORCHESTRATOR-CONVERGENCE-POLICY-v2.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Orchestrator Convergence Policy v2",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/ORCHESTRATOR-POLICY.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/ORCHESTRATOR-POLICY.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Orchestrator-Backed Deployment Policy",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/README.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/README.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern \u2014 Local-First AI Chat + Media Curator for Households",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/UNIFIED-DEPLOYMENT-MANIFEST.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/UNIFIED-DEPLOYMENT-MANIFEST.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Unified Deployment Manifest \u2014 Lantern OS v1.0",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/apps_bettersafe-pilot_bettersafe-feature-schema.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_bettersafe-pilot_bettersafe-feature-schema.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "BetterSafe Feature Schema \u2014 Local-First Data Model",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/apps_bettersafe-pilot_bettersafe-local-first-architecture.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_bettersafe-pilot_bettersafe-local-first-architecture.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "BetterSafe \u2014 Local-First Architecture",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/apps_bettersafe-pilot_social-services-registry-schema.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_bettersafe-pilot_social-services-registry-schema.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Social Services Registry \u2014 Waynesville & Spring Valley, Ohio",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/apps_lantern-discord-radio_README.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_lantern-discord-radio_README.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern Discord Radio Bot",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/apps_rhythm-os_DEPLOYMENT.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_rhythm-os_DEPLOYMENT.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Rhythm OS Deployment Guide",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/apps_rhythm-os_README.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_rhythm-os_README.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Rhythm OS \u2014 Music + AI Convergence",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/deploy_README.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/deploy_README.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Multi-Platform Deploy \u2014 HFF Dashboard",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_CLAIM-PACKET-SCIENTIFIC-RIGOR.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_CLAIM-PACKET-SCIENTIFIC-RIGOR.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Claim Packet Scientific Rigor Standard",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_CLAIM-PACKET-TEMPLATE.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_CLAIM-PACKET-TEMPLATE.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Claim Packet Template",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_CONVERGENCE-LOOP.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_CONVERGENCE-LOOP.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern OS Convergence Loop",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_INNOVATOR-EVIDENCE-METHOD.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_INNOVATOR-EVIDENCE-METHOD.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Innovator Evidence Method",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_LANTERN-ORCHESTRATOR-DEPENDENCY.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_LANTERN-ORCHESTRATOR-DEPENDENCY.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Orchestrator Dependency Contract",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_MCP-CONNECTOR-REVIEW-2026-06-17.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_MCP-CONNECTOR-REVIEW-2026-06-17.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "MCP Connector Review \u2014 2026-06-17",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_V1-READINESS-GATES.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_V1-READINESS-GATES.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern OS v1.0.0 Readiness Gates",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_adr_ADR-1-EVENT-SOURCING.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_adr_ADR-1-EVENT-SOURCING.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "ADR-1: Event Sourcing for Immutable Audit Trail",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_adr_ADR-2-BYZANTINE-CONSENSUS.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_adr_ADR-2-BYZANTINE-CONSENSUS.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "ADR-2: Byzantine Fault Tolerant Consensus for Research Queue Acceptance",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_adr_ADR-3-DISCORD-ARCHITECTURE.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_adr_ADR-3-DISCORD-ARCHITECTURE.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "ADR-3: Discord Bot Architecture \u2014 Continuous Playback + Reaction Control",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_arc-reactor-mining-lab_README.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_arc-reactor-mining-lab_README.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Arc Reactor Mining Lab",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_bettersafe-capability-profile-views.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_bettersafe-capability-profile-views.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "BetterSafe Capability Profile Views",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_internationalization-and-accessibility.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_internationalization-and-accessibility.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Internationalization and Accessibility Posture",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_live-polling-readiness.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_live-polling-readiness.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Live Polling Readiness",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_public-ux-baseline.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_public-ux-baseline.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Public UX Baseline",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/docs_repo-layout.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_repo-layout.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "HFF Repository Layout",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/lantern_os_master_push_rag_house_plan.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/lantern_os_master_push_rag_house_plan.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern OS Master Push + RAG House Convergence Report",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/lore_LANTERN-CHARACTERS-AND-REALMS.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/lore_LANTERN-CHARACTERS-AND-REALMS.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern OS Lore: Characters and Realms",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/lore_LORE.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/lore_LORE.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Lantern OS Lore & Symbolic Sandbox",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/manifests_dual-boot.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/manifests_dual-boot.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Dual Boot Manifest",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    },
-    "hff/manifests_windows-surfaces.md": {
-      "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/manifests_windows-surfaces.md",
-      "source": "Human Flourishing Frameworks",
-      "title": "Windows Surface Manifest",
-      "external": true,
-      "topics": [
-        "convergence",
-        "flourishing",
-        "research"
-      ]
-    }
-  },
-  "sections": 2551,
-  "external": 34,
-  "sha256": "eef1bccfbd913bd5bcaf014f4f3ff0f131f6fefd80b429b6d151c27638a0a4a3"
+  "doc_meta": {},
+  "sections": 1904,
+  "external": 0,
+  "sha256": "225da49acb2e437894469494a31ab79760fca320bf12ec6e816acc0750ee542c"
 }

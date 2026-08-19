@@ -30,15 +30,13 @@ const NON_PUBLIC = new Set([
   // auth / session / personal
   'auth.html', 'reset-password.html', 'entry.html', 'accounts.html', 'profile.html', 'settings.html',
   // admin / operator / dev diagnostics
-  'admin-flags.html', 'agent-leaderboard.html', 'agent-status.html', 'calibration.html', 'drift.html',
-  'metrics.html', 'systems.html', 'grounding-diff.html', 'replay.html', 'factcheck.html', 'demo.html',
-  'fallout-radio.html', 'wide-search.html', 'rag-house.html',
+  'admin-flags.html',
+  'metrics.html', 'system-health.html',
+  'fallout-radio.html', 'wide-search.html',
   // personal broker/config surfaces
-  'ibkr-connect.html', 'ibkr-setup-guide.html', 'kalshi-screener.html',
+  'ibkr-setup-guide.html',
   // operator surfaces hidden from guests (app functionality, not indexable content)
   'orchestration.html', 'work.html',
-  // superseded / duplicate
-  'dream-chat.html',
 ]);
 
 // Priority by page (default 0.6). Marketing highest, then primary product, then
@@ -48,7 +46,7 @@ const PRIORITY = {
   '/pricing.html': '0.9', '/welcome.html': '0.9',
   '/chat.html': '0.8', '/stock-trader.html': '0.8', '/explore.html': '0.8',
   '/kalshi-terminal.html': '0.6', '/create.html': '0.6', '/faq.html': '0.6',
-  '/proof.html': '0.6', '/knowledgecenter.html': '0.6',
+  '/knowledgecenter.html': '0.6',
   '/changelog.html': '0.5', '/whats-new.html': '0.5',
   '/terms.html': '0.3',
 };

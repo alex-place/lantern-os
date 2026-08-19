@@ -21,6 +21,7 @@
 const {
   isConfigured, isLiveKey, roleForPrice, accessForStatus, tierToRole, priceIdForRole,
   pickLinkableSubscription, alreadyProcessed, markProcessed, HANDLED_EVENTS,
+  lineItemForRole, canCheckout,
 } = require("../lib/stripe-billing");
 const {
   getProfile, applyStripeState, getProfileByStripeCustomer, getProfileByEmail, verifiedEmailOf,
@@ -36,10 +37,17 @@ function stripe() {
   // (checkout/subscriptions/portal) can be exercised end-to-end without a Stripe
   // account. No-op in prod (env unset). Webhook signature verification is unaffected —
   // it only uses STRIPE_WEBHOOK_SECRET, never reaches the network.
+  // Pin the Stripe API version explicitly. Without it the effective version is whatever the
+  // installed SDK defaults to, so a routine `stripe` dependency bump silently moves prod's
+  // request/response shapes — the #3156 18→22 bump adopted 2026-07-29.dahlia, which (among
+  // other changes) relocated subscription.current_period_end onto the item. Pin it to the
+  // version this integration is written and verified against so an SDK upgrade becomes a
+  // deliberate, reviewed change instead of a surprise. Value = stripe@22.4.0's own default.
+  const STRIPE_API_VERSION = "2026-07-29.dahlia";
   const host = (process.env.STRIPE_API_HOST || "").trim();
   const opts = host
-    ? { host, port: Number(process.env.STRIPE_API_PORT) || 443, protocol: process.env.STRIPE_API_PROTOCOL || "https" }
-    : undefined;
+    ? { apiVersion: STRIPE_API_VERSION, host, port: Number(process.env.STRIPE_API_PORT) || 443, protocol: process.env.STRIPE_API_PROTOCOL || "https" }
+    : { apiVersion: STRIPE_API_VERSION };
   _stripe = Stripe((process.env.STRIPE_SECRET_KEY || "").trim(), opts);
   return _stripe;
 }
@@ -338,9 +346,9 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     sendJson(res, {
       configured: isConfigured(),
       tiers: {
-        member: !!priceIdForRole("supporter"),
-        pro: !!priceIdForRole("deep_dreamer"),
-        pilot: !!priceIdForRole("pilot"),
+        member: canCheckout("supporter"),
+        pro: canCheckout("deep_dreamer"),
+        pilot: canCheckout("pilot"),
       },
       subscribed,                                  // has a live Stripe subscription
       stripeStatus: (prof && prof.stripeStatus) || null,
@@ -360,8 +368,10 @@ module.exports = async function billingRoutes(req, res, url, deps) {
 
     const role = tierToRole(body.tier || body.role);
     if (!role) { sendJson(res, { error: "unknown_tier", detail: String(body.tier || body.role || "") }, 400); return true; }
-    const price = priceIdForRole(role);
-    if (!price) { sendJson(res, { error: "price_not_configured", detail: `set STRIPE_PRICE_${role.toUpperCase()}` }, 503); return true; }
+    // Prefer a configured Price id; fall back to an inline price built from the
+    // canonical AMOUNT_CENTS ladder so a deploy needs only STRIPE_SECRET_KEY.
+    const lineItem = lineItemForRole(role);
+    if (!lineItem) { sendJson(res, { error: "price_not_configured", detail: `no Price id and no known amount for ${role}` }, 503); return true; }
 
     const profile = getProfile(userId);
     // Guard against a SECOND concurrent subscription: a user with a live Stripe sub who
@@ -393,7 +403,7 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     try {
       const session = await stripe().checkout.sessions.create({
         mode: "subscription",
-        line_items: [{ price, quantity: 1 }],
+        line_items: [lineItem],
         client_reference_id: userId,
         // Reuse the stored customer so a returning buyer doesn't get a duplicate.
         ...(profile && profile.stripeCustomerId ? { customer: profile.stripeCustomerId } : (profile && profile.email ? { customer_email: profile.email } : {})),
@@ -528,7 +538,13 @@ module.exports = async function billingRoutes(req, res, url, deps) {
       // Cancel at period end so the user keeps access they already paid for; the
       // subscription.updated webhook re-syncs the role when it actually lapses.
       const updated = await stripe().subscriptions.update(sub.id, { cancel_at_period_end: true });
-      sendJson(res, { ok: true, cancel_at_period_end: true, current_period_end: updated.current_period_end ? updated.current_period_end * 1000 : null });
+      // current_period_end moved onto the subscription ITEM under Basil (2025-04+); read it
+      // there first with a fallback to the legacy subscription-level field — same as the
+      // mapping used when syncing a subscription above. Without this the cancel confirmation
+      // would report a null period end on the newer API version.
+      const uItem = updated.items && updated.items.data && updated.items.data[0];
+      const periodEnd = (uItem && uItem.current_period_end) || updated.current_period_end || null;
+      sendJson(res, { ok: true, cancel_at_period_end: true, current_period_end: periodEnd ? periodEnd * 1000 : null });
     } catch (e) { console.error("[BILLING] cancel failed", e.message); sendJson(res, { error: "cancel_failed", detail: e.message }, 502); }
     return true;
   }

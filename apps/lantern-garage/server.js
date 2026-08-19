@@ -85,7 +85,7 @@ const { JobQueue } = require("./lib/job-queue");
 const { JobWorker } = require("./lib/job-worker");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
-const { dataRoot } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
+const { dataRoot, dataPath } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
 const publicRoot = path.join(__dirname, "public");
 const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177);
 const host = process.env.LANTERN_GARAGE_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
@@ -158,6 +158,18 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
   "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
+  // Options ANALYSIS is market data, exactly like the Watch page's charts/news:
+  // the chain, the IV smile and the volume view are read-only views of public
+  // quotes. Gating them behind Pro left a logged-out visitor staring at "Chain
+  // unavailable — no data source" on a page we link them to (reported on
+  // unisona.ai). PLACING an options order stays Pro — that route is a POST
+  // (/api/trading/options/order) and this allowlist is GET-only.
+  "/api/trading/options/chain",     // read-only chain snapshot (free quote feed)
+  "/api/trading/options/strategies", // deterministic advisory proposals — no orders
+  // NOTE deliberately absent: /api/trading/track-record. Product decision
+  // (2026-08-11): we do not publish the ledger — the record stays behind
+  // sign-in as the journal's data layer; the public proof surface is the live
+  // demo book (demo-feed above), not a published performance record.
 ]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
@@ -168,7 +180,11 @@ function tradeApiGuard(req, res, url) {
   // gated shell. The param is what the pages request for guests; the real,
   // broker-backed paths (no param) stay trade-gated, so no real account leaks.
   if (req.method === "GET" &&
-      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history") &&
+      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history" ||
+       // Journal demo-mode (#3242): the guest Journal tab reads a SIMULATED
+       // book (lib/champion-demo.journalRows) through these two — the routes
+       // switch to demo data on this param and never read the real ledger.
+       url.pathname === "/api/trading/track-record" || url.pathname === "/api/trading/scorecard") &&
       url.searchParams.get("demo") === "champion") return false;
   // Watchlist add/remove is available to everyone incl. read-only guests — it is
   // "which symbols to chart", not a trade, so it isn't behind the trade gate.
@@ -383,7 +399,7 @@ try {
 const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
-  store: new FileSessionStore({ dir: path.join(__dirname, "..", "..", "data", "sessions") }),
+  store: new FileSessionStore({ dir: dataPath("sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
@@ -391,11 +407,21 @@ const sessionMiddleware = session({
   proxy: true,
   cookie: {
     httpOnly: true,
-    // Secure whenever bound beyond loopback — PORT set (Railway/tunnel) OR production —
-    // not NODE_ENV alone. A PORT-set deploy that didn't also set NODE_ENV was serving the
-    // session cookie without Secure, so it could ride a downgraded/http request (#2618).
-    // Mirrors the fail-closed rule in session-secret.resolveSessionSecret.
-    secure: !!process.env.PORT || process.env.NODE_ENV === "production",
+    // Secure tracks the ACTUAL connection, not a PORT guess (#3010). The old
+    // `!!process.env.PORT` forced Secure whenever PORT was set — but a launcher that
+    // injects PORT on a plain-http localhost box (the preview tool, autostart, etc.) is
+    // NOT https, so express-session saved the session yet silently dropped Set-Cookie
+    // and every sign-in stayed guest with no error.
+    //
+    // Production stays hard-Secure regardless, so #2618's fail-closed rule holds
+    // unconditionally rather than depending on a proxy header being present. Everywhere
+    // else "auto" (with proxy:true above) makes the cookie Secure exactly when the
+    // request is: https behind Railway's TLS via X-Forwarded-Proto, plain on loopback.
+    //
+    // The remaining edge — a prod proxy that strips X-Forwarded-Proto — was left as a
+    // follow-up when this landed via #3128; establishSession now closes it, refusing to
+    // report a sign-in whose cookie cannot be delivered instead of returning ok:true.
+    secure: process.env.NODE_ENV === "production" ? true : "auto",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
@@ -420,6 +446,21 @@ async function route(req, res) {
     url = new URL(req.url, `http://${req.headers.host}`);
   } catch {
     return sendJson(res, { error: "bad_request", detail: "malformed request target" }, 400);
+  }
+
+  // CANONICAL HOST (2026-08-11): strip a leading "www." with a 308 to the apex.
+  // OAuth redirect_uris are minted from the request Host, and only the apex
+  // callback is registered with Google — signing in on www.unisona.ai produced
+  // "Error 400: redirect_uri_mismatch" at the consent screen. Redirecting the
+  // whole www host (not just OAuth routes) keeps sessions/cookies on ONE origin.
+  // 308 preserves method for the rare POST. Loopback/dev hosts never match.
+  {
+    const _host = String(req.headers.host || "");
+    if (/^www\./i.test(_host)) {
+      const _proto = String(req.headers["x-forwarded-proto"] || (req.socket && req.socket.encrypted ? "https" : "http")).split(",")[0].trim();
+      res.writeHead(308, { Location: `${_proto}://${_host.replace(/^www\./i, "")}${req.url}`, "Cache-Control": "no-store" });
+      return res.end();
+    }
   }
 
   // #1946 G4 desktop loopback token: when the launcher-opened page carries the
@@ -710,6 +751,16 @@ process.on("uncaughtException", (err) => {
 
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
+  // Print the resolved data root (#3088): a CLI script and the server used to pick
+  // different roots depending on cwd, so a `setUserRole` could "succeed" against a
+  // store this process never reads. One line here makes that visible instead of silent.
+  console.info(`[data] root: ${dataRoot()}`);
+  // #3136 follow-up: if a pre-collapse cwd-relative store still holds the auth data
+  // (the GCE systemd cwd was the app dir, so the 08-04 v1.14.2 upgrade orphaned every
+  // existing account — email+password 401'd and Google minted fresh guest profiles),
+  // MERGE it into the canonical root instead of just warning about it. One-time,
+  // idempotent, fail-soft; legacy files are renamed *.migrated after the merge.
+  try { require('./lib/legacy-data-migrate').migrateLegacyData(); } catch (e) { console.warn(`[data-migrate] skipped: ${e.message}`); }
 
   // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
   // beats stop). No-op unless UNISONA_DESKTOP=1.

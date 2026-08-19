@@ -142,8 +142,9 @@ pass:
    candidate and the failing tests*, then re-verify. Escalation inherits progress; it does not
    restart.
 5. **Halt** on one of three: **verified** (goal), **budget** (an anytime dial the user sets), or
-   **honest halt** ("I cannot verify this"), which fires only after loop, escalation, and budget
-   are all exhausted.
+   **effectively-false-until-true** (the answer stays unverified after loop, escalation, and
+   budget are all exhausted, so it settles grounded=False rather than abstaining — every means of
+   verifying it having been spent).
 
 **Why the verifier is load-bearing.** Persistence without an external checker does not converge
 on truth — it converges on a self-consistent fixed point (representational collapse; §5). The
@@ -294,8 +295,9 @@ and able to prove or disprove an edge before capital is risked.*
 - **In-regime proofs only.** All stability theorems certify the local linear Jacobian; grounding,
   not the certificate, is the global safety mechanism.
 - **Domain-bounded.** Σ₀ is scoped to verifiable work. On broad world knowledge, creative writing,
-  and long context — where small models are documented to fail — it escalates or abstains, and the
-  product must communicate this at onboarding or fail its users' expectations.
+  and long context — where small models are documented to fail — it escalates, and where
+  verification remains out of reach it marks the answer effectively-false-until-true rather than
+  asserting it; the product must communicate this at onboarding or fail its users' expectations.
 - **The wedge may not hold.** If G1 shows the specialist-from-scratch arm cannot beat a
   retrofit baseline at matched compute, the from-scratch program stops; the measurement stands
   and the retrofit path remains.

@@ -52,6 +52,11 @@ from .csf_pack import (
     pack_blobs,
     read_file,
     read_slice,
+    read_slice_verified,
+    member_merkle_root,
+    merkle_root,
+    verify_leaf,
+    leaf_proof,
     unpack,
 )
 
@@ -60,6 +65,11 @@ __all__ = [
     "pack_blobs",
     "unpack",
     "read_slice",
+    "read_slice_verified",
+    "member_merkle_root",
+    "merkle_root",
+    "verify_leaf",
+    "leaf_proof",
     "list_archive",
     "read_file",
     "file_annotation",

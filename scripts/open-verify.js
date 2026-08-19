@@ -31,7 +31,23 @@ function loadEnv() {
   try {
     const store = require(path.join(APP, 'lib', 'ibkr-credentials.js'));
     const IbkrCpapi = require(path.join(APP, 'lib', 'ibkr-cpapi.js'));
-    const c = new IbkrCpapi({ oauth1: store.buildSigner('local-owner'), statusTtlMs: 0, timeoutMs: 20000 });
+    // The credential identity is NOT always 'local-owner'. It was hardcoded, so in any
+    // checkout whose store holds a different id (the dev worktree keeps 'test-user')
+    // buildSigner returned null, the client authenticated as nobody, and every report
+    // read "IBKR connected: false / 0 positions / VERDICT REVIEW NEEDED" no matter what
+    // the account had actually done. Three consecutive runs (2026-07-30 close, 07-31
+    // open + close) were blind that way — a verification that always cries wolf is
+    // worse than none, because you learn to ignore it.
+    //
+    // Prefer local-owner when present (the operator identity on the stable box), else
+    // fall back to whatever single identity this checkout's store actually holds.
+    const users = (typeof store.listUsers === 'function' ? store.listUsers() : []) || [];
+    const uid = users.includes('local-owner') ? 'local-owner' : users[0];
+    report.identity = uid || null;
+    if (!uid) throw new Error('no IBKR credentials in this checkout — cannot verify');
+    const signer = store.buildSigner(uid);
+    if (!signer) throw new Error(`IBKR credentials for "${uid}" could not build a signer`);
+    const c = new IbkrCpapi({ oauth1: signer, statusTtlMs: 0, timeoutMs: 20000 });
     const st = await c.getStatus();
     const acct = st.accountId;
     const sum = await c.getAccountSummary(acct).catch(() => null);
@@ -84,7 +100,7 @@ function loadEnv() {
     const oversized = sizes.filter((s) => s.pct != null && s.pct > 5.5).map((s) => s.sym); // >5% cap (+buffer)
 
     report.result = {
-      connected: !!st.connected, account: acct,
+      connected: !!st.connected, account: acct, identity: uid,
       equity: eq, dayPnl: pnl && pnl.dailyPnl, unrealizedPnl: pnl && pnl.unrealizedPnl,
       positions: pos.length, shorts, longsMissingStop: longsNoStop,
       workingStops: stops.length, avgPositionPct: avgPct, oversized, sizes, churn,
@@ -103,7 +119,7 @@ function loadEnv() {
   fs.writeFileSync(path.join(dir, `verify-${stamp}.json`), JSON.stringify(report, null, 2));
   const txt = [
     `OPEN VERIFICATION — ${report.verifiedAt} (ET)`,
-    `IBKR connected : ${r.connected}   account ${r.account || '?'}   equity $${r.equity || '?'}`,
+    `IBKR connected : ${r.connected}   account ${r.account || '?'}   equity $${r.equity || '?'}   as ${r.identity || '(no credentials)'}`,
     `day P&L        : $${r.dayPnl != null ? r.dayPnl : 'n/a'}   (unrealized $${r.unrealizedPnl != null ? r.unrealizedPnl : 'n/a'})`,
     `positions      : ${r.positions}`,
     `shorts         : ${(r.shorts || []).join(', ') || 'NONE ✓'}`,

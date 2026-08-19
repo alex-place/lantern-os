@@ -60,8 +60,21 @@ def git_sha(short: bool = True) -> Optional[str]:
         return None
 
 
+# Leaf directory names that every training run reuses for its final/selected checkpoint,
+# so they carry NO run identity on their own — checkpoint_id qualifies them with the parent
+# dir. (Container names like "adapters" are deliberately absent: as a *parent* they still add
+# signal, e.g. ".../adapters/final" -> "adapters-final".)
+_GENERIC_CKPT_DIRS = {
+    "final", "best", "last", "merged", "output", "model", "ckpt", "checkpoint", "adapter",
+}
+
+
 def checkpoint_id(model: Optional[str], adapter: Optional[str]) -> Optional[str]:
-    """Canonical ``"<model>@<adapter-basename>"`` id (just the model when no adapter).
+    """Canonical ``"<model>@<adapter-id>"`` id (just the model when no adapter).
+
+    The ``<adapter-id>`` is the adapter dir's basename, but a *generic* leaf name (``final``,
+    ``best``, ``checkpoint-*`` excepted as it is already unique, …) is qualified with its parent
+    dir, because every run's ``.../final`` would otherwise collapse to the same ``@final``.
 
     Writers that KNOW what they loaded should stamp ``served_checkpoint`` themselves
     with this (``stamp_provenance`` never clobbers a caller-set value) rather than
@@ -73,7 +86,20 @@ def checkpoint_id(model: Optional[str], adapter: Optional[str]) -> Optional[str]
     if not model and not adapter:
         return None
     if adapter:
-        base = os.path.basename(str(adapter).rstrip("/\\")) or adapter
+        # Normalize both separators so Windows (\) and POSIX (/) paths split identically on
+        # ANY host — os.path.basename only splits "\" on Windows, and this id lands in a ledger
+        # that is read on Linux CI too.
+        parts = [seg for seg in str(adapter).replace("\\", "/").split("/") if seg]
+        base = parts[-1] if parts else str(adapter)
+        # A bare final-checkpoint dir name is the SAME for every training run, so the leaf
+        # alone collapses distinct adapters to one id: ouro-sigma0-adapters/final and
+        # ouro-distill/lr5e5-r16/final BOTH stamp "@final", and the ledger can no longer tell
+        # which model produced a row (violating the provenance the docstring promises). Qualify
+        # these generic names with the parent dir. Unique names (checkpoint-600) pass through.
+        if base.lower() in _GENERIC_CKPT_DIRS and len(parts) >= 2:
+            parent = parts[-2]
+            if parent.lower() not in _GENERIC_CKPT_DIRS:
+                base = f"{parent}-{base}"
         return f"{model or 'ouro'}@{base}"
     return model
 

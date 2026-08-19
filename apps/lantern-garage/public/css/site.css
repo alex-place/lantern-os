@@ -32,6 +32,13 @@ p, li, dd, dt, td, th, blockquote, figcaption { overflow-wrap: break-word; }
 }
 
 :root {
+  /* Tell the browser which scheme its NATIVE widgets should paint in. Without this
+     Chrome renders a <select>'s popup list -- which the OS draws, not our CSS -- in
+     the light scheme regardless of the page, so a dark toolbar dropdown flashed white
+     the moment the pointer left a hovered option. Our own .pat-menu pickers were never
+     affected because they are plain divs. One declaration fixes every native control
+     on every page: selects, scrollbars, date pickers, form fields. */
+  color-scheme: light;
   --bg: #ffffff;
   --surface: #f8f9fa;
   --surface2: #f1f3f5;
@@ -52,6 +59,7 @@ p, li, dd, dt, td, th, blockquote, figcaption { overflow-wrap: break-word; }
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0a0e17;
   --surface: #111827;
   --surface2: #1a2332;

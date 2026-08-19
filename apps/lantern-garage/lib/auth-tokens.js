@@ -10,6 +10,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("./app-paths");
 const { resolveSessionSecret } = require("./session-secret");
 
 function secret() {
@@ -22,7 +23,10 @@ function b64url(buf) {
 }
 
 function sign(payloadB64) {
-  return crypto.createHmac("sha256", secret()).update(payloadB64).digest("base64url");
+  // A MAC over a token payload, not a stored password. The security here is the ~300-bit
+  // secret key plus a short TTL, not hash slowness; a KDF would add latency and buy
+  // nothing, because there is no low-entropy value for an attacker to enumerate.
+  return crypto.createHmac("sha256", secret()).update(payloadB64).digest("base64url"); // codeql[js/insufficient-password-hash]
 }
 
 const TTL = {
@@ -64,8 +68,9 @@ function verifyToken(token, expectedPurpose) {
 
 // ── Single-use ledger — a signed token is otherwise replayable for its whole TTL, so a
 // leaked reset/verify link works again even after the legitimate user used it (#2614).
-// jti → expiry, in-memory + cwd-relative append log (survives restart), pruned on load.
-function ledgerPath() { return path.resolve(process.cwd(), "data", "auth", "consumed-tokens.jsonl"); }
+// jti → expiry, in-memory + an append log under the single data root (survives restart),
+// pruned on load. Anchored via app-paths.dataPath, never the cwd (#3088).
+function ledgerPath() { return dataPath("auth", "consumed-tokens.jsonl"); }
 let _consumed = null; // Map<jti, exp>
 function _load() {
   if (_consumed) return _consumed;

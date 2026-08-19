@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -31,15 +32,19 @@ MAX_SECTION_CHARS = 1200
 KC_HTML = REPO / "apps" / "lantern-garage" / "public" / "knowledgecenter.html"
 CORE_DOCS = ["README.md", "CLAUDE.md", "AGENTS.md", "QUICKSTART.md"]
 
-# External (out-of-repo) sources — e.g. Human Flourishing Frameworks docs pulled
-# into gitignored staging. They are SURFACED as KC/Explore cards that link to their
-# upstream source, but their text is intentionally NOT folded into the committed
-# grounding index (the staging decision: nothing about the external repo is
-# committed here). Built by scripts/build_doc_library.js.
+# External (out-of-repo) sources — Human Flourishing Frameworks. RETIRED in the
+# Knowledge Center rework: HFF is a separate project with no bearing on chat, trading,
+# or model research, and it was taking 34 of the library's cards plus 34 entries in the
+# Explore/grounding metadata. The card surface no longer renders them, so the index no
+# longer advertises them either — leaving them here would let chat cite an unrelated
+# corpus. data/knowledge/external-sources.json stays on disk for the record; set
+# KEYSTONE_INDEX_EXTERNAL=1 to fold it back in.
 EXTERNAL_SOURCES = OUT_DIR / "external-sources.json"
 
 
 def external_docs() -> list[dict]:
+    if os.environ.get("KEYSTONE_INDEX_EXTERNAL") != "1":
+        return []
     if not EXTERNAL_SOURCES.exists():
         return []
     try:

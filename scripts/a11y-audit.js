@@ -24,7 +24,7 @@ const MIN_AA_LARGE = 3.0;  // large text / UI
 // and reported but not yet gated (backlog). Grow this set as surfaces are remediated.
 const CLEAN_SET = new Set([
   "index.html", "pricing.html", "entry.html", "faq.html",
-  "knowledgecenter.html", "agent-leaderboard.html", "metrics.html", "welcome.html",
+  "knowledgecenter.html",  "metrics.html", "welcome.html"
 ]);
 
 // ── contrast math ──────────────────────────────────────────────────────────

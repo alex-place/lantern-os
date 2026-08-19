@@ -70,6 +70,19 @@ function dataRoot(env = process.env, platform = process.platform) {
 }
 
 /**
+ * Join a path under the writable data root: dataPath("profiles", "index.jsonl").
+ *
+ * The convenience form of dataRoot(), and the ONE way modules should resolve a data
+ * file. Before this, most of them recomputed `path.join(process.cwd(), "data", …)`,
+ * so which store a module read depended on the cwd of whoever launched the process:
+ * a CLI script and the server saw two different trees, and a `setUserRole()` could
+ * report success against a file the server never opened (#3088).
+ */
+function dataPath(...segments) {
+  return path.join(dataRoot(), ...segments);
+}
+
+/**
  * Create the state + data dirs if missing (desktop first-run on a virgin machine).
  * A no-op-safe mkdir -p; returns the ensured data root.
  */
@@ -86,5 +99,6 @@ module.exports = {
   osAppDataBase,
   stateRoot,
   dataRoot,
+  dataPath,
   ensureStateDirs,
 };

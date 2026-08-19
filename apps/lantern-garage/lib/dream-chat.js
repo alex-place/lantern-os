@@ -495,8 +495,9 @@ function _appendConvergenceRecord(fields) {
     ...fields,
   };
   try {
-    const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-    const RECORDS_PATH = path.join(REPO_ROOT, "data", "convergence", "records.jsonl");
+    // Resolve through the shared store owner so a test process is auto-redirected off the
+    // live store (#3293) instead of this emitter hardcoding the live path.
+    const { RECORDS_PATH } = require("./convergence-records");
     fs.mkdirSync(path.dirname(RECORDS_PATH), { recursive: true });
     // M1 enforced gate (#2872): same invariant on the command/verify write path.
     const gated = require("./m1-gate").applyM1Gate(record, { file: RECORDS_PATH });
@@ -1277,7 +1278,8 @@ async function verifyResponse(draft, userMessage, agentName) {
   // lib/ → lantern-garage/ → apps/ → repo root (THREE levels). Records + the
   // codebase grep must resolve against the real repo root, not apps/.
   const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-  const RECORDS_PATH = path.join(REPO_ROOT, "data", "convergence", "records.jsonl");
+  // Shared store owner: auto-redirects off the live store under a test process (#3293).
+  const { RECORDS_PATH } = require("./convergence-records");
 
   // ── Helper: Gemini grounding check ───────────────────────────────
   // Tries web-grounded (googleSearch tool) first; on a billing/quota error

@@ -6,16 +6,15 @@
 const path = require("path");
 
 module.exports = async function leaderboardRoutes(req, res, url, deps) {
-  const { sendJson, sendFile } = deps;
+  const { sendJson } = deps;
 
-  // GET /leaderboard — Serve dashboard HTML
+  // GET /leaderboard — the agent-leaderboard.html surface was retired in #3109
+  // (orphaned: no inbound nav path from anywhere on the site). The retirement
+  // records below are still served as JSON; only the HTML view is gone, so this
+  // path 302s to the fleet view rather than 500ing on a missing file.
   if (url.pathname === "/leaderboard" && req.method === "GET") {
-    try {
-      const dashboardPath = path.resolve(__dirname, "..", "public", "agent-leaderboard.html");
-      await sendFile(res, dashboardPath, "text/html");
-    } catch (error) {
-      sendJson(res, { error: error.message }, 500);
-    }
+    res.writeHead(302, { Location: "/orchestration.html" });
+    res.end();
     return true;
   }
 

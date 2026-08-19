@@ -86,48 +86,6 @@ function normalizeEntry(data) {
   };
 }
 
-// Persist a structured analysis failure (stage + reason) so the dashboard can
-// show exactly what went wrong instead of a silent hang. Also appends a failed
-// run to the audit trail.
-function recordAnalysisError(repoRoot, entryId, info) {
-  const entry = getEntry(repoRoot, entryId);
-  if (!entry) return null;
-  const runs = [...(entry.analysisRuns || []), {
-    jobId: info.jobId || null,
-    status: "failed",
-    stage: info.stage || null,
-    error: info.error || "unknown error",
-    finishedAt: info.at || new Date().toISOString(),
-  }].slice(-20); // keep the last 20 runs
-  return updateEntry(repoRoot, entryId, {
-    analysisError: { stage: info.stage || null, error: info.error || "unknown error", at: info.at || new Date().toISOString() },
-    analysisRuns: runs,
-    status: "failed",
-  });
-}
-
-function clearAnalysisError(repoRoot, entryId) {
-  const entry = getEntry(repoRoot, entryId);
-  if (!entry || !entry.analysisError) return entry;
-  return updateEntry(repoRoot, entryId, { analysisError: null });
-}
-
-// Append a run to the analysis audit trail (most-recent-last, capped at 20).
-function addAnalysisRun(repoRoot, entryId, run) {
-  const entry = getEntry(repoRoot, entryId);
-  if (!entry) return null;
-  const runs = [...(entry.analysisRuns || []), {
-    jobId: run.jobId || null,
-    status: run.status || "complete",
-    startedAt: run.startedAt || null,
-    finishedAt: run.finishedAt || new Date().toISOString(),
-    highlightCount: typeof run.highlightCount === "number" ? run.highlightCount : null,
-    durationSec: typeof run.durationSec === "number" ? run.durationSec : null,
-    analysisCapped: !!run.analysisCapped,
-  }].slice(-20);
-  return updateEntry(repoRoot, entryId, { analysisRuns: runs });
-}
-
 function getEntry(repoRoot, entryId) {
   const metadataPath = path.join(getEntryDir(repoRoot, entryId), "metadata.json");
 
@@ -254,16 +212,30 @@ function addAnalysisRun(repoRoot, entryId, run) {
 
 // Record the last analysis failure on the entry so a reopened project can show
 // what went wrong (cleared on the next successful run).
+// Persist a structured analysis failure (stage + reason) so the dashboard can show exactly
+// what went wrong instead of a silent hang, AND append a failed run to the analysisRuns audit
+// trail — so a failure is visible in run history next to the successful runs addAnalysisRun
+// records. (The audit-trail half had been dead code since a duplicate declaration shadowed
+// the richer implementation; restored deliberately.)
 function recordAnalysisError(repoRoot, entryId, err) {
   const entry = getEntry(repoRoot, entryId);
   if (!entry) return null;
+  const at = (err && err.at) || new Date().toISOString();
+  const analysisRuns = [...(entry.analysisRuns || []), {
+    jobId: (err && err.jobId) || null,
+    status: "failed",
+    stage: (err && err.stage) || null,
+    error: (err && err.error) || "unknown error",
+    finishedAt: at,
+  }].slice(-20);   // same cap as addAnalysisRun
   return updateEntry(repoRoot, entryId, {
     analysisError: {
       stage: (err && err.stage) || "unknown",
       error: (err && err.error) || "unknown error",
-      at: (err && err.at) || new Date().toISOString(),
+      at,
       jobId: (err && err.jobId) || null,
     },
+    analysisRuns,
     status: "failed",
   });
 }
@@ -414,9 +386,6 @@ module.exports = {
   repairAllProjects,
   saveAnalysis,
   getAnalysis,
-  addAnalysisRun,
-  recordAnalysisError,
-  clearAnalysisError,
   saveRender,
   saveValidation,
   saveThumbnail,

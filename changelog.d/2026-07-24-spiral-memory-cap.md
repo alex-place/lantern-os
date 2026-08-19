@@ -1,3 +1,0 @@
-### Added
-
-- spiral(#2977): **memory cap + per-turn recall view** — the thing ADR-0030's own Negatives said breaks first on real horizons. Prompt-facing calls (tiers, answerability) now receive a deterministic recency-windowed view of committed memory (`memoryWindow`, default 4 steps; `memoryTextCap`, default 4000 chars/step with the true length receipted as `_truncated`) so a long SWE-grade episode can't saturate the cheap tier's context. The internal ratchet history and the returned `memory` stay complete, and advancing corpus rows now carry the FULL candidate `text` — the distillation record is complete even when the prompt view is truncated. `memoryWindow: 0` restores the uncapped legacy view. 49/49 across the five spiral suites (2 new tests).

@@ -26,11 +26,11 @@ const { loginGateEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken, isConsumed, consumeToken } = require("../lib/auth-tokens");
 const { destroyUserSessions } = require("../lib/session-file-store");
-const _pathAuth = require("path");
 // Session store dir (mirrors server.js) — a password reset invalidates the account's live
 // sessions so a hijacked session can't survive the remediation (#2614).
-const AUTH_SESSION_DIR = _pathAuth.join(__dirname, "..", "..", "..", "data", "sessions");
-const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
+const AUTH_SESSION_DIR = require("../lib/app-paths").dataPath("sessions");
+const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("../lib/mailer");
+const { issueCode, checkCode } = require("../lib/verify-codes");
 const { isLoopback, clientIp } = require("../lib/request-auth");
 const { canonicalOrigin } = require("../lib/base-url");
 
@@ -124,7 +124,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
   const path = url.pathname;
   const method = req.method;
 
-  console.log(`[AUTH] ${method} ${path}`);
+  // Per-request trace, opt-in (AUTH_DEBUG=1) — an unconditional console.log here
+  // both spams prod logs and trips the SLOP debug-statement gate.
+  if (process.env.AUTH_DEBUG === "1") console.error(`[AUTH] ${method} ${path}`);
 
   // GET /api/auth/session
   if (method === "GET" && path === "/api/auth/session") {
@@ -178,7 +180,8 @@ module.exports = async function authRoutes(req, res, url, deps) {
       (err) => {
         if (err) {
           res.writeHead(500, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ error: "session_save_failed" }));
+          // "secure_cookie_on_http" when the cookie could not be delivered (#3010).
+          return res.end(JSON.stringify({ error: err.code || "session_save_failed" }));
         }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, role, provider }));
@@ -206,7 +209,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   }
 
   // GET /api/auth/:provider/start
-  const startMatch = method === "GET" && START_RE.exec(path);
+  const startMatch = method === "GET" && path.match(START_RE);
   if (startMatch) {
     const provider = startMatch[1];
     if (!getProvider(provider)) return false; // unknown → fall through to 404
@@ -222,7 +225,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   }
 
   // GET /api/auth/:provider/callback
-  const cbMatch = method === "GET" && CALLBACK_RE.exec(path);
+  const cbMatch = method === "GET" && path.match(CALLBACK_RE);
   if (cbMatch) {
     const provider = cbMatch[1];
     if (!getProvider(provider)) return false;
@@ -303,10 +306,67 @@ module.exports = async function authRoutes(req, res, url, deps) {
         source: `email_verified:${profile.id}`,
         note: "email address confirmed via verify-email link",
       }).catch(() => {});
+      // First successful verification → welcome email (fire-and-forget). Guarded by
+      // the same pre-update flag, so re-confirmations never re-send it.
+      try { require("../lib/mailer").sendWelcomeEmail(updates.email || profile.email, profile.name).catch(() => {}); } catch (_e) { /* never block the verify */ }
     }
     if (isPost) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, dest })); }
     res.writeHead(302, { Location: `${dest}?verify=1` });
     return res.end();
+  }
+
+  // POST /api/auth/verify-code { email, code } — confirm a SIGNUP with the 6-digit
+  // code from the email. The link route above still serves the email-CHANGE flow.
+  //
+  // Deliberately does NOT reveal whether the account exists: an unknown address and a
+  // wrong code both return the same 400 invalid_code, so this can't be used to
+  // enumerate registered emails (the same property the 202-on-existing-email signup
+  // response protects, #2617).
+  if (method === "POST" && path === "/api/auth/verify-code") {
+    if (emailEndpointThrottled(req)) { res.writeHead(429, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "too_many_attempts" })); }
+    const b = (await readJsonBody(req)) || {};
+    const email = String(b.email || "").trim().toLowerCase();
+    const code = String(b.code || "").trim();
+    const bad = (reason, status) => {
+      res.writeHead(status || 400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: reason }));
+    };
+    if (!EMAIL_RE.test(email) || !/^\d+$/.test(code)) return bad("invalid_code");
+
+    const profile = getProfileByEmail(email);
+    if (!profile) return bad("invalid_code"); // same shape as a wrong code — no enumeration
+    if (profile.emailVerified === true) {
+      // Benign already-confirmed state; mirrors the link route's `already` response.
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok: true, already: true, dest: "/auth.html" }));
+    }
+
+    const result = await checkCode(profile.id, code);
+    if (!result.ok) {
+      // `locked` and `expired` are surfaced distinctly ONLY because the user already
+      // proved they hold this address by having a code at all — and because "request a
+      // new code" is otherwise undiscoverable. Neither reveals account existence, since
+      // an unknown email never reaches this branch.
+      if (result.reason === "locked") return bad("code_locked", 429);
+      if (result.reason === "expired" || result.reason === "none") return bad("code_expired", 410);
+      return bad("invalid_code");
+    }
+
+    const wasVerified = profile.emailVerified === true;
+    updateProfile(profile.id, { emailVerified: true, emailAssumed: false });
+    if (!wasVerified) {
+      recordTractionEvent({
+        kind: "signup",
+        actor: profile.email || profile.id,
+        verified: true,
+        confidence: "high",
+        source: `email_verified:${profile.id}`,
+        note: "email address confirmed via verification code",
+      }).catch(() => {});
+      try { require("../lib/mailer").sendWelcomeEmail(profile.email, profile.name).catch(() => {}); } catch (_e) { /* never block the verify */ }
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, dest: "/auth.html" }));
   }
 
   // POST /api/auth/resend-verification { email } — re-send the signup confirmation
@@ -320,13 +380,14 @@ module.exports = async function authRoutes(req, res, url, deps) {
     if (EMAIL_RE.test(email)) {
       const profile = getProfileByEmail(email);
       if (profile && profile.emailVerified !== true) {
-        const token = createToken("verify_email", profile.id, profile.email);
-        const link = `${originOf(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-        sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
+        // Issuing supersedes any outstanding code, which is the point of a resend:
+        // it also clears a code that was locked out by wrong guesses.
+        const code = await issueCode(profile.id, profile.email);
+        sendVerificationCodeEmail(profile.email, profile.name, code).catch(() => {});
         // Dev-only self-service: no mail server + direct loopback hit → return the
-        // link so the operator can confirm locally. Never on proxied/public traffic
-        // or when SMTP is configured (mirrors local-auth.devVerifyLink).
-        if (!smtpConfigured() && isLoopback(req)) respBody.devVerifyLink = link;
+        // code so the operator can confirm locally. Never on proxied/public traffic
+        // or when a provider is configured (mirrors local-auth.devVerifyCode).
+        if (!mailerConfigured() && isLoopback(req)) respBody.devVerifyCode = code;
       }
     }
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -340,7 +401,11 @@ module.exports = async function authRoutes(req, res, url, deps) {
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
     if (EMAIL_RE.test(email)) {
-      const profile = getProfileByEmail(email);
+      // rootOnly: the reset link goes to the address the user TYPED or nowhere.
+      // Matching linked-identity emails resolved the account and mailed its
+      // ROOT address instead (2026-08-11) — a reset for a linked gmail landed
+      // in founder@'s inbox. Identity emails never receive reset links.
+      const profile = getProfileByEmail(email, { rootOnly: true });
       if (profile) {
         const token = createToken("reset_password", profile.id, profile.email);
         const link = `${originOf(req)}/reset-password.html?token=${encodeURIComponent(token)}`;
@@ -368,6 +433,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
     setLocalPassword(payload.sub, newPassword);
     consumeToken(payload.jti, payload.exp);              // burn the token — no replay
     destroyUserSessions(AUTH_SESSION_DIR, payload.sub);  // sign out any hijacked session
+    // Security notice to the account's address (fire-and-forget): the industry-
+    // standard "if this wasn't you" alert after any password change.
+    try { const pr = getProfile(payload.sub); if (pr && pr.email) require("../lib/mailer").sendPasswordChangedEmail(pr.email, pr.name).catch(() => {}); } catch (_e) { /* never block the reset */ }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }

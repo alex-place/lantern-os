@@ -1,0 +1,3 @@
+### Added
+
+- trader-ui: drawing tools — 19 of them across lines (trend, ray, extended, horizontal, horizontal ray, vertical, arrow, parallel channel), Fibonacci (retracement, extension), patterns (rectangle, ellipse, triangle), forecasting (long/short position labelled in R, measure) and notes (brush, text, note). Every shape stores its anchors as timestamp+price rather than pixels, so drawings stay welded to their bars through zoom, pan, timeframe and theme changes. Existing saved levels and trendlines migrate to the new anchor form on load rather than disappearing. Alt-click deletes the nearest drawing whatever tool is armed (#2444)

@@ -179,11 +179,12 @@ D1 tiers and cluster shape; dense-recurrent vs MoE-UT (D2); the exact objective 
 
 ---
 
-## Amendment A1 (2026-07-27) — **Proposed, awaiting approval**
+## Amendment A1 (2026-07-27) — **Accepted**
 
-> **Status: Proposed.** Per ADR-0001 an agent drafts and never self-approves. This amendment does
-> not change the Accepted decision above until an authorized approver signs it off. It is recorded
-> here rather than in a new ADR because it narrows *this* program's scope; nothing else changes.
+> **Status: Accepted** (Alex Place, in-session, 2026-07-27 — "approve the adr", closing #3002).
+> Drafted by an agent per ADR-0001 and approved by the operator; the narrowing below is now the
+> decision of record. It is recorded here rather than in a new ADR because it narrows *this*
+> program's scope; nothing else changes.
 
 ### What prompted it
 

@@ -1,0 +1,201 @@
+{
+ "corpus": [
+  "synthetic:float64_smooth",
+  "synthetic:int32_counter",
+  "synthetic:int16_signal",
+  "data/eval/leaderboard.jsonl",
+  "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
+  "src/csf/csf_pack.py",
+  "data/convergence/records.jsonl"
+ ],
+ "n": 7,
+ "winner_hit_rate": 1.0,
+ "mean_ratio_loss_pct": 0.0,
+ "worst_ratio_loss_pct": 0.0,
+ "mean_candidate_reduction_x": 2.67,
+ "mean_time_speedup_x": 2.33,
+ "gate": {
+  "ratio_loss_le_0.5pct(worst)": true,
+  "reduction_ge_2x": true,
+  "VERDICT": "PASS"
+ },
+ "rows": [
+  {
+   "file": "synthetic:float64_smooth",
+   "bytes": 32000,
+   "oracle": {
+    "size": 22712,
+    "tid": 8,
+    "cid": 8,
+    "sec": 0.6305
+   },
+   "predicted_transforms": [
+    8,
+    0
+   ],
+   "hit": true,
+   "routed": {
+    "size": 22712,
+    "tid": 8,
+    "cid": 8,
+    "sec": 0.2665
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.83,
+   "time_speedup_x": 2.37,
+   "full_transforms": 9
+  },
+  {
+   "file": "synthetic:int32_counter",
+   "bytes": 32000,
+   "oracle": {
+    "size": 77,
+    "tid": 7,
+    "cid": 5,
+    "sec": 0.4555
+   },
+   "predicted_transforms": [
+    7,
+    0
+   ],
+   "hit": true,
+   "routed": {
+    "size": 77,
+    "tid": 7,
+    "cid": 5,
+    "sec": 0.1989
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.83,
+   "time_speedup_x": 2.29,
+   "full_transforms": 9
+  },
+  {
+   "file": "synthetic:int16_signal",
+   "bytes": 24000,
+   "oracle": {
+    "size": 1528,
+    "tid": 6,
+    "cid": 8,
+    "sec": 0.3658
+   },
+   "predicted_transforms": [
+    6,
+    0
+   ],
+   "hit": true,
+   "routed": {
+    "size": 1528,
+    "tid": 6,
+    "cid": 8,
+    "sec": 0.1568
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.83,
+   "time_speedup_x": 2.33,
+   "full_transforms": 9
+  },
+  {
+   "file": "data/eval/leaderboard.jsonl",
+   "bytes": 23614,
+   "oracle": {
+    "size": 2725,
+    "tid": 0,
+    "cid": 6,
+    "sec": 0.4295
+   },
+   "predicted_transforms": [
+    0,
+    3,
+    2
+   ],
+   "hit": true,
+   "routed": {
+    "size": 2725,
+    "tid": 0,
+    "cid": 6,
+    "sec": 0.1888
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.27,
+   "time_speedup_x": 2.28,
+   "full_transforms": 9
+  },
+  {
+   "file": "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
+   "bytes": 210890,
+   "oracle": {
+    "size": 65981,
+    "tid": 0,
+    "cid": 2,
+    "sec": 2.08
+   },
+   "predicted_transforms": [
+    0,
+    3
+   ],
+   "hit": true,
+   "routed": {
+    "size": 65981,
+    "tid": 0,
+    "cid": 2,
+    "sec": 0.8514
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.83,
+   "time_speedup_x": 2.44,
+   "full_transforms": 9
+  },
+  {
+   "file": "src/csf/csf_pack.py",
+   "bytes": 35084,
+   "oracle": {
+    "size": 9165,
+    "tid": 0,
+    "cid": 6,
+    "sec": 0.4317
+   },
+   "predicted_transforms": [
+    0,
+    3
+   ],
+   "hit": true,
+   "routed": {
+    "size": 9165,
+    "tid": 0,
+    "cid": 6,
+    "sec": 0.1756
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.83,
+   "time_speedup_x": 2.46,
+   "full_transforms": 9
+  },
+  {
+   "file": "data/convergence/records.jsonl",
+   "bytes": 815026,
+   "oracle": {
+    "size": 66243,
+    "tid": 2,
+    "cid": 6,
+    "sec": 7.6977
+   },
+   "predicted_transforms": [
+    0,
+    3,
+    2
+   ],
+   "hit": true,
+   "routed": {
+    "size": 66243,
+    "tid": 2,
+    "cid": 6,
+    "sec": 3.5517
+   },
+   "ratio_loss_pct": 0.0,
+   "candidate_reduction_x": 2.27,
+   "time_speedup_x": 2.17,
+   "full_transforms": 9
+  }
+ ]
+}

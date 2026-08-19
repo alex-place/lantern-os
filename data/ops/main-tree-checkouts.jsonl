@@ -1,0 +1,5 @@
+{"ts":"2026-08-01T16:24:41Z","event":"agent_main_tree_checkout","from":"87a897e4b001dcd455203ec7282c3e7bd395e945","to":"d81634e64c789919dad9d0ff969120ca49d9583d","branch":"kriskin/crypto-real-logos"}
+{"ts":"2026-08-01T16:33:31Z","event":"agent_main_tree_checkout","from":"d81634e64c789919dad9d0ff969120ca49d9583d","to":"d81634e64c789919dad9d0ff969120ca49d9583d","branch":"kriskin/trader-ui-fixes-1"}
+{"ts":"2026-08-01T16:33:34Z","event":"agent_main_tree_checkout","from":"d81634e64c789919dad9d0ff969120ca49d9583d","to":"d81634e64c789919dad9d0ff969120ca49d9583d","branch":"kriskin/crypto-real-logos"}
+{"ts":"2026-08-01T16:37:14Z","event":"agent_main_tree_checkout","from":"878e4cdbea943b8d34d468aea1ea545fcfbb7738","to":"d81634e64c789919dad9d0ff969120ca49d9583d","branch":"kriskin/badge-null-fix"}
+{"ts":"2026-08-01T16:42:28Z","event":"agent_main_tree_checkout","from":"9ff7b26a000d8e3e25399e64ca9462de23a31a48","to":"878e4cdbea943b8d34d468aea1ea545fcfbb7738","branch":"kriskin/crypto-real-logos"}

@@ -11,7 +11,9 @@ const path = require("path");
 const { Readable } = require("stream");
 
 // Isolate the profile + token-ledger stores to a temp cwd BEFORE requiring the app.
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "verify-int-")));
+const _tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "verify-int-"));
+process.chdir(_tmpRoot);
+process.env.UNISONA_STATE_DIR = _tmpRoot; // #3088: user-profiles roots at dataRoot(), not cwd
 const profiles = require("../lib/user-profiles");
 const { createToken } = require("../lib/auth-tokens");
 const authRoutes = require("../routes/auth");

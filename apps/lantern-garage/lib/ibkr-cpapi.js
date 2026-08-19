@@ -45,6 +45,49 @@ const { orderGate } = require('./trading-guard');
 
 const DEFAULT_BASE = 'https://api.ibkr.com/v1/api';
 
+// IBKR prefixes each order-reply message with its numeric id ("20/You are trying…").
+// These are ADVISORY NOTICES ABOUT THE ACCOUNT, not about the order's risk, so they
+// fire on literally every order and can never be "resolved" by choosing a better one.
+// P0-8 exists to stop us blindly clicking through MARGIN / SIZE-vs-ADV / PRICE-CAP /
+// outside-RTH warnings — none of which are in this set. Auto-confirming only these
+// honours that rule instead of bypassing it.
+//
+//   20 — "submitting an order without market data for this instrument" (the paper
+//        account carries no market-data subscription). On 2026-07-31 this single
+//        notice parked 408 of 409 orders as "Order Not Submitted" and let exactly one
+//        through — the one sell, which passed acceptWarnings. The engine prices from
+//        its own Yahoo feed and is bounded by the notional cap in trading-guard, so
+//        IBKR's lack of a data subscription does not make the decision blinder than it
+//        already was. The clean long-term fix is to subscribe the account to market
+//        data, which removes the notice at the source.
+const BENIGN_WARNING_IDS = new Set(['20']);
+
+// IBKR STOPPED SENDING THE NUMERIC PREFIX (observed live 2026-08-03). Reply ids are
+// now UUIDs and the message text arrives WITHOUT the leading "20/", so matching on the
+// numeric id alone silently stopped recognising this very notice — isBenignWarning
+// returned false for it and every autopilot entry parked as Inactive for days (22 on
+// 2026-08-03 alone). Match the message TEXT as well: same advisory, identified by its
+// wording instead of a prefix IBKR no longer sends.
+//
+// This does NOT widen P0-8. Only the market-data advisory is listed; MARGIN /
+// SIZE-vs-ADV / PRICE-CAP / outside-RTH warnings match nothing here and still block
+// until the caller passes acceptWarnings explicitly.
+const BENIGN_WARNING_TEXT = [
+  /submitting an order without market data/i,
+];
+
+/** True when EVERY line of an IBKR reply message is a known-benign advisory notice. */
+function isBenignWarning(message) {
+  const lines = Array.isArray(message) ? message : [message];
+  if (!lines.length) return false;
+  return lines.every((m) => {
+    const s = String(m == null ? '' : m);
+    const id = (s.match(/^\s*(\d+)\s*\//) || [])[1];        // legacy "20/…" form
+    if (id) return BENIGN_WARNING_IDS.has(id);
+    return BENIGN_WARNING_TEXT.some((re) => re.test(s));    // current, prefix-less form
+  });
+}
+
 /** True for loopback hostnames whose self-signed gateway cert can't be verified. */
 function isLoopback(hostname) {
   if (!hostname) return false;
@@ -454,13 +497,19 @@ class IbkrCpapi {
     // caller EXPLICITLY opts in via acceptWarnings:true. Otherwise surface them for a human.
     const warnings = [];
     let confirms = 0;
+    let allBenign = true;
     while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
-      warnings.push({ id: r.json[0].id, message: r.json[0].message });
-      if (!acceptWarnings) break;
+      const msg = r.json[0].message;
+      warnings.push({ id: r.json[0].id, message: msg });
+      const benign = isBenignWarning(msg);
+      if (!benign) allBenign = false;
+      // Auto-confirm ONLY the known-benign notices (see BENIGN_WARNING_IDS). Any
+      // risk-bearing warning still needs an explicit acceptWarnings from the caller.
+      if (!acceptWarnings && !benign) break;
       r = await this._request('POST', `/iserver/reply/${encodeURIComponent(r.json[0].id)}`, { confirmed: true });
       confirms += 1;
     }
-    if (warnings.length && !acceptWarnings) {
+    if (warnings.length && !acceptWarnings && !allBenign) {
       return {
         status: 'needs_confirmation', dry: false, gate, order, warnings,
         note: 'IBKR returned order warnings; re-submit with acceptWarnings:true to confirm each',
@@ -594,6 +643,8 @@ function reasonText(reason, lstErr) {
 
 module.exports = IbkrCpapi;
 module.exports.isLoopback = isLoopback;
+module.exports.isBenignWarning = isBenignWarning;
+module.exports.BENIGN_WARNING_IDS = BENIGN_WARNING_IDS;
 module.exports.pickAmount = pickAmount;
 module.exports.normalizeSummary = normalizeSummary;
 module.exports.normalizePosition = normalizePosition;

@@ -1,0 +1,149 @@
+'use strict';
+
+/**
+ * account-lock.js — one broker account is managed by exactly ONE process at a time.
+ *
+ * WHY THIS EXISTS
+ * On 2026-07-31 two servers (:4177 stable and :4178 dev) both ran the autonomous scan
+ * loop against the SAME IBKR account, DUR193395. Each keeps its own in-memory cooldowns
+ * and its own trader-state.json, so neither could see the other's orders. The result
+ * was duplicate submissions seconds apart, mirrored exit rows in both ledgers, and a
+ * TLT long that went through flat into an unintended short.
+ *
+ * The scan loop is already correct for MULTI-USER: it iterates each connected user and
+ * trades that user's own account, so two customers never collide. What was missing is
+ * mutual exclusion at the ACCOUNT level — which is what this provides, and which is what
+ * lets several instances run for many Pilot customers without fighting over an account.
+ *
+ * DESIGN
+ * A lock is a small JSON file per broker account id under data/trading/locks/. It holds
+ * the owning pid, host, and a heartbeat. Rules:
+ *
+ *   - acquire() succeeds if the account is unlocked, already ours, or the holder's
+ *     heartbeat is STALE (older than staleMs — a crashed process must never wedge an
+ *     account forever; that would silently stop exit management on real positions).
+ *   - The holder re-stamps the heartbeat on every acquire, so a live owner keeps it.
+ *   - An ARMED caller (one that can place entries) preempts a live DISARMED holder
+ *     (exit-management only). Never the reverse, and never between equal ranks.
+ *   - release() removes only OUR lock, never someone else's.
+ *
+ * Deliberately a file lock, not an OS mutex: it must work across separate node
+ * processes and survive inspection (`cat` the file to see who owns an account).
+ *
+ * FAIL-OPEN, ON PURPOSE. If the lock directory is unreadable/unwritable we return
+ * acquired:true with a reason. A broken lock file must never stop the engine from
+ * managing REAL money positions — a stuck stop-loss is far worse than a double order.
+ */
+
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+// The lock must be visible to EVERY process on the box, so it cannot live inside a
+// checkout. The first cut resolved it relative to __dirname, which gave
+//   dev    -> C:\dev\lantern-os-dev\data\lantern-garage\trading\locks
+//   stable -> C:\dev\lantern-os-stable\data\lantern-garage\trading\locks
+// Two separate directories: neither server could ever see the other's lock, so the
+// module would have silently failed to prevent the exact collision it exists for.
+// Default to a machine-wide (per-user) directory instead; TRADER_LOCK_DIR overrides
+// it, and both servers set it explicitly so the shared path is visible in config.
+const LOCK_DIR = process.env.TRADER_LOCK_DIR
+  ? path.resolve(process.env.TRADER_LOCK_DIR)
+  : path.join(os.tmpdir(), 'unisona-account-locks');
+
+// A holder that hasn't heartbeat in this long is presumed dead. Must comfortably
+// exceed the scan interval (60s) so a slow-but-alive scan is never evicted.
+const DEFAULT_STALE_MS = 5 * 60 * 1000;
+
+/** Lock files are named from the account id — keep it filesystem-safe. */
+function _fileFor(accountId) {
+  const safe = String(accountId).replace(/[^A-Za-z0-9_.-]/g, '_');
+  return path.join(LOCK_DIR, safe + '.lock.json');
+}
+
+function _read(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_e) { return null; }
+}
+
+/** Identity of THIS process. host+pid is enough to distinguish the two local servers. */
+function selfId() {
+  return { pid: process.pid, host: os.hostname(), label: process.env.TRADER_INSTANCE || null };
+}
+
+function _isSelf(held) {
+  const me = selfId();
+  return !!held && held.pid === me.pid && held.host === me.host;
+}
+
+/**
+ * Claim management of a broker account for this process.
+ * @returns {{acquired:boolean, reason:string, heldBy?:object, staleMs:number}}
+ */
+function acquire(accountId, { now = Date.now(), staleMs = DEFAULT_STALE_MS, armed = false } = {}) {
+  if (!accountId) return { acquired: true, reason: 'no account id — nothing to lock', staleMs };
+  const file = _fileFor(accountId);
+  try {
+    fs.mkdirSync(LOCK_DIR, { recursive: true });
+    const held = _read(file);
+    if (held && !_isSelf(held)) {
+      const age = now - Number(held.heartbeat || 0);
+      // ARMED PRIORITY (2026-08-05). Exit-management alone is enough to win this
+      // lock, so on 2026-08-05 the DISARMED dev server (:4178, exits only) grabbed
+      // IBKR DUR193395 at the open and the ARMED stable server (:4177) stood down
+      // for the whole morning — zero entries on a live trading day, and no error
+      // anywhere to show for it. Ranking fixes that: a process that can place
+      // ENTRIES outranks one that can only manage exits, so the armed trader
+      // preempts an exit-only holder instead of waiting out its 5-minute
+      // heartbeat. The reverse is never allowed — an exit-only process must never
+      // evict the armed trader. Equal rank keeps first-come-first-served, so two
+      // armed instances still cannot both drive one account (the original bug).
+      if (age < staleMs && !(armed && !held.armed)) {
+        // Someone else owns it and outranks-or-ties us — stand down.
+        return { acquired: false, reason: `held by pid ${held.pid}@${held.host} (${Math.round(age / 1000)}s ago)`, heldBy: held, staleMs };
+      }
+      // Stale holder (died mid-session), or a disarmed holder being preempted by
+      // the armed trader. Take over rather than leave the account unmanaged —
+      // open positions still need their exits run.
+      const preempt = age < staleMs;
+      const rec = { ...selfId(), accountId, armed, heartbeat: now, tookOverFrom: held.pid };
+      fs.writeFileSync(file, JSON.stringify(rec));
+      return {
+        acquired: true,
+        reason: preempt
+          ? `preempted disarmed pid ${held.pid} (armed trader outranks exit-only)`
+          : `took over from stale pid ${held.pid} (${Math.round(age / 1000)}s stale)`,
+        staleMs,
+      };
+    }
+    // Free, or already ours → (re)stamp the heartbeat. Armed rank is STICKY across
+    // our own renewals: the armed trader also runs an exit-only fast-exit tick on
+    // the same account, and that tick passing armed:false must not silently demote
+    // the process's own lock (which would let a second armed instance preempt it).
+    const _armed = armed || !!(held && _isSelf(held) && held.armed);
+    fs.writeFileSync(file, JSON.stringify({ ...selfId(), accountId, armed: _armed, heartbeat: now }));
+    return { acquired: true, reason: held ? 'renewed' : 'acquired', staleMs };
+  } catch (e) {
+    // Fail OPEN — see the header. Never let a lock problem strand a live position.
+    return { acquired: true, reason: `lock unavailable (${e.message}) — proceeding`, staleMs };
+  }
+}
+
+/** Drop our claim. Never removes a lock held by another process. */
+function release(accountId) {
+  if (!accountId) return false;
+  const file = _fileFor(accountId);
+  try {
+    const held = _read(file);
+    if (held && !_isSelf(held)) return false;
+    fs.unlinkSync(file);
+    return true;
+  } catch (_e) { return false; }
+}
+
+/** Who currently holds this account (or null). Read-only — for status endpoints. */
+function holder(accountId) {
+  if (!accountId) return null;
+  return _read(_fileFor(accountId));
+}
+
+module.exports = { acquire, release, holder, selfId, LOCK_DIR, DEFAULT_STALE_MS };

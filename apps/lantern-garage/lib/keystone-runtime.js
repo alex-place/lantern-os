@@ -439,7 +439,10 @@ async function emitConvergenceRecord({ issue, result, confidence }) {
     result: result.status,
     confidence,
   };
-  await appendJsonlQueued("data/convergence/records.jsonl", record);
+  // Shared store owner: a test process is auto-redirected off the live store (#3293)
+  // instead of this kernel hardcoding the live relative path.
+  const { RECORDS_PATH } = require("./convergence-records");
+  await appendJsonlQueued(RECORDS_PATH, record);
 }
 
 function log(verbose, message) {

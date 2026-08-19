@@ -70,6 +70,8 @@ function _isUsExtendedHours() {
   return (mins >= 240 && mins < 570) || (mins >= 960 && mins < 1200); // 04:00–09:30 | 16:00–20:00
 }
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const accountLock = require('../lib/account-lock');       // one account, one managing process
+const _lockNoticed = new Set();                          // accounts we've already logged a stand-down for
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
 // Champion is a SLOW allocation book — it must not rebalance every autoscan tick like
@@ -87,16 +89,27 @@ function _championDue(uid, now) {
 // or TRADER_EXTENDED_HOURS=1) the trader also scans + acts during the extended session,
 // placing marketable-limit + outsideRTH orders (regular hours use market orders as before).
 let _extendedTrading = process.env.TRADER_EXTENDED_HOURS === '1';
+// EXTENDED-HOURS PROTECTIVE MODE (TRADER_EXTENDED_EXITS=1, 2026-08-12). Distinct
+// from _extendedTrading: it does NOT enable extended-hours entries. It runs the
+// loop pre/after-hours purely to MANAGE open positions — trailing floors, zone
+// floors, give-back, max-loss — because between 16:00 and 09:30 the loop is idle
+// and a winner's trail cannot ratchet (2026-08-12: SOXS sat on its R2 target at
+// +$3,617 and gave back into the close with nobody watching). Signal-derived
+// exits and all entries stay off; see runAutoTrade's `protectiveOnly` contract.
+const _extendedExitsOnly = () => process.env.TRADER_EXTENDED_EXITS === '1';
 async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
   const marketHours = _isUsMarketHours();
   const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
+  // Protective-only window: run the loop, manage positions, take no entries.
+  // Full extended trading (extNow) supersedes it — no double-gating.
+  const extManageNow = !marketHours && !extNow && _isUsExtendedHours() && _extendedExitsOnly();
   // Asymmetric-options SHADOW trader (Verify stage): measurement only, never orders.
   // Self-throttles to its own close/open ET windows; fail-soft so it can't break scans.
   try { require('../lib/options-shadow').tick().catch(() => {}); } catch (_e) { /* absent/failed → skip */ }
   // Regular hours always run; extended hours only when the toggle is on. Otherwise idle
   // (no Python spawn / model call — the price collectors keep polling for free).
-  if (marketHours || extNow) {
+  if (marketHours || extNow || extManageNow) {
     // Overnight sleeve book (lib/overnight-trader.js): opt-in (OVERNIGHT_TRADER=1),
     // dry unless OVERNIGHT_ARM=1. Self-windowing (15:45 enter / 09:31 exit ET) — a
     // no-op on every other tick. Fail-soft: the scan loop must never die for it.
@@ -106,6 +119,11 @@ async function _autoscanTick() {
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
       if (n) console.info(`[Trading] autoscan — ${n} signal(s)${marketHours ? '' : ' (extended hours)'}`);
+      // User alerts (#3248): evaluate every user's rules against THIS scan —
+      // zero extra market-data calls, fail-soft by construction (the engine
+      // swallows its own errors and returns a count).
+      const alertsFired = require('../lib/alert-engine').evaluateScan(scan);
+      if (alertsFired) console.info(`[Trading] alerts — ${alertsFired} fired`);
       // Act stage: execute on EVERY connected IBKR account, not just one — so when a
       // second person links their account the autopilot trades both. TRADER_AUTO_USER,
       // if set, pins it to a single user (back-compat / testing). Dedupe by broker
@@ -143,9 +161,10 @@ async function _autoscanTick() {
       const _seenAccts = new Set();
       for (const uid of users) {
         // AI-autopilot tier gate (operator tiering 2026-07-26): the autonomous
-        // trader is a $200 Pilot capability. Follows PLAN_ENFORCEMENT like every
-        // plan gate — unset, behavior unchanged. local-owner is the operator.
-        if (process.env.PLAN_ENFORCEMENT === '1' && uid !== 'local-owner') {
+        // trader is a $200 Pilot capability, enforced always (it previously sat
+        // behind PLAN_ENFORCEMENT, which was never set). local-owner is the
+        // operator's own book and stays exempt.
+        if (uid !== 'local-owner') {
           try {
             const { getProfile } = require('../lib/user-profiles');
             const role = String(((getProfile(uid) || {}).role) || 'guest');
@@ -157,11 +176,54 @@ async function _autoscanTick() {
         if (!resolved || !resolved.accountId) continue;          // neither broker connected
         if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip
         _seenAccts.add(resolved.accountId);
+        // ARM BEFORE LOCK (2026-08-03). The lock used to be claimed before we knew
+        // whether this process would act at all, so a DISARMED instance squatted the
+        // account: the dev server (TRADER_AUTO_EXECUTE removed) re-claimed IBKR
+        // DUR193395 every tick and held it, while the ARMED stable server saw
+        // "managed by another process" and stood down — nothing traded for the whole
+        // session. Decide whether we can place orders for this user FIRST, and only
+        // contend for the account if we can. Mirrors each strategy's own arm gate:
+        //   champion   → sigma.rebalanceNow needs SIGMA_ARM=1
+        //   day-trader → runAutoTrade needs TRADER_AUTO_EXECUTE=1 or TRADER_MANAGE_EXITS=1
+        // A disarmed process places no orders either way, so skipping costs nothing.
+        // Per-user autopilot kill-switch (#3212): 'off' means NOTHING touches this
+        // account — no entries, no exits, no lock contention. Checked before the
+        // lock so an off user can never squat an account another process manages.
+        const _userMode = traderMode.get(uid);
+        if (_userMode === 'off') continue;
+        const _isChampion = _userMode === 'champion';
+        const _canAct = _isChampion
+          ? process.env.SIGMA_ARM === '1'
+          : (process.env.TRADER_AUTO_EXECUTE === '1' || process.env.TRADER_MANAGE_EXITS === '1');
+        if (!_canAct) continue;                                  // disarmed here → never touch the lock
+        // CROSS-PROCESS ACCOUNT LOCK (lib/account-lock.js). _seenAccts only dedupes
+        // within THIS process; on 2026-07-31 the stable and dev servers both drove
+        // IBKR DUR193395 with separate cooldown state and double-submitted. One
+        // account is managed by one process — the other stands down for this tick.
+        // Covers BOTH strategies below (champion rebalance and the day-trader), since
+        // either would place orders on this account. Fails OPEN if the lock is
+        // unreadable: an unmanaged position is worse than a duplicate order.
+        // ARMED RANK: only a process that can place ENTRIES claims armed priority.
+        // An exit-only instance (TRADER_MANAGE_EXITS without TRADER_AUTO_EXECUTE)
+        // still takes a free lock, but yields it to the armed trader — see the
+        // 2026-08-05 incident note in lib/account-lock.js.
+        const _armed = _isChampion
+          ? process.env.SIGMA_ARM === '1'
+          : process.env.TRADER_AUTO_EXECUTE === '1';
+        const _lock = accountLock.acquire(resolved.accountId, { armed: _armed });
+        if (!_lock.acquired) {
+          if (!_lockNoticed.has(resolved.accountId)) {          // log the change, not every tick
+            _lockNoticed.add(resolved.accountId);
+            console.info(`[Trading] account ${resolved.accountId} managed by another process — standing down (${_lock.reason})`);
+          }
+          continue;
+        }
+        _lockNoticed.delete(resolved.accountId);
         // ACTIVE-TRADER switch (Phase 2): one account, one strategy. A 'champion' user
         // has the day-trader PAUSED — instead we run the Champion allocation book on
         // their own account (throttled; DRY unless SIGMA_ARM=1, same governance as the
         // standalone Sigma book). Default 'stock' users fall through to runAutoTrade.
-        if (traderMode.get(uid) === 'champion') {
+        if (_isChampion) {
           if (_championDue(uid, Date.now())) {
             await sigma.rebalanceNow({ userId: uid, arm: true }).catch((e) => console.error('[Trading] champion rebalance failed:', e.message));
           }
@@ -182,16 +244,61 @@ async function _autoscanTick() {
         // each engine manages only its own positions. Fail-soft empty set.
         let _ovnHeld = [];
         try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
-        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld });
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld, protectiveOnly: extManageNow });
       }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }
   }
-  if (!_autoscanStopped) setTimeout(_autoscanTick, (marketHours || extNow) ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
+  if (!_autoscanStopped) setTimeout(_autoscanTick, (marketHours || extNow || extManageNow) ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
+
+  // ── FAST EXIT LOOP (#3165): price-only exit checks between full scans ──────────
+  // The 60s scan cadence made exits blind for a minute at a time — a near-miss of R1
+  // with momentum dying round-tripped before the next scan could act. This loop runs
+  // auto-trader.fastExitTick (no bars, no Python, no signal engine — mark-price only)
+  // every TRADER_FAST_EXIT_MS (default 10s) during market hours, owner account only,
+  // honoring the same cross-process account lock as the scan loop. Cost: one
+  // positions + one open-orders call per tick against the local gateway; zero extra
+  // Yahoo calls. Kill: TRADER_FAST_EXITS=0.
+  const FAST_EXIT_MS = Math.max(3000, parseInt(process.env.TRADER_FAST_EXIT_MS || '10000'));
+  let _fastExitBusy = false;
+  if (process.env.TRADER_FAST_EXITS !== '0') {
+    const t = setInterval(async () => {
+      if (_fastExitBusy || _autoscanStopped || !traderAgent) return;
+      const mh = _isUsMarketHours();
+      const ext = _isUsExtendedHours() && _extendedTrading;
+      if (!mh && !ext) return;
+      _fastExitBusy = true;
+      try {
+        // Honor the active-trader switch (#3212), same contract as the scan loop:
+        // 'off' means NOTHING touches this account — the fast loop used to keep
+        // firing day-trader exits every 10s regardless (audit 2026-08-08); and a
+        // 'champion' account belongs to the allocation book, whose positions the
+        // day-trader's exit set (1R take-profit, 2.5% trail, -8% backstop) would
+        // actively unwind. Only 'stock' gets the fast day-trader exit path.
+        if (require('../lib/trader-mode').get('local-owner') !== 'stock') return;
+        const { brokerFacadeFor } = require('../lib/broker-facade');
+        const resolved = await brokerFacadeFor('local-owner', _autoBridge).catch(() => null);
+        if (resolved && resolved.accountId && !resolved.demo) {
+          // Fast-exit is exit management, so it never claims armed rank — it must
+          // not be able to preempt the armed trader that owns this account.
+          const lock = accountLock.acquire(resolved.accountId, { armed: false });   // re-stamps if ours; skips if another process owns it
+          if (lock.acquired) {
+            let ovn = [];
+            try { ovn = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
+            await require('../lib/auto-trader').fastExitTick({
+              bridge: resolved.facade, userId: 'local-owner', extended: !mh, excludeSymbols: ovn,
+            });
+          }
+        }
+      } catch (_e) { /* fail-soft — the fast path must never take down the server */ }
+      finally { _fastExitBusy = false; }
+    }, FAST_EXIT_MS);
+    if (t.unref) t.unref();
+  }
   console.info(`[Trading] autonomous scan loop started (every ${AUTOSCAN_MS}ms)`);
 }
 
@@ -339,6 +446,8 @@ const optionsRoutes = require('./trading/options');
 const brakeRoutes = require('./trading/brake');
 const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
+const trackRecordRoutes = require('./trading/track-record');
+const alertsRoutes = require('./trading/alerts');
 const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
@@ -393,6 +502,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await brakeRoutes(req, res, url, ctx)) return true;
   if (await demoRoutes(req, res, url, ctx)) return true;
   if (await scorecardRoutes(req, res, url, ctx)) return true;
+  if (await trackRecordRoutes(req, res, url, ctx)) return true;
+  if (await alertsRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;

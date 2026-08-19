@@ -69,7 +69,7 @@ ok("healthy varied reply → below threshold", () => {
   const text = [
     "The Convergence Core is a local-first reasoning system that remembers, reasons, acts, and verifies.",
     "It stores experience in append-only logs and improves via retrieval, not weight modification.",
-    "The primary interface is dream-chat.html where you can talk to unisona.ai directly.",
+    "The primary interface is chat.html where you can talk to unisona.ai directly.",
     "External grounding ensures nothing is accepted without evidence from web or codebase sources.",
   ].join(" ");
   const { proximity } = scoreReplyCollapse(text);

@@ -56,13 +56,14 @@ function _oauthSecret() {
 }
 function signOauth(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url");
+  // MAC over the OAuth state payload, not a stored password — see sign() in auth-tokens.js.
+  const sig = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url"); // codeql[js/insufficient-password-hash]
   return `${data}.${sig}`;
 }
 function verifyOauth(token) {
   if (!token || !token.includes(".")) return null;
   const [data, sig] = token.split(".");
-  const expect = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url");
+  const expect = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url"); // codeql[js/insufficient-password-hash]
   const a = Buffer.from(sig), b = Buffer.from(expect);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   try {
@@ -233,6 +234,19 @@ async function handleOAuthCallback(providerId, req, res, query) {
   const cookieProvider = req.session.oauth_provider || (ck && ck.provider) || providerId;
 
   if (!expectedState || state !== expectedState || cookieProvider !== providerId) {
+    // Three distinct causes shared one opaque message, so a real outage was
+    // indistinguishable from a stale tab: (a) no recoverable state — the signed
+    // cookie failed HMAC verification, which is what a rotated/unset SESSION_SECRET
+    // or a cross-instance callback looks like; (b) the state genuinely differs;
+    // (c) the cookie was minted for another provider. Log which, never the values.
+    try {
+      const why = !expectedState
+        ? (readCookie(req, OAUTH_COOKIE) ? "cookie_present_but_unverifiable (SESSION_SECRET rotated/unset, or cookie expired past its 10min TTL)" : "no_session_and_no_cookie (cookie dropped — check SameSite/Secure and the redirect_uri host)")
+        : state !== expectedState ? "state_value_differs (concurrent/stale login attempt)"
+        : `provider_mismatch (cookie=${cookieProvider} callback=${providerId})`;
+      console.error(`[oauth] state check FAILED provider=${providerId} reason=${why}` +
+        ` session_state=${req.session.oauth_state ? "present" : "absent"} cookie=${readCookie(req, OAUTH_COOKIE) ? "present" : "absent"}`);
+    } catch (_e) { /* logging must never mask the response */ }
     res.writeHead(403, { "Content-Type": "application/json", "Set-Cookie": clearCookie });
     return res.end(JSON.stringify({ error: "State mismatch" }));
   }
@@ -321,6 +335,21 @@ async function handleOAuthCallback(providerId, req, res, query) {
       },
       (err) => {
         if (err) {
+          // Log the UNDERLYING store error. This branch fires when req.session.save()
+          // fails — i.e. the session STORE refused the write (read-only filesystem,
+          // missing/unwritable session dir, unreachable external store, disk full).
+          // It previously returned a five-word body and logged nothing, so a live
+          // sign-in outage produced no evidence at all (unisona.ai, 2026-07-27).
+          // Never log the OAuth code/token or the profile — only fault diagnostics.
+          try {
+            console.error(
+              `[oauth] session save FAILED provider=${providerId}` +
+              ` code=${err.code || "-"} errno=${err.errno || "-"} syscall=${err.syscall || "-"}` +
+              ` path=${err.path || "-"} store=${(req.sessionStore && req.sessionStore.constructor && req.sessionStore.constructor.name) || "unknown"}` +
+              ` msg=${err.message || String(err)}`
+            );
+            if (err.stack) console.error(`[oauth] session save stack: ${String(err.stack).slice(0, 400)}`);
+          } catch (_e) { /* logging must never mask the response */ }
           res.writeHead(500, { "Content-Type": "application/json", "Set-Cookie": clearCookie });
           return res.end(JSON.stringify({ error: "Session save failed" }));
         }
@@ -335,8 +364,32 @@ async function handleOAuthCallback(providerId, req, res, query) {
     );
     return publicProfile(profile);
   } catch (err) {
-    console.error(`[AUTH] ${providerId} callback error:`, err.message);
-    res.writeHead(302, { "Set-Cookie": clearCookie, Location: `/auth.html?error=oauth_failed&provider=${providerId}` });
+    // CLASSIFY the failure so the user (and the log) learn something. A bare
+    // "Sign-in didn't complete" is the same silent-failure pattern that hid the
+    // trader outages: the operator hit it on 2026-08-01 and nothing on screen or
+    // in the response said which of five very different things went wrong.
+    //
+    // The `reason` is a short STABLE code, never the raw message — upstream error
+    // bodies can carry tokens/PII and must not reach a URL. The full detail stays
+    // server-side in the log line below.
+    const msg = String((err && err.message) || err || '');
+    const reason =
+      /Token exchange failed/i.test(msg) ? 'token_exchange'
+      : /invalid_grant/i.test(msg) ? 'code_rejected'
+      : /invalid_client/i.test(msg) ? 'bad_client_credentials'
+      : /userinfo|fetch user|profile fetch/i.test(msg) ? 'userinfo'
+      : /ENOENT|EACCES|EROFS|permission|read-only/i.test(msg) ? 'storage'
+      : /profile|identity/i.test(msg) ? 'profile'
+      : 'unknown';
+    console.error(
+      `[AUTH] ${providerId} callback FAILED reason=${reason} msg=${msg}` +
+      ` | redirect_uri=${(() => { try { return resolveRedirectUri(req, providerId); } catch (_e) { return '?'; } })()}`
+    );
+    if (err && err.stack) console.error(`[AUTH] ${providerId} stack: ${String(err.stack).slice(0, 400)}`);
+    res.writeHead(302, {
+      "Set-Cookie": clearCookie,
+      Location: `/auth.html?error=oauth_failed&provider=${providerId}&reason=${encodeURIComponent(reason)}`,
+    });
     res.end();
   }
 }

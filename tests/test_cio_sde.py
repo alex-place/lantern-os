@@ -776,6 +776,11 @@ def test_t1_nonnormal_invariance():
     """(a) The Riesz spectral split is A-invariant — the cross-term that defeats the
     symmetric-split energy proof of Theorem 1 vanishes (‖(I−BBᵀ)A B‖ ≈ 0) even for
     strongly non-normal A. This is the load-bearing fact of the dichotomy."""
+    # Needs scipy like its siblings. Worse than the missing guard on the dichotomy test:
+    # this one PASSED without it, because a scipy-less run left invariance_residual at
+    # its initial 0.0 and `0.0 < 1e-8` is true — a green assertion over a number that was
+    # never computed (#3105).
+    pytest.importorskip("scipy")
     A = _nonnormal_from_spectrum([-0.8, -1.2, -2.0, -0.6], [(0.0, 1.5)], cond=200.0, seed=1)
     assert (A @ A.T - A.T @ A).norm() > 1.0                 # genuinely non-normal
     cert = dichotomy_certificate(A, delta=0.25)
@@ -815,6 +820,10 @@ def test_t1_nonnormal_dichotomy():
     All-stable ⇒ COLLAPSE; one RHP mode in the slow block ⇒ DIVERGE; in the diverge
     case the active part STILL contracts (the whole point). The shipped small-gain
     certificate over-rejects both — it cannot certify either as contracting."""
+    # Every sibling dichotomy test guards on scipy; this one was missed. Without the
+    # guard it failed as `assert 0.0 > 0`, which reads like a math bug rather than a
+    # missing dependency — see #3105.
+    pytest.importorskip("scipy")
     collapse = _nonnormal_from_spectrum([-0.5, -0.6, -0.7, -0.8, -0.9, -1.0], [], cond=200.0, seed=2)
     diverge = _nonnormal_from_spectrum([-0.8, -1.2, -2.0, -0.6, -1.5, 0.3], [], cond=30.0, seed=3)
     c_cert = dichotomy_certificate(collapse, delta=0.25)
@@ -853,6 +862,10 @@ def test_dichotomy_continuous_defective_via_schur():
 def test_discrete_dichotomy_radius_trichotomy():
     """Discrete fate keys off the spectral radius ρ(A), NOT the abscissa: ρ<1 COLLAPSE,
     ρ>1 DIVERGE, |λ|=1 rotation MARGINAL — the three discrete-time fates, no fourth."""
+    # Like its continuous sibling, this passed on a scipy-less box because the certificate
+    # silently returned uncomputed defaults. Now that the certificate refuses instead,
+    # the dependency has to be declared (#3105).
+    pytest.importorskip("scipy")
     import numpy as np
     contract = torch.tensor(np.diag([0.5, 0.3, -0.2, 0.1]), dtype=torch.float64)   # ρ=0.5
     expand = torch.tensor(np.diag([1.3, 0.4, 0.2, -0.1]), dtype=torch.float64)     # ρ=1.3

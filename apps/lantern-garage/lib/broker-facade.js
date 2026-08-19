@@ -61,9 +61,15 @@ async function brokerFacadeFor(userId, ibkrBridge) {
   // account with a simulated fixture. They fall through the normal chain, and only land on
   // demo below if nothing at all is connected (see demoFacade at the end).
   const accountMode = require('./trading-account-mode');
-  const demoFacade = () => {
+  const demoFacade = async () => {
     const demo = require('./champion-demo');
-    const snap = demo.positions();
+    // #2983: mark the demo book at LIVE quotes (positionsLive → the SAME Yahoo feed
+    // /api/trading/watchlist-prices uses) instead of the baked static marks. Otherwise the
+    // positions card and the watchlist showed two different prices for one symbol on the same
+    // screen (TLT baked at $88.10 vs the live $83.70), and the P&L was computed off the stale
+    // mark. positionsLive() already falls back to the baked marks if the quote fetch fails, so
+    // wiring it in only ever improves accuracy — it can't regress the offline/degraded case.
+    const snap = await demo.positionsLive();
     // Read-only is structural, not conventional: there is no working write path here, so a
     // caller that forgets to check the mode still cannot place an order in demo.
     const reject = async () => accountMode.assertCanPlaceOrder(accountMode.DEMO);
@@ -71,7 +77,7 @@ async function brokerFacadeFor(userId, ibkrBridge) {
       broker: 'demo', accountId: snap.account.account_id, demo: true, readOnly: true,
       facade: {
         getIBKRAccount: async () => snap.account,
-        getIBKRPositions: async () => demo.positions().positions,
+        getIBKRPositions: async () => snap.positions,
         getIBKROpenOrders: async () => [],          // a fixture has no working orders
         getIBKRDayPnl: async () => ({ dailyPnl: snap.account.pnl_today, unrealizedPnl: snap.account.unrealized, realizedPnl: 0 }),
         placeIBKROrder: reject,
@@ -79,7 +85,7 @@ async function brokerFacadeFor(userId, ibkrBridge) {
       },
     };
   };
-  if (accountMode.getExplicit(userId) === accountMode.DEMO) return demoFacade();
+  if (accountMode.getExplicit(userId) === accountMode.DEMO) return await demoFacade();
 
   const tryIbkr = async () => {
     if (!ibkrBridge) return null;
@@ -144,7 +150,7 @@ async function brokerFacadeFor(userId, ibkrBridge) {
   // demo book — a populated dashboard beats an empty one, and it can place no orders.
   const house = await tryHouse();
   if (house) return house;
-  if (userId != null && userId !== '' && userId !== 'local-owner') return demoFacade();
+  if (userId != null && userId !== '' && userId !== 'local-owner') return await demoFacade();
   return null;   // owner identity with nothing configured — unchanged
 }
 

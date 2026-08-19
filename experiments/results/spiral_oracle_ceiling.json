@@ -1,0 +1,41 @@
+{
+ "n": 16,
+ "always_cheap": {
+  "solved": 16,
+  "solve_rate": 1.0,
+  "frontier_calls": 0,
+  "total_lat_s": 71.8
+ },
+ "always_frontier": {
+  "solved": 8,
+  "solve_rate": 0.5,
+  "frontier_calls": 16,
+  "total_lat_s": 27.1
+ },
+ "cascade_actual": {
+  "solved": 16,
+  "solve_rate": 1.0,
+  "frontier_calls": 0,
+  "total_lat_s": 71.8
+ },
+ "oracle_router": {
+  "solved": 16,
+  "solve_rate": 1.0,
+  "frontier_calls": 0,
+  "total_lat_s": 71.8
+ },
+ "ceiling": {
+  "wasted_escalations_both_fail": 0,
+  "cascade_frontier_calls": 0,
+  "oracle_frontier_calls": 0,
+  "frontier_calls_saved_by_perfect_router": 0,
+  "frontier_call_reduction_pct": null,
+  "solve_rate_gain_over_cascade": 0.0,
+  "verdict": "cheap tier solved everything it could \u2014 zero escalations to optimize; a learned router has no headroom on this sample"
+ },
+ "sources": [
+  "data\\eval\\cascade\\verified-cascade-live.jsonl",
+  "data\\eval\\cascade\\verified-cascade-live-hard.jsonl"
+ ],
+ "skipped_rows": 0
+}

@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: a held symbol with no entry row in the ledger is no longer treated as a carried position. The day-P&L classifier was two-state — "not entered today" meant "carried" — which is also true when the ledger has never heard of the symbol, so any surface whose ledger did not write the entries charged a position opened TODAY with the entire overnight gap. Live 2026-08-18 on the :4178 instance (it scans but never trades, so its ledger held 980 rows for the day and zero entries): SMH read −$5,573 against a true −$1,798 and GLD −$1,720 against +$47, overstating the day by ~$3,200. Unknown lots now fall back to the broker's since-entry figure and say so in `pnl_basis`

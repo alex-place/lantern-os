@@ -37,6 +37,42 @@ sudo systemctl enable --now lantern-release-deploy.timer
 To force a deploy now: `sudo systemctl start lantern-release-deploy.service`, then
 `journalctl -u lantern-release-deploy.service -n 30`.
 
+## Setting a secret (e.g. the Stripe key)
+
+Env/secrets are systemd drop-ins in `/etc/systemd/system/lantern.service.d/`, outside
+the checkout, so `git checkout -f <tag>` can't touch them. Set once; survives releases.
+
+From your workstation, pulling the key out of your own environment:
+
+```powershell
+.\ops\gce\Push-StripeKey.ps1            # -WhatIf to preview, -Remove to undo
+```
+
+Or on the VM itself, pasting it at a prompt:
+
+```bash
+sudo bash ops/gce/set-stripe-key.sh       # --env-file, --file PATH, --remove
+```
+
+The same pair exists for the Resend mail config (`RESEND_API_KEY` + `MAIL_FROM` +
+`PUBLIC_BASE_URL`): `Push-ResendKey.ps1` / `set-resend-key.sh`. That one is not
+cosmetic — with **no** mail provider configured, `lib/local-auth.js` takes the
+no-mailer path from #2065 and **auto-admits a public signup** with
+`emailVerified`/`emailAssumed` set, so anyone can register an address they do not
+own. Loopback is exempt, so it does **not** reproduce over `127.0.0.1` — only real
+proxied traffic. See #3119.
+
+Both validate the key's shape, write `0600` root-owned, `daemon-reload` + restart
+`lantern.service`, and then verify `/api/billing/config` reports `configured:true`.
+Neither ever puts the key in a command line -- argv is readable by any local user via
+`ps`/`/proc` -- and neither echoes it.
+
+> **Don't pipe secrets through `gcloud compute ssh --command` on Windows.** `gcloud`
+> there is a PowerShell wrapper that does not forward stdin to ssh; it answers a
+> prompt with `y`, and that single character is what lands in the file. It looks
+> like it worked (`echo INSTALLED` still fires) and the app stays unconfigured.
+> `Push-StripeKey.ps1` uses `gcloud compute scp` for this reason.
+
 ## Notes
 
 - The `git checkout -f <tag>` discards any live hotfix drift in the checkout — by

@@ -52,6 +52,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     surface: "",
     sessionId: null,
     attachments: [],
+    approvals: [],
     forceGround: false,
   };
 
@@ -62,6 +63,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.requestedProvider = String(url.searchParams.get("provider") || "").trim().toLowerCase();
     // Model pin (#1127): honoured only with a pinned provider AND an allowlisted id.
     parsed.requestedModel = String(url.searchParams.get("model") || "").trim().slice(0, 80);
+    parsed.approvals = String(url.searchParams.get("approvals") || "").split(/[,\s]+/).map((t) => t.trim().slice(0, 32)).filter(Boolean).slice(0, 20);
     parsed.routeIntent = String(url.searchParams.get("routeIntent") || "").trim();
     parsed.surface = String(url.searchParams.get("surface") || "").trim().toLowerCase();
     parsed.sessionId = String(url.searchParams.get("sessionId") || "").trim().slice(0, 64) || null;
@@ -93,6 +95,11 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.requestedAgent = String(body.agent || "").trim();
     parsed.requestedProvider = String(body.provider || "").trim().toLowerCase();
     parsed.requestedModel = String(body.model || "").trim().slice(0, 80);
+    // #3070 — approval tokens the user granted for side-effectful tool calls. Each binds a
+    // tool name + its exact arguments, so one can never authorise a different call.
+    parsed.approvals = Array.isArray(body.approvals)
+      ? body.approvals.map((t) => String(t || "").trim().slice(0, 32)).filter(Boolean).slice(0, 20)
+      : [];
     parsed.history = sanitizeHistory(body.history);
     parsed.routeIntent = String(body.routeIntent || "").trim();
     parsed.surface = String(body.surface || "").trim().toLowerCase();

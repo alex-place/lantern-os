@@ -44,6 +44,20 @@ module.exports = async function csfRoutes(req, res, url, deps) {
   const p = url.pathname;
   if (!p.startsWith("/api/csf/") && !p.startsWith("/api/knowledge/")) return false;
 
+  // GET /api/knowledge/report-manifest — the allowlist of research PDFs that may be
+  // shown on the PUBLIC Knowledge Center. /api/pdfs is a directory listing of the
+  // ingest pool (third-party papers included), so the page filters through this.
+  if (p === "/api/knowledge/report-manifest" && req.method === "GET") {
+    try {
+      const mf = path.resolve(__dirname, "../../../data/knowledge/report-manifest.json");
+      const j = JSON.parse(fs.readFileSync(mf, "utf8"));
+      return sendJson(res, { reports: Array.isArray(j.reports) ? j.reports : [] });
+    } catch {
+      // Fail CLOSED: an unreadable allowlist must not become "allow everything".
+      return sendJson(res, { reports: [] });
+    }
+  }
+
   // GET/POST /api/knowledge/query — cheaper deterministic/near routing over the
   // base Knowledge Center index. Answers $0 (no LLM) on a near hit; else miss.
   if (p === "/api/knowledge/query") {

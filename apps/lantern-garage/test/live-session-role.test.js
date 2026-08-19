@@ -14,7 +14,9 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-liverole-")));
+const _tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-liverole-"));
+process.chdir(_tmpRoot);
+process.env.UNISONA_STATE_DIR = _tmpRoot; // #3088: user-profiles roots at dataRoot(), not cwd
 process.env.SESSION_SECRET = ["unit", "test", "strong", "secret", "value"].join("-");
 
 const profiles = require(path.join(__dirname, "..", "lib", "user-profiles"));

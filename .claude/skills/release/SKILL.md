@@ -56,7 +56,9 @@ Direct master push is blocked, so land the bump through a PR; merging it flips
 ```bash
 V=$(node -p "require('./package.json').version")
 git checkout -b "claude/release-v$V" master
-git add CHANGELOG.MD package.json apps/lantern-garage/package.json apps/lantern-garage/version.json changelog.d
+git add CHANGELOG.MD package.json apps/lantern-garage/package.json apps/lantern-garage/version.json apps/lantern-garage/public/version.json changelog.d
+# public/version.json is the file /version.json actually SERVES — omitting it ships a
+# release whose site footer still reports the previous version (bit v1.15.0 on GCE).
 git commit -m "chore(release): v$V"        # ends with the Co-Authored-By trailer
 git push -u origin "claude/release-v$V"
 # gh pr create/merge are broken in this repo — use the API (see gotchas):

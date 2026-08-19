@@ -299,3 +299,62 @@ test("memory cap: memoryWindow 0 = uncapped view (legacy); small runs unaffected
   });
   assert.equal(seen[seen.length - 1], 5, "window 0 passes the whole history");
 });
+
+test("holdout (#2999): a visible-solve that breaks the held-out test is NOT solved; the loop recovers", async () => {
+  let t = 0;
+  // Candidate 0 passes ALL visible tests but fails holdout (the memorizer).
+  // Candidate 1 passes visible AND holdout (the real solution).
+  const cands = ["pass:a,b", "pass:a,b,H"];
+  const r = await runSpiral({
+    problem: { id: "s18", prompt: "transduction trap" },
+    tiers: { cheap: async () => ({ text: cands[Math.min(t++, 1)], cost: 0.001 }) },
+    verify: async (text) => parseVerify(text), // visible split: tests a,b
+    holdoutVerify: async (text) => [{ name: "H", passed: /H/.test(text) }],
+    corpus: sink(), now: clock, maxTurns: 6,
+  });
+  assert.equal(r.solved, true, "the loop kept going past the memorizer and truly solved");
+  assert.equal(r.turns, 2, "one holdout rejection, then the real solve");
+  assert.equal(r.y, "pass:a,b,H", "the returned answer passes the held-out test");
+  assert.equal(r.confidence, 1);
+  assert.equal(r.holdout.frac, 1);
+});
+
+test("holdout: unsolved runs return the HOLDOUT-best commit, visible-best kept in yVisible", async () => {
+  let t = 0;
+  // Both commit (advance on visible); first scores better on holdout than second.
+  const seq = ["pass:a,H", "pass:a,b"]; // second is visible-better but holdout-worse
+  const r = await runSpiral({
+    problem: { id: "s19", prompt: "select visible, return holdout" },
+    tiers: { cheap: async () => ({ text: seq[t] || `pass: filler${t}`, cost: 0.001, model: `m${t++}` }) },
+    verify: async (text) => parseVerify(text),
+    holdoutVerify: async (text) => [{ name: "H", passed: /H/.test(text) }],
+    corpus: sink(), now: clock, maxTurns: 12, stallLimit: 3,
+  });
+  assert.equal(r.solved, false);
+  assert.equal(r.y, "pass:a,H", "holdout-best returned even though a later commit was visible-better");
+  assert.equal(r.yVisible, "pass:a,b", "visible-best preserved for transparency");
+  assert.equal(r.confidence, 1, "confidence is the held-out pass fraction of the returned answer");
+});
+
+test("holdout: absent → legacy semantics untouched (y = visible-best, holdout null)", async () => {
+  const r = await runSpiral({
+    problem: { id: "s20", prompt: "legacy" },
+    tiers: { cheap: async () => ({ text: "pass:a,b", cost: 0.001 }) },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock,
+  });
+  assert.equal(r.solved, true);
+  assert.equal(r.y, "pass:a,b");
+  assert.equal(r.holdout, null);
+});
+
+test("splitHoldout: last-n held out deterministically; the visible split is never emptied", () => {
+  const { splitHoldout } = require("../lib/spiral-tiers");
+  const tests = [{ name: "a" }, { name: "b" }, { name: "c" }];
+  const s = splitHoldout(tests, 1);
+  assert.deepEqual(s.visible.map((t) => t.name), ["a", "b"]);
+  assert.deepEqual(s.holdout.map((t) => t.name), ["c"]);
+  const greedy = splitHoldout(tests, 99);
+  assert.equal(greedy.visible.length, 1, "visible never empties — a loop with no selection tests cannot ratchet");
+  assert.equal(splitHoldout([{ name: "only" }], 1).holdout.length, 0, "a single test stays visible");
+});

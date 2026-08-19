@@ -230,6 +230,51 @@ function currentRetest(ticker, price) {
  * @returns {object} see module header.
  */
 function findSrZones(ticker, price, bars, opts = {}) {
+  // ── ADAPTIVE CLUSTERING TOLERANCE (operator design 2026-08-05) ─────────────
+  // The 0.5%% clustering constant means opposite things on different tickers: on
+  // GLD (daily range ~1.1%%) it merges half a day's range into one zone; on a 5%%
+  // -range instrument it shatters real structure into fragments. Scale it by the
+  // instrument's own recent true range so zone GRANULARITY adapts to how the
+  // symbol actually moves — a structural property that persists, unlike a fitted
+  // constant. opts.clusterAtrMult (or ZONE_CLUSTER_ATR_MULT) sets the multiple;
+  // 0 keeps the legacy fixed 0.5%%. Clamped to [0.15%%, 2%%] so a volatility spike
+  // can never collapse every level into one zone or fragment them into noise.
+  // PER-SYMBOL DEFAULTS (measured, not fitted). GLD is the most range-bound
+  // instrument in the book and asked for tighter/local zone structure in TWO
+  // independent tests: it preferred a 40-bar lookback (0.70R vs 0.60R, held out
+  // of sample) and 1.0xATR clustering (PF 2.88 vs 2.68, +155.7R vs +141.4R,
+  // RR 1:1.82, higher win rate). Every other symbol tested preferred the legacy
+  // fixed 0.5%%, so this is a specific finding about GLD, NOT a general law —
+  // portfolio-wide the adaptive versions LOST (+463.8R vs +491.2R legacy).
+  // ZONE_CLUSTER_ATR_BY_SYMBOL overrides; ZONE_CLUSTER_ATR_MULT forces globally.
+  const SYMBOL_CLUSTER_ATR = (() => {
+    const m = { GLD: 1.0 };
+    try {
+      for (const part of String(process.env.ZONE_CLUSTER_ATR_BY_SYMBOL || '').split(',')) {
+        const [sym, v] = part.split(':');
+        const f = parseFloat(v);
+        if (sym && Number.isFinite(f)) m[sym.trim().toUpperCase()] = f;
+      }
+    } catch (_e) { /* malformed override -> defaults */ }
+    return m;
+  })();
+  const _symMult = SYMBOL_CLUSTER_ATR[String(ticker || '').toUpperCase()];
+  const _clusterMult = Number(opts.clusterAtrMult ?? process.env.ZONE_CLUSTER_ATR_MULT ?? _symMult ?? 0);
+  let _clusterTol = 0.005;
+  if (_clusterMult > 0 && Array.isArray(bars) && bars.length >= 15 && price > 0) {
+    const _rec = bars.slice(-15);
+    let _sum = 0, _cnt = 0;
+    for (let k = 1; k < _rec.length; k++) {
+      const h = Number(_rec[k].high), l = Number(_rec[k].low), pc = Number(_rec[k - 1].close);
+      if (!(h > 0) || !(l > 0) || !(pc > 0)) continue;
+      _sum += Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)); _cnt++;
+    }
+    if (_cnt) {
+      const _atrPct = (_sum / _cnt) / price;          // fractional ATR
+      _clusterTol = Math.min(0.02, Math.max(0.0015, _atrPct * _clusterMult));
+    }
+  }
+
   try {
     if (!Array.isArray(bars) || bars.length < 20) return neutralResult("insufficient bars");
     if (!price || price <= 0) return neutralResult("invalid price");
@@ -347,7 +392,7 @@ function findSrZones(ticker, price, bars, opts = {}) {
         const pt = sorted[n];
         const ref = current[0].price;
         if (ref <= 0) { clusters.push(current); current = [pt]; continue; }
-        if (Math.abs(pt.price - ref) / ref < 0.005) current.push(pt);
+        if (Math.abs(pt.price - ref) / ref < _clusterTol) current.push(pt);
         else { clusters.push(current); current = [pt]; }
       }
       clusters.push(current);

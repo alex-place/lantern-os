@@ -24,19 +24,31 @@ const DIR = process.env.TRADER_MODE_DIR
   ? path.resolve(process.env.TRADER_MODE_DIR)
   : path.join(__dirname, '..', 'data', 'trader-mode');
 
-const VALID = new Set(['stock', 'champion']);
+// 'off' (#3212): the user's autopilot kill-switch. An 'off' account is never
+// entered OR exited by the loop — fully hands-off, the user manages their own
+// positions. Chosen over exits-only because a half-managed account is the most
+// confusing possible state ("I turned it off, why did it sell?").
+const VALID = new Set(['off', 'stock', 'champion']);
 const DEFAULT = 'stock';
+
+// SAFE POSTURE (#3212): a REAL signed-in user who never made a choice defaults
+// to OFF — connecting a broker must never silently start an autonomous trader
+// on someone's account; they flip it on themselves. The operator identities
+// keep the historical 'stock' default (the single-user box the trader ships in,
+// where connecting credentials IS the opt-in).
+function defaultFor(userId) {
+  return (userId == null || userId === '' || userId === 'local-owner') ? DEFAULT : 'off';
+}
 
 function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId)) + '.json'); }
 
-/** The user's active trader: 'stock' | 'champion' (default 'stock' when unset). A
- *  null userId (anonymous) is always the default — no identity, no stored choice. */
+/** The user's active trader: 'off' | 'stock' | 'champion'. Unset → defaultFor(). */
 function get(userId) {
   if (userId == null) return DEFAULT;
   try {
     const v = JSON.parse(fs.readFileSync(_file(userId), 'utf8')).mode;
-    return VALID.has(v) ? v : DEFAULT;
-  } catch (_e) { return DEFAULT; }
+    return VALID.has(v) ? v : defaultFor(userId);
+  } catch (_e) { return defaultFor(userId); }
 }
 
 /** Persist a choice. Returns false on an invalid value or missing identity (caller 4xxs). */
@@ -47,4 +59,4 @@ function set(userId, mode) {
   return true;
 }
 
-module.exports = { get, set, VALID, DEFAULT };
+module.exports = { get, set, VALID, DEFAULT, defaultFor };

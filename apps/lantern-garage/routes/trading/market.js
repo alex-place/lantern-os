@@ -183,11 +183,28 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     // populated without a linked broker. Read-only + labeled demo; never touches
     // a real account. Placed first so it short-circuits before any broker call.
     if (url.searchParams.get('demo') === 'champion') {
-      sendJson(res, require('../../lib/champion-demo').positions(), 200);
+      // positionsLive marks the fixture to the live quote feed (user report:
+      // "the same numbers for days" — the baked snapshot never moved). Fail-soft
+      // to the static snapshot inside positionsLive if quotes are down.
+      sendJson(res, await require('../../lib/champion-demo').positionsLive(), 200);
       return true;
     }
     try {
-      const uid = getEffectiveUserId(req);
+      // OPERATOR VIEW (2026-08-06). The autonomous trader manages the operator
+      // account under the fixed id 'local-owner', but this route resolves the
+      // BROWSER session's profile id. Those are different identities, so an
+      // admin signed in normally queried a profile with no linked broker and the
+      // dashboard rendered $0.00 account value / $0 buying power while the bot
+      // was trading a $960k IBKR account — the UI could not see the book it
+      // exists to monitor.
+      //
+      // ADMIN ONLY, and only as a FALLBACK below: an admin whose own profile has
+      // a broker linked still sees their own account, and non-admins are
+      // unaffected, so no real account can leak to a normal user.
+      const _sessionUid = getEffectiveUserId(req);
+      const _isAdmin = (() => { try { return require('../../lib/auth-middleware').isAdmin(req); } catch (_e) { return false; } })();
+      const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+      const uid = _sessionUid;
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Serve the Alpaca account view (the user's own OAuth account, else the
@@ -221,55 +238,106 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           const sumUpl = ibkrPositions.reduce(
             (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
           ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
-          // Realized today: IBKR reports $0 on the paper CPAPI (both `rpl` and the portfolio
-          // summary), so tally it from the autopilot ledger — the P&L of positions that
-          // ACTUALLY closed today (symbol now flat). One value per symbol (its LAST exit row;
-          // earlier rows were phantom re-attempts on the still-open position, now prevented by
-          // the exit-reattempt cooldown). Positions still open are skipped (their exits didn't
-          // fill). Cheap: the ledger is a small append-only file.
+          // REALIZED TODAY + DAY P&L. IBKR reports $0 realized on the paper CPAPI
+          // (both `rpl` and the portfolio summary), so both come from the autopilot
+          // ledger via lib/day-pnl.js — which applies ONE basis rule to realized
+          // and unrealized alike: a lot opened today counts in full, a carried lot
+          // counts only from yesterday's close. See that module for the incidents
+          // each rule is paid for by; the one it was extracted for is 2026-08-13,
+          // where realized still used whole-lot P&L and the header printed
+          // +$7,653.13 against a true +$2,533.54 (#3283).
+          //
+          // realized_today stays whole — the cash the closed trades actually
+          // banked. Only the Day P&L sum uses the attributable slice, and
+          // pnl_carry_adjustment reports the difference so the two reconcile.
+          // Both exclude commissions, which the ledger does not track — expect a
+          // small gap to the broker's own dpl, in that direction only.
           try {
             const fs = require('fs'), path = require('path');
             const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
-            const openSyms = new Set(ibkrPositions.map((p) => p.symbol));
-            const today = new Date().toISOString().slice(0, 10);
-            const lastBySym = {};
-            for (const line of fs.readFileSync(logPath, 'utf8').split('\n')) {
-              if (!line.trim()) continue;
-              let r; try { r = JSON.parse(line); } catch (_e) { continue; }
-              if (r && r.event === 'exit' && String(r.ts || '').slice(0, 10) === today && r.pnl != null) lastBySym[r.symbol] = Number(r.pnl);
-            }
-            let realized = 0, any = false;
-            for (const [sym, pnl] of Object.entries(lastBySym)) if (!openSyms.has(sym) && Number.isFinite(pnl)) { realized += pnl; any = true; }
-            if (any) ibkrAccount.realized_today = Math.round(realized * 100) / 100;
-          } catch (_e) { /* keep the broker realized if the ledger isn't readable */ }
-          // Reconcile Day P&L the same way. IBKR's `dpl` lags/rounds on the paper CPAPI
-          // (it read −2310 while Realized stayed $0 despite closes today), so derive each
-          // position's day change from the cached watchlist chg_pct — prevClose =
-          // price/(1+chg%) — and sum. Reuses the 30s price cache (no extra fetch); only
-          // overrides when EVERY held symbol has a fresh %, else keeps the broker figure.
-          try {
-            const wlp = await traderAgent.getWatchlistPrices().catch(() => []);
-            const chgBy = {};
-            for (const w of (wlp || [])) if (w && w.ticker) chgBy[w.ticker] = Number(w.chg_pct);
-            let dayPnl = 0, haveAll = true;
+            const { computeDayPnl } = require('../../lib/day-pnl');
+            const _d = await computeDayPnl({
+              positions: ibkrPositions,
+              ledgerText: fs.readFileSync(logPath, 'utf8'),
+              now: Date.now(),
+              getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
+              // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
+              // hour, and pre-market it can still serve the SESSION-BEFORE-LAST as
+              // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
+              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars')),
+            });
+            ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
+            ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
+            ibkrAccount.unrealized_today = _d.unrealized_today;     // today's move on the open book
+            ibkrAccount.pnl_today = _d.pnl_today;
+            ibkrAccount.pnl_carry_adjustment = _d.pnl_carry_adjustment;
+            ibkrAccount.pnl_pct = ibkrAccount.equity ? (_d.pnl_today / ibkrAccount.equity) * 100 : 0;
+            ibkrAccount.pnl_basis = _d.pnl_basis;
+            // Per-position day contribution, so the panel reconciles against the
+            // table row by row — the check that caught the summary/table mismatch
+            // before, now available for the "today" basis too.
+            const _dayBySym = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
             for (const p of ibkrPositions) {
-              const chg = chgBy[p.symbol];
-              const cur = Number(p.current_price) || 0;
-              if (chg == null || Number.isNaN(chg) || !cur) { haveAll = false; break; }
-              const prev = cur / (1 + chg / 100);
-              dayPnl += (Number(p.qty) || 0) * (cur - prev);
+              const _x = _dayBySym.get(String(p.symbol).toUpperCase());
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
             }
-            if (haveAll) {
-              ibkrAccount.pnl_today = Math.round((dayPnl + (Number(ibkrAccount.realized_today) || 0)) * 100) / 100;
-              ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
-            }
-          } catch (_e) { /* keep the broker dpl if the price cache isn't ready */ }
+          } catch (_e) { /* keep the broker figures if the ledger isn't readable */ }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
       }
       // No IBKR account (or IBKR preferred but unavailable) → Alpaca fallback.
       if (await serveAlpaca()) return true;
+      // Nothing resolved for the session profile — fall back to the operator
+      // account so the admin dashboard shows the book the trader actually runs.
+      if (_isAdmin && _sessionUid !== OPERATOR_UID) {
+        const opAccount = await bridge.getIBKRAccount(OPERATOR_UID).catch(() => null);
+        if (opAccount) {
+          const opPositions = (await bridge.getIBKRPositions(OPERATOR_UID).catch(() => []))
+            .filter((p) => Math.abs(Number(p && p.qty) || 0) > 0);
+          if (opPositions.length) {
+            opAccount.unrealized = Math.round(opPositions.reduce((t, p) => t + (Number(p && p.unrealized_pl) || 0), 0) * 100) / 100;
+          }
+          // DAY P&L, SAME FORMULA AS THE PRIMARY PATH (2026-08-10). This fallback
+          // passed the broker's raw `dpl` straight through, so the admin dashboard
+          // — the view the operator actually watches — showed IBKR's pre-market
+          // drift vs Friday's close (-$448.80 at 3am) while the fixed path would
+          // say $0. It was an inline duplicate of the primary computation, which
+          // is exactly how it came to miss the carried-realized fix; both paths
+          // now call the one module so they cannot drift apart again.
+          try {
+            const fs = require('fs'), path = require('path');
+            const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+            const { computeDayPnl } = require('../../lib/day-pnl');
+            const _d = await computeDayPnl({
+              positions: opPositions,
+              ledgerText: fs.readFileSync(logPath, 'utf8'),
+              now: Date.now(),
+              getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
+              // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
+              // hour, and pre-market it can still serve the SESSION-BEFORE-LAST as
+              // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
+              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars')),
+            });
+            opAccount.realized_today = _d.realized_today;
+            opAccount.realized_booked = _d.realized_booked;
+            opAccount.unrealized_today = _d.unrealized_today;
+            opAccount.pnl_today = _d.pnl_today;
+            opAccount.pnl_carry_adjustment = _d.pnl_carry_adjustment;
+            opAccount.pnl_pct = opAccount.equity ? (_d.pnl_today / opAccount.equity) * 100 : 0;
+            opAccount.pnl_basis = 'operator view: ' + _d.pnl_basis;
+            const _opDay = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
+            for (const p of opPositions) {
+              const _x = _opDay.get(String(p.symbol).toUpperCase());
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
+            }
+          } catch (_e) { /* ledger unreadable → keep the broker figures */ }
+          // Flagged so the UI can never silently present the operator book as
+          // the viewer's own account.
+          sendJson(res, { positions: opPositions, account: opAccount, operator_view: true }, 200);
+          return true;
+        }
+      }
     } catch (_e) { /* fall through to the legacy agent */ }
     // No broker connected (no IBKR, no Alpaca account, no legacy agent). Emit an
     // explicit `available:false` + reason so callers — the chat's trader_positions
@@ -412,15 +480,27 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     const token = process.env.LOGODEV_TOKEN || '';
     const fmpUrl = `https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png`;
     const ldUrl = token
-      ? `https://img.logo.dev/ticker/${encodeURIComponent(sym)}?token=${encodeURIComponent(token)}&size=128&format=png&retina=true`
+      ? `https://img.logo.dev/ticker/${encodeURIComponent(sym)}?token=${encodeURIComponent(token)}&size=128&format=png&retina=true&fallback=404`
       : '';
+    // FMP serves one generic stand-in image for every symbol it has no logo
+    // for — passing it through gave every small-cap the same samey badge.
+    // Detect it by hash and 404 instead, so the client's colored monogram
+    // fallback renders. (logo.dev placeholders are disabled via fallback=404.)
+    const PLACEHOLDER_SHA1 = 'b4e668e07c9d189f20f9e7302a5d8d1089abfb3a';
     const pipeFrom = (srcUrl, onFail) => {
       const rq = https.get(srcUrl, (up) => {
         const ct = up.headers['content-type'] || '';
-        if (up.statusCode >= 200 && up.statusCode < 300 && ct.startsWith('image')) {
+        if (!(up.statusCode >= 200 && up.statusCode < 300 && ct.startsWith('image'))) { up.resume(); onFail(); return; }
+        const chunks = [];
+        up.on('data', (c) => chunks.push(c));
+        up.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          const sha = require('crypto').createHash('sha1').update(buf).digest('hex');
+          if (sha === PLACEHOLDER_SHA1) { onFail(); return; }
           res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
-          up.pipe(res);
-        } else { up.resume(); onFail(); }
+          res.end(buf);
+        });
+        up.on('error', onFail);
       });
       rq.on('error', onFail);
       rq.setTimeout(8000, () => { rq.destroy(); onFail(); });

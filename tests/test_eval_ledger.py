@@ -34,7 +34,9 @@ def test_campaign_id_falls_back_to_sha(monkeypatch):
 def test_served_checkpoint_from_env(monkeypatch):
     monkeypatch.setenv("OURO_MODEL", "ByteDance/Ouro-1.4B")
     monkeypatch.setenv("OURO_ADAPTER", "/models/ouro-honesty-balanced/final")
-    assert eval_ledger.served_checkpoint() == "ByteDance/Ouro-1.4B@final"
+    # The generic "final" leaf is qualified by its run dir so this row is distinguishable
+    # from any other run's ".../final" adapter (the #2766 provenance fix).
+    assert eval_ledger.served_checkpoint() == "ByteDance/Ouro-1.4B@ouro-honesty-balanced-final"
 
 
 def test_served_checkpoint_none_when_unset(monkeypatch):
@@ -103,8 +105,25 @@ def test_signal_less_row_keeps_env_fallback(monkeypatch):
 def test_checkpoint_id_shapes():
     assert eval_ledger.checkpoint_id("m", None) == "m"
     assert eval_ledger.checkpoint_id("m", "/x/checkpoint-600/") == "m@checkpoint-600"
-    assert eval_ledger.checkpoint_id(None, "/adapters/final") == "ouro@final"
+    # A generic leaf dir ("final") is qualified with its parent so it names the run.
+    assert eval_ledger.checkpoint_id(None, "/adapters/final") == "ouro@adapters-final"
     assert eval_ledger.checkpoint_id(None, None) is None
+
+
+def test_checkpoint_id_generic_leaf_does_not_collapse_distinct_adapters():
+    """The provenance bug: every training run's final-checkpoint dir is named `final`, so a
+    basename-only id stamped BOTH ouro-sigma0-adapters/final and ouro-distill/<tag>/final as
+    `@final` — the ledger could no longer tell which adapter produced a HumanEval row. Distinct
+    adapters must now get distinct ids (regression guard for #2766)."""
+    sigma0 = eval_ledger.checkpoint_id("ouro", "D:/lantern-train/ouro-sigma0-adapters/final")
+    distill = eval_ledger.checkpoint_id("ouro", "D:/lantern-train/ouro-distill/lr5e5-r16/final")
+    assert sigma0 == "ouro@ouro-sigma0-adapters-final"
+    assert distill == "ouro@lr5e5-r16-final"
+    assert sigma0 != distill
+    # An already-unique leaf (checkpoint-600) is untouched — no needless parent noise.
+    assert eval_ledger.checkpoint_id("ouro", "/x/ck/checkpoint-600") == "ouro@checkpoint-600"
+    # Backslash paths (Windows) resolve the same way.
+    assert eval_ledger.checkpoint_id("ouro", r"D:\lantern-train\run-A\best") == "ouro@run-A-best"
 
 
 def test_writer_stamp_beats_env_for_ouro_engine(monkeypatch):

@@ -1,0 +1,117 @@
+name: Deployment verify
+
+# Does the product actually WORK where it is deployed?
+#
+# Written after the 2026-08-14 outage: the GCE host ran with zero providers
+# configured, so every chat turn fell through to the offline reply. CI was fully
+# green throughout — because every other suite boots its own server with correct
+# test env, which is structurally incapable of catching a broken deployment.
+#
+# This workflow points the deployment suite at a RUNNING host and asserts the key
+# features answer there. It is the only check in the repo that can fail because
+# of configuration rather than code.
+#
+#   • after a release tag  — verify what we just shipped is actually serving
+#   • hourly               — an outage is found by us, not by a user
+#   • manually             — any base URL, e.g. a staging host
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to verify"
+        required: true
+        default: "https://unisona.ai"
+      expect_version:
+        description: "Optional semver the deployment must report (e.g. 1.15.3)"
+        required: false
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  schedule:
+    # Hourly. Cheap (a handful of HTTP calls) and turns a silent outage into a
+    # notification within the hour.
+    - cron: "17 * * * *"
+
+concurrency:
+  group: deployment-verify-${{ github.event.inputs.base_url || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    # An alarm that is permanently red stops being an alarm. When production is
+    # deliberately offline (see ops/production-status.json) the HOURLY schedule
+    # would fail every hour forever and train everyone to ignore it — so the
+    # schedule is paused, in the repo, with a reason and a date.
+    #
+    # Explicit intent is never paused: a manual dispatch or a post-release run
+    # still verifies, because there the caller is asserting something should be
+    # serving right now.
+    name: Should we verify?
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: gate
+        run: |
+          paused=$(python3 -c "import json;print(str(json.load(open('ops/production-status.json'))['paused']).lower())" 2>/dev/null || echo false)
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$paused" = "true" ]; then
+            reason=$(python3 -c "import json;print(json.load(open('ops/production-status.json'))['reason'])" 2>/dev/null)
+            since=$(python3 -c "import json;print(json.load(open('ops/production-status.json'))['since'])" 2>/dev/null)
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Scheduled verification PAUSED since ${since} — ${reason}"
+            echo "Unpause by setting \"paused\": false in ops/production-status.json."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    needs: preflight
+    if: needs.preflight.outputs.run == 'true'
+    name: Verify live deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install root deps (Playwright runner)
+        run: npm ci --ignore-scripts --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify the deployment
+        env:
+          DEPLOY_BASE_URL: ${{ github.event.inputs.base_url || 'https://unisona.ai' }}
+          # The serving assertions (at least one provider usable) only mean
+          # something against a real deployment — this is that context.
+          DEPLOY_EXPECT_LIVE: "1"
+          DEPLOY_EXPECT_VERSION: ${{ github.event.inputs.expect_version }}
+        run: npm run test:deploy
+
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-verify-traces
+          path: test-results/
+          retention-days: 7
+
+      - name: Explain a failure
+        if: failure()
+        run: |
+          echo "::error::The live deployment failed verification — this is a CONFIG or OUTAGE signal, not a code regression."
+          echo "Most likely causes, in the order they have actually happened:"
+          echo "  1. No provider configured on the host (chat has no model). Check /api/providers/status."
+          echo "     lantern.service reads its env from /etc/systemd/system/lantern.service.d/*.conf"
+          echo "  2. The service is down or serving an older tag. Check /api/version."
+          echo "  3. A gate regressed and per-account data is readable anonymously."
+          echo "  4. Production is offline ON PURPOSE (e.g. local-only piloting). If so, set"
+          echo "     \"paused\": true in ops/production-status.json so the hourly run stops"
+          echo "     crying wolf — a permanently-red alarm is one nobody reads."
+          echo "See docs/ops/gce-cloud-deploy-runbook.md for the deploy + verify runbook."

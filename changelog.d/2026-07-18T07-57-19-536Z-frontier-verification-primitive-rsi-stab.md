@@ -1,3 +1,0 @@
-### Added
-
-- Frontier verification primitive + RSI stabilizer spectrum, grounded in the 1250-paper RSI survey (arXiv:2607.07663) that names governance-grade measurement of self-improvement the field's most underpopulated niche: deanchored_verifier.py implements the commit-first judge (arXiv:2607.05904) that resists self-reward-hacking without external truth (mock: anchored rubber-stamps 62% of wrong answers, de-anchored 0%); rsi_gated_vs_ungrounded expanded to the 5-arm verification hierarchy the survey describes (self-anchored collapses, de-anchored prevents the basin, reused filters slow-not-stop, fresh gate bounds) reproducing all of it

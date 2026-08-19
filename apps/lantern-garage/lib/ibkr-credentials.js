@@ -11,6 +11,7 @@
  */
 
 const crypto = require('crypto');
+const { resolveSessionSecret } = require('./session-secret');
 const fs = require('fs');
 const path = require('path');
 const IbkrOAuth1 = require('./ibkr-oauth1');
@@ -27,7 +28,15 @@ const LEGACY_DIR = path.join(process.cwd(), 'data', 'ibkr-credentials');
 const REQUIRED = ['consumerKey', 'accessToken', 'accessTokenSecret', 'signaturePem', 'encryptionPem', 'dhPrime'];
 
 function _key() {
-  const secret = process.env.IBKR_CRED_KEY || process.env.SESSION_SECRET || 'lantern-local-dev-secret-change-in-prod';
+  // At-rest key for LIVE BROKERAGE credentials (accessTokenSecret, PEMs). The literal
+  // fallback this replaced is published in this repo, so on any deploy without
+  // SESSION_SECRET the "encrypted" file was decryptable by anyone who obtained it —
+  // same class as #3101, higher stakes. resolveSessionSecret throws beyond loopback.
+  //
+  // Migration-safe: the removed literal was byte-identical to resolveSessionSecret's
+  // loopback dev default, so an existing dev box derives the SAME key and previously
+  // stored credentials still decrypt.
+  const secret = process.env.IBKR_CRED_KEY || resolveSessionSecret();
   return crypto.scryptSync(secret, 'ibkr-cred-v1', 32);
 }
 function _encrypt(obj) {

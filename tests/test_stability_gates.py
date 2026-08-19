@@ -11,11 +11,16 @@ PROVEN transient bounds actually hold (via matrix exponentials).
 import numpy as np
 import pytest
 
-# torch is a heavy, optional dependency that CI does not install. Skip the whole
-# module (rather than erroring at collection) when it is unavailable, so the
-# Python test job stays green where torch isn't present.
+# torch and scipy are heavy, optional dependencies that CI does not install. Skip the
+# whole module (rather than erroring at collection) when either is unavailable, so the
+# Python test job stays green where they aren't present.
+#
+# scipy needed the same treatment as torch and didn't have it: the bare
+# `from scipy.linalg import expm` raised ModuleNotFoundError during COLLECTION, which
+# pytest reports as "Interrupted: 1 error during collection" — that aborts the entire
+# run, so one missing optional dep took down every other Python test, not just this file.
 torch = pytest.importorskip("torch")
-from scipy.linalg import expm
+expm = pytest.importorskip("scipy.linalg").expm
 
 from src.cio_sde.collapse import stability_gates, collapse_certificate, StabilityGates
 

@@ -64,29 +64,48 @@ function rng(seed) {
   };
 }
 
-/** Simulated positions + account. Marked paper + demo; never a real broker. */
-function positions() {
+/**
+ * Simulated positions + account. Marked paper + demo; never a real broker.
+ *
+ * MARKED TO LIVE QUOTES (user report 2026-07-28: "the same numbers for days"):
+ * the holdings/quantities/cost bases stay the deterministic fixture, but
+ * current prices come from the keyless quote feed, so the demo book moves with
+ * the actual market — exactly like a real account whose owner stopped trading.
+ * `quotesBySym` maps SYM → { price, chg_pct }; symbols the feed missed fall
+ * back to the baked snapshot price (stale but never blank), and the account
+ * reports which mode it's in via `marked_to_market`.
+ */
+function positions(quotesBySym = null) {
+  let liveCount = 0;
   const positions = HOLDINGS.map((h) => {
+    const q = quotesBySym && quotesBySym[h.symbol];
+    const live = q && Number(q.price) > 0 ? Number(q.price) : null;
+    if (live) liveCount++;
+    const px = live || h.price;
+    const dayPct = live && Number.isFinite(Number(q.chg_pct)) ? Number(q.chg_pct) : h.day;
+    // Quantities derive from the BAKED snapshot so the book composition is
+    // stable; only the marks move.
     const targetMv = INVESTED * h.weight;
     const qty = Math.max(1, Math.round(targetMv / h.price));
-    const marketValue = qty * h.price;
-    const avg = h.price / (1 + h.gain);                 // cost basis implied by the gain
-    const unrealized = (h.price - avg) * qty;
+    const marketValue = qty * px;
+    const avg = h.price / (1 + h.gain);                 // cost basis implied by the snapshot gain
+    const unrealized = (px - avg) * qty;
     return {
       symbol: h.symbol,
       qty,
       side: 'long',
       avg_entry_price: Math.round(avg * 100) / 100,
-      current_price: h.price,
+      current_price: Math.round(px * 100) / 100,
       market_value: Math.round(marketValue * 100) / 100,
       unrealized_pl: Math.round(unrealized * 100) / 100,
-      pnl_pct: Math.round(h.gain * 10000) / 100,
+      pnl_pct: avg > 0 ? Math.round(((px - avg) / avg) * 10000) / 100 : 0,
+      day_pct: Math.round(dayPct * 100) / 100,
     };
   });
   const invested = positions.reduce((s, p) => s + p.market_value, 0);
   const unrealized = positions.reduce((s, p) => s + p.unrealized_pl, 0);
   // Day P&L = Σ qty × price × dayChg%.
-  const dayPnl = HOLDINGS.reduce((s, h, i) => s + positions[i].qty * h.price * (h.day / 100), 0);
+  const dayPnl = positions.reduce((s, p) => s + p.market_value * (p.day_pct / 100), 0);
   const equity = Math.round((invested + CASH_BUFFER) * 100) / 100;
   const account = {
     account_id: 'CHAMPION-DEMO',
@@ -100,9 +119,29 @@ function positions() {
     mode: 'demo',                          // a simulated showroom account, not paper/live
     source: 'champion-demo',
     demo: true,
+    simulated: true,                       // explicit flag the UI banner keys off
+    marked_to_market: liveCount > 0,       // false → serving the stale baked snapshot
+    live_quotes: liveCount,
     paid_in: PAID_IN,
   };
-  return { positions, account, demo: true, source: 'champion-demo' };
+  return { positions, account, demo: true, simulated: true, source: 'champion-demo' };
+}
+
+/**
+ * positions() marked to the live keyless quote feed. Fail-soft: any feed error
+ * returns the baked snapshot (marked_to_market:false) — the demo must render
+ * even when quotes are down, it just stops claiming to be live.
+ */
+async function positionsLive() {
+  try {
+    const yahoo = require('./market-data-yahoo');
+    const quotes = await yahoo.getQuotes(HOLDINGS.map((h) => h.symbol));
+    const bySym = {};
+    for (const q of quotes || []) if (q && q.ticker) bySym[q.ticker] = q;
+    return positions(bySym);
+  } catch (_e) {
+    return positions(null);
+  }
 }
 
 /** Simulated equity curve for a range (1D/1W/1M/3M/YTD/1Y/ALL). */
@@ -143,4 +182,79 @@ function history(range = '1D') {
   };
 }
 
-module.exports = { positions, history, EQUITY, HOLDINGS };
+// ── Demo journal (#3242 demo-mode) ───────────────────────────────────────────
+// Deterministic, SIMULATED exit + skip rows for the guest Journal tab — same
+// sanctioned pattern as positions()/history(): never real ledger data, seeded
+// per ET calendar day so the feed is stable within a day and evolves across
+// days. Row shape mirrors the real autopilot ledger (lib/trader-scorecard.js
+// consumes them through the same row-based builders as the real thing).
+const DEMO_EXIT_WINS = [
+  'zone_r1 (banked at first level)',
+  'take_profit_R (1R)',
+  'trailing_stop (-2.1% from peak)',
+  'zone_r2 (runner through)',
+];
+const DEMO_EXIT_LOSSES = ['stop (broker STP filled)', 'signal_exit (bearish flip)'];
+const DEMO_SKIPS = [
+  (r) => `gross ${78 + Math.floor(r() * 6)}% > cap 80% — cash reserve`,
+  (r) => `signal not persistent yet (${1 + Math.floor(r() * 2)}/2 scans)`,
+  () => 'cooldown active after a stop fill',
+  () => 'below minimum price',
+];
+
+function journalRows(days = 28) {
+  const exits = [];
+  const skips = [];
+  const dayMs = 86400e3;
+  const now = Date.now();
+  const round2 = (n) => Math.round(n * 100) / 100;
+  // SHAPE-STABLE outcomes (2026-08-12). Two failed attempts stand as warnings:
+  // a seeded random win draw handed one window PF 0.63, and a per-day slot
+  // cadence with random win SIZES still flipped the next day's sliding window
+  // to −$104 / PF 0.89. A showroom must be positive on EVERY window, so both
+  // dimensions are now deterministic: wins follow a strict 3-in-5 sequence over
+  // the window's trade index, and a winner is a FIXED 1.5R vs the loser's 1R —
+  // any window with ≥40% wins (the pattern floor) is non-negative by
+  // construction, and ~60% wins lands PF ≈ 2.25. Sizes/symbols/reasons keep
+  // their per-day seeded variety; the ECONOMICS don't gamble.
+  const WIN_PATTERN = [1, 1, 0, 1, 0];
+  let tradeIdx = 0;
+  for (let d = days; d >= 1; d--) {
+    const day = new Date(now - d * dayMs);
+    const dow = day.getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    const dayKey = day.getUTCFullYear() * 10000 + (day.getUTCMonth() + 1) * 100 + day.getUTCDate();
+    const rand = rng(0x50C1E7 ^ dayKey);   // per-day seed: stable today, new texture tomorrow
+    // 0–2 exits per weekday — a plausible, modest cadence.
+    const nExits = Math.floor(rand() * 3);
+    for (let k = 0; k < nExits; k++) {
+      const h = HOLDINGS[Math.floor(rand() * HOLDINGS.length)];
+      const win = WIN_PATTERN[tradeIdx % WIN_PATTERN.length] === 1;
+      tradeIdx += 1;
+      const risk = 35 + rand() * 120;
+      const pnl = round2(win ? risk * 1.5 : -risk);
+      const entry = round2(h.price * (0.95 + rand() * 0.08));
+      const pnlPct = round2((pnl / (entry * 40)) * 100); // vs a ~40-share notional
+      const reason = win
+        ? DEMO_EXIT_WINS[Math.floor(rand() * DEMO_EXIT_WINS.length)]
+        : DEMO_EXIT_LOSSES[Math.floor(rand() * DEMO_EXIT_LOSSES.length)];
+      const ts = new Date(day.setUTCHours(14 + k * 2, 30, 0, 0)).toISOString();
+      exits.push({
+        ts, event: 'exit', symbol: h.symbol, entry, exit: round2(entry + pnl / 40),
+        pnl, pnl_pct: pnlPct, reason, status: 'filled', source: 'champion-demo',
+        mfe_pct: round2(Math.abs(pnlPct) * (win ? 1 + rand() * 0.4 : rand() * 0.8)),
+        mae_pct: round2(-(win ? rand() * 0.9 : Math.abs(pnlPct) * (1 + rand() * 0.3))),
+      });
+    }
+    const nSkips = 1 + Math.floor(rand() * 2);
+    for (let k = 0; k < nSkips; k++) {
+      const h = HOLDINGS[Math.floor(rand() * HOLDINGS.length)];
+      const mk = DEMO_SKIPS[Math.floor(rand() * DEMO_SKIPS.length)];
+      const ts = new Date(day.setUTCHours(13, 5 + k * 7, 0, 0)).toISOString();
+      skips.push({ ts, event: 'skip', symbol: h.symbol, reason: mk(rand), source: 'champion-demo' });
+    }
+  }
+  return { exits, skips };
+}
+
+module.exports = { positions, positionsLive, history, journalRows, EQUITY, HOLDINGS };
