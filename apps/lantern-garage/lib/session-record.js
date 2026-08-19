@@ -121,7 +121,28 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
   // do NOT know a stop fired — that ambiguity is #3281. Counting it here would
   // inflate stops_fired with maybes.
   const isStop = (x) => /stop/i.test(String(x.reason || '').split('(')[0]);
+  // PRICE EVIDENCE, not just the reason string (#3354). The reason-only rule
+  // undercounts: on 2026-08-18 SOXL exited at 130.76 against a recorded stop of
+  // 130.77 and was logged `broker fill`, so stops_fired read 0 for a session in
+  // which a stop demonstrably filled — and "0 stop-outs" was quoted back as a
+  // health signal. An exit printing AT or THROUGH the stop recorded for that
+  // entry IS a stop fill whatever the venue called it; the 10bp tolerance covers
+  // the tick a market-on-stop gives up. Kept as a SEPARATE count so the honest
+  // ambiguity of #3281 stays visible instead of being folded away.
+  const stopPxBySym = new Map();
+  for (const e of entries) {
+    const sp = Number(e.stop);
+    if (sp > 0) stopPxBySym.set(String(e.symbol).toUpperCase(), sp);
+  }
+  const atStopPrice = (x) => {
+    if (isStop(x)) return false;                 // already counted
+    const sp = stopPxBySym.get(String(x.symbol).toUpperCase());
+    const px = Number(x.exit);
+    if (!(sp > 0) || !(px > 0)) return false;
+    return px <= sp * 1.001;                     // at or through
+  };
   const stops = exits.filter(isStop);
+  const stopsByPrice = exits.filter(atStopPrice);
 
   return {
     ts: new Date(now).toISOString(),
@@ -145,6 +166,9 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
     exits_by_reason: byReason,
     stops_fired: stops.length,
     stops_pnl: round(stops.reduce((t, x) => t + (Number(x.pnl) || 0), 0)),
+    stops_by_price: stopsByPrice.length,
+    stops_by_price_pnl: round(stopsByPrice.reduce((t, x) => t + (Number(x.pnl) || 0), 0)),
+    stops_total: stops.length + stopsByPrice.length,
     max_slots_used: slotsUsed.length ? Math.max(...slotsUsed) : null,
     slot_cap: slotRows.length ? (Number(slotRows[slotRows.length - 1].cap) || null) : null,
     // ── the book carried into tonight: what tomorrow's gap acts on
@@ -159,6 +183,23 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
       }))
       .sort((a, b) => (a.symbol < b.symbol ? -1 : 1)),
     open_risk: round(positions.reduce((t, p) => t + (Number(p.unrealized_pl) || 0), 0)),
+    // BETA-ADJUSTED FAMILY EXPOSURE (#3354). The gross cap counts NOTIONAL, so a
+    // 3x wrapper at 6% of equity reads as 6% while carrying 18% of market risk.
+    // On 2026-08-18 that hid 30.2% of the book in semis (SMH 12.1% + SOXL 18.1%)
+    // going into a 4.33% sector drop — 67% of the day's loss, from an exposure no
+    // log reported. Recorded, deliberately NOT capped: the two highest-
+    // concentration sessions on record were the two best days.
+    family_beta_exposure: (() => {
+      try {
+        const dl = require('./direction-lock');
+        const abs = dl.familyBetaNotional(positions);
+        const eq = Number(account.equity) || 0;
+        const pct = {};
+        for (const [f, v] of Object.entries(abs)) pct[f] = eq ? Math.round((v / eq) * 1000) / 10 : null;
+        const vals = Object.values(pct).filter((v) => v != null);
+        return { abs, pct_of_equity: pct, max_pct: vals.length ? Math.max(...vals) : null };
+      } catch (_e) { return null; }
+    })(),
     skips: Object.fromEntries([...skips.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12)),
   };
 }
