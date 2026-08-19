@@ -93,6 +93,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | Script | Anchored by | How to run |
 |--------|-------------|-----------|
 | `scripts/eval_keystone.py` | `.github/workflows/eval-leaderboard-gate.yml` | `python scripts/eval_keystone.py` |
+| `research/epistemic_controller/run_mvp.py` | registered here + `tests/test_epistemic_controller.py` (CI pytest) — the epistemic boundary MVP: a deterministic controller that detects model-class failure and seeks discriminating evidence before any update; claim survives 300 held-out seeds (README in that dir). Imports `research/epistemic_controller/controller.py`, `research/epistemic_controller/agents/explorer.py`, `research/epistemic_controller/agents/auditor.py`, `research/epistemic_controller/environments/hidden_variable.py` | `python research/epistemic_controller/run_mvp.py 200` |
 | `scripts/rollover_gate.py` | `scripts/eval_keystone.py` | via `eval_keystone.py` |
 | `scripts/eval_ledger.py` | `tests/test_eval_ledger.py` | `python scripts/eval_ledger.py` |
 | `scripts/honesty_ledger.py` | `tests/test_honesty_ledger.py` | `python scripts/honesty_ledger.py` |
