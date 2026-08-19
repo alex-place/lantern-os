@@ -19,6 +19,8 @@ import json
 import math
 from dataclasses import dataclass, field
 
+import os
+
 import numpy as np
 
 from agents.explorer import Explorer
@@ -40,8 +42,30 @@ class Evidence:
 
 
 class Controller:
+    # Every constructor default can be overridden by an EC_<NAME> environment variable. This
+    # exists so an OUTER experiment loop (research/robin_llm) can treat these as the design
+    # knobs of the machine and measure what changing them does, without editing the file under
+    # test. Unset variables change nothing, so a plain run is byte-identical to before.
+    _ENV = {"window": int, "mse_k": float, "alpha": float, "hold": int, "budget": float,
+            "retract_below": float, "cost_exponent": float}
+
+    @classmethod
+    def _env(cls, name, default):
+        raw = os.environ.get("EC_" + name.upper())
+        if raw is None or raw == "":
+            return default
+        try:
+            return cls._ENV[name](raw)
+        except (KeyError, ValueError):
+            return default
+
     def __init__(self, world, *, window=30, mse_k=3.0, alpha=0.05, hold=2, budget=10.0,
                  refuse_updates_in_boundary=True, log=None):
+        window = self._env("window", window)
+        mse_k = self._env("mse_k", mse_k)
+        alpha = self._env("alpha", alpha)
+        hold = self._env("hold", hold)
+        budget = self._env("budget", budget)
         self.world = world
         self.W = window
         self.mse_k = mse_k                  # SUSPECT when MSE > k x nominal baseline
@@ -69,7 +93,7 @@ class Controller:
         # function of x). 0.94 sits in the gap. Budget 10 = one full probe round (~2) + one
         # measurement (~3) + ongoing upkeep, so a correctly-diagnosed variable is affordable;
         # at 6, 20% of seeds diagnosed correctly and could not pay.
-        self.retract_below = 0.94
+        self.retract_below = self._env("retract_below", 0.94)
         self.probes_paid = 0                # probes actually bought (see _design: sequential + early accept)
         # Candidates bought and REJECTED this episode (EXPAND did not remove the structure, or a
         # held expansion was dropped). A tested-and-rejected hypothesis is not re-bought. Found
@@ -79,7 +103,7 @@ class Controller:
         # Utility = explained / cost**cost_exponent. Exposed because it is a property of the
         # SCIENTIST, not of the world: a machine that can diagnose its own selection policy
         # needs a knob its diagnosis can turn (see run_world_s.py).
-        self.cost_exponent = 1.0
+        self.cost_exponent = self._env("cost_exponent", 1.0)
         self.log = log
 
     # ── helpers ───────────────────────────────────────────────────────────────────────────

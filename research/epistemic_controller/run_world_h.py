@@ -58,7 +58,7 @@ class HoldController(Controller):
 
     def __init__(self, world, *, hold_steps=40, **kw):
         super().__init__(world, **kw)
-        self.hold_steps = hold_steps
+        self.hold_steps = int(os.environ.get("EC_HOLD_STEPS") or hold_steps)
         self._hold_left = 0
         self.expansions_dropped = 0
 
