@@ -1,0 +1,3 @@
+### Changed
+
+- trader: the Haiku analyst is measured and stays OFF (#3358). 25 recorded round trips with context reconstructed from the 5m bar cache: conviction >55 (n=4) returned −$2,184, <45 (n=18) returned +$7,998, Spearman rho 0.007 — and 0.089 on an independently worded prompt. Two prompts, both indistinguishable from chance. Its prompt is also de-biased: naming the strategy's failure mode made the model hunt that one failure and never use the upper half of the scale (25/25 convictions below 45), so it now asks symmetrically whether a setup is better *or* worse than the deterministic score. `experiments/haiku_analyst_replay_enriched.js` reconstructs the context the ledger never stored, so the question can be re-asked with more data
