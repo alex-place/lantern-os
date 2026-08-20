@@ -1,0 +1,355 @@
+{
+  "goal": "raise reasoning capability per parameter in a small in-house language model we can serve on 8GB, using open-weight models and verification we can run ourselves",
+  "malformed": 0,
+  "lit": {
+    "relevant": [
+      {
+        "id": "2605.00334",
+        "title": "AgentFloor: How Far Up the tool use Ladder Can Small Open-Weight Models Go?",
+        "published": "2026-05",
+        "snippet": "Production agentic systems make many model calls per user request, and most of those calls are short, structured, and routine. This raises a practical routing question that existing evaluations do not directly answer: which parts of an agent workflow truly require large frontier intelligence, and which can be handled by smaller models? We introduce AgentFloor, a deterministic 30-task benchmark org…",
+        "url": "https://arxiv.org/abs/2605.00334",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.04719",
+        "title": "Diagnosing Tool-Selection Reasoning in LLM Agents with Canary Tools",
+        "published": "2026-08",
+        "snippet": "Agent evaluations tell us that a model picked the wrong tool, but rarely why. We introduce canary tools: diagnostic probe tools planted in an agent's Model Context Protocol (MCP) tool set, each engineered to probe one specific tool-selection weakness. A six-type taxonomy (semantic decoys, parameter traps, capability mirages, prerequisite blindness, temporal decoys, and granularity traps) turns a s…",
+        "url": "https://arxiv.org/abs/2608.04719",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2510.17498",
+        "title": "Deep Self-Evolving Reasoning",
+        "published": "2025-10",
+        "snippet": "Long-form chain-of-thought reasoning has become a cornerstone of advanced reasoning in large language models. While recent verification-refinement frameworks have enabled proprietary models to solve Olympiad-level problems, their effectiveness hinges on strong, reliable verification and correction capabilities, which remain fragile in open-weight, smaller-scale models. This work demonstrates that…",
+        "url": "https://arxiv.org/abs/2510.17498",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.03065",
+        "title": "Spectral Rewiring for Exploration, Purification, and Model Merging",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning has become a standard post-training recipe for large language models, but dense full-parameter updates create two deployment-relevant bottlenecks: suppressed reasoning performance, often reflected by premature saturation of test-time scaling, and interference when consolidating multiple capabilities through multi-domain training or model merging. We show that the reasoning-e…",
+        "url": "https://arxiv.org/abs/2607.03065",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2603.00729",
+        "title": "Qwen3-Coder-Next Technical Report",
+        "published": "2026-03",
+        "snippet": "We present Qwen3-Coder-Next, an open-weight language model specialized for coding agents. Qwen3-Coder-Next is an 80-billion-parameter model that activates only 3 billion parameters during inference, enabling strong coding capability with efficient inference. In this work, we explore how far strong training recipes can push the capability limits of models with small parameter footprints. To achieve…",
+        "url": "https://arxiv.org/abs/2603.00729",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2606.21638",
+        "title": "Toward Open Weight Models Without Risks: Separating Public and Private Capabilities in LLMs",
+        "published": "2026-06",
+        "snippet": "Open-weight Large Language Models (LLMs) enable scientific progress and broad deployment. However, they make it difficult to control access to sensitive capabilities. Current practice either suppresses dangerous capabilities before release or mediates access through closed services that use specialized model variants, input/output monitors, and API permissions. The former is susceptible to jailbre…",
+        "url": "https://arxiv.org/abs/2606.21638",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2507.10182",
+        "title": "Breaking the Myth: Can Small Models Infer Postconditions Too?",
+        "published": "2025-07",
+        "snippet": "Formal specifications are essential for ensuring software correctness, yet manually writing them is tedious and error-prone. Large Language Models (LLMs) have shown promise in generating such specifications from natural language intents, but the giant model size and high computational demands raise a fundamental question: Do we really need large models for this task? In this paper, we show that a…",
+        "url": "https://arxiv.org/abs/2507.10182",
+        "primary_category": "cs.SE"
+      },
+      {
+        "id": "2607.20448",
+        "title": "Domyn-Small: A European 10B Reasoning Language Model",
+        "published": "2026-07",
+        "snippet": "We introduce Domyn-Small, a 10-billion-parameter open-weight reasoning language model released under the MIT license. Domyn-Small is the product of an initial pre-training phase on 9 trillion tokens multilingual data, followed by a post-training pipeline for reasoning, instruction following, and context extension. For the latter, we performed a Continued Pre-Training (CPT) phase that doubles the n…",
+        "url": "https://arxiv.org/abs/2607.20448",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2510.25055",
+        "title": "GAPMAP: Mapping Scientific Knowledge Gaps in Biomedical Literature Using Large Language Models",
+        "published": "2025-10",
+        "snippet": "Scientific progress is driven by the deliberate articulation of what remains unknown. This study investigates the ability of large language models (LLMs) to identify research knowledge gaps in the biomedical literature. We define two categories of knowledge gaps: explicit gaps, clear declarations of missing knowledge; and implicit gaps, context-inferred missing knowledge. While prior work has focu…",
+        "url": "https://arxiv.org/abs/2510.25055",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2603.00842",
+        "title": "MedGPT-oss: Training a General-Purpose Vision-Language Model for Biomedicine",
+        "published": "2026-03",
+        "snippet": "Biomedical multimodal assistants have the potential to unify radiology, pathology, and clinical-text reasoning, yet a critical deployment gap remains: top-performing systems are either closed-source or computationally prohibitive, precluding the on-premises deployment required for patient privacy and PHI compliance. We introduce MEDGPT-OSS, an open-weight, 20B-parameter generalist vision-language…",
+        "url": "https://arxiv.org/abs/2603.00842",
+        "primary_category": "cs.CL"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2608.06756",
+        "title": "Capek 0.5: An Execution-Centric Vision-Language Model for Embodied Intelligence",
+        "published": "2026-08",
+        "snippet": "Vision-language models are increasingly serving as the reasoning core of embodied agents. Robot execution is inherently iterative: each action reshapes the scene and physical state, continually renewing what must be perceived, reasoned about, and verified. Meeting these demands requires complementary capabilities that differ in supervision signals, prediction formats, and verification criteria. Ex…",
+        "url": "https://arxiv.org/abs/2608.06756",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.08654",
+        "title": "The Scaffolding Matters More Than the Interface: A Controlled Comparison of MCP and CLI Tool Use Across Seven Agent Scaffoldings, Five Language Models, and One Software Task",
+        "published": "2026-08",
+        "snippet": "How much an AI coding agent costs to run can depend more on the agent scaffolding that drives it than on the interface through which it reaches its tools. We set out to measure the cost of tool use over the Model Context Protocol (MCP) against tool use over an ordinary command-line interface (CLI), a difference on which published estimates disagree by more than an order of magnitude while resting…",
+        "url": "https://arxiv.org/abs/2608.08654",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.13272",
+        "title": "Sovereign by necessity? Frontier AI export controls, cyber security, and the limits of national AI capability",
+        "published": "2026-08",
+        "snippet": "A small number of firms based in two states produce the most capable frontier AI models. The governments of those states have shown both the legal power and the political will to decide which other countries may use these systems. In June 2026 the United States required a leading developer to obtain licences before releasing its most advanced models to any foreign person, including foreign nationa…",
+        "url": "https://arxiv.org/abs/2608.13272",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.01017",
+        "title": "Why LLMs Give In: Conversational Factors and Reasoning Behind Medical Sycophancy",
+        "published": "2026-08",
+        "snippet": "A language model that abandons a correct medical answer under user pushback is more dangerous than one that was simply wrong, because it lends the credibility of a correct answer to the user's misinformation. Such model behavior, described as medical sycophancy, is usually reported as a single rate per model, but we find it is a property of the conversation, not the model. We study medical sycopha…",
+        "url": "https://arxiv.org/abs/2608.01017",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2608.00004",
+        "title": "Cost-Effective Automated Judging of Natural-Language Mathematical Proofs",
+        "published": "2026-08",
+        "snippet": "Grading natural-language mathematical proofs is a recurring cost in evaluating math-reasoning systems, and frontier LLM judges are expensive. We ask whether cheap open-weight models can serve as reliable judges given a candidate proof, a ground-truth proof, and a human-grading rubric. On a 200-instance validation sample of IMO-GradingBench, three cheap judges (GPT-OSS 120B, DeepSeek-V4 Flash, Gemm…",
+        "url": "https://arxiv.org/abs/2608.00004",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.13332",
+        "title": "Agora: Collective and Permissionless Internet-Scale Pretraining of Large Language Models",
+        "published": "2026-07",
+        "snippet": "Training large language models at the multi-billion to trillion parameter scale is confined to datacenters, where data-parallel (DP) and model-parallel (MP) techniques presume homogeneous accelerators, high-speed interconnects, and a single orchestrating entity. Frontier model development is thereby concentrated among the few groups able to assemble such clusters. Meanwhile, an enormous pool of co…",
+        "url": "https://arxiv.org/abs/2607.13332",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2607.20062",
+        "title": "Solar Open 2 Technical Report",
+        "published": "2026-07",
+        "snippet": "We present Solar Open 2, a 250B-A15B Mixture-of-Experts language model built for long-horizon agentic tasks, scaled up from Solar Open 1 (Solar Open 100B). To hold entire agent trajectories in a single context, Solar Open 2 reaches a 1M-token window through a hybrid attention stack that interleaves one softmax layer among every three linear-attention layers, using no positional encoding and a gate…",
+        "url": "https://arxiv.org/abs/2607.20062",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.09693",
+        "title": "Depth-Entropy Guided Sampling for Training-Free LLM Reasoning",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning (RL) has become the dominant paradigm for improving the reasoning capabilities of large language models, but it requires expensive training, curated data, and reward signals. Recent work shows that sampling from sharpened base-model distributions at test time recovers much of the RL gain, yet existing methods rely solely on output-layer likelihoods and ignore the transformer…",
+        "url": "https://arxiv.org/abs/2607.09693",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "pairs": 36,
+  "sham_rank": 9,
+  "of": 9,
+  "sham_control_held": true,
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.5071,
+      "wins": 8,
+      "comparisons": 8,
+      "title": "Test-Time Sampling Sharpening for Reasoning Enhancement",
+      "mechanism": "Use depth-entropy guided sampling to sharpen output distributions at inference, mimicking RL gains without training",
+      "experiment": "Compare reasoning task accuracy of a 6B open-weight model with standard vs depth-entropy guided sampling",
+      "falsifier": "No accuracy gain or increased hallucination rate with sharpened sampling",
+      "needs": "8GB GPUs, reasoning benchmarks, 3 days inference experiments",
+      "cost": "low",
+      "review": "MECHANISM:  \nTest-time sampling sharpening aims to improve reasoning by selectively reducing entropy in the model’s output distribution at key decision points, effectively focusing probability mass on more confident tokens. This mimics RL fine-tuning gains by biasing sampling towards higher-quality reasoning paths without retraining. Depth-entropy guidance leverages internal transformer states to identify where uncertainty is highest, sharpening only those steps to preserve diversity elsewhere, potentially enhancing reasoning coherence and correctness.\n\nEVIDENCE:  \n[1] directly supports this approach, showing that depth-entropy guided sampling recovers much of RL’s reasoning improvements without training. [4] and [7] also discuss entropy-based sharpening and power sampling at inference, highlighting benefits and pitfalls. None of the other papers provide strong direct evidence for test-time sharpening as a standalone reasoning enhancer, though [3] and [8] explore related test-time alignment and entropy shaping in multimodal contexts.\n\nWHAT WOULD FALSIFY IT:  \nIf applying depth-entropy guided sharpening at inference fails to improve or even degrades reasoning accuracy on standard benchmarks compared to baseline sampling, especially in small models, this would falsify the claim. Additionally, if sharpening reduces output diversity but does not increase correctness or coherence, it would show the mechanism is ineffective.\n\nRISK:  \nSharpening may artificially inflate confidence and reduce output entropy, improving metrics like likelihood or self-consistency without genuine reasoning gains. This could lead to overconfident but incorrect answers, harming robustness and generalization. It may also mask model weaknesses by suppressing uncertainty rather than resolving it.",
+      "citations": [
+        "2607.09693",
+        "2602.19169",
+        "2608.03204",
+        "2606.09926",
+        "2510.11686",
+        "2604.26326",
+        "2605.28142",
+        "2606.20244"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 2,
+      "strength": 0.2515,
+      "wins": 7,
+      "comparisons": 8,
+      "title": "Contextual Prompt Ensembles with Lightweight Re-Ranking",
+      "mechanism": "Generate multiple reasoning chains per query using small model, then re-rank with a lightweight learned scorer to select best chain",
+      "experiment": "Run ensemble generation and re-ranking on 10B model, measure reasoning correctness and latency",
+      "falsifier": "Re-ranking fails to improve or worsens final reasoning accuracy",
+      "needs": "8GB GPU for inference, small re-ranker training data, 1 week",
+      "cost": "low",
+      "review": "**MECHANISM:**  \nContextual Prompt Ensembles with Lightweight Re-Ranking could improve reasoning per parameter by generating diverse reasoning chains from a small model, increasing the chance that one chain is correct or insightful. The learned scorer then efficiently selects the best chain, effectively amplifying reasoning quality without increasing model size or memory footprint. This leverages test-time compute to compensate for limited model capacity, potentially boosting accuracy on complex queries within 8GB constraints.\n\n**EVIDENCE:**  \nThe literature supports aspects of this approach. Test-time scaling via multiple candidates and Best-of-N selection improves reasoning in large models [2]. Learned scorers (PRMs) can outperform heuristic ranking [2]. However, small open models show mixed gains from such methods [1], and reliable re-ranking remains challenging without strong verification [3,8]. None directly confirm that lightweight re-ranking on small models reliably raises reasoning per parameter.\n\n**WHAT WOULD FALSIFY IT:**  \nIf generating multiple chains plus lightweight re-ranking does not improve or even degrades reasoning accuracy compared to a single best chain baseline—especially when measured on held-out reasoning benchmarks—this would falsify the claim. Also, if the learned scorer fails to generalize or consistently misranks better chains, the mechanism fails.\n\n**RISK:**  \nThis method might inflate headline accuracy by cherry-picking rare correct chains, masking overall model weakness. It could increase latency and complexity, and the scorer might overfit to superficial features, reducing robustness. Thus, apparent gains might not translate to consistent, reliable reasoning improvements in real use.",
+      "citations": [
+        "2607.09438",
+        "2604.16535",
+        "2508.18444",
+        "2604.21133",
+        "2606.22862",
+        "2601.21278",
+        "2508.19999",
+        "2510.17498"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 3,
+      "strength": 0.1243,
+      "wins": 6,
+      "comparisons": 8,
+      "title": "Parameter-Efficient Instruction Tuning on Reasoning Subtasks",
+      "mechanism": "Use LoRA or adapters to instruction-tune a 10B model on targeted reasoning subtasks to boost reasoning per parameter",
+      "experiment": "Fine-tune adapters on math and logic subtasks, evaluate on held-out reasoning benchmarks",
+      "falsifier": "No significant reasoning accuracy gain over base model",
+      "needs": "8GB GPU, reasoning subtask datasets, 2 weeks",
+      "cost": "medium",
+      "review": "MECHANISM:  \nParameter-Efficient Instruction Tuning (PEFT) methods like LoRA or adapters can selectively update a small subset of parameters focused on reasoning subtasks, enabling targeted improvements without full model retraining. This can boost reasoning capability per parameter by concentrating capacity on reasoning patterns and instruction-following, potentially improving sample efficiency and inference cost on a 10B model that fits 8GB VRAM.\n\nEVIDENCE:  \nThe literature supports LoRA’s efficiency and modularity for fine-tuning [3,6], and its use in instruction tuning for domain-specific tasks [5,7]. Domyn-Small [1] shows a 10B reasoning model benefits from continued pretraining and instruction tuning, though not specifically via LoRA. None directly demonstrate that LoRA-based instruction tuning on reasoning subtasks alone significantly raises reasoning *per parameter* in small models.\n\nWHAT WOULD FALSIFY IT:  \nIf LoRA or adapter tuning on reasoning subtasks fails to improve reasoning benchmarks relative to full fine-tuning or larger models, or if improvements come only from increased parameter count or data scale rather than tuning method, the claim would be falsified.\n\nRISK:  \nFocusing on parameter-efficient tuning might improve benchmark scores superficially by overfitting reasoning subtasks or instruction formats, while degrading generalization or robustness. This could inflate headline reasoning metrics but reduce real-world reasoning reliability or increase vulnerability to adversarial inputs.",
+      "citations": [
+        "2607.20448",
+        "2602.15195",
+        "2507.08044",
+        "2510.00229",
+        "2606.12801",
+        "2510.00206",
+        "2608.05161",
+        "2509.03234"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 4,
+      "strength": 0.0618,
+      "wins": 5,
+      "comparisons": 8,
+      "title": "Tool-Use Routing with Canary Tools in Small Models",
+      "mechanism": "Embed diagnostic canary tools to identify and correct tool-selection errors in agent workflows",
+      "experiment": "Deploy a small 7B model agent with canary tools on AgentFloor tasks, measure tool-selection accuracy and reasoning gains",
+      "falsifier": "No measurable improvement in tool selection or downstream reasoning performance",
+      "needs": "8GB GPUs, AgentFloor benchmark, 1 week integration and testing",
+      "cost": "low",
+      "review": "**MECHANISM:**  \nEmbedding canary tools acts as targeted diagnostic probes that reveal specific tool-selection errors by triggering known failure modes (e.g., semantic decoys or parameter traps). This explicit error signal can guide the model or controller to recognize and correct misrouted calls, improving reasoning per parameter by reducing wasted steps and incorrect tool invocations. In small models constrained by memory and compute, this focused feedback loop could compensate for limited internal reasoning by externalizing error detection and correction.\n\n**EVIDENCE:**  \n[1] directly introduces canary tools and a taxonomy of tool-selection weaknesses, demonstrating their diagnostic value in identifying why models pick wrong tools. [5] discusses routing challenges in small open-weight models, highlighting the importance of precise tool selection. However, none of the papers provide conclusive evidence that embedding canary tools improves reasoning capability per parameter or overall system performance in small models on limited hardware.\n\n**WHAT WOULD FALSIFY IT:**  \nIf embedding canary tools does not reduce tool-selection errors or fails to improve downstream task accuracy and reasoning quality in small models—especially when measured against a baseline without canaries—this would falsify the claim. Additionally, if the overhead of canary tools leads to no net gain or even regression in effective reasoning per parameter, the mechanism would be invalidated.\n\n**RISK:**  \nCanary tools might inflate apparent reasoning metrics by catching trivial or contrived errors without improving genuine reasoning or task success. They could also increase context size or complexity, causing latency or memory issues on 8GB hardware, thereby degrading real-world usability despite improved diagnostic signals. This could mislead evaluation to overstate gains while masking practical regressions.",
+      "citations": [
+        "2608.04719",
+        "2509.23426",
+        "2602.17046",
+        "2608.15579",
+        "2605.00334",
+        "2605.27957",
+        "2607.03953",
+        "2606.30185"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 5,
+      "strength": 0.0305,
+      "wins": 4,
+      "comparisons": 8,
+      "title": "Spectral Rewiring for Parameter-Efficient Reasoning Boost",
+      "mechanism": "Apply spectral rewiring to selectively update subnetworks to reduce interference and improve reasoning",
+      "experiment": "Fine-tune a 6B open-weight model on reasoning tasks with spectral rewiring vs standard fine-tuning",
+      "falsifier": "No improvement or degradation in reasoning accuracy or parameter efficiency",
+      "needs": "8GB GPUs, reasoning datasets, 2 weeks fine-tuning",
+      "cost": "medium",
+      "review": "**MECHANISM:**  \nSpectral rewiring aims to selectively update subnetworks by manipulating the spectral properties (e.g., singular values or eigen-directions) of weight matrices. This can reduce interference between learned features and preserve useful reasoning pathways, potentially improving parameter efficiency by focusing updates on critical subspaces rather than the full parameter space. For a small 8GB model, this targeted adaptation could boost reasoning per parameter by avoiding destructive interference common in dense fine-tuning.\n\n**EVIDENCE:**  \n[1] discusses spectral rewiring to reduce interference and improve reasoning in large models, supporting the core idea. [4] also highlights preserving capabilities via dominant spectral directions, aligning with selective subnetwork updates. However, none of the papers directly demonstrate spectral rewiring’s effectiveness specifically for small, resource-constrained models or reasoning improvements per parameter. Other papers focus on related but distinct methods (e.g., LoRA in [2], federated training in [8]) or general small model scaling ([6], [7]).\n\n**WHAT WOULD FALSIFY IT:**  \nIf applying spectral rewiring to a small 7B or similar model yields no improvement—or even degradation—in reasoning benchmarks per parameter compared to standard fine-tuning or LoRA, especially when controlling for compute and memory, this would falsify the claim. Also, if interference is not measurably reduced or reasoning pathways are not preserved, the mechanism fails.\n\n**RISK:**  \nSpectral rewiring might improve headline reasoning scores by overfitting or focusing on narrow subspaces, reducing generalization or robustness. It could also increase training complexity and overhead, negating parameter efficiency gains. Worse, it might mask failures in multi-step reasoning by stabilizing superficial patterns rather than true capability improvements.",
+      "citations": [
+        "2607.03065",
+        "2507.06558",
+        "2508.08665",
+        "2606.31092",
+        "2602.09314",
+        "2606.01806",
+        "2508.12387",
+        "2608.09250"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 6,
+      "strength": 0.0147,
+      "wins": 3,
+      "comparisons": 8,
+      "title": "Self-Consistency Verification via Multi-Pass Reasoning Sampling",
+      "mechanism": "Sample multiple reasoning paths per query, then verify consistency across outputs to improve confidence and accuracy",
+      "experiment": "Generate multiple chains on 10B model, measure accuracy gain from self-consistency voting",
+      "falsifier": "Self-consistency voting does not improve or reduces accuracy",
+      "needs": "8GB GPU, reasoning benchmark, 1 week",
+      "cost": "low",
+      "review": "**MECHANISM:**  \nSelf-Consistency Verification via Multi-Pass Reasoning Sampling works by generating multiple independent reasoning chains for the same query, then aggregating or verifying consistency across these outputs. This can reduce errors caused by single-path hallucinations or reasoning shortcuts, as consensus among diverse samples may indicate higher confidence and correctness. It leverages the model’s stochasticity to explore alternative reasoning trajectories, potentially surfacing more robust answers.\n\n**EVIDENCE:**  \nThe literature provides mixed support. Early work [5] shows self-consistency can improve reasoning accuracy by aggregating multiple samples. However, [2] warns that as models improve, returns diminish and costs rise, sometimes degrading performance on reliably solved problems. [4] highlights that models struggle with self-verification, limiting gains from consistency checks. [8] suggests iterative verification loops can help but require careful design. Overall, evidence supports potential benefits but also significant caveats and diminishing returns.\n\n**WHAT WOULD FALSIFY IT:**  \nIf multi-pass sampling and consistency verification fail to improve or even reduce accuracy on reasoning benchmarks—especially when controlling for compute—and if consensus answers do not correlate with correctness, this would falsify the mechanism. Additionally, if verification consistently fails to detect or correct errors in sampled reasoning paths, the approach would be invalidated.\n\n**RISK:**  \nThis method could inflate headline accuracy by favoring frequent but incorrect consensus answers, masking rare but correct solutions. It may also increase latency and compute costs, reducing practical throughput. Over-reliance on consensus might suppress answer diversity, leading to brittle or overconfident outputs that degrade user trust or downstream verification.",
+      "citations": [
+        "2602.02443",
+        "2511.00751",
+        "2608.14420",
+        "2602.07594",
+        "2603.21301",
+        "2510.15444",
+        "2606.17312",
+        "2606.21724"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 7,
+      "strength": 0.0067,
+      "wins": 2,
+      "comparisons": 8,
+      "title": "Verification-Refinement Loop on 10B Open-Weight Model",
+      "mechanism": "Iteratively generate chain-of-thought with self-verification and correction to boost reasoning per parameter",
+      "experiment": "Run multi-step math reasoning tasks with and without verification-refinement on Domyn-Small 10B",
+      "falsifier": "No significant accuracy or coherence improvement after 3 refinement cycles",
+      "needs": "8GB GPU, curated reasoning benchmarks, 1 week of fine-tuning and evaluation",
+      "cost": "medium",
+      "review": "**MECHANISM:**\nThe proposed verification-refinement loop aims to boost reasoning by mimicking human problem-solving. The model would first generate a chain-of-thought, then critically evaluate",
+      "citations": [
+        "2510.17498",
+        "2602.02416",
+        "2606.13156",
+        "2602.08948",
+        "2603.25944",
+        "2602.00871",
+        "2606.21724",
+        "2607.20448"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 8,
+      "strength": 0.0027,
+      "wins": 1,
+      "comparisons": 8,
+      "title": "Modular Verification Heads for Localized Reasoning",
+      "mechanism": "Add small specialized verification heads to frozen base model layers to improve local reasoning checks without full retraining",
+      "experiment": "Attach and fine-tune verification heads on 10B model layers, measure reasoning accuracy on multi-step logic tasks",
+      "falsifier": "No accuracy improvement or degraded reasoning despite heads added",
+      "needs": "8GB GPU for fine-tuning heads, curated reasoning dataset, 1-2 weeks",
+      "cost": "medium",
+      "review": "MECHANISM:  \nAdding modular verification heads to frozen base model layers could improve local reasoning by explicitly checking intermediate representations for consistency or correctness. These small specialized heads act as lightweight monitors or validators, enabling targeted corrections or confidence assessments without retraining the entire model. This modular approach leverages frozen weights to save compute and memory, while enhancing reasoning by isolating and verifying subcomponents of the reasoning chain.\n\nEVIDENCE:  \nNone of the retrieved papers directly evaluate modular verification heads for local reasoning in frozen models. [1] LARA shows lightweight residual adapters can adapt frozen models efficiently but focuses on adaptation rather than verification. [4] SPOT-E uses test-time interventions to improve evidence readout but in vision-language models, not language-only reasoning. [6] shows capability localization in attention heads, suggesting some modularity, but does not test added verification modules. Overall, no direct empirical support for the proposed mechanism is found.\n\nWHAT WOULD FALSIFY IT:  \nIf adding verification heads to frozen layers fails to improve or even degrades reasoning benchmarks compared to the base model, especially when controlling for parameter count and compute, this would falsify the claim. Also, if verification heads cannot reliably detect or correct local reasoning errors, or if their outputs do not correlate with improved final answers, the approach would be invalidated.\n\nRISK:  \nVerification heads might improve intermediate metrics or confidence scores without improving end-task reasoning, creating a false sense of progress. They could also increase inference latency or complexity, harming throughput. Worse, they might bias the model toward overconfident but incorrect local checks, reducing overall robustness despite raising headline reasoning scores.",
+      "citations": [
+        "2607.28669",
+        "2607.03065",
+        "2603.00729",
+        "2606.20244",
+        "2605.31268",
+        "2603.03335",
+        "2605.00334",
+        "2602.18649"
+      ],
+      "grounded": true
+    }
+  ],
+  "wall_s": 114
+}
