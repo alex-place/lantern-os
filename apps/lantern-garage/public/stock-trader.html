@@ -432,7 +432,11 @@
      run all the way to the bottom; the footer trading panel sits under the charts. */
   .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
-  .main{grid-column:3;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
+  /* min-width:0 is load-bearing. A grid item defaults to min-width:auto, which means it
+     refuses to shrink below its content -- so the chart column ignored its own track and
+     ran 236px underneath the ticket and watchlist docks. The track was already
+     minmax(0,1fr); that constrains the TRACK, not the item sitting in it. */
+  .main{grid-column:3;grid-row:2;min-width:0;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
   .footer{position:relative;grid-column:3;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:9px var(--hdr-px);border-bottom:1px solid var(--border)}
@@ -1101,8 +1105,10 @@
   /* Reflow the deck + footer to the left so content sits BESIDE the rail, never under
      it — the same mechanism the order ticket uses. When both rails are open, reserve
      room for both and the chat sits to the left of the ticket. */
-  /* #3355: the chat is a dock panel now — the grid reserves its column, so padding the chart area as well would double-count the space. */
-  body.dc-open.ot-open .main{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
+  /* #3355: the chat is a dock panel now -- the grid reserves its column, so padding the
+     chart area as well double-counted the space. The padding also pinned the chart open:
+     a border-box element cannot shrink below its own padding, so 12 + (360+340+16) held
+     .main at 728px inside a 492px track, and it ran under the docks. */
   body.ot-open .dc-bg{ right: var(--ticket-w,340px); }
   @media (max-width:760px){ body.ot-open .dc-bg{ right:0; } }
 
@@ -7164,6 +7170,13 @@ function _applyDocks() {
     if (tab) tab.setAttribute('aria-selected', on ? 'true' : 'false');
   }
   const ct = document.getElementById('ltab-chat'); if (ct) ct.setAttribute('aria-pressed', _leftOpen ? 'true' : 'false');
+  /* The header's Chat button is a view of the same state, so it syncs HERE rather than
+     in whichever handler happened to run. It was set only inside dcToggle, so it lit up
+     wrong twice: on load it read 'off' with the chat open, and closing via the dock's
+     own X left it lit. Every open/close path lands in _applyDocks, so this is the one
+     place it can't drift. */
+  const hb = document.getElementById('dcToggle');
+  if (hb) { hb.classList.toggle('dc-on', _leftOpen); hb.setAttribute('aria-expanded', _leftOpen ? 'true' : 'false'); }
   const tt = document.getElementById('rtab-ticket'); if (tt) tt.setAttribute('aria-pressed', (_rightOpen && _ticketOpen) ? 'true' : 'false');
   if (_rwPanel === 'alerts' && _rightOpen && typeof loadAlerts === 'function') loadAlerts();
   // Pixel-sized deck tracks: a column change has to re-tile or the charts keep the old geometry.
@@ -8849,13 +8862,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   const history=[];              // {role:'user'|'assistant', content} — last 10 sent for context
   let busy=false;
 
+  /* The chat lives in the LEFT DOCK COLUMN now -- its modal was adopted out of the
+     .dc-bg shell, and that shell is display:none!important. Toggling a class on it
+     moved nothing a user could see: the header button lit up, the column stayed put,
+     and closing the chat left its 360px of space behind. Drive the column instead --
+     that is the thing on screen. */
   window.dcToggle=function(force){
-    const openNow = typeof force==='boolean' ? force : panel.classList.contains('hidden');
-    panel.classList.toggle('hidden', !openNow);
-    document.body.classList.toggle('dc-open', openNow);   // reflows the deck left (like ot-open)
+    const openNow = typeof force==='boolean' ? force : !_leftOpen;
+    _leftOpen = openNow; _saveDocks(); _applyDocks();
+    document.body.classList.toggle('dc-open', openNow);
     if(modal) modal.setAttribute('aria-hidden', openNow?'false':'true');
-    toggle.classList.toggle('dc-on', openNow);
-    toggle.setAttribute('aria-expanded', openNow?'true':'false');
+    // (button state is synced by _applyDocks -- see there)
     if(openNow) setTimeout(()=>input.focus(),30);
   };
 
