@@ -133,7 +133,9 @@
   :root{--pop-r:12px;--pop-r-sm:10px;--pop-r-item:7px;
         --pop-sh:0 24px 60px rgba(0,0,0,.6);--pop-sh-sm:0 12px 32px rgba(0,0,0,.5);
         --pop-scrim:rgba(4,6,10,.62);--pop-pad:6px;--pop-fs:12.5px;--pop-fs-sm:11.5px}
-  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,340px)}
+  /* The watchlist column is FIXED. It is not draggable, so it does not read a saved
+     width -- 340px fits every track with ~40px to spare (measured, not guessed). */
+  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:340px}
   .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
   body.ticket-closed{--col-t:0px}
@@ -155,8 +157,7 @@
   body.leftdock-closed .dockL > *,
   body.rightdock-closed .dockR > *{display:none}
   .dockL-resize{position:absolute;right:-3px;top:0;bottom:0;width:7px;z-index:40}
-  .dockR-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;z-index:40}
-  body.leftdock-closed .dockL-resize, body.rightdock-closed .dockR-resize{display:none}
+  body.leftdock-closed .dockL-resize{display:none}
 
   .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
   .dock-panel[hidden]{display:none}
@@ -529,7 +530,7 @@
      signal on a tight second line. */
   /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
      right-aligned tracks so figures line up down the whole list. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px max-content 1fr 66px 60px 58px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -546,7 +547,7 @@
   /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
      exactly over the figures they name. */
   .wl-head{position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px max-content 1fr 66px 60px 58px;align-items:center;gap:8px;
+    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
@@ -1363,7 +1364,6 @@
 
 <!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
 <div class="dockR" id="dockR" role="region" aria-label="Right panels">
-  <div class="col-resize dockR-resize" id="dockRResize" role="separator" aria-orientation="vertical" aria-label="Resize the right panel" tabindex="0" title="Drag to resize"></div>
 
   <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
     <header class="dock-head"><span class="dock-title">Watchlist</span>
@@ -7450,15 +7450,14 @@ document.addEventListener('DOMContentLoaded', () => { _adoptIntoDock(); renderDr
   const setVar = (name, key, px) => {
     document.documentElement.style.setProperty(name, px + 'px'); _lsSet(key, String(px));
   };
-  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--dockr-w', 'trader.dockRW'], ['--ticket-w', 'trader.ticketW']]) {
+  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--ticket-w', 'trader.ticketW']]) {
     const s = parseInt(_lsGet(key, ''), 10); if (s) document.documentElement.style.setProperty(name, s + 'px');
   }
   bind('dockLResize', (e) => setVar('--dockl-w', 'trader.dockLW', clamp((e.clientX || 0) - 44, 220, 560)));
-  bind('dockRResize', (e) => setVar('--dockr-w', 'trader.dockRW', clamp(window.innerWidth - (e.clientX || 0) - 44, 240, 620)));
   // The ticket is a column now, so its grip sets a WIDTH from the right edge, past the
   // watchlist column and the rail.
   bind('ticketGrip', (e) => {
-    const railW = 44, wl = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dockr-w'), 10) || 320;
+    const railW = 44, wl = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--col-r'), 10) || 340;
     setVar('--ticket-w', 'trader.ticketW', clamp(window.innerWidth - (e.clientX || 0) - railW - wl, 240, 560));
   });
 })();
