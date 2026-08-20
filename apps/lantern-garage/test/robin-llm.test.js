@@ -258,6 +258,27 @@ ok("rungs come from distinctive pairs, not sentence position", () => {
             "a rung of two domain-generic words matches everything and stops the ladder early");
 });
 
+ok("the judge's window shows every leg, not just the first one concatenated", () => {
+  // Hits arrive leg by leg, so a flat slice of 12 was twelve arXiv results and the OpenReview
+  // leg -- added specifically to catch conference submissions -- was invisible on every idea.
+  const hits = [];
+  for (let i = 0; i < 20; i++) hits.push({ source: "arxiv", id: `a${i}`, title: `A${i}`, rung: 1 });
+  for (let i = 0; i < 5; i++) hits.push({ source: "openreview", id: `o${i}`, title: `O${i}`, rung: 0 });
+  const win = novelty.webSlice(hits, 9);
+  assert.strictEqual(win.length, 9);
+  assert.ok(win.some((h) => h.source === "openreview"), "the smallest leg must still be represented");
+  assert.ok(win.filter((h) => h.source === "openreview").length >= 4,
+            `expected the interleave to carry openreview through: ${win.map((h) => h.source).join(",")}`);
+});
+
+ok("prior-work indexing excludes the mill's own output lists", () => {
+  // Indexing results/ made every idea match the very list it came from, which then outranked the
+  // note that actually names its prior art.
+  const hits = priorwork.search("verification head frozen model reasoning step correctness", 5);
+  assert.ok(!hits.some((h) => /robin_llm[\/]results/.test(h.file)),
+            `a bench list is not prior work: ${hits.map((h) => h.file).join(", ")}`);
+});
+
 ok("a leg that did not run is never reported as a leg that found nothing", async () => {
   process.env.ROBIN_WEB_NOCACHE = "1";
   process.env.ROBIN_WEB_GAP_MS = "0";

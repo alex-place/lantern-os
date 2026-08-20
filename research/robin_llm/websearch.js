@@ -14,11 +14,15 @@
 //                    filter, not `search`: plain search is citation-weighted and returned YOLOv10
 //                    for a hallucination-detection query, while the filter returned exactly one
 //                    result and it was the right one.
+//   OpenReview       conference submissions under review, which neither of the above can see.
+//                    Added after an audited run left "Modular Verification Head Addition" as
+//                    UNVERIFIED with 40 arXiv and 16 OpenAlex hits searched -- while UHeads, an
+//                    ICLR submission doing exactly that, sat in OpenReview. api2, not api1: the
+//                    same query returns UHeads first from api2 and unrelated CoT work from api1.
 //
-// WHAT IT STILL MISSES, stated because the audit's honesty depends on it: OpenReview submissions
-// and other unindexed preprints. UHeads -- one of the two papers that killed a novelty claim in
-// the red team -- returns zero results from both legs, because it is an ICLR submission. So even
-// with this wired in, "no match" is not "novel". It is a stronger silence, not evidence.
+// WHAT IT STILL MISSES, stated because the audit's honesty depends on it: venues with no open
+// index at all, work published only as a blog post or a model card, and anything too recent to be
+// indexed anywhere. "No match" remains a stronger silence, not evidence.
 //
 // Polite by construction: one request per host per REQUEST_GAP ms, results cached on disk so a
 // re-run costs nothing. Failures are reported, never swallowed -- a leg that did not run must not
@@ -181,6 +185,56 @@ function parseArxiv(body, rung) {
   return hits;
 }
 
+// OpenReview's `term` search is full-text relevance, not a conjunction, so the raw query works
+// where arXiv and OpenAlex need narrowing. One narrowing rung is still tried for recall.
+async function openreviewOnce(query, k) {
+  await polite("openreview");
+  // Ask for FOUR TIMES what we want: most notes returned are reviews and replies, which carry no
+  // title and are filtered out. Requesting k returned 2 usable hits for k=8.
+  return get(`https://api2.openreview.net/notes/search?term=${encodeURIComponent(query)}&limit=${k * 4}`);
+}
+
+function orTitle(v) {
+  return v && typeof v === "object" ? String(v.value || "") : String(v || "");
+}
+
+async function openreview(query, k = 5) {
+  // The same narrowing ladder as the other legs, and for the same reason: OpenReview's term
+  // search is literal, so "lightweight verification head frozen model reasoning step correctness"
+  // returns papers about lightweight things, while "verification head" returns UHeads. One pair
+  // was not enough -- with cap 1 the only pair offered was the leading one, which is exactly the
+  // positional bias already fixed for arXiv.
+  const pairs = distinctivePairs(query, 3);
+  const ladder = [query, ...pairs.map(([a, b]) => `${a} ${b}`)];
+  const hits = [];
+  const seen = new Set();
+  let anyOk = false;
+  let lastStatus = "no-response";
+  for (let i = 0; i < ladder.length; i++) {
+    const r = await openreviewOnce(ladder[i], k);
+    lastStatus = r.status;
+    if (r.status !== 200) continue;
+    anyOk = true;
+    try {
+      const j = JSON.parse(r.body);
+      for (const note of j.notes || []) {
+        const c = note.content || {};
+        const title = orTitle(c.title);
+        // Replies and reviews are notes too, and they have no title. Only submissions count.
+        if (!title || seen.has(title.toLowerCase())) continue;
+        seen.add(title.toLowerCase());
+        hits.push({ source: "openreview", id: note.id || "", title,
+                    year: note.cdate ? String(new Date(note.cdate).getUTCFullYear()) : "",
+                    abstract: orTitle(c.abstract).slice(0, 400), venue: orTitle(c.venue), rung: i });
+      }
+    } catch (e) {
+      return { ok: false, reason: `openreview parse: ${e.message}`, hits, rung: i };
+    }
+  }
+  if (!anyOk) return { ok: false, reason: `openreview ${lastStatus}`, hits: [], rung: 0 };
+  return { ok: true, reason: "", hits, rung: hits.length ? Math.min(...hits.map((h) => h.rung)) : 0 };
+}
+
 async function openalexOnce(query, k) {
   await polite("openalex");
   return get(`https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)}`
@@ -223,13 +277,14 @@ async function search(query, k = 5) {
   const key = `${query}::${k}`;
   const c = cache();
   if (c[key]) return c[key];
-  const [a, o] = [await arxiv(query, k), await openalex(query, k)];
+  const [a, o, v] = [await arxiv(query, k), await openalex(query, k), await openreview(query, k)];
   const out = {
     query,
     legs: { arxiv: { ok: a.ok, reason: a.reason, n: a.hits.length, rung: a.rung },
-            openalex: { ok: o.ok, reason: o.reason, n: o.hits.length, rung: o.rung } },
-    searched: a.ok || o.ok,
-    hits: [...a.hits, ...o.hits],
+            openalex: { ok: o.ok, reason: o.reason, n: o.hits.length, rung: o.rung },
+            openreview: { ok: v.ok, reason: v.reason, n: v.hits.length, rung: v.rung } },
+    searched: a.ok || o.ok || v.ok,
+    hits: [...a.hits, ...o.hits, ...v.hits],
   };
   c[key] = out;
   saveCache();
@@ -237,12 +292,12 @@ async function search(query, k = 5) {
 }
 
 async function searchAll(queries, k = 5) {
-  const legs = { arxiv: { ok: false, n: 0 }, openalex: { ok: false, n: 0 } };
+  const legs = { arxiv: { ok: false, n: 0 }, openalex: { ok: false, n: 0 }, openreview: { ok: false, n: 0 } };
   const seen = new Set();
   const hits = [];
   for (const q of queries.slice(0, 3)) {
     const r = await search(q, k);
-    for (const leg of ["arxiv", "openalex"]) {
+    for (const leg of ["arxiv", "openalex", "openreview"]) {
       legs[leg].ok = legs[leg].ok || r.legs[leg].ok;
       legs[leg].n += r.legs[leg].n;
     }
@@ -251,8 +306,9 @@ async function searchAll(queries, k = 5) {
       if (!seen.has(id)) { seen.add(id); hits.push(h); }
     }
   }
-  return { queries: queries.slice(0, 3), legs, searched: legs.arxiv.ok || legs.openalex.ok, hits };
+  return { queries: queries.slice(0, 3), legs,
+           searched: legs.arxiv.ok || legs.openalex.ok || legs.openreview.ok, hits };
 }
 
-module.exports = { search, searchAll, arxiv, openalex, arxivQueries, openalexQueries, distinctivePairs,
+module.exports = { search, searchAll, arxiv, openalex, openreview, arxivQueries, openalexQueries, distinctivePairs,
                    _setFetch, _resetFetch, REQUEST_GAP, CACHE };

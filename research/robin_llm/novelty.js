@@ -16,7 +16,7 @@
 //   REPO      priorwork.js over 432 experiment scripts, notes, ADRs and result files
 //   CORPUS    the local arXiv BM25 index
 //   SHOWN     the papers this very idea was generated from
-//   WEB       live arXiv API + OpenAlex, via websearch.js
+//   WEB       live arXiv API + OpenAlex + OpenReview, via websearch.js
 //
 // THE WEB LEG IS A SECOND PASS. The first judgement uses local evidence only. If it comes back
 // UNVERIFIED -- nothing here matched -- the queries it generated are actually run and the idea is
@@ -29,9 +29,9 @@
 // article on Lewy body dementia, with success:true). websearch.js talks to the scholarly indexes
 // directly instead.
 //
-// Even so, "no match" is still not "novel". Both legs miss OpenReview and other unindexed
-// preprints -- UHeads, one of the two papers that killed a novelty claim in the red team, returns
-// zero results from both. A searched silence is a stronger silence, not evidence.
+// Even so, "no match" is still not "novel". The legs miss venues with no open index, work that
+// exists only as a blog post or model card, and anything too recent to be indexed. A searched
+// silence is a stronger silence, not evidence.
 //
 // THE VERDICT VOCABULARY. Fixed, and deliberately WITHOUT a "novel" value:
 //   ANSWERED-HERE   this repo already measured it -- cites the file and the number
@@ -87,6 +87,29 @@ function candidates(idea, shown = []) {
   return { repo, corpus, shown: shownTop };
 }
 
+// The judge sees a WINDOW of the search results, and which window decides the verdict. Hits
+// arrive concatenated leg by leg, so a flat slice of 12 was twelve arXiv results and the
+// OpenReview leg -- added specifically to catch conference submissions -- was invisible to the
+// judge on every idea. Interleave the sources and put tight matches first: rung 0 is the
+// exact-phrase hit, higher rungs are progressively looser.
+function webSlice(hits, cap) {
+  const bySource = new Map();
+  for (const h of [...hits].sort((a, b) => (a.rung || 0) - (b.rung || 0))) {
+    if (!bySource.has(h.source)) bySource.set(h.source, []);
+    bySource.get(h.source).push(h);
+  }
+  const queues = Array.from(bySource.values());
+  const out = [];
+  for (let i = 0; out.length < cap; i++) {
+    let added = false;
+    for (const q of queues) {
+      if (i < q.length) { out.push(q[i]); added = true; if (out.length >= cap) break; }
+    }
+    if (!added) break;
+  }
+  return out;
+}
+
 function block(c) {
   const L = [];
   if (c.repo.length) {
@@ -102,8 +125,8 @@ function block(c) {
     for (const p of c.shown) L.push(`  [${p.id}] ${p.title}`);
   }
   if (c.web && c.web.length) {
-    L.push("\nLIVE SEARCH OF arXiv AND OpenAlex FOR THIS IDEA:");
-    for (const h of c.web.slice(0, 12)) L.push(`  [${h.source}:${h.id}] (${h.year}) ${h.title}`);
+    L.push("\nLIVE SEARCH OF arXiv, OpenAlex AND OpenReview FOR THIS IDEA:");
+    for (const h of webSlice(c.web, 21)) L.push(`  [${h.source}:${h.id}] (${h.year}) ${h.title}`);
   }
   return L.join("\n");
 }
@@ -116,6 +139,12 @@ async function judgeOnce(idea, c, llm) {
     + `describes? If a listed title says the same thing as the idea's title, that is RESTATES. `
     + `An idea whose title appears in the lists above is NEVER "UNVERIFIED".\n`
     + `2. Is it a method from a paper above, applied to our setting? PORT.\n`
+    + `2b. Our own prior work includes NOTES that cite outside papers. If a note above names `
+    + `a paper or system that already does what the idea proposes, that counts -- answer `
+    + `RESTATES or PORT and cite the paper the note names. A note is not a measurement, but `
+    + `it is knowledge we already have, and re-proposing something our own notebook records `
+    + `as done is the failure this audit exists to catch.
+`
     + `3. Did OUR OWN prior work measure THE SAME SIGNAL? ANSWERED-HERE if it did, REFUTED-HERE `
     + `if it measured it and the signal failed. Name what that file measured. If the honest `
     + `description is "related to", "closely related", "similar to" or "a different signal in `
@@ -209,4 +238,4 @@ async function audit(ideas, { llm, shown = [], web = true, log = () => {} } = {}
   return { ideas: audited, controls, counts };
 }
 
-module.exports = { audit, auditIdea, runControls, candidates, repoCandidates, VERDICTS, PLANT_ANSWERED };
+module.exports = { audit, auditIdea, runControls, candidates, repoCandidates, webSlice, VERDICTS, PLANT_ANSWERED };

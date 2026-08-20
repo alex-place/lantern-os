@@ -22,9 +22,13 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const SOURCES = [
   { dir: "experiments", ext: ".py", kind: "experiment" },
   { dir: "research/epistemic_controller", ext: ".py", kind: "experiment" },
-  // research/robin_llm itself is deliberately NOT indexed: this mill is not a measurement,
-  // and its own docstrings describe the red-team findings, so it surfaced as "prior work" for
-  // the very ideas those findings were about.
+  // The mill's CODE is deliberately not indexed -- it is not a measurement, and its docstrings
+  // describe the red-team findings, so it surfaced as "prior work" for the very ideas those
+  // findings were about. Its NOTES are a different matter: RED-TEAM-2026-08-20.md records that
+  // UHeads kills the verification-head idea, found by hand because no query-based search reaches
+  // a paper phrased differently from the idea. A finding that only lives in a chat transcript
+  // gets rediscovered; one in the notebook does not.
+  { dir: "research/robin_llm", ext: ".md", kind: "note" },
   { dir: "docs/research", ext: ".md", kind: "note" },
   { dir: "docs/adr", ext: ".md", kind: "decision" },
   { dir: "scripts", ext: ".py", kind: "harness" },
@@ -55,8 +59,12 @@ function tokenize(s) {
 function head(text, kind) {
   const t = String(text);
   if (kind === "note" || kind === "decision") {
+    // 3000, not 1400: a note states its question up front but puts the FINDING in a table
+    // further down. RED-TEAM-2026-08-20.md matched an idea at the top of the prior-work ranking
+    // while the row naming the paper that kills it sat past the old cut, so the judge saw a
+    // relevant document with the relevant part missing and returned UNVERIFIED.
     const body = t.replace(/^---[\s\S]*?---\s*/, "");         // front matter
-    return body.slice(0, 1400);
+    return body.slice(0, 3000);
   }
   const m = t.match(/^[\s\S]{0,200}?(?:r?"""|r?''')([\s\S]{0,1400}?)(?:"""|''')/);
   if (m) return m[1];
@@ -76,6 +84,9 @@ function walk(dir, ext, out, depth = 0) {
   if (!fs.existsSync(abs) || depth > 2) return;
   for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
     const rel = path.join(dir, e.name);
+    // A mill output is not prior work. Indexing results/ made every idea match the very list it
+    // came from, which outranked the note that actually names its prior art.
+    if (e.isDirectory() && e.name === "results") continue;
     if (e.isDirectory()) walk(rel, ext, out, depth + 1);
     else if (e.name.endsWith(ext)) out.push(rel);
   }

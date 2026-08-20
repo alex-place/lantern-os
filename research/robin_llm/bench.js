@@ -259,7 +259,7 @@ function renderMarkdown(result, meta = {}) {
       L.push("");
       const web = i.audit.verdict === "UNVERIFIED"
         ? (i.audit.web_searched
-            ? ` arXiv and OpenAlex were searched (${i.audit.web_hits} hits) and none matched.`
+            ? ` arXiv, OpenAlex and OpenReview were searched (${i.audit.web_hits} hits) and none matched.`
             : " **The live search did not run**, so this is unchecked, not unmatched.")
         : "";
       L.push(`**Prior art: ${i.audit.verdict}**`
@@ -295,11 +295,10 @@ function renderMarkdown(result, meta = {}) {
     L.push("## Verify before starting");
     L.push("");
     const searched = unverified.filter((i) => i.audit.web_searched).length;
-    L.push(`${unverified.length} idea(s) matched nothing — ${searched} of them after arXiv and `
-         + `OpenAlex were actually searched. That is still not novelty: both indexes miss `
-         + `OpenReview submissions and unindexed preprints, which is where one of the two papers `
-         + `that killed a novelty claim on 2026-08-20 lives. Re-run these by hand before `
-         + `committing real time.`);
+    L.push(`${unverified.length} idea(s) matched nothing — ${searched} of them after arXiv, `
+         + `OpenAlex and OpenReview were actually searched. That is still not novelty: no index `
+         + `covers work published only as a blog post or a model card, or anything too recent to `
+         + `be indexed at all. Re-run these by hand before committing real time.`);
     for (const i of unverified) {
       L.push("");
       L.push(`**${i.rank}. ${i.title}**`);
