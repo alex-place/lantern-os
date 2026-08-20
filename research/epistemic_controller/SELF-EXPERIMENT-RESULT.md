@@ -114,6 +114,38 @@ one mechanism sitting between them. The next question is whether the gap to the 
 budget (more episodes) or estimator quality (the discordant-pair test is crude) — separable by
 running the same arm at 60 episodes and seeing whether it converges to the oracle or plateaus.
 
+## 2c. Round three: it is the evidence budget, and S2 has a defect
+
+Round two left one question: is the gap to the oracle an evidence-budget limit or an estimator
+limit? Run the same arm at 60 episodes and see whether it converges or plateaus.
+
+| | 20 episodes (60 seeds) | 60 episodes (30 seeds) |
+|---|---|---|
+| discordant rounds available to the diagnosis | 182 | 275 |
+| proxy bought, `hold` late | 19.0% | 18.7% |
+| proxy bought, `self-cf` late | **12.2%** | **9.6%** |
+| below the `hold` arm's own late rate | 36% | **49%** |
+| share of the gain above the oracle floor (5%) | 49% | **67%** |
+| experiments per discovery vs `hold` | 3.7% cheaper | 5.1% cheaper |
+| fires in C1 / C2 | 0% / 0% | 0% / 0% |
+
+**It converges.** Every cross-arm measure improves with more episodes and none has flattened, so
+the limit is how much disagreement a single scientist has seen, not the crudeness of the
+discordant-pair test. Specificity is unchanged at both lengths — 0% false firing in both controls,
+after 1,567 explicit null diagnoses in C2 at 60 episodes.
+
+**And S2 has a defect I have to name.** S2 compares an arm's late window to its own early window,
+with the split at `EPISODES // 2`. At 60 episodes "early" is episodes 1–30, which already contains
+most of the learning, so the arm's own baseline is contaminated by the effect being measured: the
+within-arm number *falls* from 40% to 31% while every cross-arm measure *rises*. A gate that gets
+weaker the longer you run it is a bad gate.
+
+The bar does not move and the verdict does not change: **S2 as pre-registered FAILS at both
+lengths, S3 passes at both, S4 fails at both.** But the within-arm reading is not the sound one,
+and the honest summary of the mechanism is the cross-arm row: at 60 episodes the counterfactual
+self-diagnosis puts the machine 49% below the never-learning baseline and two-thirds of the way to
+what hard-coding the right policy would have given — with no false firing in either control.
+
 ## 3. What the failed experiment actually bought
 
 Building world S found four defects in the shipped controller — none of them visible in the
