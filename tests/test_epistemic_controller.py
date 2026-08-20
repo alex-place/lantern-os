@@ -113,3 +113,79 @@ def test_evidence_log_cites_transitions():
     for tr in r["transitions"]:
         if tr["to"] == BOUNDARY:
             assert tr["evidence"], "a BOUNDARY transition must cite the evidence it rests on"
+
+
+# ── the self-model's counterfactual replay (research/epistemic_controller/self_model.py) ──────
+# The ledger mechanism was killed by run_world_s.py; the replacement replays each DESIGN round
+# already paid for under an alternative cost exponent. These pin the two properties that make it
+# a diagnosis rather than a reflex: it only counts rounds where the two policies DISAGREE, and it
+# stays silent when they agree.
+
+def test_counterfactual_pick_follows_the_cost_exponent():
+    from self_model import SelfModel
+    cands = [{"name": "cheap_proxy", "cost": 1.0, "explained": 0.95},
+             {"name": "true_cause", "cost": 3.0, "explained": 0.99}]
+    m = SelfModel(mode="counterfactual")
+    assert m._pick(cands, 1.0) == "cheap_proxy", "cost-weighted utility prefers the cheap explanation"
+    assert m._pick(cands, 0.0) == "true_cause", "unweighted utility prefers the better explanation"
+
+
+def test_counterfactual_counts_only_discordant_rounds():
+    from self_model import SelfModel
+
+    class _Ev:
+        def __init__(self, rows):
+            self.rows = rows
+
+    class _Ctrl:
+        def __init__(self, rows):
+            self.ev = _Ev(rows)
+
+    disagree = [{"name": "cheap_proxy", "cost": 1.0, "explained": 0.95},
+                {"name": "true_cause", "cost": 3.0, "explained": 0.99}]
+    agree = [{"name": "true_cause", "cost": 1.0, "explained": 0.99},
+             {"name": "other", "cost": 3.0, "explained": 0.10}]
+
+    m = SelfModel(mode="counterfactual")
+    m._replay(_Ctrl([{"kind": "design", "candidates": agree}]), "true_cause")
+    assert m.pairs == {}, "a round where both policies pick the same thing carries no information"
+
+    m2 = SelfModel(mode="counterfactual")
+    m2._replay(_Ctrl([{"kind": "design", "candidates": disagree}]), "true_cause")
+    b, c = m2.pairs[0.0]
+    assert (b, c) == (1, 0), f"the alternative picked the survivor, the current policy did not: {m2.pairs}"
+
+    m3 = SelfModel(mode="counterfactual")
+    m3._replay(_Ctrl([{"kind": "design", "candidates": disagree}]), None)
+    assert m3.pairs == {} and m3.rounds_usable == 0, "no survivor means no target to score against"
+
+
+def test_counterfactual_stays_silent_without_enough_discordant_evidence():
+    from self_model import SelfModel
+    m = SelfModel(mode="counterfactual")
+    m.pairs = {0.0: (1, 0)}                      # one discordant round, below min_drops
+    m._diagnose_counterfactual()
+    assert m.trial is None and m.cost_exponent == 1.0, "one round is not a diagnosis"
+    m.pairs = {0.0: (4, 0)}
+    m._diagnose_counterfactual()
+    assert m.trial is not None and m.cost_exponent == 0.0, "four discordant rounds all one way is"
+
+
+def test_the_repair_the_self_model_can_make_is_worth_making():
+    """If the repair bought nothing, world S would be asking the machine to diagnose a defect
+    that costs it nothing, and a null result there would mean nothing. Measured on a small n
+    here; the 200-seed sweep is run_cost_exponent_sweep.py."""
+    from run_world_h import HoldController
+    from environments.two_explanations import TwoExplanationsWorld
+    bought = {}
+    for e in (1.0, 0.0):
+        n = 0
+        for seed in range(60):
+            w = TwoExplanationsWorld(seed)
+            c = HoldController(w)
+            c.cost_exponent = e
+            c.run()
+            acquired = [x["name"] for x in c.ev.rows if x["kind"] == "measurement"]
+            n += w.truth()["proxy_z"] in acquired
+        bought[e] = n
+    assert bought[0.0] < bought[1.0], f"dropping the cost weight must cut proxy purchases: {bought}"
