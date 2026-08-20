@@ -65,6 +65,10 @@ async function scanAfterVanish(lastPos, stopDistPct) {
     stopDistPct: stopDistPct || {},
   }));
   _loadState();
+  // TWO scans since #3378: a reconstructed close books only on the second
+  // consecutive absence (one flapped read booked three still-held positions as
+  // exits on 2026-08-19), so the cooldown arms one scan later than it used to.
+  await runAutoTrade({ signals: [] }, { bridge, userId: 't' });
   await runAutoTrade({ signals: [] }, { bridge, userId: 't' });
 }
 
@@ -156,7 +160,8 @@ test('two attributed stops trip the daily breaker', async () => {
     stopDistPct: { SQQQ: 3, SPXS: 3 },
   }));
   _loadState();
-  await runAutoTrade({ signals: [] }, { bridge, userId: 't' });
+  await runAutoTrade({ signals: [] }, { bridge, userId: 't' });   // first absence: deferred (#3378)
+  await runAutoTrade({ signals: [] }, { bridge, userId: 't' });   // second consecutive absence: booked
   const st = readState();
   assert.strictEqual(st.stopFills.count, 2, 'both stop-outs counted toward TRADER_STOP_BREAKER=2');
   assert.ok(st.stopCooldownThrough.SQQQ && st.stopCooldownThrough.SPXS);
