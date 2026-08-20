@@ -66,3 +66,21 @@ runs.
 Not a trading signal, not a claim the probe helps trading, and not a novelty claim. It is one
 bounded comparison with pre-registered gates, plus one cheap logging change that makes the honest
 version of the dataset exist.
+
+---
+
+## Outcome (2026-08-21, same day — recorded against the frozen gates)
+
+**P0: FAIL.** 1443/1531 rows matched (1442 by exact close time, 0 API errors). 19.6% of matched
+rows have close price in [0.05, 0.95], against the ≥20% bar. By 0.4 points — and the bar does not
+move. The retrospective close-price supervision arm is **KILLED as pre-registered**; median
+closing spread is 1.00 (empty books at settlement), which independently confirms close-time
+prices are degenerate. The prospective arm (collector logging at real horizons) is the only
+honest path, and it was named here before this number existed.
+
+**The finding that outranks the one this was built for:** 94 matched rows (**6.5%**) where the
+benchmark's `ground_truth` contradicts the exchange's official settlement result — and in **all
+94**, the market's own closing price sides with the exchange against the label. That is a defect
+list for this dataset, not an idea. Full list: `results/benchmark-label-disputes.csv`; corrected
+dataset with prices, spreads, exchange results and a `label_disputed` flag:
+`data/kalshi/settled/benchmark-with-prices.parquet` (local, data/ is gitignored).
