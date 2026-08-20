@@ -152,3 +152,54 @@ def test_writer_and_dedup(tmp_path):
 
     seen = ah.load_seen_ids(raw)
     assert "2508.00001" in seen
+
+
+# ── network retry (the 2026-08-20 silent-failure bug) ────────────────────────────────────
+# urlopen raises URLError when the CONNECTION fails, but a socket timeout during resp.read()
+# raises TimeoutError, which is NOT a URLError. The retry loop only caught URLError, so a read
+# timeout escaped it: the harvest logged "The read operation timed out", rebuilt the index over
+# the same corpus, and reported success with zero new papers. These pin the fix.
+
+def test_read_timeout_is_retried_not_raised(monkeypatch):
+    calls = {"n": 0}
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise TimeoutError("The read operation timed out")
+            return b"<ok/>"
+
+    monkeypatch.setattr(ah, "urlopen", lambda *a, **k: _Resp())
+    monkeypatch.setattr(ah.time, "sleep", lambda *_: None)
+    assert ah._http_get({"verb": "ListRecords"}) == b"<ok/>"
+    assert calls["n"] == 3, "the first two read timeouts must be retried, not propagated"
+
+
+def test_read_timeout_still_raises_once_retries_are_exhausted():
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            raise TimeoutError("The read operation timed out")
+
+    import unittest.mock as mock
+    with mock.patch.object(ah, "urlopen", lambda *a, **k: _Resp()), \
+         mock.patch.object(ah.time, "sleep", lambda *_: None), \
+         pytest.raises(TimeoutError):
+        ah._http_get({"verb": "ListRecords"}, max_retries=2)
+
+
+def test_http_timeout_is_configurable_and_generous_by_default():
+    # 60s was not enough for a full ListRecords page, which is what produced the silent failure.
+    assert ah._HTTP_TIMEOUT >= 120
