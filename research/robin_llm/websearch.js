@@ -83,14 +83,34 @@ function stripTags(s) { return String(s).replace(/<[^>]+>/g, "").replace(/\s+/g,
 const STOP = new Set(["the", "and", "for", "with", "from", "that", "this", "using", "via", "into",
                       "when", "what", "how", "does", "can", "are", "its", "our", "per", "than"]);
 
-// arXiv's `all:` field takes a quoted phrase as an EXACT match, so a long question returns
-// nothing: "uncertainty aware attention heads" finds the paper, the same sentence with four more
-// words finds zero. Try the phrase, then fall back to the distinctive terms ANDed.
-function arxivQueries(query) {
-  const terms = String(query).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
+function terms(query) {
+  return String(query).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
     .filter((w) => w.length > 3 && !STOP.has(w));
+}
+
+// A NARROWING LADDER, because both indexes treat a multi-term query as a conjunction: one word
+// the paper does not happen to use zeroes the whole search. Measured -- "spectral rewiring
+// parameter-efficient fine-tuning reasoning" returns nothing from either leg, while "spectral
+// rewiring" returns the paper the idea was restating. So: exact phrase, then progressively fewer
+// of the leading terms, stopping at the first rung that returns anything.
+//
+// Looser rungs return looser matches, and that is fine here: the judge decides relevance, and a
+// candidate it can reject beats a silence it would read as novelty. The rung that matched is
+// recorded so a loose match can be seen for what it is.
+function arxivQueries(query) {
+  const t = terms(query);
   const out = [`all:${encodeURIComponent(`"${query}"`)}`];
-  if (terms.length > 3) out.push(terms.slice(0, 6).map((t) => `all:${encodeURIComponent(t)}`).join("+AND+"));
+  for (const n of [6, 3, 2]) {
+    if (t.length > n) out.push(t.slice(0, n).map((x) => `all:${encodeURIComponent(x)}`).join("+AND+"));
+  }
+  if (t.length >= 2 && !out.length) out.push(t.slice(0, 2).map((x) => `all:${encodeURIComponent(x)}`).join("+AND+"));
+  return out;
+}
+
+function openalexQueries(query) {
+  const t = terms(query);
+  const out = [query];
+  for (const n of [3, 2]) if (t.length > n) out.push(t.slice(0, n).join(" "));
   return out;
 }
 
@@ -102,39 +122,53 @@ async function arxivOnce(searchQuery, k) {
 
 async function arxiv(query, k = 5) {
   let r = null;
-  for (const sq of arxivQueries(query)) {
-    r = await arxivOnce(sq, k);
+  let rung = 0;
+  const ladder = arxivQueries(query);
+  for (let i = 0; i < ladder.length; i++) {
+    r = await arxivOnce(ladder[i], k);
+    rung = i;
     if (r.status === 200 && r.body.includes("<entry>")) break;
   }
-  if (!r || r.status !== 200) return { ok: false, reason: `arxiv ${r ? r.status : "no-response"}`, hits: [] };
+  if (!r || r.status !== 200) return { ok: false, reason: `arxiv ${r ? r.status : "no-response"}`, hits: [], rung };
   const hits = [];
   for (const entry of r.body.split("<entry>").slice(1)) {
     const id = (entry.match(/<id>([^<]+)<\/id>/) || [])[1] || "";
     const title = stripTags((entry.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || "");
     const summary = stripTags((entry.match(/<summary>([\s\S]*?)<\/summary>/) || [])[1] || "");
     const pub = (entry.match(/<published>(\d{4})/) || [])[1] || "";
-    if (title) hits.push({ source: "arxiv", id: id.split("/abs/")[1] || id, year: pub, title, abstract: summary.slice(0, 400) });
+    if (title) hits.push({ source: "arxiv", id: id.split("/abs/")[1] || id, year: pub, title,
+                          abstract: summary.slice(0, 400), rung });
   }
-  return { ok: true, reason: "", hits };
+  return { ok: true, reason: "", hits, rung };
+}
+
+async function openalexOnce(query, k) {
+  await polite("openalex");
+  return get(`https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)}`
+           + `&per_page=${k}&mailto=founder@lantern-os.net`);
 }
 
 async function openalex(query, k = 5) {
-  await polite("openalex");
-  const url = `https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)}`
-            + `&per_page=${k}&mailto=founder@lantern-os.net`;
-  const r = await get(url);
-  if (r.status !== 200) return { ok: false, reason: `openalex ${r.status}`, hits: [] };
-  try {
-    const j = JSON.parse(r.body);
-    const hits = (j.results || []).map((w) => ({
-      source: "openalex", id: (w.ids && w.ids.doi) || w.id || "", year: String(w.publication_year || ""),
-      title: String(w.title || ""), abstract: "", venue: (w.primary_location && w.primary_location.source
-        && w.primary_location.source.display_name) || "",
-    })).filter((h) => h.title);
-    return { ok: true, reason: "", hits };
-  } catch (e) {
-    return { ok: false, reason: `openalex parse: ${e.message}`, hits: [] };
+  const ladder = openalexQueries(query);
+  let last = null;
+  for (let i = 0; i < ladder.length; i++) {
+    const r = await openalexOnce(ladder[i], k);
+    last = r;
+    if (r.status !== 200) continue;
+    try {
+      const j = JSON.parse(r.body);
+      const hits = (j.results || []).map((w) => ({
+        source: "openalex", id: (w.ids && w.ids.doi) || w.id || "", year: String(w.publication_year || ""),
+        title: String(w.title || ""), abstract: "", rung: i,
+        venue: (w.primary_location && w.primary_location.source
+          && w.primary_location.source.display_name) || "",
+      })).filter((h) => h.title);
+      if (hits.length || i === ladder.length - 1) return { ok: true, reason: "", hits, rung: i };
+    } catch (e) {
+      return { ok: false, reason: `openalex parse: ${e.message}`, hits: [], rung: i };
+    }
   }
+  return { ok: false, reason: `openalex ${last ? last.status : "no-response"}`, hits: [], rung: 0 };
 }
 
 // One query across both legs. Returns hits plus WHICH LEGS ACTUALLY RAN -- the audit must be able
@@ -146,8 +180,8 @@ async function search(query, k = 5) {
   const [a, o] = [await arxiv(query, k), await openalex(query, k)];
   const out = {
     query,
-    legs: { arxiv: { ok: a.ok, reason: a.reason, n: a.hits.length },
-            openalex: { ok: o.ok, reason: o.reason, n: o.hits.length } },
+    legs: { arxiv: { ok: a.ok, reason: a.reason, n: a.hits.length, rung: a.rung },
+            openalex: { ok: o.ok, reason: o.reason, n: o.hits.length, rung: o.rung } },
     searched: a.ok || o.ok,
     hits: [...a.hits, ...o.hits],
   };
@@ -174,5 +208,5 @@ async function searchAll(queries, k = 5) {
   return { queries: queries.slice(0, 3), legs, searched: legs.arxiv.ok || legs.openalex.ok, hits };
 }
 
-module.exports = { search, searchAll, arxiv, openalex, arxivQueries,
+module.exports = { search, searchAll, arxiv, openalex, arxivQueries, openalexQueries,
                    _setFetch, _resetFetch, REQUEST_GAP, CACHE };

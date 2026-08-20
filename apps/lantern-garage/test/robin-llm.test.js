@@ -227,12 +227,20 @@ ok("an unparseable audit reply degrades to UNVERIFIED with queries, never to a n
 });
 
 // ── the live search leg ──────────────────────────────────────────────────────────────────
-ok("arXiv gets a phrase query and a term fallback, because long phrases return nothing", () => {
-  const q = websearch.arxivQueries("uncertainty aware attention heads hallucination detection tokens");
-  assert.strictEqual(q.length, 2, "a phrase query alone silently returns zero on long questions");
+ok("both indexes get a narrowing ladder, because a multi-term query is a conjunction", () => {
+  // Measured: "spectral rewiring parameter-efficient fine-tuning reasoning" returns nothing from
+  // either leg, while "spectral rewiring" returns the paper the idea was restating. One word the
+  // paper does not use zeroes the whole search, so the query has to get shorter, not smarter.
+  const q = websearch.arxivQueries("spectral rewiring parameter efficient fine tuning reasoning");
+  assert.ok(q.length >= 3, `expected phrase + narrowing rungs, got ${q.length}`);
   assert.ok(decodeURIComponent(q[0]).includes('"'), "first attempt is the exact phrase");
-  assert.ok(q[1].includes("+AND+"), "fallback ANDs the distinctive terms");
+  const widths = q.slice(1).map((x) => x.split("+AND+").length);
+  assert.deepStrictEqual(widths, [...widths].sort((a, b) => b - a), "rungs must get narrower, not wider");
+  assert.ok(widths[widths.length - 1] <= 2, "the last rung must be short enough to actually match");
   assert.ok(!decodeURIComponent(q[1]).includes(" the "), "stopwords must not eat the term budget");
+
+  const o = websearch.openalexQueries("spectral rewiring parameter efficient fine tuning reasoning");
+  assert.ok(o.length >= 2 && o[o.length - 1].split(/\s+/).length <= 2, "openalex needs the same ladder");
 });
 
 ok("a leg that did not run is never reported as a leg that found nothing", async () => {
