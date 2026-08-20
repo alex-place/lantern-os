@@ -126,6 +126,13 @@
      the surfaces. Tabs stay a touch larger than labels because they are hit targets,
      but everything shares the same rhythm, colour and border. */
   :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
+  /* Popup surfaces. Every overlay had grown its own corner, shadow and scrim, so a
+     flyout, a modal and a floating toolbar read as three different materials. These
+     are the alert dialog's values -- the newest and best-judged of them -- promoted
+     to tokens so the rest inherit rather than re-invent. */
+  :root{--pop-r:12px;--pop-r-sm:10px;--pop-r-item:7px;
+        --pop-sh:0 24px 60px rgba(0,0,0,.6);--pop-sh-sm:0 12px 32px rgba(0,0,0,.5);
+        --pop-scrim:rgba(4,6,10,.62);--pop-pad:6px;--pop-fs:12.5px;--pop-fs-sm:11.5px}
   :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,340px)}
   .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
@@ -212,16 +219,16 @@
 
   /* Flyout: the category's tools, grouped, each with ? / shortcut / favourite. */
   .dr-flyout{position:fixed;z-index:1400;min-width:250px;max-height:76vh;overflow-y:auto;
-    background:var(--bg1);border:1px solid var(--border);border-radius:8px;
-    box-shadow:0 10px 30px rgba(0,0,0,.45);padding:5px}
+    background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);
+    box-shadow:var(--pop-sh-sm);padding:var(--pop-pad)}
   .dr-flyout[hidden]{display:none}
-  .dr-fly-group{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--text2);padding:7px 9px 3px}
-  .dr-fly-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer}
+  .dr-fly-group{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;
+    color:var(--hdr-fg);padding:8px 9px 4px}
+  .dr-fly-item{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--pop-r-item);cursor:pointer}
   .dr-fly-item:hover{background:var(--bg2)}
   .dr-fly-item.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
   .dr-fly-ico{width:20px;text-align:center;color:var(--text1);flex:0 0 auto;font-size:15px}
-  .dr-fly-name{flex:1;font-size:12.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dr-fly-name{flex:1;font-size:var(--pop-fs);color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dr-fly-q,.dr-fly-key,.dr-fly-star{background:none;border:0;cursor:pointer;color:var(--text2);
     font-family:var(--mono);line-height:1;padding:2px 3px;border-radius:4px;flex:0 0 auto}
   .dr-fly-q{font-size:10px;width:16px;height:16px;border:1px solid var(--border);border-radius:50%}
@@ -229,33 +236,33 @@
   .dr-fly-star{font-size:12px}
   .dr-fly-star.on{color:var(--amber,#f5a623)}
   .dr-fly-q:hover,.dr-fly-key:hover,.dr-fly-star:hover{color:var(--text0);background:var(--bg3)}
-  .dr-fly-why{font-size:12px;line-height:1.5;color:var(--text1);padding:2px 9px 6px;margin:0;max-width:270px}
-  .dr-fly-meta{font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 9px 8px;margin:0}
+  .dr-fly-why{font-size:var(--pop-fs);line-height:1.5;color:var(--text1);padding:2px 9px 6px;margin:0;max-width:270px}
+  .dr-fly-meta{font-family:var(--mono);font-size:var(--hdr-size);color:var(--text2);padding:0 9px 8px;margin:0}
   .dr-fly-foot{display:flex;gap:6px;padding:6px 8px 3px;border-top:1px solid var(--border)}
-  .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:11px;padding:5px;border-radius:5px;
+  .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:var(--pop-fs-sm);padding:6px;border-radius:var(--pop-r-item);
     border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
   .dr-fly-foot button:hover{background:var(--bg3);color:var(--text0)}
   /* Style popup rows for a selected drawing. */
-  .dr-st-row{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12px;color:var(--text1)}
+  .dr-st-row{display:flex;align-items:center;gap:8px;padding:6px 9px;font-size:var(--pop-fs);color:var(--text1)}
   .dr-st-row span{flex:1}
-  .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0}
+  .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:5px;padding:0}
   .dr-st-row input[type=range]{width:96px}
   .dr-settings{min-width:250px}
   .dset-tabs{display:flex;gap:2px;padding:2px 6px 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
   .dset-tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);
-    font-size:11.5px;padding:4px 2px;cursor:pointer}
+    font-size:var(--pop-fs-sm);padding:5px 2px;cursor:pointer}
   .dset-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
   .dset-tab.empty{opacity:.45}
   .dset-tab:hover{color:var(--text0)}
   /* Quick-action row raised over a selected drawing. */
   /* Selection toolbar -- a compact strip of real controls, not a row of glyphs. */
   .dsel-bar{position:fixed;z-index:1350;display:flex;align-items:center;gap:1px;padding:3px 5px;
-    background:var(--bg1);border:1px solid var(--border);border-radius:9px;
-    box-shadow:0 8px 24px rgba(0,0,0,.5)}
+    background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);
+    box-shadow:var(--pop-sh-sm)}
   .dsel-bar[hidden]{display:none}
   .dsel-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 4px 0 1px;user-select:none}
   .dsel-bar button{height:26px;min-width:28px;display:inline-flex;align-items:center;justify-content:center;
-    gap:4px;background:none;border:1px solid transparent;border-radius:6px;color:var(--text1);
+    gap:4px;background:none;border:1px solid transparent;border-radius:var(--pop-r-item);color:var(--text1);
     font-size:13px;padding:0 6px;cursor:pointer}
   .dsel-bar button:hover{background:var(--bg3);color:var(--text0)}
   .dsel-bar button.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
@@ -277,7 +284,7 @@
   .al-count{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
   .al-deliv{display:flex;align-items:center;gap:7px;padding:8px var(--hdr-px) 4px;font-size:12px;color:var(--text1)}
   .al-sec{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);padding:10px var(--hdr-px) 4px;
-    color:var(--text2);padding:10px 10px 4px;border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
+    border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
   .al-pad{padding:0 var(--hdr-px) 4px}
   .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px var(--hdr-px) 10px;margin:0}
   .al-link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
@@ -300,32 +307,32 @@
   .al-teaser p{margin:6px 0;color:var(--text2)}
   .al-teaser a{color:var(--accent)}
   .al-modal-bg{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;
-    background:rgba(4,6,10,.62);backdrop-filter:blur(3px)}
+    background:var(--pop-scrim);backdrop-filter:blur(3px)}
   .al-modal-bg[hidden]{display:none}
   .al-modal{width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
-    border:1px solid var(--border);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+    border:1px solid var(--border);border-radius:var(--pop-r);box-shadow:var(--pop-sh)}
   .al-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border)}
   .al-title{font-size:15px;color:var(--text0)}
   .al-sym{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0);
-    background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 9px}
+    background:var(--bg3);border:1px solid var(--border);border-radius:var(--pop-r-item);padding:2px 9px}
   .al-head .dock-x{margin-left:auto}
   .al-body{padding:6px 16px 12px}
   .al-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-  .al-row > label{flex:0 0 96px;font-size:12.5px;color:var(--text2);padding-top:7px}
+  .al-row > label{flex:0 0 96px;font-size:var(--pop-fs);color:var(--text2);padding-top:7px}
   .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
   .al-fields select,.al-fields input[type=text],.al-fields input[type=number]{
-    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--pop-r-item);
     color:var(--text0);padding:7px 9px;font:inherit;font-size:13px}
   .al-inline{display:flex;align-items:center;gap:7px}
   .al-inline input{width:auto;flex:1}
-  .al-sub{font-size:11.5px;color:var(--text2);white-space:nowrap}
-  .al-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text1)}
+  .al-sub{font-size:var(--pop-fs-sm);color:var(--text2);white-space:nowrap}
+  .al-check{display:flex;align-items:center;gap:7px;font-size:var(--pop-fs);color:var(--text1)}
   .al-check input{width:auto}
-  .al-note{margin:0;font-size:11.5px;line-height:1.5;color:var(--text2)}
-  .al-err{margin:10px 0 0;font-size:12.5px;color:var(--red)}
+  .al-note{margin:0;font-size:var(--pop-fs-sm);line-height:1.5;color:var(--text2)}
+  .al-err{margin:10px 0 0;font-size:var(--pop-fs);color:var(--red)}
   .al-err[hidden]{display:none}
   .al-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
-  .al-btn{padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);
+  .al-btn{padding:8px 18px;border-radius:var(--pop-r-item);border:1px solid var(--border);background:var(--bg2);
     color:var(--text1);font:inherit;font-size:13px;cursor:pointer}
   .al-btn:hover{background:var(--bg3);color:var(--text0)}
   .al-btn.primary{background:var(--accent);border-color:var(--accent);color:#04202b;font-weight:600}
@@ -506,7 +513,7 @@
   .wi-alert-add:hover{border-color:var(--accent);color:var(--text0)}
   .wi-alert-chip{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:9px;border:1px solid rgba(245,166,35,.45);background:rgba(245,166,35,.08);color:var(--amber);white-space:nowrap}
   .wi-alert-chip button{background:none;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px;font-size:10.5px}
-  .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:var(--pop-r-sm);box-shadow:var(--pop-sh-sm)}
   /* #2439: watchlist sort control */
   .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
   .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
@@ -729,11 +736,11 @@
   /* #1696: buttons stay vibrant — Σ₀ no longer mutes them (sig-off is a no-op). */
   .order-ticket button.sig-off{opacity:1;filter:none}
   /* ── Symbol-search popup (#1692) ── */
-  .sym-bg{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-start;justify-content:center;background:rgba(5,6,8,.62);padding-top:8vh}
+  .sym-bg{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-start;justify-content:center;background:var(--pop-scrim);backdrop-filter:blur(3px);padding-top:8vh}
   .sym-bg.hidden{display:none}
-  .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r);box-shadow:var(--pop-sh);display:flex;flex-direction:column;overflow:hidden}
   .sym-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
-  .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:8px;outline:none}
+  .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:var(--pop-r-item);outline:none}
   .sym-head input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
   .sym-close{cursor:pointer;color:var(--text2);font-size:16px;padding:4px 8px;border-radius:4px}
   .sym-close:hover{color:var(--text0);background:var(--bg2)}
@@ -778,10 +785,10 @@
   /* Patterns dropdown: the trigger reads "active" (accent) when any layer is opted in;
      the panel is a floating checklist positioned under whichever button opened it. */
   #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
-  .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
+  .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);box-shadow:var(--pop-sh-sm);padding:6px}
   .pat-menu[hidden]{display:none}
-  .pat-menu-group{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);padding:8px 8px 3px}
-  .pat-menu-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:5px;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--text0);user-select:none}
+  .pat-menu-group{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);padding:8px 9px 4px}
+  .pat-menu-item{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--pop-r-item);cursor:pointer;font-family:var(--sans);font-size:var(--pop-fs);color:var(--text0);user-select:none}
   .pat-menu-item:hover{background:var(--bg2)}
   .pat-menu-item input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
   .pat-menu-item .pat-lbl{flex:1}
