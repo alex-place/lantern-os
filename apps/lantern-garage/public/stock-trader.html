@@ -126,7 +126,7 @@
      the surfaces. Tabs stay a touch larger than labels because they are hit targets,
      but everything shares the same rhythm, colour and border. */
   :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
-  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,320px)}
+  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,384px)}
   .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
   body.ticket-closed{--col-t:0px}
@@ -166,7 +166,7 @@
     width:100%;max-width:none;height:100%;min-width:0;flex:1 1 auto;
     border:none;box-shadow:none;animation:none}
   .dock-body > .dc-modal{display:flex;flex-direction:column;min-height:0}
-  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
   .dock-body .wl-info{flex:0 0 auto}
 
   /* Order ticket: a sibling row under the widget panel, so both are open at once. */
@@ -518,7 +518,7 @@
      signal on a tight second line. */
   /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
      right-aligned tracks so figures line up down the whole list. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(52px,1fr) 68px 62px 60px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -535,7 +535,7 @@
   /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
      exactly over the figures they name. */
   .wl-head{position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;
+    grid-template-columns:18px minmax(52px,1fr) 68px 62px 60px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
@@ -1386,12 +1386,12 @@
 
 <!-- Right widget rail — TradingView's right-hand switcher. -->
 <nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
-  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">☰</button>
-  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">🔔</button>
+  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">' + ico('menu') + '</button>
+  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">' + ico('bell') + '</button>
   <span class="rail-sep"></span>
-  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">⇅</button>
+  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">' + ico('swap') + '</button>
   <span class="rail-sep"></span>
-  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)">💬</button>
+  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)">' + ico('chat') + '</button>
 </nav>
 </div><!-- /layout -->
 
@@ -4334,6 +4334,64 @@ const CHART_NOTE_BG = () =>
    DRAW_CATS is the source of truth; DRAW_TOOLS below is the flat map the renderer,
    the hit-tester and the commit path already read, derived from it so there is one
    catalogue and not two. `k` is the default shortcut; `why` is the ? blurb. */
+
+/* -- Icons -------------------------------------------------------------------
+   Inline SVG, stroked in currentColor. Emoji were doing this job before: they
+   render in the FONT's colour palette rather than the UI's, differ per platform,
+   and drag a colour picture into a monochrome terminal. These inherit colour,
+   size with the text, and look the same everywhere. */
+const ICON = {
+  menu:      'M3 6h14M3 10h14M3 14h14',
+  bell:      'M10 3a4 4 0 0 0-4 4v3l-1.5 2h11L14 10V7a4 4 0 0 0-4-4Zm-1.5 11a1.5 1.5 0 0 0 3 0',
+  bellOff:   'M6 7a4 4 0 0 1 6.9-2.8M14 10V7m0 3 1.5 2h-9M3 3l14 14',
+  swap:      'M6 4v12m0 0-2.5-2.5M6 16l2.5-2.5M14 16V4m0 0-2.5 2.5M14 4l2.5 2.5',
+  chat:      'M4 5h12v8H8l-4 3V5Z',
+  trash:     'M4 6h12M8 6V4h4v2m-6 0 1 10h6l1-10',
+  lock:      'M6 9V6.5a4 4 0 0 1 8 0V9M4.5 9h11v7h-11z',
+  unlock:    'M6 9V6.5a4 4 0 0 1 7.6-1.7M4.5 9h11v7h-11z',
+  eye:       'M1.5 10S4.5 5 10 5s8.5 5 8.5 5-3 5-8.5 5-8.5-5-8.5-5Z M10 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4',
+  clock:     'M10 4.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM10 7v3.2l2.2 1.3',
+  pencil:    'M13.5 3.5 16 6l-8.5 8.5L4 15l.5-3.5 9-8Z',
+  ruler:     'M3 12 12 3l5 5-9 9-5-5Zm3 0 1.5 1.5M8.5 9.5 10 11M11 7l1.5 1.5',
+  marker:    'M5 15h10M6 12.5 12.5 6l2 2L8 14.5l-2.5.5.5-2.5Z',
+  note:      'M5 3.5h10v13H5zM7.5 7h5M7.5 10h5M7.5 13h3',
+  callout:   'M3.5 4h13v8h-7l-3.5 3v-3h-2.5V4Z',
+  tag:       'M3.5 9.5 9.5 3.5h6v6l-6 6-6-6Zm9-2.5h.01',
+  balloon:   'M4 4.5h12v7H9l-3.5 3v-3H4v-7Z',
+  target:    'M10 3.5v13M3.5 10h13M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7',
+  chart:     'M3 16h14M5.5 13V8m3.5 5V5m3.5 8v-3m3.5 3V7',
+  search:    'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM13.2 13.2 17 17',
+  compass:   'M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm2.8 3.7-1.9 4.3-4.3 1.9 1.9-4.3 4.3-1.9Z',
+  book:      'M4 4h5.5a2 2 0 0 1 2 2v10a2 2 0 0 0-2-2H4V4Zm12 0h-4.5v10H16V4Z',
+  trophy:    'M6 3.5h8v3a4 4 0 0 1-8 0v-3ZM6 5H4v1.5A2.5 2.5 0 0 0 6.5 9M14 5h2v1.5A2.5 2.5 0 0 1 13.5 9M8 13h4l.5 3.5h-5L8 13Z',
+  bolt:      'M11 3 5.5 11H9l-.5 6L15 9h-3.5L11 3Z',
+  warn:      'M10 3.5 17.5 16.5h-15L10 3.5ZM10 8v4m0 2.2h.01',
+  briefcase: 'M3.5 6.5h13v9h-13zM7.5 6.5V4.5h5v2',
+  pin:       'M10 3.5a4 4 0 0 1 4 4c0 3-4 8.5-4 8.5S6 10.5 6 7.5a4 4 0 0 1 4-4Zm0 2.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8',
+  inbox:     'M3.5 11h4l1 2h3l1-2h4M3.5 11 5 4.5h10L16.5 11v5h-13v-5Z',
+  link:      'M8.5 11.5 11.5 8.5M8 6.5 9.5 5a3.5 3.5 0 0 1 5 5l-1.5 1.5M12 13.5 10.5 15a3.5 3.5 0 0 1-5-5L7 8.5',
+  star:      'M10 3.5l2 4.3 4.5.6-3.3 3.2.8 4.6-4-2.2-4 2.2.8-4.6L3.5 8.4l4.5-.6L10 3.5Z',
+  cross:     'M5 5l10 10M15 5 5 15',
+  plus:      'M10 4v12M4 10h12',
+  cursor:    'M10 3v14M3 10h14',
+  magnet:    'M5 4v6a5 5 0 0 0 10 0V4h-3v6a2 2 0 0 1-4 0V4H5Z',
+  dot:       'M10 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3',
+  arrowUp:   'M10 16V5m0 0-4 4m4-4 4 4',
+  arrowDown: 'M10 4v11m0 0 4-4m-4 4-4-4',
+  fan:       'M4 16 16 4M4 16h12M4 16V4',
+  grid:      'M4 4h12v12H4zM4 8h12M4 12h12M8 4v12M12 4v12',
+  moon:      'M14.5 12.5A6 6 0 0 1 7.5 5.5a6 6 0 1 0 7 7Z',
+  sun:       'M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M15.7 4.3l-1.4 1.4M5.7 14.3l-1.4 1.4',
+};
+/** Render an icon at `size` px. Fill-type marks pass fill:true. */
+function ico(name, size, opts) {
+  const d = ICON[name]; if (!d) return '';
+  const o = opts || {}, sz = size || 14;
+  return '<svg class="ic" viewBox="0 0 20 20" width="' + sz + '" height="' + sz + '" aria-hidden="true" '
+    + 'fill="' + (o.fill ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="' + (o.w || 1.5) + '" '
+    + 'stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>';
+}
+
 const DRAW_CATS = [
   { id:'cursor', name:'Cursors', groups:[
     { name:'Cursors', tools:[
@@ -4391,17 +4449,17 @@ const DRAW_CATS = [
       ['fibfan', { name:'Fib speed fan',      icon:'⋔',  pts:2,            why:'Rays through the fib divisions of a move — support and resistance that rises with time rather than staying flat.' }],
     ]},
     { name:'Gann', tools:[
-      ['gannfan',{ name:'Gann fan',           icon:'✳',  pts:2,            why:'Rays at Gann\'s price/time ratios (1x1, 1x2, 2x1 …). The 1x1 is the one Gann treated as the balance line.' }],
+      ['gannfan',{ name:'Gann fan',           icon:ico('fan'),  pts:2,            why:'Rays at Gann\'s price/time ratios (1x1, 1x2, 2x1 …). The 1x1 is the one Gann treated as the balance line.' }],
       ['gannbox',{ name:'Gann box',           icon:'▦',  pts:2,            why:'A box gridded at Gann\'s divisions, for reading price and time proportions off the same rectangle.' }],
     ]},
   ]},
   { id:'forecast', name:'Forecasting', groups:[
     { name:'Positions', tools:[
-      ['pos',    { name:'Long position',    icon:'⬆',  pts:3, hint:'click entry, then stop, then target', why:'Entry, stop and target in three clicks; shows the risk/reward in R — the same unit the trader\'s own plan uses.' }],
-      ['poss',   { name:'Short position',   icon:'⬇',  pts:3, hint:'click entry, then stop, then target', why:'The same as Long position, mirrored for a short.' }],
+      ['pos',    { name:'Long position',    icon:ico('arrowUp'),  pts:3, hint:'click entry, then stop, then target', why:'Entry, stop and target in three clicks; shows the risk/reward in R — the same unit the trader\'s own plan uses.' }],
+      ['poss',   { name:'Short position',   icon:ico('arrowDown'),  pts:3, hint:'click entry, then stop, then target', why:'The same as Long position, mirrored for a short.' }],
     ]},
     { name:'Measure', tools:[
-      ['meas',   { name:'Measure',          icon:'📏', pts:2, k:'Alt+M', why:'Reports the price change, percentage and number of bars between two points.' }],
+      ['meas',   { name:'Measure',          icon:ico('ruler'), pts:2, k:'Alt+M', why:'Reports the price change, percentage and number of bars between two points.' }],
       ['range',  { name:'Price range',      icon:'↕',  pts:2,            why:'Measures price only — how far a move travelled, ignoring how long it took.' }],
       ['drange', { name:'Date range',       icon:'↔',  pts:2,            why:'Measures time only — how many bars and how long a move lasted.' }],
       ['fcast',  { name:'Forecast',         icon:'⤳',  pts:3,            why:'Sketch a path you expect price to take, so you can compare it against what actually happens.' }],
@@ -4411,21 +4469,21 @@ const DRAW_CATS = [
   { id:'brushes', name:'Brushes', groups:[
     { name:'Brushes', tools:[
       ['pen',    { name:'Brush',            icon:'✎',  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
-      ['hl',     { name:'Highlighter',      icon:'🖍', pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
+      ['hl',     { name:'Highlighter',      icon:ico('marker'), pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
     ]},
     { name:'Arrows', tools:[
       ['arrow',  { name:'Arrow',            icon:'➚',  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
-      ['arrowup',{ name:'Arrow up',           icon:'⬆',  pts:1,            why:'A marker under a bar — the quickest way to flag an entry or a signal you want to find again.' }],
-      ['arrowdn',{ name:'Arrow down',         icon:'⬇',  pts:1,            why:'The same marker above a bar, for exits and rejections.' }],
+      ['arrowup',{ name:'Arrow up',           icon:ico('arrowUp'),  pts:1,            why:'A marker under a bar — the quickest way to flag an entry or a signal you want to find again.' }],
+      ['arrowdn',{ name:'Arrow down',         icon:ico('arrowDown'),  pts:1,            why:'The same marker above a bar, for exits and rejections.' }],
     ]},
   ]},
   { id:'text', name:'Text and notes', groups:[
     { name:'Text', tools:[
       ['text',   { name:'Text',             icon:'T',  pts:1, text:true, k:'Alt+X', why:'Free text anchored to a point on the chart. Moves with the bar it was placed on.' }],
-      ['note',   { name:'Note',             icon:'🗒', pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
-      ['callout',{ name:'Callout',          icon:'💬', pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
-      ['plabel', { name:'Price label',      icon:'🏷', pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
-      ['balloon',{ name:'Comment balloon',    icon:'🗨',  pts:1, text:true, why:'A rounded speech bubble anchored to a bar, for a short remark rather than a full note.' }],
+      ['note',   { name:'Note',             icon:ico('note'), pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
+      ['callout',{ name:'Callout',          icon:ico('callout'), pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
+      ['plabel', { name:'Price label',      icon:ico('tag'), pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
+      ['balloon',{ name:'Comment balloon',    icon:ico('balloon'),  pts:1, text:true, why:'A rounded speech bubble anchored to a bar, for a short remark rather than a full note.' }],
     ]},
   ]},
 ];
@@ -5239,15 +5297,15 @@ function showSelBar(tk, i) {
       '<span class="dsel-grip" title="Drawing actions">⠿</span>'
     + B('⊞', 'Settings', 'openDrawingSettings(\'' + tk + '\',' + i + ',null,null)')
     + '<button type="button" class="dsel-colbtn" title="Colour" aria-label="Colour"'
-    +   ' onclick="openColourPop(\'' + tk + '\',' + i + ',this)">✏<span class="dsel-swatch" style="background:' + col + '"></span></button>'
+    +   ' onclick="openColourPop(\'' + tk + '\',' + i + ',this)">' + ico('pencil') + '<span class="dsel-swatch" style="background:' + col + '"></span></button>'
     + '<button type="button" class="dsel-wbtn" title="Line width" aria-label="Line width"'
     +   ' onclick="openWidthPop(\'' + tk + '\',' + i + ',this)"><span class="wd-line" style="height:' + Math.min(4, w) + 'px"></span>'
     +   '<span class="dsel-wlbl">' + w + 'px</span></button>'
     + '<span class="dsel-sep"></span>'
-    + B('⏱', 'Alerts for this symbol', 'alertFromDrawing(\'' + tk + '\')')
-    + B(d.locked ? '🔒' : '🔓', d.locked ? 'Unlock' : 'Lock', 'toggleDrawingLock(\'' + tk + '\',' + i + ')',
+    + B(ico('clock'), 'Alerts for this symbol', 'alertFromDrawing(\'' + tk + '\')')
+    + B(d.locked ? ico('lock') : ico('unlock'), d.locked ? 'Unlock' : 'Lock', 'toggleDrawingLock(\'' + tk + '\',' + i + ')',
         d.locked ? ' class="on"' : '')
-    + B('🗑', 'Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')')
+    + B(ico('trash'), 'Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')')
     + B('⋯', 'More', 'openMorePop(\'' + tk + '\',' + i + ',this)');
   const geom = _selGeom(tk);
   const anchors = geom ? _drawingAnchors(tk, geom.data, i, geom.pw, geom.ph) : [];
@@ -5631,10 +5689,12 @@ function renderWatchlist(){
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
-    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span class="wl-signal"></span>';
+    // The per-row signal chip was removed (operator): at 320px it consumed the symbol
+    // column and truncated four-letter tickers to 'S...'. The engine's read is still on
+    // the card header and in the symbol details panel below the list.
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
-      <span class="wl-symcell"><span class="wl-sym">${t.ticker}</span>${sigTxt}</span>
+      <span class="wl-sym">${t.ticker}</span>
       <span class="wl-price">${_wlPx(t.price)}</span>
       <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
       <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
@@ -7118,7 +7178,7 @@ function toggleTicketDock() {
 // nothing in the render or commit path actually read. Hide is real -- the drawing pass
 // checks it -- so it stays.
 const DRAW_UTILS = {
-  hide: { icon: '👁', label: 'Hide drawings' },
+  hide: { icon: ico('eye'), label: 'Hide drawings' },
 };
 const _dj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
 const _ds = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -7214,7 +7274,7 @@ function toggleDrawFlyout(catId, btn) {
         +   ' onclick="event.stopPropagation();assignToolKey(\'' + id + '\')">' + (key ? _esc(key) : '＋') + '</button>'
         + '<button class="dr-fly-star' + (fav ? ' on' : '') + '" type="button" aria-pressed="' + (fav ? 'true' : 'false')
         +   '" title="Favourite — show on the chart shortcut bar" aria-label="Favourite ' + _esc(t.name) + '"'
-        +   ' onclick="event.stopPropagation();toggleDrawFav(\'' + id + '\')">' + (fav ? '★' : '☆') + '</button>'
+        +   ' onclick="event.stopPropagation();toggleDrawFav(\'' + id + '\')">' + ico('star', 12, { fill: fav }) + '</button>'
         + '</div>';
     }
   }
@@ -7756,7 +7816,7 @@ function alRender(pane, rules, cap, feed) {
         + '  <div class="al-item-act">'
         + '    <button type="button" title="' + (off ? 'Resume' : 'Pause') + '" onclick="alToggleRule(\'' + esc(r.id) + '\')">' + (off ? '▶' : '❙❙') + '</button>'
         + '    <button type="button" title="' + (r.email === false ? 'Unmute email' : 'Mute email') + '"'
-        + '      onclick="alToggleRuleEmail(\'' + esc(r.id) + '\')">' + (r.email === false ? '🔕' : '🔔') + '</button>'
+        + '      onclick="alToggleRuleEmail(\'' + esc(r.id) + '\')">' + (r.email === false ? ico('bellOff', 12) : ico('bell', 12)) + '</button>'
         + '    <button type="button" title="Delete" onclick="alDeleteRule(\'' + esc(r.id) + '\')">✕</button>'
         + '  </div></div>';
     }
