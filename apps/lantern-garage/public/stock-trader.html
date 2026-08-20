@@ -510,7 +510,9 @@
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(30px,1fr) auto auto auto;align-items:center;gap:5px;padding:4px 20px 4px 8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.2}
+  /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
+     right-aligned tracks so figures line up down the whole list. */
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;padding:6px 10px;min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -524,13 +526,40 @@
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
-  .wl-sym{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0);overflow:hidden;text-overflow:ellipsis}
+  /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
+     exactly over the figures they name. */
+  .wl-head{position:sticky;top:0;z-index:5;display:grid;
+    grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;
+    /* The list below scrolls and this does not, so without reserving the same gutter the
+       labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
+       runtime because the width differs by platform and by overlay-scrollbar setting. */
+    padding:6px calc(10px + var(--wl-sb, 0px)) 5px 10px;
+    background:var(--bg1);border-bottom:1px solid var(--border)}
+  .wl-h-sym{grid-column:2;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--text2)}
+  .wl-h-num{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--text2);text-align:right}
+  /* Symbol, then any signal marker, in ONE grid cell -- a seventh child in a five-track
+     grid was wrapping to its own line and making every row three lines tall. */
+  .wl-symcell{display:flex;align-items:center;gap:5px;min-width:0}
+  .wl-symcell .wl-signal{flex:0 0 auto;font-size:9.5px}
+  .wl-sym{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--text0);overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+  /* One numeric treatment for all three money columns: tabular figures so digits line
+     up, and the same size so no column shouts over another. */
+  .wl-price,.wl-abs,.wl-chg{font-family:var(--mono);font-size:12px;text-align:right;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .wl-price{color:var(--text0)}
+  .wl-abs{color:var(--text2);font-weight:500}
+  .wl-chg{font-weight:600}
+  .wl-abs.up,.wl-chg.up{color:var(--green)}
+  .wl-abs.down,.wl-chg.down{color:var(--red,#f23645)}
+  .wl-abs.flat,.wl-chg.flat{color:var(--text2)}
+  /* Hover and selection read as a whole row, with the accent as a left edge rather
+     than a border box -- quieter at a glance down a long list. */
+  .wl-item:hover{background:rgba(255,255,255,.035)}
+  .wl-item.active{background:rgba(255,255,255,.06);box-shadow:inset 2px 0 0 var(--accent)}
   /* Two aligned columns, not space-between: left holds symbol/change, right holds
      price/signal, so every row forms a real column instead of drifting with each
      value's width. */
   .wl-right{display:flex;align-items:center;gap:6px;justify-content:flex-end}
-  .wl-price{font-family:var(--mono);font-size:12px;color:var(--text0);text-align:right;font-variant-numeric:tabular-nums}
-  .wl-chg{font-family:var(--mono);font-size:12px;font-weight:600;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
   .wl-signal{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
@@ -1328,6 +1357,12 @@
           <option value="chg">Δ%</option>
           <option value="rvol">RVOL</option>
         </select>
+      </div>
+      <div class="wl-head" aria-hidden="true">
+        <span class="wl-h-sym">Symbol</span>
+        <span class="wl-h-num">Last</span>
+        <span class="wl-h-num">Chg</span>
+        <span class="wl-h-num">Chg%</span>
       </div>
       <div id="wlList"></div>
       <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
@@ -5593,13 +5628,14 @@ function renderWatchlist(){
     const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span class="wl-signal"></span>';
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
-      <span class="wl-sym">${t.ticker}</span>
-      <span class="wl-price">$${_wlPx(t.price)}</span>
+      <span class="wl-symcell"><span class="wl-sym">${t.ticker}</span>${sigTxt}</span>
+      <span class="wl-price">${_wlPx(t.price)}</span>
+      <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
       <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
-      ${sigTxt}
       <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
   }).join('');
+  if (typeof _syncWlScrollbar === 'function') _syncWlScrollbar();
   if(activeTicker) renderSymbolInfo(activeTicker);
 }
 
@@ -5613,6 +5649,26 @@ function _fmtCap(v){ return v==null?'—': v>=1e12?(v/1e12).toFixed(2)+'T': v>=1
 function _fmtNum(v){ return v==null?'—': (+v).toFixed(2); }
 function _fmtPx(v){ return v==null?'—': '$'+(+v).toFixed(2); }
 function _fmtRange(lo,hi){ return (lo==null&&hi==null)?'—': _fmtPx(lo)+' – '+_fmtPx(hi); }
+/* Absolute day change. The feed sends price and percent but not the previous close,
+   so derive it: prev = price / (1 + pct/100). */
+/* Publish the watchlist scrollbar width so the sticky header can reserve the same
+   gutter. Re-measured on resize because overlay scrollbars appear and disappear. */
+function _syncWlScrollbar() {
+  const list = document.getElementById('wlList'); if (!list) return;
+  const sb = Math.max(0, list.offsetWidth - list.clientWidth);
+  document.documentElement.style.setProperty('--wl-sb', sb + 'px');
+}
+window.addEventListener('resize', _syncWlScrollbar);
+
+function _wlAbs(price, pct) {
+  const p = Number(price), c = Number(pct);
+  if (!Number.isFinite(p) || !Number.isFinite(c)) return '—';
+  const prev = p / (1 + c / 100);
+  if (!Number.isFinite(prev) || prev <= 0) return '—';
+  const d = p - prev;
+  return (d >= 0 ? '+' : '') + d.toFixed(Math.abs(p) >= 100 ? 2 : 3);
+}
+
 function renderSymbolInfo(ticker){
   const el = document.getElementById('wlInfo'); if(!el) return;
   if(!ticker){ el.className='wl-info'; el.innerHTML=''; return; }
