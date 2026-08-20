@@ -391,4 +391,27 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
   };
 }
 
-module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory };
+/**
+ * Where the trade ledger and bar corpus actually live (#3380). The positions
+ * route hardcoded repo-relative paths, which is correct exactly once: on the
+ * tree the engine writes to. On the DEV server (:4178, a different checkout)
+ * the same code read a stale dev ledger, computeDayPnl found no session, the
+ * route fell back to broker figures — and the footer showed IBKR's post-reset
+ * dpl (-$174) under a tooltip promising "how much the account made TODAY" on a
+ * +$1,901 day. Honour the same env overrides the engine itself uses, so any
+ * server can be pointed at the tree that holds the truth.
+ */
+function resolveTradesLog(repoRootDataDir) {
+  const path = require('path');
+  return process.env.TRADER_TRADES_LOG
+    ? path.resolve(process.env.TRADER_TRADES_LOG)
+    : path.join(repoRootDataDir, 'autopilot-trades.jsonl');
+}
+function resolveBarsDir(repoRootDataDir) {
+  const path = require('path');
+  return process.env.TRADER_BARS_DIR
+    ? path.resolve(process.env.TRADER_BARS_DIR)
+    : path.join(repoRootDataDir, 'bars');
+}
+
+module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir };
