@@ -6995,7 +6995,19 @@ const _lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == 
 const _lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
 let _rwPanel = RW_PANELS.includes(_lsGet('trader.rwPanel', '')) ? _lsGet('trader.rwPanel', '') : 'watchlist';
-let _leftOpen = _lsGet('trader.leftOpen', '1') !== '0';
+// The chart is the product, so it must not be the narrowest column on the screen.
+// The three panels are fixed-width (360 + 320 + 320) and the rails add 88, so 1088px
+// of every viewport is spoken for before the chart gets anything. On a 1920 monitor
+// that still leaves the chart 832px — but on the two commonest laptop widths it left
+// it 352px at 1440 (narrower than the chat panel beside it) and 192px at 1280, where
+// the candles stop being readable at all. Measured in-browser 2026-08-18.
+//
+// So the chat dock's FIRST-VISIT default is viewport-aware: below the width where all
+// three panels can coexist, it starts closed and the chart keeps ~550px. This is a
+// default only — an explicit choice is persisted and always wins, in both directions.
+const DESK_FULL_MIN_W = 1500;
+const _deskNarrow = (typeof window !== 'undefined' ? window.innerWidth : 1920) < DESK_FULL_MIN_W;
+let _leftOpen = _lsGet('trader.leftOpen', _deskNarrow ? '0' : '1') !== '0';
 let _rightOpen = _lsGet('trader.rightOpen', '1') !== '0';
 let _ticketOpen = _lsGet('trader.ticketOpen', '1') !== '0';
 
