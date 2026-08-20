@@ -150,6 +150,29 @@ ok("a bench idea needs a title AND a mechanism, and the rest are counted", () =>
   assert.strictEqual(p.malformed, 2);
 });
 
+ok("a fenced or truncated reply is handled, not silently read as 'no ideas'", () => {
+  // The first live bench run returned 0 ideas AND 0 malformed -- the reply was truncated
+  // mid-object because ten ideas do not fit one call. Both failure shapes are now visible.
+  const fenced = "```json" + String.fromCharCode(10)
+    + '{"title":"a","mechanism":"m"}' + String.fromCharCode(10)
+    + '{"title":"b","mechanism":"m"}' + String.fromCharCode(10) + "```";
+  assert.strictEqual(bench.parseIdeas(fenced).ideas.length, 2, "a code fence must not hide the ideas");
+  const arr = bench.parseIdeas('[{"title":"a","mechanism":"m"},{"nope":1}]');
+  assert.strictEqual(arr.ideas.length, 1);
+  assert.strictEqual(arr.malformed, 1, "an array reply is accepted and its bad entries counted");
+  const cut = bench.parseIdeas('{"title":"a","mech');
+  assert.strictEqual(cut.ideas.length, 0);
+  assert.strictEqual(cut.malformed, 1, "a truncated object is MALFORMED, not invisible");
+});
+
+ok("near-duplicate ideas are collapsed, so a restated idea cannot vote for itself", () => {
+  // Both of these came back from one live run as separate ideas.
+  assert.strictEqual(bench.nearDuplicate("Test-Time Sampling with Depth-Entropy Guided Decoding",
+                                         "Test-Time Depth-Entropy Sampling on Small Models"), true);
+  assert.strictEqual(bench.nearDuplicate("Verification-Refinement Loop on 135M Model",
+                                         "Sparse Activation Routing with Small MoE"), false);
+});
+
 ok("the bench sham is inert and cannot be mistaken for a real proposal", () => {
   assert.strictEqual(bench.SHAM.sham, true);
   assert.ok(/no change/i.test(bench.SHAM.falsifier), "an inert proposal's falsifier is 'nothing moves'");

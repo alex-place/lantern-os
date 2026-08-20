@@ -39,10 +39,28 @@ const SHAM = {
 
 const FIELDS = ["title", "mechanism", "experiment", "falsifier", "needs", "cost"];
 
+// Models wrap JSON-lines in a code fence about as often as not, and a fenced reply parsed to
+// zero ideas with zero malformed -- a silent failure that reads as "the model had no ideas".
+// Fences are stripped and a whole-reply array is accepted; anything still unparseable is COUNTED.
 function parseIdeas(text) {
   const out = [];
   let malformed = 0;
-  for (const line of String(text || "").split(/\r?\n/)) {
+  const body = String(text || "").replace(/```[a-zA-Z]*/g, "").trim();
+  if (body.startsWith("[")) {
+    try {
+      const arr = JSON.parse(body);
+      if (Array.isArray(arr)) {
+        for (const o of arr) {
+          if (!o || !o.title || !o.mechanism) { malformed++; continue; }
+          const idea = {};
+          for (const f of FIELDS) idea[f] = String(o[f] || "").slice(0, 900);
+          out.push(idea);
+        }
+        return { ideas: out, malformed };
+      }
+    } catch { /* not an array reply -- fall through to line mode */ }
+  }
+  for (const line of body.split(/\r?\n/)) {
     const s = line.trim();
     if (!s.startsWith("{")) continue;
     try {
@@ -72,6 +90,46 @@ function paperBlock(papers) {
   return papers.map((p) => `[${p.id}] (${(p.published || "").slice(0, 10)}) ${p.title}\n${(p.snippet || "").slice(0, 420)}`).join("\n\n");
 }
 
+// Batch 2 is told which titles batch 1 produced and restates one anyway -- the first live run
+// returned "Test-Time Sampling with Depth-Entropy Guided Decoding" and "Test-Time Depth-Entropy
+// Sampling on Small Models" as separate ideas, which then padded the ranking with a vote for
+// itself. Exact-title matching does not catch that; token overlap does.
+const STOP = new Set(["a", "an", "the", "of", "on", "in", "for", "with", "and", "to", "via", "using", "by"]);
+
+function titleTokens(t) {
+  return new Set(String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w)));
+}
+
+function nearDuplicate(a, b, bar = 0.6) {
+  const A = titleTokens(a), B = titleTokens(b);
+  if (!A.size || !B.size) return false;
+  let shared = 0;
+  for (const w of A) if (B.has(w)) shared++;
+  return shared / Math.min(A.size, B.size) >= bar;
+}
+
+async function genBatch(llm, goal, lit, want, already) {
+  const avoid = already.length
+    ? `Already proposed, do not repeat or restate these:\n${already.map((t) => `- ${t}`).join("\n")}\n\n` : "";
+  return llm(
+    `You are proposing experiments for a small team to run at the bench. They have: this codebase, `
+    + `a few consumer GPUs, cloud GPU hours they must pay for, the frontier APIs, and their own time. `
+    + `They cannot train a frontier model from scratch.\n\n`
+    + `GOAL: ${goal}\n\n`
+    + (lit.relevant.length ? `MOST RELEVANT RETRIEVED WORK:\n${paperBlock(lit.relevant)}\n\n` : "")
+    + (lit.recent.length ? `MOST RECENT RETRIEVED WORK:\n${paperBlock(lit.recent)}\n\n` : "")
+    + avoid
+    + `Propose ${want} DISTINCT experiments. Each one must be something reality could refuse: a `
+    + `concrete mechanism, a concrete measurement, and a concrete result that would kill it. `
+    + `Prefer ideas that the retrieved work makes plausible but has not already settled. Do not `
+    + `propose literature reviews, surveys, or "investigate whether" -- propose a thing to DO.\n\n`
+    + `Output exactly ${want} lines, each ONE JSON object, no code fence, no other text. Keep every `
+    + `field under 45 words:\n`
+    + `{"title":"...","mechanism":"why this changes the quantity, concretely","experiment":"what to run",`
+    + `"falsifier":"the result that kills it","needs":"what it costs them: hardware, data, time",`
+    + `"cost":"low|medium|high"}`, 1600);
+}
+
 async function millIdeas(goal, opts = {}) {
   const llm = opts.llm || agents.defaultLlm();
   const n = opts.n || 10;
@@ -79,24 +137,32 @@ async function millIdeas(goal, opts = {}) {
   const lit = retrieve(goal, opts.corpusK || 40);
   log("corpus", { available: lit.available, pool: lit.pool || 0, relevant: lit.relevant.length, recent: lit.recent.length });
 
-  const gen = await llm(
-    `You are proposing experiments for a small team to run at the bench. They have: this codebase, `
-    + `a few consumer GPUs, cloud GPU hours they must pay for, the frontier APIs, and their own time. `
-    + `They cannot train a frontier model from scratch.\n\n`
-    + `GOAL: ${goal}\n\n`
-    + (lit.relevant.length ? `MOST RELEVANT RETRIEVED WORK:\n${paperBlock(lit.relevant)}\n\n` : "")
-    + (lit.recent.length ? `MOST RECENT RETRIEVED WORK:\n${paperBlock(lit.recent)}\n\n` : "")
-    + `Propose ${n} DISTINCT experiments. Each one must be something reality could refuse: a `
-    + `concrete mechanism, a concrete measurement, and a concrete result that would kill it. `
-    + `Prefer ideas that the retrieved work makes plausible but has not already settled. Do not `
-    + `propose literature reviews, surveys, or "investigate whether" -- propose a thing to DO.\n\n`
-    + `Output exactly ${n} lines, each ONE JSON object and nothing else:\n`
-    + `{"title":"...","mechanism":"why this changes the quantity, concretely","experiment":"what to run",`
-    + `"falsifier":"the result that kills it","needs":"what it costs them: hardware, data, time",`
-    + `"cost":"low|medium|high"}`, 2200);
-  const parsed = parseIdeas(gen);
-  log("generated", { n: parsed.ideas.length, malformed: parsed.malformed });
-  if (!parsed.ideas.length) return { goal, ideas: [], malformed: parsed.malformed, lit };
+  // Generated in BATCHES. Ten ideas with six prose fields each does not fit one reply: the
+  // provider truncates mid-object, every line fails to parse, and the run reports "0 ideas,
+  // 0 malformed" -- which reads as "the model had nothing to say" when it actually had too much.
+  // Measured on the first live run of this file.
+  const batch = opts.batch || 4;
+  const ideas = [];
+  let malformed = 0;
+  let raw = "";
+  for (let done = 0; done < n; done += batch) {
+    const want = Math.min(batch, n - done);
+    const text = await genBatch(llm, goal, lit, want, ideas.map((i) => i.title));
+    raw += String(text || "") + "\n";
+    const got = parseIdeas(text);
+    malformed += got.malformed;
+    for (const idea of got.ideas) {
+      if (!ideas.some((x) => nearDuplicate(x.title, idea.title))) ideas.push(idea);
+    }
+    log("batch", { asked: want, parsed: got.ideas.length, malformed: got.malformed, kept: ideas.length });
+  }
+  const parsed = { ideas, malformed };
+  log("generated", { n: ideas.length, malformed });
+  if (!ideas.length) {
+    // Say WHY, with the evidence. A generation failure and an empty model are different problems.
+    log("generation_failed", { reply_chars: raw.trim().length, head: raw.trim().slice(0, 200) });
+    return { goal, ideas: [], malformed, lit, raw_head: raw.trim().slice(0, 800) };
+  }
 
   for (const idea of parsed.ideas) {
     const f = await agents.falcon({ title: idea.title, rationale: idea.mechanism, assay: "bench", params: {} }, goal, { llm });
@@ -185,4 +251,4 @@ function renderMarkdown(result, meta = {}) {
   return L.join("\n");
 }
 
-module.exports = { millIdeas, renderMarkdown, parseIdeas, retrieve, SHAM };
+module.exports = { millIdeas, renderMarkdown, parseIdeas, retrieve, nearDuplicate, SHAM };
