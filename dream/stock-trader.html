@@ -307,34 +307,73 @@
   .al-teaser{padding:12px 10px;font-size:12px;line-height:1.55;color:var(--text1)}
   .al-teaser p{margin:6px 0;color:var(--text2)}
   .al-teaser a{color:var(--accent)}
+  /* ── Alert dialog ───────────────────────────────────────────────────────────
+     Measured against TradingView's Create-alert panel. What separated them was not
+     colour, it was rhythm: one control height everywhere, one divider between
+     GROUPS rather than a hairline under every row, and no native OS widgetry
+     (blue focus rings, system select arrows, system checkboxes) breaking the
+     surface. Nothing here invents controls we cannot honour -- TradingView's
+     "+ Add condition" and template buttons are absent because we do not implement
+     them, and drawing a dead button would be worse than not drawing it. */
   .al-modal-bg{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;
     background:var(--pop-scrim);backdrop-filter:blur(3px)}
   .al-modal-bg[hidden]{display:none}
-  .al-modal{width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
+  .al-modal{--al-h:32px;--al-label:96px;
+    width:min(460px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
     border:1px solid var(--border);border-radius:var(--pop-r);box-shadow:var(--pop-sh)}
-  .al-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .al-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
   .al-title{font-size:15px;color:var(--text0)}
-  .al-sym{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0);
-    background:var(--bg3);border:1px solid var(--border);border-radius:var(--pop-r-item);padding:2px 9px}
+  /* A pill with a monogram disc. TradingView shows the instrument's logo here; we
+     have no logo art, so the initial is the honest stand-in rather than a blank box. */
+  .al-sym{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;
+    border-radius:999px;background:var(--bg2);border:1px solid var(--border);
+    font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--text0);letter-spacing:.02em}
+  .al-sym i{width:20px;height:20px;border-radius:50%;background:var(--bg0);border:1px solid var(--border);
+    display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:700;color:var(--text1)}
   .al-head .dock-x{margin-left:auto}
-  .al-body{padding:6px 16px 12px}
-  .al-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-  .al-row > label{flex:0 0 96px;font-size:var(--pop-fs);color:var(--text2);padding-top:7px}
-  .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .al-body{padding:4px 16px 14px}
+  /* Rows sit in groups. Only the group boundary gets a rule -- a hairline under
+     every row made four settings read as four separate panels. */
+  .al-row{display:flex;gap:12px;padding:9px 0}
+  .al-row.al-sep{border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:5px}
+  .al-row > label{flex:0 0 var(--al-label);font-size:var(--pop-fs);color:var(--text2);
+    line-height:var(--al-h);align-self:flex-start}
+  .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
   .al-fields select,.al-fields input[type=text],.al-fields input[type=number]{
-    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--pop-r-item);
-    color:var(--text0);padding:7px 9px;font:inherit;font-size:13px}
-  .al-inline{display:flex;align-items:center;gap:7px}
-  .al-inline input{width:auto;flex:1}
+    width:100%;height:var(--al-h);background:var(--bg3);border:1px solid var(--border);
+    border-radius:var(--pop-r-item);color:var(--text0);padding:0 10px;font:inherit;font-size:13px}
+  .al-fields select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer;
+    background-image:url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23828a99' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
+  .al-fields input::placeholder{color:var(--text2)}
+  .al-fields select:hover,.al-fields input:hover{border-color:var(--text2)}
+  /* Programmatic focus on open must not paint a ring -- :focus-visible keeps it for
+     the keyboard, which is who the ring is actually for. */
+  .al-fields select:focus,.al-fields input:focus,.al-check input:focus{outline:none}
+  .al-fields select:focus-visible,.al-fields input:focus-visible,.al-check input:focus-visible{
+    outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .al-inline{display:flex;align-items:center;gap:8px}
+  /* Inline inputs fill by default -- the price VALUE is the dialog's primary field and
+     a 84px box made it look like an afterthought next to a full-width operator. Only
+     the cooldown is genuinely a small number, so only it stays pinned. */
+  .al-inline input{flex:1 1 auto;width:auto;min-width:0}
+  .al-inline #alCool{flex:0 0 84px;width:84px}
   .al-sub{font-size:var(--pop-fs-sm);color:var(--text2);white-space:nowrap}
-  .al-check{display:flex;align-items:center;gap:7px;font-size:var(--pop-fs);color:var(--text1)}
-  .al-check input{width:auto}
+  .al-check{display:flex;align-items:center;gap:8px;font-size:var(--pop-fs);color:var(--text1);
+    min-height:22px;cursor:pointer}
+  .al-check input{appearance:none;-webkit-appearance:none;flex:0 0 16px;width:16px;height:16px;margin:0;
+    border:1px solid var(--border);border-radius:4px;background:var(--bg3);
+    display:grid;place-items:center;cursor:pointer}
+  .al-check input:checked{background:var(--accent);border-color:var(--accent)}
+  .al-check input:checked::after{content:'';width:8px;height:4.5px;border:2px solid #04202b;
+    border-top:0;border-right:0;transform:rotate(-45deg) translateY(-1px)}
+  .al-check input:disabled{opacity:.5;cursor:default}
+  .al-check:has(input:disabled){cursor:default;color:var(--text2)}
   .al-note{margin:0;font-size:var(--pop-fs-sm);line-height:1.5;color:var(--text2)}
   .al-err{margin:10px 0 0;font-size:var(--pop-fs);color:var(--red)}
   .al-err[hidden]{display:none}
   .al-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
-  .al-btn{padding:8px 18px;border-radius:var(--pop-r-item);border:1px solid var(--border);background:var(--bg2);
-    color:var(--text1);font:inherit;font-size:13px;cursor:pointer}
+  .al-btn{height:34px;padding:0 18px;border-radius:var(--pop-r-item);border:1px solid var(--border);
+    background:var(--bg2);color:var(--text1);font:inherit;font-size:13px;cursor:pointer}
   .al-btn:hover{background:var(--bg3);color:var(--text0)}
   .al-btn.primary{background:var(--accent);border-color:var(--accent);color:#04202b;font-weight:600}
   .al-btn.primary:hover{filter:brightness(1.08)}
@@ -5166,7 +5205,7 @@ function openAlertDialog(opts) {
   _alertDlg.innerHTML =
     '<div class="al-modal" role="dialog" aria-modal="true" aria-label="Create alert">'
   + '  <header class="al-head"><span class="al-title">' + (_alertEditId ? 'Edit alert on' : 'Create alert on') + '</span>'
-  + '    <span class="al-sym">' + esc(sym) + '</span>'
+  + '    <span class="al-sym"><i aria-hidden="true">' + esc(sym.charAt(0)) + '</i>' + esc(sym) + '</span>'
   + '    <button type="button" class="dock-x" onclick="closeAlertDialog()" aria-label="Close">✕</button></header>'
   + '  <div class="al-body">'
   + '    <div class="al-row"><label for="alCondType">Condition</label><div class="al-fields">'
@@ -5176,7 +5215,7 @@ function openAlertDialog(opts) {
   + '      </select>'
   + '      <div id="alCondFields"></div>'
   + '    </div></div>'
-  + '    <div class="al-row"><label for="alTrigger">Trigger</label><div class="al-fields">'
+  + '    <div class="al-row al-sep"><label for="alTrigger">Trigger</label><div class="al-fields">'
   + '      <select id="alTrigger">' + opt('every', 'Every time', o.trigger || 'every') + opt('once', 'Once only', o.trigger) + '</select>'
   + '      <div class="al-inline"><label for="alCool" class="al-sub">Stay quiet for</label>'
   + '        <input id="alCool" type="number" min="5" max="1440" step="5" value="' + (o.cooldownMin || 60) + '"> <span class="al-sub">min</span></div>'
