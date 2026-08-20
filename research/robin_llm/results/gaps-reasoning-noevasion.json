@@ -1,0 +1,478 @@
+{
+  "goal": "raise reasoning capability per parameter in a small in-house language model we can serve on 8GB, using open-weight models and verification we can run ourselves",
+  "lit": {
+    "relevant": [
+      {
+        "id": "2605.00334",
+        "title": "AgentFloor: How Far Up the tool use Ladder Can Small Open-Weight Models Go?",
+        "published": "2026-05",
+        "snippet": "Production agentic systems make many model calls per user request, and most of those calls are short, structured, and routine. This raises a practical routing question that existing evaluations do not directly answer: which parts of an agent workflow truly require large frontier intelligence, and which can be handled by smaller models? We introduce AgentFloor, a deterministic 30-task benchmark org…",
+        "url": "https://arxiv.org/abs/2605.00334",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.04719",
+        "title": "Diagnosing Tool-Selection Reasoning in LLM Agents with Canary Tools",
+        "published": "2026-08",
+        "snippet": "Agent evaluations tell us that a model picked the wrong tool, but rarely why. We introduce canary tools: diagnostic probe tools planted in an agent's Model Context Protocol (MCP) tool set, each engineered to probe one specific tool-selection weakness. A six-type taxonomy (semantic decoys, parameter traps, capability mirages, prerequisite blindness, temporal decoys, and granularity traps) turns a s…",
+        "url": "https://arxiv.org/abs/2608.04719",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2510.17498",
+        "title": "Deep Self-Evolving Reasoning",
+        "published": "2025-10",
+        "snippet": "Long-form chain-of-thought reasoning has become a cornerstone of advanced reasoning in large language models. While recent verification-refinement frameworks have enabled proprietary models to solve Olympiad-level problems, their effectiveness hinges on strong, reliable verification and correction capabilities, which remain fragile in open-weight, smaller-scale models. This work demonstrates that…",
+        "url": "https://arxiv.org/abs/2510.17498",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.03065",
+        "title": "Spectral Rewiring for Exploration, Purification, and Model Merging",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning has become a standard post-training recipe for large language models, but dense full-parameter updates create two deployment-relevant bottlenecks: suppressed reasoning performance, often reflected by premature saturation of test-time scaling, and interference when consolidating multiple capabilities through multi-domain training or model merging. We show that the reasoning-e…",
+        "url": "https://arxiv.org/abs/2607.03065",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2603.00729",
+        "title": "Qwen3-Coder-Next Technical Report",
+        "published": "2026-03",
+        "snippet": "We present Qwen3-Coder-Next, an open-weight language model specialized for coding agents. Qwen3-Coder-Next is an 80-billion-parameter model that activates only 3 billion parameters during inference, enabling strong coding capability with efficient inference. In this work, we explore how far strong training recipes can push the capability limits of models with small parameter footprints. To achieve…",
+        "url": "https://arxiv.org/abs/2603.00729",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2606.21638",
+        "title": "Toward Open Weight Models Without Risks: Separating Public and Private Capabilities in LLMs",
+        "published": "2026-06",
+        "snippet": "Open-weight Large Language Models (LLMs) enable scientific progress and broad deployment. However, they make it difficult to control access to sensitive capabilities. Current practice either suppresses dangerous capabilities before release or mediates access through closed services that use specialized model variants, input/output monitors, and API permissions. The former is susceptible to jailbre…",
+        "url": "https://arxiv.org/abs/2606.21638",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2507.10182",
+        "title": "Breaking the Myth: Can Small Models Infer Postconditions Too?",
+        "published": "2025-07",
+        "snippet": "Formal specifications are essential for ensuring software correctness, yet manually writing them is tedious and error-prone. Large Language Models (LLMs) have shown promise in generating such specifications from natural language intents, but the giant model size and high computational demands raise a fundamental question: Do we really need large models for this task? In this paper, we show that a…",
+        "url": "https://arxiv.org/abs/2507.10182",
+        "primary_category": "cs.SE"
+      },
+      {
+        "id": "2607.20448",
+        "title": "Domyn-Small: A European 10B Reasoning Language Model",
+        "published": "2026-07",
+        "snippet": "We introduce Domyn-Small, a 10-billion-parameter open-weight reasoning language model released under the MIT license. Domyn-Small is the product of an initial pre-training phase on 9 trillion tokens multilingual data, followed by a post-training pipeline for reasoning, instruction following, and context extension. For the latter, we performed a Continued Pre-Training (CPT) phase that doubles the n…",
+        "url": "https://arxiv.org/abs/2607.20448",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2510.25055",
+        "title": "GAPMAP: Mapping Scientific Knowledge Gaps in Biomedical Literature Using Large Language Models",
+        "published": "2025-10",
+        "snippet": "Scientific progress is driven by the deliberate articulation of what remains unknown. This study investigates the ability of large language models (LLMs) to identify research knowledge gaps in the biomedical literature. We define two categories of knowledge gaps: explicit gaps, clear declarations of missing knowledge; and implicit gaps, context-inferred missing knowledge. While prior work has focu…",
+        "url": "https://arxiv.org/abs/2510.25055",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2603.00842",
+        "title": "MedGPT-oss: Training a General-Purpose Vision-Language Model for Biomedicine",
+        "published": "2026-03",
+        "snippet": "Biomedical multimodal assistants have the potential to unify radiology, pathology, and clinical-text reasoning, yet a critical deployment gap remains: top-performing systems are either closed-source or computationally prohibitive, precluding the on-premises deployment required for patient privacy and PHI compliance. We introduce MEDGPT-OSS, an open-weight, 20B-parameter generalist vision-language…",
+        "url": "https://arxiv.org/abs/2603.00842",
+        "primary_category": "cs.CL"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2608.06756",
+        "title": "Capek 0.5: An Execution-Centric Vision-Language Model for Embodied Intelligence",
+        "published": "2026-08",
+        "snippet": "Vision-language models are increasingly serving as the reasoning core of embodied agents. Robot execution is inherently iterative: each action reshapes the scene and physical state, continually renewing what must be perceived, reasoned about, and verified. Meeting these demands requires complementary capabilities that differ in supervision signals, prediction formats, and verification criteria. Ex…",
+        "url": "https://arxiv.org/abs/2608.06756",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.08654",
+        "title": "The Scaffolding Matters More Than the Interface: A Controlled Comparison of MCP and CLI Tool Use Across Seven Agent Scaffoldings, Five Language Models, and One Software Task",
+        "published": "2026-08",
+        "snippet": "How much an AI coding agent costs to run can depend more on the agent scaffolding that drives it than on the interface through which it reaches its tools. We set out to measure the cost of tool use over the Model Context Protocol (MCP) against tool use over an ordinary command-line interface (CLI), a difference on which published estimates disagree by more than an order of magnitude while resting…",
+        "url": "https://arxiv.org/abs/2608.08654",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.13272",
+        "title": "Sovereign by necessity? Frontier AI export controls, cyber security, and the limits of national AI capability",
+        "published": "2026-08",
+        "snippet": "A small number of firms based in two states produce the most capable frontier AI models. The governments of those states have shown both the legal power and the political will to decide which other countries may use these systems. In June 2026 the United States required a leading developer to obtain licences before releasing its most advanced models to any foreign person, including foreign nationa…",
+        "url": "https://arxiv.org/abs/2608.13272",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.01017",
+        "title": "Why LLMs Give In: Conversational Factors and Reasoning Behind Medical Sycophancy",
+        "published": "2026-08",
+        "snippet": "A language model that abandons a correct medical answer under user pushback is more dangerous than one that was simply wrong, because it lends the credibility of a correct answer to the user's misinformation. Such model behavior, described as medical sycophancy, is usually reported as a single rate per model, but we find it is a property of the conversation, not the model. We study medical sycopha…",
+        "url": "https://arxiv.org/abs/2608.01017",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2608.00004",
+        "title": "Cost-Effective Automated Judging of Natural-Language Mathematical Proofs",
+        "published": "2026-08",
+        "snippet": "Grading natural-language mathematical proofs is a recurring cost in evaluating math-reasoning systems, and frontier LLM judges are expensive. We ask whether cheap open-weight models can serve as reliable judges given a candidate proof, a ground-truth proof, and a human-grading rubric. On a 200-instance validation sample of IMO-GradingBench, three cheap judges (GPT-OSS 120B, DeepSeek-V4 Flash, Gemm…",
+        "url": "https://arxiv.org/abs/2608.00004",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.13332",
+        "title": "Agora: Collective and Permissionless Internet-Scale Pretraining of Large Language Models",
+        "published": "2026-07",
+        "snippet": "Training large language models at the multi-billion to trillion parameter scale is confined to datacenters, where data-parallel (DP) and model-parallel (MP) techniques presume homogeneous accelerators, high-speed interconnects, and a single orchestrating entity. Frontier model development is thereby concentrated among the few groups able to assemble such clusters. Meanwhile, an enormous pool of co…",
+        "url": "https://arxiv.org/abs/2607.13332",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2607.20062",
+        "title": "Solar Open 2 Technical Report",
+        "published": "2026-07",
+        "snippet": "We present Solar Open 2, a 250B-A15B Mixture-of-Experts language model built for long-horizon agentic tasks, scaled up from Solar Open 1 (Solar Open 100B). To hold entire agent trajectories in a single context, Solar Open 2 reaches a 1M-token window through a hybrid attention stack that interleaves one softmax layer among every three linear-attention layers, using no positional encoding and a gate…",
+        "url": "https://arxiv.org/abs/2607.20062",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.09693",
+        "title": "Depth-Entropy Guided Sampling for Training-Free LLM Reasoning",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning (RL) has become the dominant paradigm for improving the reasoning capabilities of large language models, but it requires expensive training, curated data, and reward signals. Recent work shows that sampling from sharpened base-model distributions at test time recovers much of the RL gain, yet existing methods rely solely on output-layer likelihoods and ignore the transformer…",
+        "url": "https://arxiv.org/abs/2607.09693",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "axes": [
+    {
+      "axis": "model size",
+      "occupied": [
+        "small (<=10B)",
+        "medium (10B-80B)",
+        "large (80B+)"
+      ]
+    },
+    {
+      "axis": "reasoning enhancement method",
+      "occupied": [
+        "chain-of-thought",
+        "verification-refinement",
+        "reinforcement learning",
+        "sampling strategies"
+      ]
+    },
+    {
+      "axis": "tool use integration",
+      "occupied": [
+        "none",
+        "canary tools diagnostic",
+        "MCP tool protocol",
+        "CLI tool protocol"
+      ]
+    },
+    {
+      "axis": "supervision type",
+      "occupied": [
+        "self-supervised",
+        "formal specifications",
+        "human-labeled",
+        "automated judging"
+      ]
+    },
+    {
+      "axis": "deployment constraints",
+      "occupied": [
+        "8GB memory",
+        "on-premises inference",
+        "open-weight availability"
+      ]
+    },
+    {
+      "axis": "task domain",
+      "occupied": [
+        "general reasoning",
+        "coding",
+        "biomedical",
+        "embodied intelligence"
+      ]
+    }
+  ],
+  "perRound": [
+    {
+      "round": 1,
+      "proposed": 4,
+      "placed": 2,
+      "kept": 2
+    },
+    {
+      "round": 2,
+      "proposed": 3,
+      "placed": 0,
+      "kept": 5
+    },
+    {
+      "round": 3,
+      "proposed": 1,
+      "placed": 0,
+      "kept": 6
+    }
+  ],
+  "malformed": 0,
+  "no_difference": 0,
+  "evasion": 1,
+  "proposed": 8,
+  "placed": 2,
+  "placed_rate": 0.25,
+  "collisions": [
+    {
+      "title": "Epistemic-Gated Self-Refinement in 7B Model under 8GB",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "research/epistemic_controller/run_mvp.py"
+    },
+    {
+      "title": "Verified-Cascade Guided Contrastive Fine-Tuning on 5B Model",
+      "verdict": "PORT",
+      "evidence": "docs/adr/0030-spiral-verified-cascade-harness.md"
+    }
+  ],
+  "pairs": 28,
+  "sham_rank": 7,
+  "of": 8,
+  "sham_control_held": true,
+  "vague_sham_rank": 8,
+  "vague_control_held": true,
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.5147,
+      "wins": 7,
+      "comparisons": 7,
+      "title": "Ledger-Guided Meta-Reasoning Policy Distillation",
+      "mechanism": "Use the lab's longitudinal ledger to meta-learn a policy that predicts which reasoning paths yield convergence, distilling this into a small model's inference-time heuristic",
+      "experiment": "Train a policy network on ledger data to guide model reasoning steps, then evaluate reasoning accuracy and efficiency on unseen tasks",
+      "falsifier": "No improvement or degradation in reasoning accuracy or efficiency compared to unguided baseline",
+      "needs": "8GB GPU, ledger access, weeks",
+      "cost": "medium",
+      "closest_prior": "Deep Self-Evolving Reasoning",
+      "difference": "Leverages unique longitudinal ledger data for meta-policy distillation rather than self-evolving from scratch",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No prior work or papers explicitly meta-learn a policy from a longitudinal ledger to guide reasoning path convergence heuristics.",
+        "web_queries": [
+          "ledger-guided meta-reasoning policy distillation",
+          "meta-learn reasoning path convergence policy distillation"
+        ],
+        "web_searched": true,
+        "web_hits": 113
+      },
+      "review": "**MECHANISM:**  \nLedger-Guided Meta-Reasoning Policy Distillation aims to leverage a longitudinal ledger of past reasoning attempts to meta-learn which reasoning paths reliably converge to correct answers. By distilling this meta-policy into a small model’s inference-time heuristic, the model can prioritize promising reasoning trajectories, improving reasoning efficiency and accuracy per parameter. This could reduce redundant or hallucinated steps, effectively compressing reasoning strategies learned from larger or more complex models into a compact form suitable for 8GB deployment.\n\n**EVIDENCE:**  \nThe retrieved literature provides partial support but no direct validation. [4] Reasoning Compression with Mixed-Policy Distillation shows distillation can shorten reasoning traces in smaller models, aligning with the idea of policy distillation. [2] discusses test-time scaling and distilling reasoning traces, relevant to meta-learning inference heuristics. [1] highlights the need for verified reasoning to avoid hallucinations, which the ledger could address. However, none explicitly demonstrate meta-learning a policy from a ledger or its distillation into a small model’s heuristic.\n\n**WHAT WOULD FALSIFY IT:**  \nIf distilling a meta-learned policy from the ledger fails to improve or even degrades the small model’s reasoning accuracy or convergence rate compared to baseline heuristics, despite sufficient training data and compute, this would falsify the claim. Also, if the distilled heuristic cannot generalize beyond the ledger’s recorded cases, it would undermine the approach.\n\n**RISK:**  \nThe approach might improve benchmark scores by overfitting to the ledger’s historical reasoning paths, reducing robustness to novel problems. It could also bias the small model toward conservative or repetitive reasoning patterns, limiting creativity or adaptability, thus worsening real-world performance despite better headline metrics.",
+      "citations": [
+        "2605.14876",
+        "2508.16665",
+        "2602.14077",
+        "2605.08776",
+        "2510.16657",
+        "2509.17489",
+        "2508.12387",
+        "2510.06101"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 2,
+      "strength": 0.2538,
+      "wins": 6,
+      "comparisons": 7,
+      "title": "Ledger-Driven Curriculum Learning for Small Model Reasoning",
+      "mechanism": "Use the lab’s longitudinal ledger of hypotheses and refutations to construct a curriculum that prioritizes historically challenging reasoning patterns",
+      "experiment": "Train 7B model on curriculum derived from ledger difficulty scores, compare reasoning generalization and sample efficiency to random curriculum",
+      "falsifier": "No improvement in generalization or sample efficiency compared to random curriculum",
+      "needs": "8GB GPU, ledger data, 1 month",
+      "cost": "high",
+      "closest_prior": "Depth-Cascade Training (2607.09693)",
+      "difference": "Curriculum derived from real longitudinal failure records, not synthetic or heuristic difficulty metrics",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No prior work or papers explicitly use a ledger-driven curriculum prioritizing historically challenging reasoning patterns for small models.",
+        "web_queries": [
+          "ledger-driven curriculum learning for small model reasoning",
+          "curriculum learning using hypothesis refutation ledger"
+        ],
+        "web_searched": true,
+        "web_hits": 71
+      },
+      "review": "**MECHANISM:**  \nLeveraging a ledger of past hypotheses and refutations to build a curriculum targets historically difficult reasoning patterns, focusing training on the model’s weak spots. This prioritization could improve reasoning per parameter by efficiently allocating limited capacity to challenging cases, fostering deeper chain-of-thought skills and error correction. The curriculum acts as a form of targeted data curation, potentially accelerating learning in a small model constrained by 8GB memory.\n\n**EVIDENCE:**  \nRelated work supports curriculum learning and targeted reasoning improvements: [3] shows easy-to-hard curricula improve small model benchmarks; [1] highlights benefits of diverse chain-of-thought data; [6] emphasizes verification-refinement frameworks for reasoning, though mostly in larger models. None directly validate ledger-driven curricula from longitudinal refutations in small open-weight models, so evidence is indirect.\n\n**WHAT WOULD FALSIFY IT:**  \nIf training on ledger-prioritized data fails to improve or even degrades reasoning accuracy compared to random or uniform sampling, especially on historically challenging patterns, this would falsify the claim. Also, if the model overfits to ledger-specific patterns and general reasoning does not improve, the mechanism would be invalidated.\n\n**RISK:**  \nFocusing too narrowly on ledger-identified challenges might cause overfitting to idiosyncratic errors, reducing generalization. This could inflate benchmark scores on curated tasks but degrade real-world reasoning diversity, harming robustness and downstream utility despite improved headline metrics.",
+      "citations": [
+        "2509.21124",
+        "2511.14435",
+        "2605.11255",
+        "2605.14215",
+        "2603.00842",
+        "2510.17498",
+        "2507.10182",
+        "2602.07549"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 3,
+      "strength": 0.1236,
+      "wins": 5,
+      "comparisons": 7,
+      "title": "Null-World Counterfactual Training for Robust Reasoning",
+      "mechanism": "Inject null-world scenarios from epistemic controller as counterfactuals during training to improve model's ability to detect and reject false premises",
+      "experiment": "Fine-tune small model with null-world augmented data, measure false premise acceptance rate and reasoning precision on adversarial sets",
+      "falsifier": "No reduction in false premise acceptance or reasoning errors compared to baseline",
+      "needs": "8GB GPU, null-world data, weeks",
+      "cost": "medium",
+      "closest_prior": "AgentFloor Tool Use Ladder",
+      "difference": "Uses null-world counterfactuals from epistemic controller for training, not just tool use diagnostics",
+      "audit": {
+        "verdict": "INCREMENTAL",
+        "evidence": "research\\epistemic_controller\\run_mvp.py",
+        "why": "Prior work runs MVP with null-worlds and boundary states, related but does not explicitly train with null-world counterfactuals to reject false premises.",
+        "web_queries": [
+          "null-world counterfactual training for robust reasoning",
+          "counterfactual training to detect false premises in language models"
+        ],
+        "web_searched": false,
+        "web_hits": 0
+      },
+      "review": "MECHANISM:  \nNull-World Counterfactual Training aims to improve reasoning by explicitly exposing the model to scenarios where premises are false or irrelevant (\"null-worlds\"). This should teach the model to recognize and reject invalid assumptions, enhancing epistemic vigilance and robustness in reasoning chains. By integrating counterfactuals during training, the model may better learn to detect contradictions or unsupported claims, thus improving reasoning per parameter in a small model.\n\nEVIDENCE:  \nThe retrieved literature provides partial support but no direct validation. Papers [1] and [2] discuss counterfactual training improving chain-of-thought faithfulness and causal reasoning, respectively, but focus on large models and do not specifically address null-world or false-premise rejection in small models. Paper [8] highlights the challenge of false premise detection but does not evaluate training interventions. Overall, none directly demonstrate that null-world counterfactual training improves reasoning in small open-weight models on 8GB hardware.\n\nWHAT WOULD FALSIFY IT:  \nIf a small model trained with null-world counterfactuals fails to improve or even degrades in benchmarks measuring false premise detection and reasoning accuracy compared to a baseline, this would falsify the claim. Additionally, if the model becomes overly conservative—rejecting valid premises or producing more refusals without improved correctness—that would also disprove the mechanism’s effectiveness.\n\nRISK:  \nThis training could increase refusal rates or produce overly cautious outputs, inflating apparent robustness metrics while reducing useful reasoning or answer coverage. It might also cause the model to memorize counterfactual patterns without genuine understanding, leading to brittle or superficial improvements that do not generalize beyond training distributions.",
+      "citations": [
+        "2602.20710",
+        "2602.16787",
+        "2603.00729",
+        "2511.15137",
+        "2603.00842",
+        "2511.19923",
+        "2601.11683",
+        "2510.10965"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 4,
+      "strength": 0.0599,
+      "wins": 4,
+      "comparisons": 7,
+      "title": "Ledger-Guided Epistemic Controller Bootstrapped Curriculum for 8GB 7B Model in Embodied Intelligence",
+      "mechanism": "Use the lab’s ledger of convergence records to dynamically generate a curriculum that adapts epistemic controller gate thresholds to embodied intelligence tasks, improving reasoning per parameter by focusing training on failure modes unique to physical interaction domains",
+      "experiment": "Train a 7B model under 8GB with curriculum steps derived from ledger-identified epistemic failures in embodied tasks, measuring reasoning accuracy and escalation rates against a static curriculum baseline",
+      "falsifier": "No statistically significant improvement in reasoning accuracy or reduction in verified cascade escalations compared to static curriculum",
+      "needs": "8GB GPU, embodied intelligence task dataset, ledger access, weeks of training",
+      "cost": "medium",
+      "closest_prior": "AgentFloor: How Far Up the tool use Ladder Can Small Open-Weight Models Go?",
+      "difference": "Leverages unique ledger-driven epistemic failure data to adapt curriculum dynamically for embodied intelligence, unlike prior static or tool-use focused curricula",
+      "audit": {
+        "verdict": "INCREMENTAL",
+        "evidence": "docs\\research\\2026-07-09-hardness-depth.md",
+        "why": "Prior work measured adaptive curriculum signals related to hardness and Q-exit adaptivity, similar but not identical to ledger-guided epistemic control.",
+        "web_queries": [
+          "ledger-guided curriculum learning embodied intelligence",
+          "epistemic controller adaptive curriculum physical interaction tasks"
+        ],
+        "web_searched": false,
+        "web_hits": 0
+      },
+      "review": "MECHANISM:  \nUsing a ledger of convergence records to dynamically adjust epistemic controller gate thresholds creates a feedback loop that targets failure modes specific to embodied intelligence tasks. By focusing training on these hard cases, the model can allocate capacity more efficiently, improving reasoning per parameter. This curriculum bootstraps from past learning trajectories, potentially accelerating convergence and robustness in physical interaction domains where data is sparse and complex.\n\nEVIDENCE:  \nThe idea aligns loosely with [3], which shows curricula driven by model failures improve robustness via targeted training. [1] and [2] emphasize the importance of embodied reasoning and iterative perception-action loops but do not directly validate ledger-guided curricula. None of the retrieved papers explicitly demonstrate dynamic gate threshold adaptation or ledger-based curriculum generation for small models on 8GB hardware.\n\nWHAT WOULD FALSIFY IT:  \nIf dynamically adjusting epistemic controller gates based on ledger records fails to improve or even degrades reasoning accuracy or convergence speed on embodied tasks, especially compared to static or random curricula, this would falsify the claim. Additionally, if the overhead of managing the ledger and dynamic gating outweighs benefits on a 7B 8GB model, the mechanism would be invalidated.\n\nRISK:  \nFocusing training narrowly on failure modes might overfit the model to rare or noisy errors, reducing generalization. The ledger-guided curriculum could bias learning towards specific embodied scenarios, harming performance on broader reasoning tasks. This might inflate reasoning metrics on curated benchmarks while degrading real-world robustness or increasing inference latency due to complex gating.",
+      "citations": [
+        "2607.11689",
+        "2608.06756",
+        "2512.01187",
+        "2510.21817",
+        "2606.08850",
+        "2604.01669",
+        "2604.14144",
+        "2607.20448"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 5,
+      "strength": 0.0284,
+      "wins": 3,
+      "comparisons": 7,
+      "title": "Prediction-Market-Driven Curriculum for Formal Specification Reasoning",
+      "mechanism": "Use live prediction market outcomes to dynamically select formal specification reasoning tasks that maximize learning signal for small models",
+      "experiment": "Iteratively fine-tune model on market-selected tasks, measure reasoning accuracy on held-out formal specs and convergence speed",
+      "falsifier": "No improvement in formal specification reasoning accuracy or slower convergence than random curriculum",
+      "needs": "8GB GPU, prediction market data, weeks",
+      "cost": "medium",
+      "closest_prior": "Ledger-Driven Curriculum Learning",
+      "difference": "Curriculum driven by live prediction market outcomes targeting formal specification reasoning, not general reasoning",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No paper or prior work directly uses live prediction market outcomes to drive formal specification reasoning curricula.",
+        "web_queries": [
+          "prediction market driven curriculum formal specification reasoning",
+          "using prediction markets to select formal reasoning tasks"
+        ],
+        "web_searched": true,
+        "web_hits": 116
+      },
+      "review": "MECHANISM:  \nUsing live prediction market outcomes to guide curriculum selection could focus training on tasks where the model’s uncertainty or error is highest, maximizing learning signal per parameter. This dynamic, feedback-driven approach might adaptively prioritize formal specification reasoning problems that are both challenging and informative, potentially improving reasoning capabilities in small models constrained by 8GB memory.\n\nEVIDENCE:  \nNone of the retrieved papers directly evaluate prediction-market-driven curricula for formal reasoning in small LLMs. Papers [5] and [6] discuss prediction markets and real-world outcome rewards but not their use in curriculum design. Papers [2], [3], [4], and [8] explore formal verification and reasoning in LLMs, but none link these to dynamic curricula driven by live market signals.\n\nWHAT WOULD FALSIFY IT:  \nIf a small model trained with a prediction-market-driven curriculum shows no improvement or worse performance on formal specification reasoning benchmarks compared to a static or heuristic curriculum, this would falsify the claim. Additionally, if the market signals fail to correlate with task difficulty or learning progress, the mechanism would be invalidated.\n\nRISK:  \nFocusing on market-driven tasks might overfit the model to idiosyncratic or noisy market signals, reducing generalization. It could also bias training toward tasks with high market volatility rather than intrinsic learning value, inflating headline metrics while degrading robustness or coverage of formal reasoning skills.",
+      "citations": [
+        "2511.14435",
+        "2507.16331",
+        "2604.22601",
+        "2507.10182",
+        "2604.26733",
+        "2606.30040",
+        "2509.19153",
+        "2601.22642"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 6,
+      "strength": 0.0128,
+      "wins": 2,
+      "comparisons": 7,
+      "title": "Prediction-Market-Informed Prompt Selection for 6B Model Reasoning",
+      "mechanism": "Use live prediction-market outcomes to dynamically select prompts that maximize reasoning accuracy per parameter",
+      "experiment": "Deploy 6B model with prompt selector trained on prediction-market data, compare reasoning accuracy and calibration to static prompt baselines",
+      "falsifier": "No improvement in reasoning accuracy or calibration over static prompt baselines",
+      "needs": "8GB GPU, prediction-market data, 3 weeks",
+      "cost": "medium",
+      "closest_prior": "AgentFloor Tool Use Ladder (2605.00334)",
+      "difference": "Incorporates live prediction-market feedback for prompt selection, not just static tool use or prompt engineering",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No exact or closely matching prior work or papers found using prediction markets to dynamically select prompts for reasoning accuracy.",
+        "web_queries": [
+          "prediction market informed prompt selection for large language models",
+          "using live prediction market outcomes to improve prompt selection in LLM reasoning"
+        ],
+        "web_searched": true,
+        "web_hits": 99
+      },
+      "review": "**MECHANISM:**  \nUsing live prediction-market outcomes to select prompts aims to leverage collective, real-time judgments about which prompts yield the most accurate reasoning. This dynamic selection could prioritize high-utility prompts that generate stronger learning signals or better inference, thus improving reasoning accuracy per parameter without increasing model size. By focusing compute on promising prompts, it may reduce wasted effort on low-gradient or uninformative prompts, enhancing efficiency in a small 6B model constrained to 8GB.\n\n**EVIDENCE:**  \nThe retrieved literature partially supports related ideas but not this exact mechanism. Papers [1] and [2] discuss online prompt selection and RL-based prompt prioritization to improve reasoning efficiency, highlighting the cost of rollout-heavy training and the benefit of selecting informative prompts. However, none explicitly use live prediction markets as a signal. Paper [1] notes many prompts yield negligible gradients, supporting the idea of selective prompt use. Other papers focus on feature selection or diagnostic tools unrelated to prediction markets. Thus, direct evidence for prediction-market-informed prompt selection is absent.\n\n**WHAT WOULD FALSIFY IT:**  \nIf dynamically selecting prompts based on live prediction-market outcomes fails to improve or even degrades reasoning accuracy per parameter compared to static or heuristic prompt selection, this would falsify the claim. Specifically, if the overhead or noise in market signals leads to poorer prompt choices or no measurable gain in reasoning performance, the mechanism would be invalidated.\n\n**RISK:**  \nThis approach might improve headline accuracy metrics by overfitting prompt selection to transient market signals or popular prompts, reducing model robustness and generalization. It could bias the system toward prompts that perform well in the market but do not reflect true reasoning improvements, masking underlying model weaknesses or encouraging sycophantic or surface-level responses that inflate scores without genuine capability gains.",
+      "citations": [
+        "2603.25184",
+        "2602.01970",
+        "2605.23102",
+        "2608.04719",
+        "2604.16742",
+        "2508.19999",
+        "2508.06692",
+        "2604.10733"
+      ],
+      "grounded": true
+    }
+  ],
+  "wall_s": 400
+}

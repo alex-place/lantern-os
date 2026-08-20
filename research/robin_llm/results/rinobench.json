@@ -1,0 +1,37 @@
+{
+  "n": 80,
+  "unparsed": 0,
+  "macro_f1": 0.17408637873754157,
+  "exact_match": 0.35,
+  "mae": 0.85,
+  "verdicts": {
+    "UNVERIFIED": 16,
+    "INCREMENTAL": 58,
+    "PORT": 3,
+    "RESTATES": 3
+  },
+  "gold": {
+    "1": 4,
+    "2": 14,
+    "3": 25,
+    "4": 26,
+    "5": 11
+  },
+  "mapping": {
+    "ANSWERED-HERE": 1,
+    "REFUTED-HERE": 1,
+    "RESTATES": 1,
+    "PORT": 3,
+    "INCREMENTAL": 3,
+    "UNVERIFIED": 4
+  },
+  "published": {
+    "gpt-5": 0.172,
+    "o3": 0.162,
+    "gpt-oss-120b": 0.148,
+    "Llama-3.1-8B": 0.146,
+    "Llama-4-Scout": 0.13,
+    "DeepSeek-R1": 0.123,
+    "Llama-3.3-70B": 0.095
+  }
+}

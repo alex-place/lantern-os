@@ -82,3 +82,41 @@ This file is indexed by `priorwork.js`, so the next audit that sees a verificati
 cluster-routing idea will find these findings as prior work rather than rediscovering them. That
 is the loop the red team asked for: a finding that lives only in a chat transcript gets found
 again; one in the notebook does not.
+
+---
+
+## Second review (same day): the gap mill's survivors
+
+`gapmill.js` re-ran goal B with retrieved work and our own notebook as EXCLUSION lists, the field
+mapped into design axes first, and the audit in the loop rejecting its own proposals. Two of seven
+survived. Both were hand-checked with live search, same as above.
+
+**1. Null-World Activation Divergence for Per-Token Hallucination** — *audit said INCREMENTAL vs
+our own `auditor.py`.*
+**Prior art is stronger than the audit found.** [Entropy Distribution as a Fingerprint for
+Hallucinations](https://arxiv.org/html/2605.28264) builds a reference CDF from non-hallucinated
+calibration data and tests whether a new generation is statistically consistent with it — that is
+the null-model control, already done. Adjacent: [internal attention divergence
+signals](https://arxiv.org/html/2605.05025), [activation-based detection
+asymmetry](https://arxiv.org/pdf/2604.13068), calibrated hidden-state probes for real-time
+intervention. **Suggested verdict: `PORT`.**
+
+**2. Live Prediction Market Disagreement as Internal Activation Signal** — *audit said UNVERIFIED,
+63 hits searched.*
+Every component exists separately. [KalshiBench](https://arxiv.org/html/2512.16030) uses
+prediction markets to evaluate epistemic calibration; the [Beta-Bernoulli
+Calibrator](https://arxiv.org/pdf/2605.27668) uses human forecasts as distributional supervision;
+[HINDCAST](https://arxiv.org/pdf/2607.14051) scores against market-implied probabilities;
+PolySwarm uses model disagreement as an uncertainty filter. What I could not find in two queries
+is the specific combination: **market-implied disagreement as the training label for a hidden-state
+probe.** Everything above calibrates or evaluates *outputs*.
+
+**This is the first idea in 23 milled that two searches could not place.** By the rules this
+project runs on that is still not a novelty claim — two queries is not a prior-art search, and the
+"markets as ground truth for LLM epistemics" space is visibly active. But it is a different
+category from the previous survivors, and it is worth noticing *why*: it is the only one that
+requires an asset the field does not have — our own settled market outcomes. That is exactly what
+the assets exclusion list was built to produce.
+
+**Suggested verdict: worth one bounded day**, framed as "does market-implied uncertainty supervise
+a hidden-state probe better than the labels we already use", not as a discovery.

@@ -21,6 +21,7 @@ const bench = require(path.join(R, "bench"));
 const novelty = require(path.join(R, "novelty"));
 const priorwork = require(path.join(R, "priorwork"));
 const websearch = require(path.join(R, "websearch"));
+const gapmill = require(path.join(R, "gapmill"));
 
 // Tests are queued and awaited: an async assertion invoked without await is a test that cannot
 // fail, which is worse than no test.
@@ -312,6 +313,97 @@ ok("one live leg is enough to count as searched", async () => {
     websearch._resetFetch();
     delete process.env.ROBIN_WEB_NOCACHE;
     delete process.env.ROBIN_WEB_GAP_MS;
+  }
+});
+
+// ── the gap mill: milling for what is NOT done, and the failure that invites ─────────────
+ok("an idea that cannot say what it is NOT is rejected before ranking, and counted", () => {
+  // Restatements arrive without a difference. bench.js milled 16 ideas and 0 were unencumbered;
+  // requiring the generator to name its closest prior work is the cheapest filter for that.
+  const lines = [
+    JSON.stringify({ title: "a", mechanism: "m", experiment: "e", falsifier: "f", needs: "n",
+                     cost: "low", closest_prior: "X et al",
+                     difference: "reads the signal at a different stage, before decoding rather than after" }),
+    JSON.stringify({ title: "b", mechanism: "m", closest_prior: "Y", difference: "better" }),
+    JSON.stringify({ title: "c", mechanism: "m" }),
+    "{broken",
+  ].join(String.fromCharCode(10));
+  const p = gapmill.parseIdeas(lines);
+  assert.strictEqual(p.ideas.length, 1);
+  assert.strictEqual(p.no_difference, 2, "a one-word difference is not a difference");
+  assert.strictEqual(p.malformed, 1);
+});
+
+ok("rephrasing a rejected proposal is caught as evasion, not counted as a gap", () => {
+  // Measured on the second gap-mill run: the placed rate fell to 5/8 and ALL THREE survivors
+  // named a round-one collision as their own closest prior work. Telling the generator what it
+  // collided with taught it to reword the collision until the audit stopped recognising it, so
+  // the falling placed rate was measuring evasion. The generator's own closest_prior field is
+  // what catches it.
+  const collisions = [{ title: "Epistemic-Controller-Gated Curriculum for Small Models" }];
+  const line = JSON.stringify({
+    title: "Epistemic-Controller-Gated Dynamic Parameter Allocation", mechanism: "m",
+    experiment: "e", falsifier: "f", needs: "n", cost: "low",
+    closest_prior: "Epistemic-Controller-Gated Curriculum for Small Models",
+    difference: "gates per step rather than per curriculum stage, a finer granularity of control",
+  });
+  const blocked = gapmill.parseIdeas(line, collisions);
+  assert.strictEqual(blocked.ideas.length, 0);
+  assert.strictEqual(blocked.evasion, 1);
+  // ... and the same idea is fine when it is not dodging something we already rejected
+  assert.strictEqual(gapmill.parseIdeas(line, []).ideas.length, 1);
+});
+
+ok("evasion is blocked against SURVIVORS too, not only collisions", () => {
+  // On the evasion-blocked run a survivor named another survivor of the same run as its closest
+  // prior work -- the same dodge one level over.
+  const kept = [{ title: "Ledger-Driven Curriculum Learning for Small Model Reasoning" }];
+  const line = JSON.stringify({
+    title: "Prediction-Market-Driven Curriculum for Formal Specification Reasoning", mechanism: "m",
+    experiment: "e", falsifier: "f", needs: "n", cost: "low",
+    closest_prior: "Ledger-Driven Curriculum Learning",
+    difference: "driven by live market outcomes targeting formal specification reasoning instead",
+  });
+  assert.strictEqual(gapmill.parseIdeas(line, kept).evasion, 1);
+});
+
+ok("diversity is measured, because optimising novelty collapses onto one theme", () => {
+  // Four of six survivors on one run were "Ledger-Guided/Driven X". A low placed rate with high
+  // overlap is one asset permuted, not a set of gaps -- and the published protocol for scoring
+  // generated ideas measures diversity alongside novelty for exactly this reason.
+  const same = [1, 2, 3, 4].map((i) => ({ title: `Ledger-Guided Reasoning Curriculum ${i}`,
+                                          mechanism: "ledger guided reasoning curriculum for small models" }));
+  const varied = [
+    { title: "Attention Sparsity Drift", mechanism: "measure head concentration during decoding" },
+    { title: "Market-Weighted Probe Labels", mechanism: "supervise hidden states with settled outcomes" },
+    { title: "Null-World Calibration", mechanism: "compare residual structure against a drift-only control" },
+    { title: "Cascade Escalation Budgets", mechanism: "spend verification only where the cheap tier is unsure" },
+  ];
+  const a = gapmill.diversity(same).mean_overlap;
+  const b = gapmill.diversity(varied).mean_overlap;
+  assert.ok(a > b, `permutations of one theme must score less diverse: ${a} vs ${b}`);
+  assert.ok(gapmill.diversity(same).repeated.length > 0, "the repeated words must be named, not just counted");
+  assert.strictEqual(gapmill.diversity([{ title: "x", mechanism: "y" }]).mean_overlap, null);
+});
+
+ok("there is a VAGUE sham, because 'not in the literature' is trivially achieved by nonsense", () => {
+  // Optimising for unplaceability selects for word salad. The inert sham catches plausible-but-
+  // empty; this one catches impressive-but-empty, which is the failure this mill invites.
+  assert.strictEqual(gapmill.VAGUE_SHAM.vague_sham, true);
+  assert.ok(!gapmill.VAGUE_SHAM.sham, "it must be a SECOND arm, not a relabelling of the first");
+  assert.ok(gapmill.VAGUE_SHAM.falsifier, "even the sham states a falsifier, or the test is easy");
+});
+
+ok("our own notebook is an exclusion list the generator can actually be handed", () => {
+  const mine = gapmill.ourWork("detect when a model is answering beyond what it knows", 5);
+  assert.ok(mine.length > 0, "the goal that produced list B must match something we have measured");
+  assert.ok(mine.every((h) => h.file && h.title), "each exclusion needs a path and a title to be quotable");
+});
+
+ok("the assets list is concrete, because a vague asset list produces vague ideas", () => {
+  assert.ok(gapmill.OUR_ASSETS.length >= 4);
+  for (const a of gapmill.OUR_ASSETS) {
+    assert.ok(a.length > 60, `too thin to aim at: "${a}"`);
   }
 });
 
