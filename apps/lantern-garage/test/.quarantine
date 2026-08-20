@@ -1,0 +1,50 @@
+# Tests in apps/lantern-garage/test/ that do NOT currently pass.
+#
+# Context: on 2026-08-18 this directory held 305 test files and CI ran FIVE of
+# them, by explicit path. The other 300 had never run in CI at all — including
+# every suite shipped with the 1.15.4 trader work. Measured that day: 279 pass,
+# 26 do not. Wiring all 305 on at once would have produced a permanently-red
+# job, which is how an alarm becomes background noise.
+#
+# So the 279 are enforced now and these 26 are quarantined WITH A RATCHET:
+# scripts/run-garage-tests.mjs fails the build if a file listed here starts
+# passing, so the list can only shrink. Delete a line when you fix its test.
+#
+# Known causes seen while triaging: some use a describe()/jest-style harness
+# node:test does not provide (model-pin), some assert seed data that has since
+# drifted (watchlist-store-seed), some depend on env this runner does not set.
+#
+convergence-inspect-tool.test.js
+deployment-profile.test.js
+discover-feeds-parse.test.js
+entry-blocked-narration.test.js
+eval-keystone-tool.test.js
+exit-warnings.test.js
+explore-feed-diversity.test.js
+explore-feed-pagination.test.js
+model-escalation.test.js
+model-pin.test.js
+news-personalize.test.js
+overnight-staff-only.test.js
+pcsf-routing.test.js
+provider-pin-backstop.test.js
+pr-review-intent.test.js
+python-stdout-utf8.test.js
+refinement-2-3.test.js
+tool-approval-gate.test.js
+tool-arg-repair.test.js
+tool-loop-hardening.test.js
+tool-loop-memory-refresh.test.js
+tool-provider-matrix.test.js
+trader-mode.test.js
+watchlist-store-seed.test.js
+web-search-snippet-quality.test.js
+
+# `env:` entries are ENVIRONMENT-DEPENDENT, not broken, and are never ratcheted —
+# their result is a property of the machine. These two pass on the 8GB dev box and
+# fail on a hosted runner: they assert the on-box local-model setup (#2171 / #2173,
+# qwen2.5-coder as the default local coding engine), which CI does not have.
+# Ratcheting them would make the build red on whichever machine satisfies them,
+# with no edit that satisfies both.
+env: local-engine-qwen.test.js
+env: local-model-registry.test.js
