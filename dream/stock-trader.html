@@ -7803,6 +7803,14 @@ function _realizedTip(a){
 }
 // Day P&L tooltip.
 function _dayPnlTip(a){
+  // FALLBACK HONESTY (#3380). When the server could not compute the ledger
+  // basis it now says so (pnl_today_source) instead of silently re-badging
+  // the broker dpl, which re-baselines at the IBKR ~17:15 ET daily reset. On
+  // 2026-08-19 this tile read -$174.07 at 11 PM on a +$1,901.14 session
+  // because of exactly that silent swap: same label, different meaning.
+  if (a && a.pnl_today_source === 'broker_reset') {
+    return 'BROKER figure, not the trading session: IBKR day P&L re-baselines at the ~17:15 ET daily reset, so in the evening this measures post-reset drift, not today. ' + (a.pnl_basis || '');
+  }
   const base = 'How much the account made TODAY — today\'s move only, across both closed and open positions. Realized + Unrealized above add up to this.';
   const adj = Number(a && a.pnl_carry_adjustment) || 0;
   if (!adj) return base;
@@ -7835,10 +7843,10 @@ function renderTpSummary(a){
     // Per-position "since entry" P&L still exists — it is the Unrealized column
     // in the positions table, beside a Day column that sums to this one.
     cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)) +
-    cell('Unrealized P&L', signed(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
+    cell(a.unrealized_today != null ? 'Unrealized P&L' : 'Unrealized (since entry)', signed(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
       cls(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
-      'Today\'s move on the positions still open. A position carried from an earlier day counts only from yesterday\'s close — its full since-entry P&L is the Unrealized column in the table below.') +
-    cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) +
+      (a.unrealized_today != null ? 'Move today on the open positions. A carried position counts only from the prior close - its full since-entry P&L is the Unrealized column in the table below.' : 'Since ENTRY, not today: the per-day basis is unavailable on this server, so this equals the sum of the Unrealized column in the table below (lifetime vs avg fill).')) +
+    cell(a.pnl_today_source === 'broker_reset' ? 'Day P&L (broker)' : 'Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) +
     cell('Buying power', money(a.buying_power));
 }
 // #2437: one-click exits. Flatten = market order for the opposite side, full size.
