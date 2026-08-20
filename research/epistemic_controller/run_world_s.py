@@ -62,7 +62,9 @@ from environments.two_explanations import TwoExplanationsWorld    # noqa: E402
 from environments.hidden_variable import HiddenVariableWorld      # noqa: E402
 from self_model import SelfModel                                  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(__file__), "results", "world_s.json")
+OUT = os.path.join(os.path.dirname(__file__), "results",
+                   "world_s.json" if int(os.environ.get("WORLD_S_EPISODES") or 6) == 6
+                   else f"world_s_e{os.environ['WORLD_S_EPISODES']}.json")
 # Episodes per seed. 6 is the PRE-REGISTERED setting and the one the recorded kill was run at.
 # It is env-overridable because the 6-episode result turned out to be evidence-budget-bound, not
 # mechanism-bound: the repair itself works (cost_exponent 1 -> 0 cuts proxy purchases from 17/100

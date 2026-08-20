@@ -62,6 +62,58 @@ outcome ledger — most likely from a *counterfactual*: what would the other ran
 and would it have survived? That is measurable here (probe data is already collected) and is the
 next thing to test.
 
+## 2b. Round two: the counterfactual, and what it is worth (2026-08-19, later)
+
+The kill above named the next thing to try: stop asking the outcome ledger and ask a
+**counterfactual** instead. At every DESIGN round the controller already recorded, per probed
+candidate, how much of the residual it explained and what it cost, and by the end of the episode
+it knows which observable survived — self-observable, no ground truth. So replay the round under
+a different cost exponent and ask whether *that* policy would have picked the survivor. Paired,
+and counting only **discordant** rounds: where both policies pick the same candidate the round
+says nothing. That is the property the ledger lacked — a hard world produces failures but not
+disagreement; a biased policy produces disagreement that resolves one way.
+
+**First, is the repair worth making?** Without that number a null result is unreadable.
+`run_cost_exponent_sweep.py`, 200 seeds of world H:
+
+| cost exponent | truth committed | proxy bought | experiments/seed |
+|---|---|---|---|
+| 1.0 (shipped) | 89% | **20%** | 6.54 |
+| 0.5 | 90% | 11% | 6.47 |
+| 0.0 | 92% | **5%** | 6.29 |
+
+A 74% cut in wasted purchases, a better truth rate, and slightly fewer experiments. So the ceiling
+is real and any failure to reach it is a failure of **diagnosis**, not of the repair.
+
+**Then, does the machine find it?** The 6-episode pre-registered run said no for every mechanism.
+That turned out to be evidence-budget-bound rather than mechanism-bound: a single scientist rarely
+sees enough discordant rounds in six episodes. Run again at 20 episodes (60 seeds, **same gates,
+same thresholds** — a longer world is a different experiment, not a moved bar):
+
+| arm | proxy bought, early → late | reduction | share of the oracle's available gain | fires in C1 / C2 |
+|---|---|---|---|---|
+| `hold` (no self-model) | 21.8% → 19.0% | 13% | 17% | — |
+| `self` (mistake ledger) | 20.7% → 16.8% | 19% | 25% | 0% / 0% |
+| `self-loose` (loose ledger) | — | — | — | **20% / 33%** |
+| **`self-cf` (counterfactual)** | 20.2% → **12.2%** | **40%** | **53%** | **0% / 0%** |
+
+Gates, unchanged: **S2 FAILS** (40% reduction against a ≥50% bar). **S3 PASSES** — 0% false firing
+in both controls, after 509 and 704 explicit null diagnoses, meaning it looked and said no.
+**S4 FAILS** (3.7% fewer experiments per discovery against a ≥10% bar).
+
+So the counterfactual is the first mechanism that is *both* specific and effective, and it still
+does not clear its bars. It captures a little over half of the gain that simply hard-coding the
+better policy would have given, and it pays for that with 18 reverted trials out of 46 — the trial
+machinery catching diagnoses that fired too early. The bars do not move; the honest verdict is
+**not proven, and now quantified**: 53% of the available gain, at 20 episodes, with specificity
+intact.
+
+What that changes: "can a machine diagnose a defect in its own experiment policy" is no longer a
+yes/no with a null answer. It is a rate, with a measured ceiling, a measured floor (13% drift), and
+one mechanism sitting between them. The next question is whether the gap to the ceiling is evidence
+budget (more episodes) or estimator quality (the discordant-pair test is crude) — separable by
+running the same arm at 60 episodes and seeing whether it converges to the oracle or plateaus.
+
 ## 3. What the failed experiment actually bought
 
 Building world S found four defects in the shipped controller — none of them visible in the
