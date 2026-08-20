@@ -547,6 +547,20 @@ const _lastPos = new Map();
 //                   later was booked as our exits, at alien cost bases).
 const _absentStreak = new Map();
 const _seenStreak = new Map();
+// PROTECTIVE-STOP REGISTRY (#3379). sym -> { id, px, qty, at } for the stop THIS
+// engine last placed. The point: /iserver/account/orders does not reliably show
+// a prior-session GTC stop once it fills (SMH, 2026-08-19 — placed 08-18, filled
+// 10:12, absent from the feed), so the fill reconciler cannot see the loss path
+// it exists for. But the engine names these order ids itself at placement; with
+// the id remembered — and PERSISTED, because a stop that outlives the process is
+// exactly the case — the per-order status endpoint can answer "did my stop
+// fill?" directly when a position vanishes.
+const _stopOrders = new Map();
+function _registerStop(sym, r, px, qty) {
+  if (r && r.order_id && !/error/i.test(String(r.status || ''))) {
+    _stopOrders.set(sym, { id: String(r.order_id), px, qty, at: Date.now() });
+  }
+}
 function _round2(n) { return Math.round(n * 100) / 100; }
 
 // An exit whose broker result is non-terminal: the order is resting, queued, or awaiting
@@ -592,6 +606,10 @@ function _reconcileFills(orders) {
     for (const row of rows) {
       logTrade(row);
       done.add(row.symbol);
+      // #3379: a fill row for our registered stop consumes the registry entry —
+      // the same-session path (the feed DID show this fill) needs no lookup.
+      const _reg = _stopOrders.get(row.symbol);
+      if (_reg && String(row.order_id) === _reg.id) _stopOrders.delete(row.symbol);
       _exitIntent.delete(row.symbol);
       _excursion.delete(row.symbol);   // consumed by the fill row it was frozen for
       // A STOP fill arms the re-entry cooldown: today + N trading days.
@@ -633,6 +651,7 @@ function _saveState() {
       zoneLadder: Object.fromEntries(_zoneLadder),
       stopDistPct: Object.fromEntries(_stopDistPct),
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
+      stopOrders: Object.fromEntries(_stopOrders),   // #3379: a GTC stop OUTLIVES the process by design
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
       // A restart DURING a dropout must not hand back a clean slate and let the
       // doubling through on the next scan (#3282).
@@ -660,6 +679,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
+    for (const [k, v] of Object.entries(o.stopOrders || {})) _stopOrders.set(k, v);   // #3379: GTC stops outlive the process
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
     for (const [k, v] of Object.entries(o.lastConfirmedHold || {})) {
       const t = Number(v);
@@ -1254,6 +1274,41 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const mark = Number(snap.mark);
     const qty = Number(snap.qty);
     if (!(qty > 0) || !Number.isFinite(entry) || !Number.isFinite(mark)) continue;  // can't value it → don't invent a number
+    // ── STOP RECONCILIATION (#3379) ──────────────────────────────────────────
+    // Before inventing a mark-priced reconstruction, ask the broker about the
+    // stop THIS ENGINE placed for the symbol. The orders feed does not reliably
+    // list a prior-session GTC stop once it fills (SMH 2026-08-19: placed 08-18,
+    // filled 10:12 at 560.79, never in the feed), but the per-order status
+    // endpoint answers for any id we can name — and we named this one. A hit
+    // books a REAL stop exit, priced at the fill: stops_fired counts it, the
+    // cooldown and breaker arm on it, and the row carries the order id instead
+    // of a guess. Anything else falls through to the honest reconstruction.
+    const _regStop = _stopOrders.get(sym);
+    let _regStatus = null;
+    if (_regStop && _regStop.id && !_loggedFills.has(_regStop.id)) {
+      _regStatus = await bridge.getIBKROrderStatus(userId, _regStop.id).catch(() => null);
+      if (_regStatus && /fill/i.test(String(_regStatus.status || ''))) {
+        const _fillPx = Number(_regStatus.avgPrice) > 0 ? Number(_regStatus.avgPrice) : mark;
+        const _fillQty = Number(_regStatus.filledQty) > 0 ? Number(_regStatus.filledQty) : qty;
+        const _fillPnl = _round2((_fillPx - entry) * _fillQty);
+        logTrade({
+          event: 'exit', symbol: sym, qty: _fillQty, entry, exit: _fillPx,
+          pnl: _fillPnl, pnl_pct: entry > 0 ? +(((_fillPx - entry) / entry) * 100).toFixed(6) : null,
+          reason: `protective_stop (broker GTC stop ${_regStop.px} filled)`,
+          order_id: _regStop.id, order_type: 'Stop', status: 'filled', source: 'stop-status',
+          estimated: !(Number(_regStatus.avgPrice) > 0),
+          ...fillLedger.excursionFields(entry, _peak.get(sym), _trough.get(sym), _stopDistPct.get(sym)),
+        });
+        // Same arming as a feed-visible stop fill (_reconcileFills): cooldown + breaker.
+        const _cd = cfg().stopCooldownDays;
+        if (_cd > 0) _stopCooldownThrough.set(sym, _nextTradingDates(_etDate(Date.now()), _cd));
+        _noteStopFill(Date.now());
+        _loggedFills.add(_regStop.id);          // a late feed appearance must not double-book
+        _stopOrders.delete(sym);
+        _peak.delete(sym); _trough.delete(sym); _entryAt.delete(sym); _excursion.delete(sym);
+        continue;
+      }
+    }
     const pnl = _round2((mark - entry) * qty);
     const _lossPct = entry > 0 ? ((mark - entry) / entry) * 100 : 0;
     // ── STOP ATTRIBUTION (#3281) ─────────────────────────────────────────────
@@ -1282,6 +1337,10 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       pnl, pnl_pct: entry > 0 ? _lossPct : null,
       reason: 'closed_externally (position left the book with no autopilot exit — protective stop, manual close, or another engine)',
       status: 'reconstructed', estimated: true,
+      // #3379: what the broker said about OUR stop for this symbol, so the row
+      // records why it was NOT classified as a stop fill.
+      stop_order_id: _regStop ? _regStop.id : null,
+      stop_order_status: _regStatus ? String(_regStatus.status || 'unknown') : (_regStop ? 'unavailable' : null),
       // Auditable: why this close was (or was not) treated as a stop-out.
       stop_attributed: _looksLikeStop,
       stop_dist_pct: _stopPct || null,
@@ -1320,6 +1379,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     if (!(Number(heldQty[sym]) > 0)) {
       // Position gone → exit resolved. Drop its state.
       _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
+      _stopOrders.delete(sym);                               // #3379: closeLong cancelled it; the record is dead
       _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
       _unclosableAt.delete(sym); _exitNoOrder.delete(sym);
       _zoneLadder.delete(sym); _stopDistPct.delete(sym);
@@ -1509,6 +1569,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           // must protect 300 — a fractional stop qty is rejected outright.
           const _sq = Number(qty) >= 1 ? Math.floor(Number(qty)) : Number(qty);
           const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: _sq, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity, acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
+          _registerStop(sym, sr, stop, _sq);   // #3379: remember our own stop's id
           (out.reprotected = out.reprotected || []).push({ symbol: sym, qty: _sq, stop, status: sr && sr.status });
         }
       }
@@ -1987,6 +2048,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       const stop = stopPriceFor(price, stopDist);
       if (stop) {
         const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
+        _registerStop(sym, sr, stop, qty);   // #3379: remember our own stop's id
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
       }
     }
@@ -2238,6 +2300,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

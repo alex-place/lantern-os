@@ -349,6 +349,32 @@ class TradingAPIBridge {
     return client.getLiveOrders();
   }
 
+  /**
+   * Status of ONE order by id (#3379). This exists because /iserver/account/orders
+   * does not reliably list a GTC order placed in a PRIOR session once it fills:
+   * on 2026-08-19 the SMH ladder stop (placed 08-18, filled 10:12) never appeared
+   * in the feed, so the fill reconciler saw nothing and the position's exit was
+   * booked as `closed_externally` — a real stop-out the books then denied
+   * (stops_fired 0 while the post-stop cooldown armed). The engine KNOWS its own
+   * stop order ids, and the per-order endpoint answers for any id you can name.
+   */
+  async getIBKROrderStatus(userId, orderId) {
+    if (!orderId) return null;
+    const client = this._clientFor(userId);
+    if (!client || !client.getOrderStatus) return null;
+    const status = await client.getStatus();
+    if (!status.connected) return null;
+    const j = await client.getOrderStatus(orderId).catch(() => null);
+    if (!j) return null;
+    const num = (...vals) => { for (const v of vals) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; } return null; };
+    return {
+      order_id: String(orderId),
+      status: String(j.order_status ?? j.status ?? ''),
+      avgPrice: num(j.average_price, j.avgPrice, j.avg_price),
+      filledQty: num(j.cum_fill, j.filledQuantity, j.filled_quantity, j.filledQty),
+    };
+  }
+
   /** Cancel a working IBKR order (e.g. an orphaned protective stop). */
   async cancelIBKROrder(userId, orderId) {
     const client = this._clientFor(userId);
