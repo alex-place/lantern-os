@@ -120,7 +120,22 @@
      the combinations was wrong: `body.leftdock-closed` and `body.ticket-closed` have equal
      specificity, so with both set the later rule won and re-expanded the left column --
      closing the chat left its 360px behind. Per-flag variables cannot collide. */
-  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,320px)}
+  /* One header language for every panel chrome. Before this the dock headers, the
+     bottom tab strip, the account summary and the in-panel section labels each had
+     their own padding (10 / 12 / 16px) and type scale, so nothing lined up across
+     the surfaces. Tabs stay a touch larger than labels because they are hit targets,
+     but everything shares the same rhythm, colour and border. */
+  :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
+  /* Popup surfaces. Every overlay had grown its own corner, shadow and scrim, so a
+     flyout, a modal and a floating toolbar read as three different materials. These
+     are the alert dialog's values -- the newest and best-judged of them -- promoted
+     to tokens so the rest inherit rather than re-invent. */
+  :root{--pop-r:12px;--pop-r-sm:10px;--pop-r-item:7px;
+        --pop-sh:0 24px 60px rgba(0,0,0,.6);--pop-sh-sm:0 12px 32px rgba(0,0,0,.5);
+        --pop-scrim:rgba(4,6,10,.62);--pop-pad:6px;--pop-fs:12.5px;--pop-fs-sm:11.5px}
+  /* The watchlist column is FIXED. It is not draggable, so it does not read a saved
+     width -- 340px fits every track with ~40px to spare (measured, not guessed). */
+  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:340px}
   .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
   body.ticket-closed{--col-t:0px}
@@ -142,13 +157,12 @@
   body.leftdock-closed .dockL > *,
   body.rightdock-closed .dockR > *{display:none}
   .dockL-resize{position:absolute;right:-3px;top:0;bottom:0;width:7px;z-index:40}
-  .dockR-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;z-index:40}
-  body.leftdock-closed .dockL-resize, body.rightdock-closed .dockR-resize{display:none}
+  body.leftdock-closed .dockL-resize{display:none}
 
   .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
   .dock-panel[hidden]{display:none}
-  .dock-head{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);flex:0 0 auto}
-  .dock-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);flex:1}
+  .dock-head{display:flex;align-items:center;gap:8px;padding:var(--hdr-py) var(--hdr-px);border-bottom:1px solid var(--border);flex:0 0 auto;min-height:30px}
+  .dock-title{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);flex:1}
   .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
   .dock-x:hover{color:var(--text0);background:var(--bg3)}
   .dock-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
@@ -160,7 +174,7 @@
     width:100%;max-width:none;height:100%;min-width:0;flex:1 1 auto;
     border:none;box-shadow:none;animation:none}
   .dock-body > .dc-modal{display:flex;flex-direction:column;min-height:0}
-  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
   .dock-body .wl-info{flex:0 0 auto}
 
   /* Order ticket: a sibling row under the widget panel, so both are open at once. */
@@ -206,16 +220,16 @@
 
   /* Flyout: the category's tools, grouped, each with ? / shortcut / favourite. */
   .dr-flyout{position:fixed;z-index:1400;min-width:250px;max-height:76vh;overflow-y:auto;
-    background:var(--bg1);border:1px solid var(--border);border-radius:8px;
-    box-shadow:0 10px 30px rgba(0,0,0,.45);padding:5px}
+    background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);
+    box-shadow:var(--pop-sh-sm);padding:var(--pop-pad)}
   .dr-flyout[hidden]{display:none}
-  .dr-fly-group{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--text2);padding:7px 9px 3px}
-  .dr-fly-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer}
+  .dr-fly-group{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;
+    color:var(--hdr-fg);padding:8px 9px 4px}
+  .dr-fly-item{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--pop-r-item);cursor:pointer}
   .dr-fly-item:hover{background:var(--bg2)}
   .dr-fly-item.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
   .dr-fly-ico{width:20px;text-align:center;color:var(--text1);flex:0 0 auto;font-size:15px}
-  .dr-fly-name{flex:1;font-size:12.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dr-fly-name{flex:1;font-size:var(--pop-fs);color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dr-fly-q,.dr-fly-key,.dr-fly-star{background:none;border:0;cursor:pointer;color:var(--text2);
     font-family:var(--mono);line-height:1;padding:2px 3px;border-radius:4px;flex:0 0 auto}
   .dr-fly-q{font-size:10px;width:16px;height:16px;border:1px solid var(--border);border-radius:50%}
@@ -223,33 +237,33 @@
   .dr-fly-star{font-size:12px}
   .dr-fly-star.on{color:var(--amber,#f5a623)}
   .dr-fly-q:hover,.dr-fly-key:hover,.dr-fly-star:hover{color:var(--text0);background:var(--bg3)}
-  .dr-fly-why{font-size:12px;line-height:1.5;color:var(--text1);padding:2px 9px 6px;margin:0;max-width:270px}
-  .dr-fly-meta{font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 9px 8px;margin:0}
+  .dr-fly-why{font-size:var(--pop-fs);line-height:1.5;color:var(--text1);padding:2px 9px 6px;margin:0;max-width:270px}
+  .dr-fly-meta{font-family:var(--mono);font-size:var(--hdr-size);color:var(--text2);padding:0 9px 8px;margin:0}
   .dr-fly-foot{display:flex;gap:6px;padding:6px 8px 3px;border-top:1px solid var(--border)}
-  .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:11px;padding:5px;border-radius:5px;
+  .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:var(--pop-fs-sm);padding:6px;border-radius:var(--pop-r-item);
     border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
   .dr-fly-foot button:hover{background:var(--bg3);color:var(--text0)}
   /* Style popup rows for a selected drawing. */
-  .dr-st-row{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12px;color:var(--text1)}
+  .dr-st-row{display:flex;align-items:center;gap:8px;padding:6px 9px;font-size:var(--pop-fs);color:var(--text1)}
   .dr-st-row span{flex:1}
-  .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0}
+  .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:5px;padding:0}
   .dr-st-row input[type=range]{width:96px}
   .dr-settings{min-width:250px}
   .dset-tabs{display:flex;gap:2px;padding:2px 6px 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
   .dset-tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);
-    font-size:11.5px;padding:4px 2px;cursor:pointer}
+    font-size:var(--pop-fs-sm);padding:5px 2px;cursor:pointer}
   .dset-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
   .dset-tab.empty{opacity:.45}
   .dset-tab:hover{color:var(--text0)}
   /* Quick-action row raised over a selected drawing. */
   /* Selection toolbar -- a compact strip of real controls, not a row of glyphs. */
   .dsel-bar{position:fixed;z-index:1350;display:flex;align-items:center;gap:1px;padding:3px 5px;
-    background:var(--bg1);border:1px solid var(--border);border-radius:9px;
-    box-shadow:0 8px 24px rgba(0,0,0,.5)}
+    background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);
+    box-shadow:var(--pop-sh-sm)}
   .dsel-bar[hidden]{display:none}
   .dsel-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 4px 0 1px;user-select:none}
   .dsel-bar button{height:26px;min-width:28px;display:inline-flex;align-items:center;justify-content:center;
-    gap:4px;background:none;border:1px solid transparent;border-radius:6px;color:var(--text1);
+    gap:4px;background:none;border:1px solid transparent;border-radius:var(--pop-r-item);color:var(--text1);
     font-size:13px;padding:0 6px;cursor:pointer}
   .dsel-bar button:hover{background:var(--bg3);color:var(--text0)}
   .dsel-bar button.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
@@ -264,18 +278,18 @@
   .dsel-pop{min-width:170px}
   /* Alert dialog -- a real modal, centred, with the reference's label/field rows. */
   /* Alerts in the rail: a single stack sized for a ~320px column. */
-  .al-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .al-bar{display:flex;align-items:center;gap:8px;padding:8px var(--hdr-px);border-bottom:1px solid var(--border)}
   .al-new{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);
     font-family:var(--mono);font-size:11.5px;padding:6px 8px;cursor:pointer}
   .al-new:hover{background:var(--bg3);color:var(--text0);border-color:var(--accent)}
   .al-count{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
-  .al-deliv{display:flex;align-items:center;gap:7px;padding:8px 10px 4px;font-size:12px;color:var(--text1)}
-  .al-sec{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--text2);padding:10px 10px 4px;border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
-  .al-pad{padding:0 10px 4px}
-  .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px 10px 10px;margin:0}
+  .al-deliv{display:flex;align-items:center;gap:7px;padding:8px var(--hdr-px) 4px;font-size:12px;color:var(--text1)}
+  .al-sec{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);padding:10px var(--hdr-px) 4px;
+    border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
+  .al-pad{padding:0 var(--hdr-px) 4px}
+  .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px var(--hdr-px) 10px;margin:0}
   .al-link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
-  .al-item{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px 10px;
+  .al-item{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px var(--hdr-px);
     border-bottom:1px solid rgba(255,255,255,.03)}
   .al-item:hover{background:var(--bg2)}
   .al-item.off{opacity:.55}
@@ -287,39 +301,39 @@
   .al-item-act button{width:22px;height:22px;background:none;border:0;border-radius:4px;color:var(--text2);
     font-size:10px;cursor:pointer;line-height:1}
   .al-item-act button:hover{color:var(--text0);background:var(--bg3)}
-  .al-fire{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .al-fire{padding:5px var(--hdr-px);border-bottom:1px solid rgba(255,255,255,.03)}
   .al-fire-when{display:block;font-family:var(--mono);font-size:9.5px;color:var(--text2)}
   .al-fire-msg{display:block;font-size:11.5px;color:var(--text1);line-height:1.4;white-space:normal}
   .al-teaser{padding:12px 10px;font-size:12px;line-height:1.55;color:var(--text1)}
   .al-teaser p{margin:6px 0;color:var(--text2)}
   .al-teaser a{color:var(--accent)}
   .al-modal-bg{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;
-    background:rgba(4,6,10,.62);backdrop-filter:blur(3px)}
+    background:var(--pop-scrim);backdrop-filter:blur(3px)}
   .al-modal-bg[hidden]{display:none}
   .al-modal{width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
-    border:1px solid var(--border);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+    border:1px solid var(--border);border-radius:var(--pop-r);box-shadow:var(--pop-sh)}
   .al-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border)}
   .al-title{font-size:15px;color:var(--text0)}
   .al-sym{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0);
-    background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 9px}
+    background:var(--bg3);border:1px solid var(--border);border-radius:var(--pop-r-item);padding:2px 9px}
   .al-head .dock-x{margin-left:auto}
   .al-body{padding:6px 16px 12px}
   .al-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-  .al-row > label{flex:0 0 96px;font-size:12.5px;color:var(--text2);padding-top:7px}
+  .al-row > label{flex:0 0 96px;font-size:var(--pop-fs);color:var(--text2);padding-top:7px}
   .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
   .al-fields select,.al-fields input[type=text],.al-fields input[type=number]{
-    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--pop-r-item);
     color:var(--text0);padding:7px 9px;font:inherit;font-size:13px}
   .al-inline{display:flex;align-items:center;gap:7px}
   .al-inline input{width:auto;flex:1}
-  .al-sub{font-size:11.5px;color:var(--text2);white-space:nowrap}
-  .al-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text1)}
+  .al-sub{font-size:var(--pop-fs-sm);color:var(--text2);white-space:nowrap}
+  .al-check{display:flex;align-items:center;gap:7px;font-size:var(--pop-fs);color:var(--text1)}
   .al-check input{width:auto}
-  .al-note{margin:0;font-size:11.5px;line-height:1.5;color:var(--text2)}
-  .al-err{margin:10px 0 0;font-size:12.5px;color:var(--red)}
+  .al-note{margin:0;font-size:var(--pop-fs-sm);line-height:1.5;color:var(--text2)}
+  .al-err{margin:10px 0 0;font-size:var(--pop-fs);color:var(--red)}
   .al-err[hidden]{display:none}
   .al-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
-  .al-btn{padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);
+  .al-btn{padding:8px 18px;border-radius:var(--pop-r-item);border:1px solid var(--border);background:var(--bg2);
     color:var(--text1);font:inherit;font-size:13px;cursor:pointer}
   .al-btn:hover{background:var(--bg3);color:var(--text0)}
   .al-btn.primary{background:var(--accent);border-color:var(--accent);color:#04202b;font-weight:600}
@@ -391,7 +405,7 @@
   .hgroup .chart-ctrl:hover{background:var(--bg2)}
   .hgroup-sep{width:1px;height:16px;background:var(--border);flex:0 0 auto}
   /* ── Hamburger (sandwich) menu: on narrow screens the chart controls + secondary
-     actions collapse into a ☰ dropdown instead of a long sideways-scrolling row.
+     actions collapse into a  dropdown instead of a long sideways-scrolling row.
      The SAME elements move into the panel (JS), so ids/handlers/state survive. ── */
   /* The ☰ is PERMANENT: the feed stamp, Pre/After, Kalshi, Explore, Connect broker,
      and Chat live in it at every width; on narrow screens it additionally swallows
@@ -419,16 +433,20 @@
      run all the way to the bottom; the footer trading panel sits under the charts. */
   .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
-  .main{grid-column:3;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
+  /* min-width:0 is load-bearing. A grid item defaults to min-width:auto, which means it
+     refuses to shrink below its content -- so the chart column ignored its own track and
+     ran 236px underneath the ticket and watchlist docks. The track was already
+     minmax(0,1fr); that constrains the TRACK, not the item sitting in it. */
+  .main{grid-column:3;grid-row:2;min-width:0;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
   .footer{position:relative;grid-column:3;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
-  .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
+  .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:9px var(--hdr-px);border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
   .tp-stat .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text0)}
   .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
-  .tp-tabs{display:flex;gap:2px;padding:6px 12px 0;border-bottom:1px solid var(--border);overflow-x:auto}
-  .tp-tab{font-family:var(--mono);font-size:12px;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;padding:6px 12px 8px;cursor:pointer;white-space:nowrap}
+  .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;min-height:30px;align-items:stretch}
+  .tp-tab{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--hdr-fg);background:none;border:none;border-bottom:2px solid transparent;padding:0 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:color .12s,border-color .12s}
   .tp-tab:hover{color:var(--text1)}
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
   .tp-badge{font-size:11px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
@@ -500,7 +518,7 @@
   .wi-alert-add:hover{border-color:var(--accent);color:var(--text0)}
   .wi-alert-chip{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:9px;border:1px solid rgba(245,166,35,.45);background:rgba(245,166,35,.08);color:var(--amber);white-space:nowrap}
   .wi-alert-chip button{background:none;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px;font-size:10.5px}
-  .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:var(--pop-r-sm);box-shadow:var(--pop-sh-sm)}
   /* #2439: watchlist sort control */
   .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
   .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
@@ -510,7 +528,9 @@
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(30px,1fr) auto auto auto;align-items:center;gap:5px;padding:4px 20px 4px 8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.2}
+  /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
+     right-aligned tracks so figures line up down the whole list. */
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -524,13 +544,40 @@
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
-  .wl-sym{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0);overflow:hidden;text-overflow:ellipsis}
+  /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
+     exactly over the figures they name. */
+  .wl-head{position:sticky;top:0;z-index:5;display:grid;
+    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;
+    /* The list below scrolls and this does not, so without reserving the same gutter the
+       labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
+       runtime because the width differs by platform and overlay-scrollbar setting. */
+    padding:var(--hdr-py) calc(var(--hdr-px) + var(--wl-sb, 0px)) 5px var(--hdr-px);
+    background:var(--bg1);border-bottom:1px solid var(--border)}
+  .wl-h-sym{grid-column:2;white-space:nowrap;font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg)}
+  .wl-h-num{font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg);text-align:right}
+  /* Symbol, then any signal marker, in ONE grid cell -- a seventh child in a five-track
+     grid was wrapping to its own line and making every row three lines tall. */
+  .wl-symcell{display:flex;align-items:center;gap:5px;min-width:0}
+  .wl-symcell .wl-signal{flex:0 0 auto;font-size:9.5px}
+  .wl-sym{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--text0);overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+  /* One numeric treatment for all three money columns: tabular figures so digits line
+     up, and the same size so no column shouts over another. */
+  .wl-price,.wl-abs,.wl-chg{font-family:var(--mono);font-size:12px;text-align:right;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .wl-price{color:var(--text0)}
+  .wl-abs{color:var(--text2);font-weight:500}
+  .wl-chg{font-weight:600}
+  .wl-abs.up,.wl-chg.up{color:var(--green)}
+  .wl-abs.down,.wl-chg.down{color:var(--red,#f23645)}
+  .wl-abs.flat,.wl-chg.flat{color:var(--text2)}
+  /* Hover and selection read as a whole row, with the accent as a left edge rather
+     than a border box -- quieter at a glance down a long list. */
+  .wl-item:hover{background:rgba(255,255,255,.035)}
+  .wl-item.active{background:rgba(255,255,255,.06);box-shadow:inset 2px 0 0 var(--accent)}
   /* Two aligned columns, not space-between: left holds symbol/change, right holds
      price/signal, so every row forms a real column instead of drifting with each
      value's width. */
   .wl-right{display:flex;align-items:center;gap:6px;justify-content:flex-end}
-  .wl-price{font-family:var(--mono);font-size:12px;color:var(--text0);text-align:right;font-variant-numeric:tabular-nums}
-  .wl-chg{font-family:var(--mono);font-size:12px;font-weight:600;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
   .wl-signal{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
@@ -694,11 +741,11 @@
   /* #1696: buttons stay vibrant — Σ₀ no longer mutes them (sig-off is a no-op). */
   .order-ticket button.sig-off{opacity:1;filter:none}
   /* ── Symbol-search popup (#1692) ── */
-  .sym-bg{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-start;justify-content:center;background:rgba(5,6,8,.62);padding-top:8vh}
+  .sym-bg{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-start;justify-content:center;background:var(--pop-scrim);backdrop-filter:blur(3px);padding-top:8vh}
   .sym-bg.hidden{display:none}
-  .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r);box-shadow:var(--pop-sh);display:flex;flex-direction:column;overflow:hidden}
   .sym-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
-  .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:8px;outline:none}
+  .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:var(--pop-r-item);outline:none}
   .sym-head input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
   .sym-close{cursor:pointer;color:var(--text2);font-size:16px;padding:4px 8px;border-radius:4px}
   .sym-close:hover{color:var(--text0);background:var(--bg2)}
@@ -743,10 +790,10 @@
   /* Patterns dropdown: the trigger reads "active" (accent) when any layer is opted in;
      the panel is a floating checklist positioned under whichever button opened it. */
   #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
-  .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
+  .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);box-shadow:var(--pop-sh-sm);padding:6px}
   .pat-menu[hidden]{display:none}
-  .pat-menu-group{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);padding:8px 8px 3px}
-  .pat-menu-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:5px;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--text0);user-select:none}
+  .pat-menu-group{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);padding:8px 9px 4px}
+  .pat-menu-item{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--pop-r-item);cursor:pointer;font-family:var(--sans);font-size:var(--pop-fs);color:var(--text0);user-select:none}
   .pat-menu-item:hover{background:var(--bg2)}
   .pat-menu-item input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
   .pat-menu-item .pat-lbl{flex:1}
@@ -1059,8 +1106,10 @@
   /* Reflow the deck + footer to the left so content sits BESIDE the rail, never under
      it — the same mechanism the order ticket uses. When both rails are open, reserve
      room for both and the chat sits to the left of the ticket. */
-  /* #3355: the chat is a dock panel now — the grid reserves its column, so padding the chart area as well would double-count the space. */
-  body.dc-open.ot-open .main{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
+  /* #3355: the chat is a dock panel now -- the grid reserves its column, so padding the
+     chart area as well double-counted the space. The padding also pinned the chart open:
+     a border-box element cannot shrink below its own padding, so 12 + (360+340+16) held
+     .main at 728px inside a 492px track, and it ran under the docks. */
   body.ot-open .dc-bg{ right: var(--ticket-w,340px); }
   @media (max-width:760px){ body.ot-open .dc-bg{ right:0; } }
 
@@ -1190,7 +1239,7 @@
   <span class="hgroup-sep" aria-hidden="true"></span>
   <button id="drawToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="toggleDrawMenu(this)"
-    title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">✏ Draw ▾</button>
+    title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">Draw ▾</button>
   </div><!-- /hgroup -->
   <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
@@ -1200,19 +1249,19 @@
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
   <a href="/trader-guide.html" class="nav-link" title="Trader guide — set up your account, connect Alpaca, turn the autopilot on and off"
-    data-hmenu-desc="Step-by-step guide: sign up, connect Alpaca, choose a strategy, turn the trader on and off.">📖 Guide</a>
-  <!-- Trader pill: shows the ACTIVE TRADER (📈 Stock / 🏆 Champion) running your
+    data-hmenu-desc="Step-by-step guide: sign up, connect Alpaca, choose a strategy, turn the trader on and off.">Guide</a>
+  <!-- Trader pill: shows the ACTIVE TRADER ( Stock /  Champion) running your
        connected account, and links to Settings → Connections to add keys / switch. -->
   <a href="/settings.html#connections" class="nav-link" id="brokerBtn" style="display:none"
     title="Which trader runs your account — click to add an account or switch traders in Settings"
-    data-hmenu-desc="Shows the active trader running your account. Click to add an account or switch traders in Settings."><span id="brokerLabel">📈 Trader</span></a>
+    data-hmenu-desc="Shows the active trader running your account. Click to add an account or switch traders in Settings."><span id="brokerLabel">Trader</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
-    data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
+    data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">Chat</button>
   <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu"
     aria-label="Menu — extended hours, Kalshi, broker, and chat"
-    title="Menu — extended hours, Kalshi, broker, and chat">☰</button>
+    title="Menu — extended hours, Kalshi, broker, and chat" data-ico="menu"></button>
 </div>
 
 <!-- Mobile-only view switch (#2501): chart deck, ticker list, and account panel can't
@@ -1315,7 +1364,6 @@
 
 <!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
 <div class="dockR" id="dockR" role="region" aria-label="Right panels">
-  <div class="col-resize dockR-resize" id="dockRResize" role="separator" aria-orientation="vertical" aria-label="Resize the right panel" tabindex="0" title="Drag to resize"></div>
 
   <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
     <header class="dock-head"><span class="dock-title">Watchlist</span>
@@ -1328,6 +1376,13 @@
           <option value="chg">Δ%</option>
           <option value="rvol">RVOL</option>
         </select>
+      </div>
+      <div class="wl-head" aria-hidden="true">
+        <span class="wl-h-sym">Symbol</span>
+        <span></span>
+        <span class="wl-h-num">Last</span>
+        <span class="wl-h-num">Chg</span>
+        <span class="wl-h-num">Chg%</span>
       </div>
       <div id="wlList"></div>
       <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
@@ -1345,12 +1400,12 @@
 
 <!-- Right widget rail — TradingView's right-hand switcher. -->
 <nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
-  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">☰</button>
-  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">🔔</button>
+  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist" data-ico="menu"></button>
+  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts" data-ico="bell"></button>
   <span class="rail-sep"></span>
-  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">⇅</button>
+  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket" data-ico="swap"></button>
   <span class="rail-sep"></span>
-  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)">💬</button>
+  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)" data-ico="chat"></button>
 </nav>
 </div><!-- /layout -->
 
@@ -1375,7 +1430,7 @@
 <div class="dc-bg hidden" id="dcPanel">
   <aside class="dc-modal" role="dialog" aria-label="Unisona assistant chat" aria-hidden="true">
     <div class="dc-head">
-      <span class="dc-title">💬 Unisona <span class="dc-sub">Assistant</span></span>
+      <span class="dc-title">Unisona <span class="dc-sub">Assistant</span></span>
       <a class="dc-x" href="/chat.html" title="Open the full chat — files, models, voice">Full chat ↗</a>
       <button type="button" class="dc-x" onclick="dcToggle(false)" aria-label="Close chat" title="Close">✕ Close</button>
     </div>
@@ -1385,9 +1440,9 @@
         <div class="dc-hero-t">Ask Unisona</div>
         <div class="dc-tag">Your local AI that remembers you — right beside your charts.</div>
         <div class="dc-chips" role="group" aria-label="Suggested prompts">
-          <button type="button" class="dc-chip" data-q="What's moving in the market today?">📈 What's moving today?</button>
-          <button type="button" class="dc-chip" data-q="Explain what the SPY chart is doing right now.">🔍 Explain SPY's chart</button>
-          <button type="button" class="dc-chip" data-q="How do I place a paper trade here?">🧭 How do paper trades work?</button>
+          <button type="button" class="dc-chip" data-q="What's moving in the market today?">What's moving today?</button>
+          <button type="button" class="dc-chip" data-q="Explain what the SPY chart is doing right now.">Explain SPY's chart</button>
+          <button type="button" class="dc-chip" data-q="How do I place a paper trade here?">How do paper trades work?</button>
         </div>
       </div>
     </div>
@@ -1454,7 +1509,7 @@
 <div class="sym-bg hidden" id="symSearchBg" onclick="if(event.target===this)closeSymbolSearch()">
   <div class="sym-modal" role="dialog" aria-modal="true" aria-label="Symbol search">
     <div class="sym-head">
-      <span aria-hidden="true">🔍</span>
+      <span aria-hidden="true"></span>
       <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
       <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
     </div>
@@ -1551,7 +1606,7 @@
       <!-- #2445: rapid mode — explicit opt-in; skips confirms + arms Shift+B/S -->
       <div class="ot-exit-head" style="margin-top:2px">
         <input type="checkbox" id="otRapid" aria-label="Rapid mode — skip order confirmations" onchange="setRapidMode(this.checked)">
-        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">⚡ Rapid mode — no confirms</span>
+        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">Rapid mode — no confirms</span>
       </div>
 
       <div class="ot-submit" id="otSubmit" onclick="submitOrderTicket()">Buy 1 — MARKET</div>
@@ -4293,12 +4348,81 @@ const CHART_NOTE_BG = () =>
    DRAW_CATS is the source of truth; DRAW_TOOLS below is the flat map the renderer,
    the hit-tester and the commit path already read, derived from it so there is one
    catalogue and not two. `k` is the default shortcut; `why` is the ? blurb. */
+
+/* -- Icons -------------------------------------------------------------------
+   Inline SVG, stroked in currentColor. Emoji were doing this job before: they
+   render in the FONT's colour palette rather than the UI's, differ per platform,
+   and drag a colour picture into a monochrome terminal. These inherit colour,
+   size with the text, and look the same everywhere. */
+const ICON = {
+  menu:      'M3 6h14M3 10h14M3 14h14',
+  bell:      'M10 3a4 4 0 0 0-4 4v3l-1.5 2h11L14 10V7a4 4 0 0 0-4-4Zm-1.5 11a1.5 1.5 0 0 0 3 0',
+  bellOff:   'M6 7a4 4 0 0 1 6.9-2.8M14 10V7m0 3 1.5 2h-9M3 3l14 14',
+  swap:      'M6 4v12m0 0-2.5-2.5M6 16l2.5-2.5M14 16V4m0 0-2.5 2.5M14 4l2.5 2.5',
+  chat:      'M4 5h12v8H8l-4 3V5Z',
+  trash:     'M4 6h12M8 6V4h4v2m-6 0 1 10h6l1-10',
+  lock:      'M6 9V6.5a4 4 0 0 1 8 0V9M4.5 9h11v7h-11z',
+  unlock:    'M6 9V6.5a4 4 0 0 1 7.6-1.7M4.5 9h11v7h-11z',
+  eye:       'M1.5 10S4.5 5 10 5s8.5 5 8.5 5-3 5-8.5 5-8.5-5-8.5-5Z M10 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4',
+  clock:     'M10 4.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM10 7v3.2l2.2 1.3',
+  pencil:    'M13.5 3.5 16 6l-8.5 8.5L4 15l.5-3.5 9-8Z',
+  ruler:     'M3 12 12 3l5 5-9 9-5-5Zm3 0 1.5 1.5M8.5 9.5 10 11M11 7l1.5 1.5',
+  marker:    'M5 15h10M6 12.5 12.5 6l2 2L8 14.5l-2.5.5.5-2.5Z',
+  note:      'M5 3.5h10v13H5zM7.5 7h5M7.5 10h5M7.5 13h3',
+  callout:   'M3.5 4h13v8h-7l-3.5 3v-3h-2.5V4Z',
+  tag:       'M3.5 9.5 9.5 3.5h6v6l-6 6-6-6Zm9-2.5h.01',
+  balloon:   'M4 4.5h12v7H9l-3.5 3v-3H4v-7Z',
+  target:    'M10 3.5v13M3.5 10h13M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7',
+  chart:     'M3 16h14M5.5 13V8m3.5 5V5m3.5 8v-3m3.5 3V7',
+  search:    'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM13.2 13.2 17 17',
+  compass:   'M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm2.8 3.7-1.9 4.3-4.3 1.9 1.9-4.3 4.3-1.9Z',
+  book:      'M4 4h5.5a2 2 0 0 1 2 2v10a2 2 0 0 0-2-2H4V4Zm12 0h-4.5v10H16V4Z',
+  trophy:    'M6 3.5h8v3a4 4 0 0 1-8 0v-3ZM6 5H4v1.5A2.5 2.5 0 0 0 6.5 9M14 5h2v1.5A2.5 2.5 0 0 1 13.5 9M8 13h4l.5 3.5h-5L8 13Z',
+  bolt:      'M11 3 5.5 11H9l-.5 6L15 9h-3.5L11 3Z',
+  warn:      'M10 3.5 17.5 16.5h-15L10 3.5ZM10 8v4m0 2.2h.01',
+  briefcase: 'M3.5 6.5h13v9h-13zM7.5 6.5V4.5h5v2',
+  pin:       'M10 3.5a4 4 0 0 1 4 4c0 3-4 8.5-4 8.5S6 10.5 6 7.5a4 4 0 0 1 4-4Zm0 2.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8',
+  inbox:     'M3.5 11h4l1 2h3l1-2h4M3.5 11 5 4.5h10L16.5 11v5h-13v-5Z',
+  link:      'M8.5 11.5 11.5 8.5M8 6.5 9.5 5a3.5 3.5 0 0 1 5 5l-1.5 1.5M12 13.5 10.5 15a3.5 3.5 0 0 1-5-5L7 8.5',
+  star:      'M10 3.5l2 4.3 4.5.6-3.3 3.2.8 4.6-4-2.2-4 2.2.8-4.6L3.5 8.4l4.5-.6L10 3.5Z',
+  cross:     'M5 5l10 10M15 5 5 15',
+  plus:      'M10 4v12M4 10h12',
+  cursor:    'M10 3v14M3 10h14',
+  magnet:    'M5 4v6a5 5 0 0 0 10 0V4h-3v6a2 2 0 0 1-4 0V4H5Z',
+  dot:       'M10 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3',
+  arrowUp:   'M10 16V5m0 0-4 4m4-4 4 4',
+  arrowDown: 'M10 4v11m0 0 4-4m-4 4-4-4',
+  fan:       'M4 16 16 4M4 16h12M4 16V4',
+  grid:      'M4 4h12v12H4zM4 8h12M4 12h12M8 4v12M12 4v12',
+  moon:      'M14.5 12.5A6 6 0 0 1 7.5 5.5a6 6 0 1 0 7 7Z',
+  sun:       'M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M15.7 4.3l-1.4 1.4M5.7 14.3l-1.4 1.4',
+};
+/** Render an icon at `size` px. Fill-type marks pass fill:true. */
+function ico(name, size, opts) {
+  const d = ICON[name]; if (!d) return '';
+  const o = opts || {}, sz = size || 14;
+  return '<svg class="ic" viewBox="0 0 20 20" width="' + sz + '" height="' + sz + '" aria-hidden="true" '
+    + 'fill="' + (o.fill ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="' + (o.w || 1.5) + '" '
+    + 'stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>';
+}
+
+/* Static markup cannot call ico() inline -- writing the call into HTML renders it as
+   literal text. Elements declare data-ico and are filled once the set is available. */
+function _paintIcons(root) {
+  (root || document).querySelectorAll('[data-ico]').forEach(el => {
+    if (el.firstElementChild && el.firstElementChild.tagName === 'svg') return;
+    const svg = ico(el.dataset.ico, Number(el.dataset.icoSize) || 15);
+    if (svg) el.innerHTML = svg;
+  });
+}
+document.addEventListener('DOMContentLoaded', () => _paintIcons());
+
 const DRAW_CATS = [
   { id:'cursor', name:'Cursors', groups:[
     { name:'Cursors', tools:[
-      ['cross',  { name:'Cross',        icon:'✛', cursor:true,  k:'Alt+C', why:'The normal chart cursor: pan, zoom and read the crosshair. Nothing is drawn.' }],
+      ['cross',  { name:'Cross',        icon:ico('cursor'), cursor:true,  k:'Alt+C', why:'The normal chart cursor: pan, zoom and read the crosshair. Nothing is drawn.' }],
       ['dot',    { name:'Dot',          icon:'·', cursor:true,             why:'A small dot cursor — the same navigation as Cross with a less intrusive pointer.' }],
-      ['pointer',{ name:'Arrow',        icon:'➤', cursor:true,             why:'A plain arrow pointer. Use it when the crosshair lines get in the way of reading candles.' }],
+      ['pointer',{ name:'Arrow',        icon:ico('arrowUp'), cursor:true,             why:'A plain arrow pointer. Use it when the crosshair lines get in the way of reading candles.' }],
     ]},
     { name:'Editing', tools:[
       ['eraser', { name:'Eraser',       icon:'⌫', erase:true,   k:'Alt+E', why:'Click any drawing to delete it. Stays armed so you can clear several in a row.' }],
@@ -4314,7 +4438,7 @@ const DRAW_CATS = [
       ['h',      { name:'Horizontal line',  icon:'—',  pts:1, k:'Alt+H', why:'A price level across the whole chart. The simplest way to mark support, resistance or a target.' }],
       ['hray',   { name:'Horizontal ray',   icon:'⊢',  pts:1, k:'Alt+J', why:'A price level that starts where you click and only projects to the right — it does not claim history it was not there for.' }],
       ['v',      { name:'Vertical line',    icon:'|',  pts:1, k:'Alt+V', why:'Marks a moment in time: an open, a print, an earnings release.' }],
-      ['crossline',{ name:'Cross line',     icon:'✚',  pts:1,            why:'A horizontal and a vertical line through one point — marks a price AND the time it happened.' }],
+      ['crossline',{ name:'Cross line',     icon:ico('target'),  pts:1,            why:'A horizontal and a vertical line through one point — marks a price AND the time it happened.' }],
     ]},
     { name:'Channels', tools:[
       ['chan',   { name:'Parallel channel', icon:'⫽',  pts:3,            why:'Two parallel lines: draw the trend with the first two clicks, the third sets the channel width.' }],
@@ -4350,17 +4474,17 @@ const DRAW_CATS = [
       ['fibfan', { name:'Fib speed fan',      icon:'⋔',  pts:2,            why:'Rays through the fib divisions of a move — support and resistance that rises with time rather than staying flat.' }],
     ]},
     { name:'Gann', tools:[
-      ['gannfan',{ name:'Gann fan',           icon:'✳',  pts:2,            why:'Rays at Gann\'s price/time ratios (1x1, 1x2, 2x1 …). The 1x1 is the one Gann treated as the balance line.' }],
+      ['gannfan',{ name:'Gann fan',           icon:ico('fan'),  pts:2,            why:'Rays at Gann\'s price/time ratios (1x1, 1x2, 2x1 …). The 1x1 is the one Gann treated as the balance line.' }],
       ['gannbox',{ name:'Gann box',           icon:'▦',  pts:2,            why:'A box gridded at Gann\'s divisions, for reading price and time proportions off the same rectangle.' }],
     ]},
   ]},
   { id:'forecast', name:'Forecasting', groups:[
     { name:'Positions', tools:[
-      ['pos',    { name:'Long position',    icon:'⬆',  pts:3, hint:'click entry, then stop, then target', why:'Entry, stop and target in three clicks; shows the risk/reward in R — the same unit the trader\'s own plan uses.' }],
-      ['poss',   { name:'Short position',   icon:'⬇',  pts:3, hint:'click entry, then stop, then target', why:'The same as Long position, mirrored for a short.' }],
+      ['pos',    { name:'Long position',    icon:ico('arrowUp'),  pts:3, hint:'click entry, then stop, then target', why:'Entry, stop and target in three clicks; shows the risk/reward in R — the same unit the trader\'s own plan uses.' }],
+      ['poss',   { name:'Short position',   icon:ico('arrowDown'),  pts:3, hint:'click entry, then stop, then target', why:'The same as Long position, mirrored for a short.' }],
     ]},
     { name:'Measure', tools:[
-      ['meas',   { name:'Measure',          icon:'📏', pts:2, k:'Alt+M', why:'Reports the price change, percentage and number of bars between two points.' }],
+      ['meas',   { name:'Measure',          icon:ico('ruler'), pts:2, k:'Alt+M', why:'Reports the price change, percentage and number of bars between two points.' }],
       ['range',  { name:'Price range',      icon:'↕',  pts:2,            why:'Measures price only — how far a move travelled, ignoring how long it took.' }],
       ['drange', { name:'Date range',       icon:'↔',  pts:2,            why:'Measures time only — how many bars and how long a move lasted.' }],
       ['fcast',  { name:'Forecast',         icon:'⤳',  pts:3,            why:'Sketch a path you expect price to take, so you can compare it against what actually happens.' }],
@@ -4369,22 +4493,22 @@ const DRAW_CATS = [
   ]},
   { id:'brushes', name:'Brushes', groups:[
     { name:'Brushes', tools:[
-      ['pen',    { name:'Brush',            icon:'✎',  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
-      ['hl',     { name:'Highlighter',      icon:'🖍', pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
+      ['pen',    { name:'Brush',            icon:ico('pencil'),  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
+      ['hl',     { name:'Highlighter',      icon:ico('marker'), pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
     ]},
     { name:'Arrows', tools:[
-      ['arrow',  { name:'Arrow',            icon:'➚',  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
-      ['arrowup',{ name:'Arrow up',           icon:'⬆',  pts:1,            why:'A marker under a bar — the quickest way to flag an entry or a signal you want to find again.' }],
-      ['arrowdn',{ name:'Arrow down',         icon:'⬇',  pts:1,            why:'The same marker above a bar, for exits and rejections.' }],
+      ['arrow',  { name:'Arrow',            icon:ico('fan'),  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
+      ['arrowup',{ name:'Arrow up',           icon:ico('arrowUp'),  pts:1,            why:'A marker under a bar — the quickest way to flag an entry or a signal you want to find again.' }],
+      ['arrowdn',{ name:'Arrow down',         icon:ico('arrowDown'),  pts:1,            why:'The same marker above a bar, for exits and rejections.' }],
     ]},
   ]},
   { id:'text', name:'Text and notes', groups:[
     { name:'Text', tools:[
       ['text',   { name:'Text',             icon:'T',  pts:1, text:true, k:'Alt+X', why:'Free text anchored to a point on the chart. Moves with the bar it was placed on.' }],
-      ['note',   { name:'Note',             icon:'🗒', pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
-      ['callout',{ name:'Callout',          icon:'💬', pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
-      ['plabel', { name:'Price label',      icon:'🏷', pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
-      ['balloon',{ name:'Comment balloon',    icon:'🗨',  pts:1, text:true, why:'A rounded speech bubble anchored to a bar, for a short remark rather than a full note.' }],
+      ['note',   { name:'Note',             icon:ico('note'), pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
+      ['callout',{ name:'Callout',          icon:ico('callout'), pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
+      ['plabel', { name:'Price label',      icon:ico('tag'), pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
+      ['balloon',{ name:'Comment balloon',    icon:ico('balloon'),  pts:1, text:true, why:'A rounded speech bubble anchored to a bar, for a short remark rather than a full note.' }],
     ]},
   ]},
 ];
@@ -4443,7 +4567,7 @@ function _setDrawBtn() {
   const b = document.getElementById('drawToggle');
   if (!b) return;
   const d = DRAW_TOOLS[_drawTool];
-  b.textContent = d ? ('✏ ' + d.name + ' ▾') : '✏ Draw ▾';
+  b.textContent = d ? (d.name + ' ▾') : 'Draw ▾';
   b.classList.toggle('on', !!_drawTool);
 }
 function _canvasTicker(canvas) { return canvas.id === 'chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/, ''); }
@@ -5198,15 +5322,15 @@ function showSelBar(tk, i) {
       '<span class="dsel-grip" title="Drawing actions">⠿</span>'
     + B('⊞', 'Settings', 'openDrawingSettings(\'' + tk + '\',' + i + ',null,null)')
     + '<button type="button" class="dsel-colbtn" title="Colour" aria-label="Colour"'
-    +   ' onclick="openColourPop(\'' + tk + '\',' + i + ',this)">✏<span class="dsel-swatch" style="background:' + col + '"></span></button>'
+    +   ' onclick="openColourPop(\'' + tk + '\',' + i + ',this)">' + ico('pencil') + '<span class="dsel-swatch" style="background:' + col + '"></span></button>'
     + '<button type="button" class="dsel-wbtn" title="Line width" aria-label="Line width"'
     +   ' onclick="openWidthPop(\'' + tk + '\',' + i + ',this)"><span class="wd-line" style="height:' + Math.min(4, w) + 'px"></span>'
     +   '<span class="dsel-wlbl">' + w + 'px</span></button>'
     + '<span class="dsel-sep"></span>'
-    + B('⏱', 'Alerts for this symbol', 'alertFromDrawing(\'' + tk + '\')')
-    + B(d.locked ? '🔒' : '🔓', d.locked ? 'Unlock' : 'Lock', 'toggleDrawingLock(\'' + tk + '\',' + i + ')',
+    + B(ico('clock'), 'Alerts for this symbol', 'alertFromDrawing(\'' + tk + '\')')
+    + B(d.locked ? ico('lock') : ico('unlock'), d.locked ? 'Unlock' : 'Lock', 'toggleDrawingLock(\'' + tk + '\',' + i + ')',
         d.locked ? ' class="on"' : '')
-    + B('🗑', 'Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')')
+    + B(ico('trash'), 'Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')')
     + B('⋯', 'More', 'openMorePop(\'' + tk + '\',' + i + ',this)');
   const geom = _selGeom(tk);
   const anchors = geom ? _drawingAnchors(tk, geom.data, i, geom.pw, geom.ph) : [];
@@ -5445,12 +5569,12 @@ async function placeMarketOrder(sym, side, qty, source){
       body: JSON.stringify({ ticker:sym, side, qty, type:'market' })
     });
     const result = await r.json();
-    if(!r.ok || result.status!=='placed'){ _alertToast('⚠ '+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
-    _alertToast(`⚡ ${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
+    if(!r.ok || result.status!=='placed'){ _alertToast(''+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
+    _alertToast(`${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
     journalLog({ symbol:sym, side, qty, type:'market', source: source||'rapid' });
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
-  }catch(e){ _alertToast('⚠ order failed: '+e.message); return false; }
+  }catch(e){ _alertToast('order failed: '+e.message); return false; }
 }
 
 // #2439: risk-based sizing — units = floor(risk$ / |entry − stop|). Entry is the
@@ -5522,21 +5646,21 @@ async function submitOrderTicket(){
       const fill = result.fill_price ? ` @ $${result.fill_price}` : '';
       const sim = result.mode==='paper' ? ' (paper)' : '';
       const verb = result.fill_price ? 'filled' : 'placed';
-      _alertToast(`✓ ${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
+      _alertToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
       journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
       closeOrderTicket();
       await Promise.all([loadOrders(), loadPortfolio()]);
     } else if(result && result.status === 'dry_run'){
       // Real broker connected but not armed — NOT a failure; explain plainly.
-      _alertToast(`⚠ Not placed — your broker isn’t armed for real orders. ${result.reason||''}`.trim());
+      _alertToast(`Not placed — your broker isn’t armed for real orders. ${result.reason||''}`.trim());
       if(submit.dataset.prev) submit.textContent=submit.dataset.prev;
     } else {
-      _alertToast('⚠ Order didn’t go through: ' + (result.reason || result.error || r.statusText));
+      _alertToast('Order didn’t go through: ' + (result.reason || result.error || r.statusText));
       if(submit.dataset.prev) submit.textContent=submit.dataset.prev;
     }
   }catch(e){
     submit.style.pointerEvents='';
-    _alertToast('⚠ Order didn’t go through: ' + e.message);
+    _alertToast('Order didn’t go through: ' + e.message);
   }
 }
 let _otArmed=false, _otArmTimer=null;
@@ -5590,16 +5714,20 @@ function renderWatchlist(){
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
-    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span class="wl-signal"></span>';
+    // The per-row signal chip was removed (operator): at 320px it consumed the symbol
+    // column and truncated four-letter tickers to 'S...'. The engine's read is still on
+    // the card header and in the symbol details panel below the list.
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
       <span class="wl-sym">${t.ticker}</span>
-      <span class="wl-price">$${_wlPx(t.price)}</span>
+      <span></span>
+      <span class="wl-price">${_wlPx(t.price)}</span>
+      <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
       <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
-      ${sigTxt}
       <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
   }).join('');
+  if (typeof _syncWlScrollbar === 'function') _syncWlScrollbar();
   if(activeTicker) renderSymbolInfo(activeTicker);
 }
 
@@ -5613,6 +5741,26 @@ function _fmtCap(v){ return v==null?'—': v>=1e12?(v/1e12).toFixed(2)+'T': v>=1
 function _fmtNum(v){ return v==null?'—': (+v).toFixed(2); }
 function _fmtPx(v){ return v==null?'—': '$'+(+v).toFixed(2); }
 function _fmtRange(lo,hi){ return (lo==null&&hi==null)?'—': _fmtPx(lo)+' – '+_fmtPx(hi); }
+/* Absolute day change. The feed sends price and percent but not the previous close,
+   so derive it: prev = price / (1 + pct/100). */
+/* Publish the watchlist scrollbar width so the sticky header can reserve the same
+   gutter. Re-measured on resize because overlay scrollbars appear and disappear. */
+function _syncWlScrollbar() {
+  const list = document.getElementById('wlList'); if (!list) return;
+  const sb = Math.max(0, list.offsetWidth - list.clientWidth);
+  document.documentElement.style.setProperty('--wl-sb', sb + 'px');
+}
+window.addEventListener('resize', _syncWlScrollbar);
+
+function _wlAbs(price, pct) {
+  const p = Number(price), c = Number(pct);
+  if (!Number.isFinite(p) || !Number.isFinite(c)) return '—';
+  const prev = p / (1 + c / 100);
+  if (!Number.isFinite(prev) || prev <= 0) return '—';
+  const d = p - prev;
+  return (d >= 0 ? '+' : '') + d.toFixed(Math.abs(p) >= 100 ? 2 : 3);
+}
+
 function renderSymbolInfo(ticker){
   const el = document.getElementById('wlInfo'); if(!el) return;
   if(!ticker){ el.className='wl-info'; el.innerHTML=''; return; }
@@ -5662,7 +5810,7 @@ function renderSymbolInfo(ticker){
     <div class="wi-sect">About</div>
     <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>
     <div class="wi-sect">Alerts</div>
-    <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ 🔔 Alert</button></div>`;
+    <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ Alert</button></div>`;
   if(!_symNames[ticker] && kind==='Equity'){
     fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
       if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
@@ -6253,13 +6401,13 @@ const s0Status = { equity:null, pnl:null, positions:0, market:null, marketOpen:n
 function renderS0StatusHtml(){
   const pnl = s0Status.pnl||0;
   const reg = s0Status.market || '—';
-  const dot = reg==='BULLISH'?'🟢':reg==='BEARISH'?'🔴':'⚪';
+  const dot = reg==='BULLISH'?'●':reg==='BEARISH'?'●':'○';
   const openTxt = s0Status.marketOpen===false?' · closed':(s0Status.marketOpen?' · open':'');
   const scanned = Object.keys(zonesData||{}).length;
   return `<div class="s0-status">`+
-    `<span>💼 ${s0Status.equity!=null?'$'+fmt(s0Status.equity,0):'—'}</span>`+
+    `<span>${s0Status.equity!=null?'$'+fmt(s0Status.equity,0):'—'}</span>`+
     `<span class="${pnl>=0?'pos':'neg'}">${pnl>=0?'▲':'▼'} ${pnl>=0?'+':'-'}$${fmt(Math.abs(pnl),0)} today</span>`+
-    `<span>${s0Status.positions?('📌 '+s0Status.positions+' open'):'📭 flat'}</span>`+
+    `<span>${s0Status.positions?(''+s0Status.positions+' open'):'flat'}</span>`+
     `<span>${dot} ${reg}${openTxt}</span>`+
     `<span>⏱ ${scanned} scanned · 1m</span>`+
   `</div>`;
@@ -6310,7 +6458,7 @@ function renderSigma0Signals(){
     </div>`).join('');
   const watchHtml = watching.slice(0,6).map(w=>`
     <div class="s0-watch${w.isShort?' short':''}">
-      <span class="s0-eye">👀</span> Looking for a <b>${w.label}</b> on <b>${newsEsc(w.ticker)}</b>${w.why?` — ${newsEsc(w.why)}`:''} · ${w.p}%
+      <span class="s0-eye" data-ico="eye" data-ico-size="12"></span> Looking for a <b>${w.label}</b> on <b>${newsEsc(w.ticker)}</b>${w.why?` — ${newsEsc(w.why)}`:''} · ${w.p}%
     </div>`).join('');
 
   if(!enters.length && !watching.length){
@@ -6318,7 +6466,7 @@ function renderSigma0Signals(){
     // the panel is honest instead of implying an active scan that can't run.
     let msg;
     if(zonesStatus.failed){
-      msg = `⚠ Market data unavailable${zonesStatus.reason?` — ${newsEsc(zonesStatus.reason.replace(/^market data unavailable — /i,''))}`:''}. Zone overlays paused until the data backend reconnects.`;
+      msg = ` Market data unavailable${zonesStatus.reason?` — ${newsEsc(zonesStatus.reason.replace(/^market data unavailable — /i,''))}`:''}. Zone overlays paused until the data backend reconnects.`;
     } else if(!zonesStatus.available){
       msg = 'Warming up the market scan — zone overlays and signals appear once the first scan completes.';
     } else {
@@ -6449,7 +6597,7 @@ function checkPriceAlerts(){
     for(let i=list.length-1;i>=0;i--){
       const a=list[i];
       if((a.dir==='above' && px>=a.price) || (a.dir==='below' && px<=a.price)){
-        const msg=`🔔 ${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
+        const msg=`${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
         _alertToast(msg);
         if(window.Notification && Notification.permission==='granted') try{ new Notification('Unisona Trader', {body:msg}); }catch(e){}
         list.splice(i,1); _saveAlerts();
@@ -7022,6 +7170,13 @@ function _applyDocks() {
     if (tab) tab.setAttribute('aria-selected', on ? 'true' : 'false');
   }
   const ct = document.getElementById('ltab-chat'); if (ct) ct.setAttribute('aria-pressed', _leftOpen ? 'true' : 'false');
+  /* The header's Chat button is a view of the same state, so it syncs HERE rather than
+     in whichever handler happened to run. It was set only inside dcToggle, so it lit up
+     wrong twice: on load it read 'off' with the chat open, and closing via the dock's
+     own X left it lit. Every open/close path lands in _applyDocks, so this is the one
+     place it can't drift. */
+  const hb = document.getElementById('dcToggle');
+  if (hb) { hb.classList.toggle('dc-on', _leftOpen); hb.setAttribute('aria-expanded', _leftOpen ? 'true' : 'false'); }
   const tt = document.getElementById('rtab-ticket'); if (tt) tt.setAttribute('aria-pressed', (_rightOpen && _ticketOpen) ? 'true' : 'false');
   if (_rwPanel === 'alerts' && _rightOpen && typeof loadAlerts === 'function') loadAlerts();
   // Pixel-sized deck tracks: a column change has to re-tile or the charts keep the old geometry.
@@ -7056,7 +7211,7 @@ function toggleTicketDock() {
 // nothing in the render or commit path actually read. Hide is real -- the drawing pass
 // checks it -- so it stays.
 const DRAW_UTILS = {
-  hide: { icon: '👁', label: 'Hide drawings' },
+  hide: { icon: ico('eye'), label: 'Hide drawings' },
 };
 const _dj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
 const _ds = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -7099,7 +7254,7 @@ function renderDrawRail() {
     h += '<button class="dr-btn util" type="button" aria-pressed="' + (drawUtilOn(k) ? 'true' : 'false')
       + '" title="' + _esc(u.label) + '" onclick="toggleDrawUtil(\'' + k + '\')">' + u.icon + '</button>';
   h += '<span class="dr-sep"></span><button class="dr-btn" type="button" title="Remove all drawings on this symbol"'
-    + ' onclick="setDrawTool(\'clear\');renderDrawRail()">🗑</button>';
+    + ' onclick="setDrawTool(\'clear\');renderDrawRail()">' + ico('trash') + '</button>';
   rail.innerHTML = h;
   renderFavBar();
 }
@@ -7152,7 +7307,7 @@ function toggleDrawFlyout(catId, btn) {
         +   ' onclick="event.stopPropagation();assignToolKey(\'' + id + '\')">' + (key ? _esc(key) : '＋') + '</button>'
         + '<button class="dr-fly-star' + (fav ? ' on' : '') + '" type="button" aria-pressed="' + (fav ? 'true' : 'false')
         +   '" title="Favourite — show on the chart shortcut bar" aria-label="Favourite ' + _esc(t.name) + '"'
-        +   ' onclick="event.stopPropagation();toggleDrawFav(\'' + id + '\')">' + (fav ? '★' : '☆') + '</button>'
+        +   ' onclick="event.stopPropagation();toggleDrawFav(\'' + id + '\')">' + ico('star', 12, { fill: fav }) + '</button>'
         + '</div>';
     }
   }
@@ -7295,15 +7450,14 @@ document.addEventListener('DOMContentLoaded', () => { _adoptIntoDock(); renderDr
   const setVar = (name, key, px) => {
     document.documentElement.style.setProperty(name, px + 'px'); _lsSet(key, String(px));
   };
-  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--dockr-w', 'trader.dockRW'], ['--ticket-w', 'trader.ticketW']]) {
+  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--ticket-w', 'trader.ticketW']]) {
     const s = parseInt(_lsGet(key, ''), 10); if (s) document.documentElement.style.setProperty(name, s + 'px');
   }
   bind('dockLResize', (e) => setVar('--dockl-w', 'trader.dockLW', clamp((e.clientX || 0) - 44, 220, 560)));
-  bind('dockRResize', (e) => setVar('--dockr-w', 'trader.dockRW', clamp(window.innerWidth - (e.clientX || 0) - 44, 240, 620)));
   // The ticket is a column now, so its grip sets a WIDTH from the right edge, past the
   // watchlist column and the rail.
   bind('ticketGrip', (e) => {
-    const railW = 44, wl = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dockr-w'), 10) || 320;
+    const railW = 44, wl = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--col-r'), 10) || 340;
     setVar('--ticket-w', 'trader.ticketW', clamp(window.innerWidth - (e.clientX || 0) - railW - wl, 240, 560));
   });
 })();
@@ -7694,7 +7848,7 @@ function alRender(pane, rules, cap, feed) {
         + '  <div class="al-item-act">'
         + '    <button type="button" title="' + (off ? 'Resume' : 'Pause') + '" onclick="alToggleRule(\'' + esc(r.id) + '\')">' + (off ? '▶' : '❙❙') + '</button>'
         + '    <button type="button" title="' + (r.email === false ? 'Unmute email' : 'Mute email') + '"'
-        + '      onclick="alToggleRuleEmail(\'' + esc(r.id) + '\')">' + (r.email === false ? '🔕' : '🔔') + '</button>'
+        + '      onclick="alToggleRuleEmail(\'' + esc(r.id) + '\')">' + (r.email === false ? ico('bellOff', 12) : ico('bell', 12)) + '</button>'
         + '    <button type="button" title="Delete" onclick="alDeleteRule(\'' + esc(r.id) + '\')">✕</button>'
         + '  </div></div>';
     }
@@ -7768,7 +7922,7 @@ function _accountDegraded(kind, reason){
     const b = document.createElement('span');
     b.id = 'staleBadge';
     b.style.cssText = 'align-self:center;margin-right:10px;padding:2px 7px;border-radius:4px;background:#f59e0b;color:#1a1a1a;font-size:10px;font-weight:800;letter-spacing:.05em';
-    b.textContent = kind === 'session' ? '⚠ STALE — SIGN IN' : '⚠ STALE';
+    b.textContent = kind === 'session' ? ' STALE — SIGN IN' : ' STALE';
     b.title = 'These figures are NOT live' + (reason ? ' — ' + reason : '') + '.';
     host.insertBefore(b, host.firstChild);
   }
@@ -7777,8 +7931,8 @@ function _accountDegraded(kind, reason){
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
     _staleKind = kind;
     _alertToast(kind === 'session'
-      ? '⚠ Session expired — account data is paused (showing last known). Sign in again to resume; it will not recover on its own.'
-      : '⚠ Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
+      ? ' Session expired — account data is paused (showing last known). Sign in again to resume; it will not recover on its own.'
+      : ' Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
   }
 }
 function _accountFresh(){
@@ -7884,9 +8038,9 @@ async function dustClear(symbol, btn){
     // seconds later. Say what is actually known — the order went in — and tell the
     // operator the one thing that settles it, which is the position row itself.
     if(j && j.ok){
-      _alertToast(`${j.session_note?'⏳':'✓'} Dust order ACCEPTED for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — accepted is not filled; re-check the position to confirm it cleared${j.session_note?' — '+j.session_note:''}`);
+      _alertToast(`${j.session_note?'':''} Dust order ACCEPTED for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — accepted is not filled; re-check the position to confirm it cleared${j.session_note?' — '+j.session_note:''}`);
     }else{
-      _alertToast(`⚠ ${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
+      _alertToast(`${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
     }
     // What this account has already answered, surfaced at the point of decision —
     // IBKR's "fractional not supported on this account" verdict sat in the probe
@@ -7894,7 +8048,7 @@ async function dustClear(symbol, btn){
     if(j && j.prior_rejection){
       _alertToast(`ℹ ${symbol}: this account previously rejected a fractional order — IBKR said "${j.prior_rejection.broker_said}" (${String(j.prior_rejection.ts).slice(0,10)}). Enable Fractional Trading in Client Portal, or have IBKR sweep the residue.`);
     }
-  }catch(e){ _alertToast('⚠ Dust probe failed: '+e.message); }
+  }catch(e){ _alertToast('Dust probe failed: '+e.message); }
   await Promise.all([loadOrders(), loadPortfolio()]);
 }
 async function flattenPosition(symbol, side, qty, skipConfirm, btn){
@@ -7917,14 +8071,14 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
         result = await _placeFlatten(symbol, exitSide, q, true);
       }
     }
-    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
+    if(!(result && result.status==='placed')){ _alertToast('Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
     const fill=result.fill_price?` @ ${result.fill_price}`:'';
     // 'Placed' is not 'filled' outside RTH — say which one happened (#3326).
-    _alertToast(`${result.session_note?'⏳ Order placed for':'✓ Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
+    _alertToast(`${result.session_note?'Order placed for':'Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
-  }catch(e){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+e.message); return false; }
+  }catch(e){ _alertToast('Couldn’t flatten '+symbol+': '+e.message); return false; }
 }
 // One flatten POST. acceptWarnings goes on the wire ONLY after the user has read
 // and confirmed IBKR's warning text above — never on the first attempt.
@@ -7946,7 +8100,7 @@ async function flattenAll(btn){
   const mv = totalMV ? ` (~$${totalMV.toLocaleString(undefined,{maximumFractionDigits:0})})` : '';
   if(!window.confirm(`Close ALL ${snapshot.length} open position${snapshot.length===1?'':'s'}${mv}?\n\nThis market-sells everything at once and can't be undone.`)) return;
   for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
-  _alertToast(`✓ Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
+  _alertToast(`Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
 }
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
@@ -8018,9 +8172,9 @@ async function cancelOrder(id, btn){
   try{
     const r = await fetch('/api/trading/orders/'+encodeURIComponent(id), { method:'DELETE' });
     const j = await r.json().catch(()=>({}));
-    if(j && j.ok) _alertToast('✓ Canceled '+id+(j.broker?' ('+j.broker+')':''));
-    else _alertToast('⚠ Cancel failed: '+((j && j.error) || r.statusText || r.status));
-  }catch(e){ _alertToast('⚠ Cancel failed: '+e.message); }
+    if(j && j.ok) _alertToast('Canceled '+id+(j.broker?' ('+j.broker+')':''));
+    else _alertToast('Cancel failed: '+((j && j.error) || r.statusText || r.status));
+  }catch(e){ _alertToast('Cancel failed: '+e.message); }
   await loadOrders();
 }
 function renderOrders(orders){
@@ -8568,20 +8722,20 @@ async function refreshBrokerButton(){
     ]);
     const connected = !!(alRes && (alRes.connected || alRes.status==='connected')) || !!(ibRes && ibRes.live && ibRes.live.connected);
     if(!connected){
-      label.textContent = '⚡ Connect account';
+      label.textContent = 'Connect account';
       btn.style.color = '';
       btn.title = 'No trading account connected — click to add your Alpaca API keys in Settings.';
       return;
     }
     const champion = modeRes && modeRes.mode === 'champion';
-    label.textContent = champion ? '🏆 Champion' : '📈 Stock trader';
+    label.textContent = champion ? 'Champion' : 'Stock trader';
     btn.style.color = 'var(--green)';
     btn.title = (champion
       ? 'Champion (auto ETF allocation) is running your account — the day-trader is paused.'
       : 'The stock day-trader is active (signals + your manual buy/sell).')
       + ' Click to switch the active trader in Settings.';
   }catch(e){
-    label.textContent = '📈 Trader';      // network hiccup → neutral, still links to Settings
+    label.textContent = 'Trader';      // network hiccup → neutral, still links to Settings
   }
 }
 // OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected
@@ -8591,10 +8745,10 @@ async function refreshBrokerButton(){
   const st = q.get('alpaca');
   if(!st) return;
   if(st === 'connected'){
-    setTimeout(()=>alert('⚡ Alpaca connected — your trades now route to your own Alpaca account (paper by default).'), 300);
+    setTimeout(()=>alert('Alpaca connected — your trades now route to your own Alpaca account (paper by default).'), 300);
   } else {
     const reason = q.get('reason') || 'unknown';
-    setTimeout(()=>alert(`Alpaca connect failed: ${reason}. You can retry from the ☰ menu.`), 300);
+    setTimeout(()=>alert(`Alpaca connect failed: ${reason}. You can retry from the  menu.`), 300);
   }
   q.delete('alpaca'); q.delete('reason');
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
@@ -8619,7 +8773,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 
 /* ── Hamburger (sandwich) menu ─────────────────────────────────────────────────
    On narrow screens the chart-controls cluster + secondary actions (Pre/After,
-   Kalshi, Explore, Connect broker) MOVE into a ☰ dropdown; on wide screens they
+   Kalshi, Explore, Connect broker) MOVE into a  dropdown; on wide screens they
    move back inline. Comment markers remember each element's original slot, so
    ids, event handlers, and select state all survive the round-trip. */
 (function(){
@@ -8707,13 +8861,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   const history=[];              // {role:'user'|'assistant', content} — last 10 sent for context
   let busy=false;
 
+  /* The chat lives in the LEFT DOCK COLUMN now -- its modal was adopted out of the
+     .dc-bg shell, and that shell is display:none!important. Toggling a class on it
+     moved nothing a user could see: the header button lit up, the column stayed put,
+     and closing the chat left its 360px of space behind. Drive the column instead --
+     that is the thing on screen. */
   window.dcToggle=function(force){
-    const openNow = typeof force==='boolean' ? force : panel.classList.contains('hidden');
-    panel.classList.toggle('hidden', !openNow);
-    document.body.classList.toggle('dc-open', openNow);   // reflows the deck left (like ot-open)
+    const openNow = typeof force==='boolean' ? force : !_leftOpen;
+    _leftOpen = openNow; _saveDocks(); _applyDocks();
+    document.body.classList.toggle('dc-open', openNow);
     if(modal) modal.setAttribute('aria-hidden', openNow?'false':'true');
-    toggle.classList.toggle('dc-on', openNow);
-    toggle.setAttribute('aria-expanded', openNow?'true':'false');
+    // (button state is synced by _applyDocks -- see there)
     if(openNow) setTimeout(()=>input.focus(),30);
   };
 
@@ -8797,7 +8955,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 </script>
 <!-- Global header (#1579) + theme toggle (#1577). site-chrome injects the shared
      <nav class="site-nav"> at the top of <body>; theme-toggle defines toggleTheme()
-     for the ☀/🌙 button; both run before auth-gate (which highlights the active link). -->
+     for the / button; both run before auth-gate (which highlights the active link). -->
 <script>
   /* Mobile view switch (#2255): toggle between the charts and the ticker list, since both
      can't fit at phone width. Chart is the default; the tab bar only shows on mobile. */
