@@ -1285,7 +1285,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // of a guess. Anything else falls through to the honest reconstruction.
     const _regStop = _stopOrders.get(sym);
     let _regStatus = null;
-    if (_regStop && _regStop.id && !_loggedFills.has(_regStop.id)) {
+    if (_regStop && _regStop.id && !_loggedFills.has(_regStop.id)
+        && typeof bridge.getIBKROrderStatus === 'function') {   // #3381: demo/practice facades lack it
       _regStatus = await bridge.getIBKROrderStatus(userId, _regStop.id).catch(() => null);
       if (_regStatus && /fill/i.test(String(_regStatus.status || ''))) {
         const _fillPx = Number(_regStatus.avgPrice) > 0 ? Number(_regStatus.avgPrice) : mark;

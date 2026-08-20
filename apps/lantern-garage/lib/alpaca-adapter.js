@@ -236,7 +236,7 @@ async function getPositions(userId) {
 
 /** Place an order on the resolved Alpaca account. PAPER fills for real (no guard);
  *  LIVE passes trading-guard + needs TRADER_ALLOW_LIVE_ACCOUNT=1. Normalized shape. */
-async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, equity }) {
+async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, equity, outsideRth }) {
   const auth = _authFor(userId);
   if (!auth) return null;                                // no Alpaca account → caller falls back
   const mode = auth.env === 'live' ? 'live' : 'paper';
@@ -266,6 +266,10 @@ async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPri
     ...(t === 'limit' && limitPrice ? { limit_price: String(limitPrice) } : {}),
     ...(t === 'stop' && stopPx ? { stop_price: String(stopPx) } : {}),
     ...(t !== 'stop' && stopLoss ? { order_class: 'oto', stop_loss: { stop_price: String(stopLoss) } } : {}),
+    // #3381: the engine's pre/post-market exits are marketable LIMITs flagged
+    // outsideRth (the IBKR spelling). Alpaca's spelling is extended_hours, and it
+    // is only valid on a DAY limit order — exactly the shape the engine sends.
+    ...(outsideRth && t === 'limit' && tif === 'day' ? { extended_hours: true } : {}),
   };
   const r = await _req(auth, 'POST', '/v2/orders', order);
   if (r.ok && r.json && r.json.id) {
@@ -290,6 +294,71 @@ async function getOpenOrders(userId) {
     status: WORKING.has(String(o.status)) ? 'submitted' : String(o.status),
     qty: Number(o.qty) || 0, order_id: o.id,
   }));
+}
+
+/**
+ * ENGINE-facing orders feed (#3381) — the shape auto-trader's reconcilers expect,
+ * matching ibkr-cpapi.getLiveOrders row-for-row: { orderId, symbol, side, qty,
+ * filledQty, status, orderType, price, avgPrice, time }.
+ *
+ * getOpenOrders (above) is a UI feed and is NOT enough for the engine, in two
+ * load-bearing ways discovered while wiring the Alpaca race leg:
+ *   - its rows carry `order_id`, but cancelRestingStops reads `o.orderId` — so
+ *     the engine could never cancel a resting stop on Alpaca (the orphaned-stop
+ *     -> naked-short class, #2213).
+ *   - it returns status=open only, so _reconcileFills never saw a FILL — every
+ *     exit would book as a mark-priced reconstruction instead of at the fill.
+ * This feed merges open orders with the last ~30h of closed ones (covers today
+ * plus an overnight GTC fill; older fills are already excluded by the process-
+ * start guard in fill-ledger and remembered by id), deduped by order id.
+ */
+async function getEngineOrders(userId) {
+  const auth = _authFor(userId);
+  if (!auth) return [];
+  const after = new Date(Date.now() - 30 * 3600 * 1000).toISOString();
+  const [open, closed] = await Promise.all([
+    _req(auth, 'GET', '/v2/orders?status=open&limit=200'),
+    _req(auth, 'GET', `/v2/orders?status=closed&limit=200&after=${encodeURIComponent(after)}`),
+  ]);
+  const WORKING = new Set(['new', 'accepted', 'pending_new', 'partially_filled', 'held', 'accepted_for_bidding']);
+  const seen = new Set();
+  const out = [];
+  for (const r of [open, closed]) {
+    if (!r.ok || !Array.isArray(r.json)) continue;
+    for (const o of r.json) {
+      const id = String(o.id || '');
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({
+        orderId: id,
+        symbol: o.symbol,
+        side: String(o.side || '').toUpperCase(),          // fill-ledger compares 'SELL'
+        qty: Number(o.qty) || 0,
+        filledQty: Number(o.filled_qty) || 0,
+        status: WORKING.has(String(o.status)) ? 'submitted' : String(o.status),
+        orderType: String(o.type || ''),
+        price: o.limit_price != null ? Number(o.limit_price) : (o.stop_price != null ? Number(o.stop_price) : null),
+        avgPrice: o.filled_avg_price != null ? Number(o.filled_avg_price) : null,
+        time: o.filled_at || o.updated_at || o.submitted_at || null,
+      });
+    }
+  }
+  return out;
+}
+
+/** ONE order by id (#3381) — the Alpaca answer to ibkr's per-order status
+ *  endpoint, shaped for auto-trader's stop reconciliation (#3379). */
+async function getOrder(userId, orderId) {
+  const auth = _authFor(userId);
+  if (!auth || !orderId) return null;
+  const r = await _req(auth, 'GET', `/v2/orders/${encodeURIComponent(orderId)}`);
+  if (!r.ok || !r.json || !r.json.id) return null;
+  return {
+    order_id: String(r.json.id),
+    status: String(r.json.status || ''),                    // 'filled' matches /fill/i
+    avgPrice: r.json.filled_avg_price != null ? Number(r.json.filled_avg_price) : null,
+    filledQty: r.json.filled_qty != null ? Number(r.json.filled_qty) : null,
+  };
 }
 
 /** Full order list (open + closed) for the Orders / Order-history tabs, newest first,
@@ -418,4 +487,4 @@ async function getPortfolioHistory(userId, range = '1D') {
   };
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };
+module.exports = { available, getAccount, getPositions, getOpenOrders, getEngineOrders, getOrder, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };
