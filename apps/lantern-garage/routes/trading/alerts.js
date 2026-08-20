@@ -30,6 +30,9 @@ function emailAvailability(userId) {
     const { getProfile } = require('../../lib/user-profiles');
     const p = getProfile(userId);
     if (!p || !String(p.email || '').includes('@')) return { possible: false, why: 'no_email' };
+    // Delivery refuses unverified addresses, so say so HERE rather than letting the
+    // UI offer a toggle that would silently never send (#3329 reconciled onto #3249).
+    if (!p.emailVerified) return { possible: false, why: 'email_unverified' };
     return { possible: true };
   } catch (_e) { return { possible: false, why: 'unknown' }; }
 }

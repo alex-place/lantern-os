@@ -568,3 +568,16 @@ data/lantern-garage/trading/*.jsonl
 data/lantern-garage/trading/*-state.json
 apps/lantern-garage/data/lantern-garage/trading/*.jsonl
 apps/lantern-garage/data/lantern-garage/trading/*-state.json
+
+# Intraday bar corpus — generated, engine-owned, never committed (#3351).
+# bar-archive.js exists to accumulate intraday history BEYOND Yahoo's ~30-day
+# cap, so a single market window can't be mistaken for a general result. The
+# files above are ignored but `*.jsonl` does not cross into bars/, so this
+# corpus stayed TRACKED — and scripts/auto-deploy-stable.ps1 (every 5 min, on
+# every master move) does `git reset --hard`, whose own contract is that it
+# "preserves all UNTRACKED runtime data". Tracked meant it was reverted to its
+# committed snapshot on every deploy: on 2026-08-17 SPY/QQQ/SMH/DIA-5m were
+# rolled back from Aug 17 to the Aug 4 commit, capping the corpus at whatever
+# Yahoo still serves and defeating the module's entire purpose.
+data/lantern-garage/trading/bars/
+apps/lantern-garage/data/lantern-garage/trading/bars/

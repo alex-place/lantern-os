@@ -91,12 +91,21 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
   //   TRADER_IBS_MODE=or    IBS adds entries on top of the zone/RSI logic
   //   unset/off             no behavior change
   const _ibsMax = Number(process.env.TRADER_IBS_MAX) || 0.15;
+  // MORNING DEPTH (pilot 2026-08-15, 23 sessions, DEFAULT OFF pending the
+  // two-window bar): first-touch IBS fires 0.4-2.3% above the coming low in
+  // morning drift, while genuine 09:45-09:55 washout bounces are DEEP by
+  // nature. Requiring IBS <= TRADER_IBS_MAX_MORNING before 11:00 ET doubled
+  // pilot income (+23.4% vs +11.0% total, n 260 vs 273) and still caught the
+  // 8/10 SLV +3.28%/GLD +1.64% fast-path winners at 09:45. Unset = off.
+  const _mMax = Number(process.env.TRADER_IBS_MAX_MORNING);
+  const _etm = (opts.etMin != null) ? opts.etMin : (() => { const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })); return d.getHours() * 60 + d.getMinutes(); })();
+  const _ibsMaxEff = (_mMax > 0 && _etm < 660) ? _mMax : _ibsMax;
   const _ibsMode = String(process.env.TRADER_IBS_MODE || "off");
   if (_ibsMode === "only") {
     const v = opts.ibs;
-    return (v != null && v <= _ibsMax) ? "BULLISH" : "NEUTRAL";
+    return (v != null && v <= _ibsMaxEff) ? "BULLISH" : "NEUTRAL";
   }
-  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMax) return "BULLISH";
+  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMaxEff) return "BULLISH";
   const trendDir = opts.trendDir ?? (process.env.ZONE_TREND_DIR === "1");
   const up = trendDir && _isUptrend(opts.closes);
   if (sr.in_zone) {
@@ -140,23 +149,189 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
  * and it is written against direction-lock's sign map so any future instrument
  * with a sign — new inverse products, short futures (#3218) — inherits it.
  */
+// Same ledger the engine writes (TRADER_TRADES_LOG override honored, so tests
+// never touch production). Own writer rather than requiring auto-trader, which
+// would create a scan<->auto-trader require cycle.
+const _VETO_LOG = process.env.TRADER_TRADES_LOG
+  ? require("path").resolve(process.env.TRADER_TRADES_LOG)
+  : require("path").join(__dirname, "..", "..", "..", "..", "data", "lantern-garage", "trading", "autopilot-trades.jsonl");
+function _logVeto(rec) {
+  try {
+    const fs = require("fs"), path = require("path");
+    fs.mkdirSync(path.dirname(_VETO_LOG), { recursive: true });
+    fs.appendFileSync(_VETO_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + "\n");
+  } catch (_e) { /* never break the scan */ }
+}
+
+/**
+ * SPY TAPE CONTEXT at this instant, from SPY's own 15m session bars — the
+ * causal inputs (#3343). Everything here is knowable at the fire; nothing
+ * peeks at the close. Returned nulls mean "unreadable", never "zero".
+ *   tape    SPY % from today's session open
+ *   mom30   SPY % over the last two 15m bars (~30 min)
+ *   ll      SPY made a lower low: last 2 bars' low < prior 2 bars' low
+ */
+// The wrapper's OWN drawdown from its session open, in % (negative = it fell).
+// A selection feature (#3349): wrapper washouts that arrive after a SHALLOW
+// fall (> -1.5%) won 67%; after a hard fall (<= -2%) they won 33%. Same
+// session-window discipline as sessionIbs — today's bars only.
+function sessionDrawdownPct(bars15) {
+  const bars = Array.isArray(bars15) ? bars15 : [];
+  if (!bars.length) return null;
+  const day = String(bars[bars.length - 1].timestamp || "").slice(0, 10);
+  const s = bars.filter((b) => String(b.timestamp || "").slice(0, 10) === day && Number(b.close) > 0);
+  if (s.length < 2) return null;
+  const open = Number(s[0].open) || Number(s[0].close);
+  const last = Number(s[s.length - 1].close);
+  return open > 0 ? ((last - open) / open) * 100 : null;
+}
+
+// ET minute-of-day for the LAST bar (the fire instant), not the wall clock —
+// so a replay/test drives it and a live scan reads it identically.
+function barEtMinute(bars15) {
+  const bars = Array.isArray(bars15) ? bars15 : [];
+  if (!bars.length) return null;
+  const ts = bars[bars.length - 1].timestamp;
+  if (!ts) return null;
+  const d = new Date(new Date(ts).toLocaleString("en-US", { timeZone: "America/New_York" }));
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function spyTapeContext(spyBars15) {
+  const bars = Array.isArray(spyBars15) ? spyBars15 : [];
+  if (!bars.length) return { tape: null, mom30: null, ll: null };
+  const day = String(bars[bars.length - 1].timestamp || "").slice(0, 10);
+  const s = bars.filter((b) => String(b.timestamp || "").slice(0, 10) === day && Number(b.close) > 0);
+  if (s.length < 2) return { tape: null, mom30: null, ll: null };
+  const open = Number(s[0].open) || Number(s[0].close);
+  const last = Number(s[s.length - 1].close);
+  const tape = open > 0 ? ((last - open) / open) * 100 : null;
+  const back = s[Math.max(0, s.length - 3)];
+  const mom30 = Number(back.close) > 0 ? ((last - Number(back.close)) / Number(back.close)) * 100 : null;
+  const n = s.length;
+  const ll = n >= 4
+    ? Math.min(Number(s[n - 1].low), Number(s[n - 2].low)) < Math.min(Number(s[n - 3].low), Number(s[n - 4].low))
+    : null;
+  return { tape, mom30, ll };
+}
+
+/**
+ * POLARITY (#3296) — a BULLISH verdict on a negative-sign instrument is an
+ * ECONOMIC SHORT and is judged as one. #3343 makes the veto CONDITIONAL:
+ *
+ *   TRADER_SHORT_EDGE=0        never (the #3296 default — measured -268R
+ *                              unconditional over 16y, #3295)
+ *   TRADER_SHORT_EDGE=falling  allow while SPY is FALLING at the fire —
+ *                              tape <= -TRADER_SHORT_TAPE_PCT (default 0.3)
+ *                              OR mom30 <= -TRADER_SHORT_MOM_PCT (default 0.15).
+ *                              Pilot (18 sessions, causal only): SPY-falling
+ *                              fires +3.92%/100% (n=3) vs SPY-rising -0.20%
+ *                              (n=26) and SPY-up>0.3% -1.17% (n=19).
+ *   TRADER_SHORT_EDGE=1        allow whenever the underlying is at its top
+ *                              (the original explicit-short thesis)
+ *
+ * The operator's objection that forced this: a veto blocking 100% of inverse
+ * entries "pretty much removed inverses from the watchlist with extra steps".
+ * On 2026-08-17 (SPY grind -0.45%, low at 15:55) the only two winners the tape
+ * offered were SOXS +2.90% and SQQQ +1.80% — both vetoed. A blanket ban was
+ * over-applying evidence that said "unconditional wrappers lose", not "every
+ * wrapper entry loses".
+ *
+ * Every vetoed fire is logged as `polarity_veto` with the full causal context
+ * (tape, mom30, ll, uIbs), so live data accumulates the counterfactual on
+ * exactly the conditions the lab is judging.
+ */
 function applyPolarity(sym, direction, opts = {}) {
   if (direction !== "BULLISH") return { direction, veto: null };
   const { family, sign } = require("../direction-lock").instrumentSign(sym);
   if (sign >= 0) return { direction, veto: null };
   const ibsMax = Number(opts.ibsMax ?? (Number(process.env.TRADER_IBS_MAX) || 0.15));
-  const shortEdge = opts.shortEdge ?? (process.env.TRADER_SHORT_EDGE === "1");
-  if (!shortEdge) {
-    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — short entries disabled (TRADER_SHORT_EDGE=0; measured -268R over 2,493 wrapper entries, #3295)` };
+  const mode = String(opts.shortEdge ?? process.env.TRADER_SHORT_EDGE ?? "0").toLowerCase();
+  const ctx = opts.spy || { tape: null, mom30: null, ll: null };
+  const ctxStr = `spy tape ${ctx.tape == null ? "?" : ctx.tape.toFixed(2) + "%"}, mom30 ${ctx.mom30 == null ? "?" : ctx.mom30.toFixed(2) + "%"}, ll ${ctx.ll == null ? "?" : ctx.ll}`;
+  if (mode === "0" || mode === "" || mode === "false") {
+    return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — short entries disabled (TRADER_SHORT_EDGE=0; ${ctxStr})` };
   }
+  if (mode === "selective") {
+    // #3349 — SELECTION, not a tape veto. Decomposing 49 wrapper IBS fires (24
+    // sessions, causal) by pre-fire features, three separated winners from
+    // losers, and none of them is "SPY falling":
+    //   fire minute        r=+0.44   10-11am 47%/-0.36%  ->  after 1pm 67%/+2.46%
+    //   wrapper drawdown   r=+0.14   fell <=-2%: 33%/-0.81%  ->  fell >-1%: 67%/+1.23%
+    //   underlying tape    r=-0.21   up >=+0.5%: 48%/-0.50%  ->  up 0-0.5%: 56%/+0.77%
+    // Composite (after 11:00 AND wrapper DD > -1.5% AND underlying < +0.5%):
+    // n=13, 62% WR, +1.70% avg (+0.60% leave-one-day-out) vs the 36 that fail it
+    // at 47%/-0.36%. The bet the wrapper washout makes is "the underlying
+    // reverses within the hour" — these are the conditions under which it does.
+    // 16y daily replication agrees on DIRECTION (mild tape is the best bucket)
+    // but cannot see time-of-day; the sample is 13. Every fire — allowed or
+    // vetoed — is logged with all three values so live data settles it.
+    const minMin = Number(process.env.TRADER_SHORT_MIN_ET_MIN) || 660;      // 11:00 ET
+    const maxDD = -(Number(process.env.TRADER_SHORT_MAX_DD_PCT) || 1.5);   // wrapper fell no more than this
+    const maxUTape = Number(process.env.TRADER_SHORT_MAX_UTAPE_PCT) || 0.5; // underlying not ripping
+    const w = opts.wrapperDD, ut = opts.underlyingTape, m = opts.etMin;
+    const selStr = `et ${m == null ? "?" : Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0")}, wrapperDD ${w == null ? "?" : w.toFixed(2) + "%"}, underlying tape ${ut == null ? "?" : ut.toFixed(2) + "%"}`;
+    if (m == null || w == null || ut == null) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — selection inputs unreadable (${selStr}); cannot certify` };
+    }
+    // TIME IS A WEIGHT, NOT A FLOOR (#3356). As a hard floor this was a ban
+    // wearing a filter's clothes: measured over 25 sessions and 8 wrappers,
+    // 72.2% of FIRST fires per symbol/session land in 09:30-10:00 and only 14.6%
+    // at or after 11:00 — so the floor refused ~85% of every actionable wrapper
+    // setup, on an n=13 composite. A gate that strict cannot even accumulate the
+    // evidence needed to judge it: at roughly one reachable fire every two
+    // sessions it would take months to reach a decidable sample. Two live
+    // sessions produced 23 wrapper fires and ZERO decisions.
+    //
+    // The measured effect is on WIN RATE, so express it there. First-fire
+    // outcomes by hour: 10:00-11:00 47%/-0.36% (n=30), 11:00-13:00 54%/+0.42%
+    // (n=13), 13:00+ 67%/+2.46% (n=6). A p_win penalty of that size IS the
+    // calibration, not a fudge — and unlike the floor it lets a strong early
+    // setup clear on its other merits while still pricing the hour.
+    //
+    // The two SETUP checks stay hard: they describe the trade (a wrapper that
+    // already collapsed, an underlying still ripping) rather than the clock.
+    const fails = [];
+    if (w <= maxDD) fails.push(`wrapper already fell ${w.toFixed(2)}% (hard-fall fires 33%/-0.81%)`);
+    if (ut >= maxUTape) fails.push(`underlying ripping ${ut.toFixed(2)}% (rally fires 48%/-0.50%)`);
+    if (fails.length) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — selection failed: ${fails.join("; ")} [${selStr}] (#3349)` };
+    }
+    // Graded by how far before the old floor the fire lands. Defaults sit at the
+    // conservative end of the measured gap (47% early vs 54-67% late = 7-20pp).
+    const _earlyPp = Number(process.env.TRADER_SHORT_EARLY_PENALTY_PP);
+    const _midPp = Number(process.env.TRADER_SHORT_MID_PENALTY_PP);
+    const earlyPp = Number.isFinite(_earlyPp) ? _earlyPp : 7;   // before 10:00
+    const midPp = Number.isFinite(_midPp) ? _midPp : 4;         // 10:00 -> the old floor
+    let timePenaltyPp = 0;
+    if (m < 600) timePenaltyPp = earlyPp;
+    else if (m < minMin) timePenaltyPp = midPp;
+    const when = timePenaltyPp > 0
+      ? `early (-${timePenaltyPp}pp p_win, was a hard block before #3356)`
+      : 'late';
+    return { direction, ctx, veto: null, timePenaltyPp, allowed: `selective: ${when} + shallow + mild (${selStr})` };
+  }
+  if (mode === "falling") {
+    const tapePct = Number(process.env.TRADER_SHORT_TAPE_PCT) || 0.3;
+    const momPct = Number(process.env.TRADER_SHORT_MOM_PCT) || 0.15;
+    if (ctx.tape == null && ctx.mom30 == null) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — SPY tape unreadable, cannot certify a falling market` };
+    }
+    const falling = (ctx.tape != null && ctx.tape <= -tapePct) || (ctx.mom30 != null && ctx.mom30 <= -momPct);
+    if (!falling) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — SPY not falling at the fire (${ctxStr}); shorts into a flat/rising tape measured -1.17% (#3343)` };
+    }
+    return { direction, ctx, veto: null, allowed: `falling tape (${ctxStr})` };
+  }
+  // mode "1": the explicit-short thesis — underlying at its session top
   const u = opts.underlyingIbs;
   if (u == null) {
-    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — underlying unreadable, no thesis to state` };
+    return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — underlying unreadable, no thesis to state` };
   }
   if (u < 1 - ibsMax) {
-    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — underlying mid-range (IBS ${u.toFixed(2)}); a wrapper washout is not a market washout` };
+    return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — underlying mid-range (IBS ${u.toFixed(2)}); a wrapper washout is not a market washout` };
   }
-  return { direction, veto: null };   // explicit short: underlying at its session top
+  return { direction, ctx, veto: null, allowed: `underlying at session top (IBS ${u.toFixed(2)})` };
 }
 
 // Deterministic composite gate — ported from agents.py `riley_strategy_gate`
@@ -249,9 +424,26 @@ function candleGrade(candle) {
 // the direction and weights it lightly (WEIGHTS.news), so one headline can nudge
 // but never dominate the TA evidence.
 function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend }) {
+  // ECONOMIC direction for MARKET-semantic evidence (#3298 findings 1-2).
+  // "SOXS BULLISH" is an economic SHORT. Two inputs compare against the MARKET
+  // and were scored in wrapper space — inverted for every signed instrument:
+  //   - regime alignment: a wrapper long in a BULLISH market scored as ALIGNED
+  //     (it is opposed) — on 2026-08-13 this upweighted p_win for shorts taken
+  //     INTO the rally, one sized tier A+;
+  //   - news: bullish-underlying news supported a wrapper long (it argues
+  //     against it). Flipping the SIGN of news for sign<0 instruments makes the
+  //     EV layer's "signed to the direction" arithmetic come out economic.
+  // Price-space evidence (zones, candles, structure, MACD on own bars) is
+  // CORRECT in wrapper space and stays untouched. Unreachable for entries while
+  // #3296 vetoes wrapper longs — this is the layer that would mis-score them
+  // the day TRADER_SHORT_EDGE ever opens.
+  const _sign = require("../direction-lock").instrumentSign(t).sign;
+  const _ecoDir = _sign < 0
+    ? (direction === "BULLISH" ? "BEARISH" : direction === "BEARISH" ? "BULLISH" : direction)
+    : direction;
   const evInput = {
     direction,
-    news_sentiment,
+    news_sentiment: _sign < 0 ? -news_sentiment : news_sentiment,
     volume_ratio,          // Tier-1: volume-spike confirmation
     macd_hist,             // Tier-1: MACD histogram (momentum)
     ma_signal,             // Tier-1: price vs MA (momentum)
@@ -264,11 +456,11 @@ function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, ne
     structure_conf: struct.strength,
     pattern_grade: candleGrade(candle),
     trend_aligned:
-      (direction === "BULLISH" && marketStatus.market === "BULLISH") ||
-      (direction === "BEARISH" && marketStatus.market === "BEARISH"),
+      (_ecoDir === "BULLISH" && marketStatus.market === "BULLISH") ||
+      (_ecoDir === "BEARISH" && marketStatus.market === "BEARISH"),
     trend_conflicts:
-      (direction === "BULLISH" && marketStatus.market === "BEARISH") ||
-      (direction === "BEARISH" && marketStatus.market === "BULLISH"),
+      (_ecoDir === "BULLISH" && marketStatus.market === "BEARISH") ||
+      (_ecoDir === "BEARISH" && marketStatus.market === "BULLISH"),
     target_r: targetR(t),
   };
   try {
@@ -279,6 +471,11 @@ function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, ne
       ev_r: c.ev_r,
       target_r: c.target_r,
       size_mult: ev.edgeRiskMultiplier(c.p_win, c.target_r),
+        // Retained so the analyst pass (#3355) can RE-SCORE this exact input with
+        // claude_conf set, rather than re-deriving it. Stripped before the signal
+        // leaves scanAll, so the API payload is unchanged.
+        _ev: evInput,
+        _sign,
     };
   } catch (_e) {
     return null;
@@ -348,15 +545,70 @@ async function scanAll(watchlist) {
     const rsiVal = rsi(_closes15) ?? 50;
     // closes feed the ZONE_TREND_DIR override — without them the trend can't be
     // judged and deriveDirection silently falls back to pure mean-reversion.
-    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: sessionIbs(b15) });
+    // Hoisted: the entry trigger itself, and the ledger records it below.
+    const _sessionIbs = sessionIbs(b15);
+    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: _sessionIbs });
     // Polarity: a BULLISH verdict on a negative-sign wrapper is an economic
     // short and must be judged on the UNDERLYING's bars (see applyPolarity).
+      // Declared OUTSIDE the polarity block: the scoring site below consumes it.
+      let _timePenaltyPp = 0;
     {
       const _proxy = require("../direction-lock").underlyingProxy(t);
       const _uBars = _proxy && _proxy !== t && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
-      const _pol = applyPolarity(t, direction, { underlyingIbs: _uBars ? sessionIbs(_uBars) : null });
-      if (_pol.veto) logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — ${_pol.veto}` });
+      const _uIbs = _uBars ? sessionIbs(_uBars) : null;
+      const _spyCtx = spyTapeContext(bars15.SPY && bars15.SPY.bars);
+      // #3349 selection features — computed for EVERY wrapper fire so the
+      // ledger grows the table whether the mode allows or vetoes.
+      const _wDD = sessionDrawdownPct(b15);
+      const _uTape = _uBars ? sessionDrawdownPct(_uBars) : null;
+      const _etMin = barEtMinute(b15);
+      const _pol = applyPolarity(t, direction, { underlyingIbs: _uIbs, spy: _spyCtx, wrapperDD: _wDD, underlyingTape: _uTape, etMin: _etMin });
+      if (_pol.veto) {
+        logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — ${_pol.veto}` });
+        // INSTRUMENT THE COUNTERFACTUAL (#3343). A vetoed fire is a trade the
+        // engine chose not to take; the ledger must know it existed, with the
+        // exact causal context the conditional is judged on, so the live table
+        // ("shorts into a falling tape: +3.92%, into a rising tape: -0.20%") keeps
+        // growing on real data. Fire-and-forget through the trade ledger's own
+        // writer so it lives beside entries and exits, not in a side file.
+        try {
+          _logVeto({
+            event: "polarity_veto", symbol: t, price: Number(price) || null,
+            wrapper_ibs: (() => { const v = sessionIbs(b15); return v == null ? null : +v.toFixed(3); })(),
+            underlying: _proxy || null, underlying_ibs: _uIbs == null ? null : +_uIbs.toFixed(3),
+            spy_tape: _spyCtx.tape == null ? null : +_spyCtx.tape.toFixed(3),
+            spy_mom30: _spyCtx.mom30 == null ? null : +_spyCtx.mom30.toFixed(3),
+            spy_lower_low: _spyCtx.ll,
+            // #3349 selection features
+            wrapper_dd: _wDD == null ? null : +_wDD.toFixed(3),
+            underlying_tape: _uTape == null ? null : +_uTape.toFixed(3),
+            et_min: _etMin,
+            mode: String(process.env.TRADER_SHORT_EDGE || "0"),
+          });
+        } catch (_e) { /* instrumentation must never break the scan */ }
+      } else if (_pol.allowed) {
+        logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — economic short ALLOWED: ${_pol.allowed}` });
+        // The ALLOWED side must be recorded too, or the live table only ever
+        // sees the fires the mode refused — half a counterfactual is none.
+        try {
+          _logVeto({
+            event: "polarity_allow", symbol: t, price: Number(price) || null,
+            wrapper_ibs: (() => { const v = sessionIbs(b15); return v == null ? null : +v.toFixed(3); })(),
+            underlying: _proxy || null, underlying_ibs: _uIbs == null ? null : +_uIbs.toFixed(3),
+            spy_tape: _spyCtx.tape == null ? null : +_spyCtx.tape.toFixed(3),
+            spy_mom30: _spyCtx.mom30 == null ? null : +_spyCtx.mom30.toFixed(3),
+            spy_lower_low: _spyCtx.ll,
+            wrapper_dd: _wDD == null ? null : +_wDD.toFixed(3),
+            underlying_tape: _uTape == null ? null : +_uTape.toFixed(3),
+            et_min: _etMin,
+            mode: String(process.env.TRADER_SHORT_EDGE || "0"),
+          });
+        } catch (_e) { /* instrumentation must never break the scan */ }
+      }
       direction = _pol.direction;
+      // #3356: carry the time penalty out of the polarity check so the scoring
+      // below can price it. Zero for 1x instruments and for late wrapper fires.
+      _timePenaltyPp = Number(_pol.timePenaltyPp) || 0;
     }
     const struct = checkMarketStructureShift(b15, direction);
     const candle = detectCandlePatterns(b15, direction);
@@ -403,6 +655,26 @@ async function scanAll(watchlist) {
       const secEtf = sectors.sectorFor(t);
       const sector_trend = secEtf && sectorMom[secEtf] != null ? sectorMom[secEtf] : null;
       const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend });
+      // APPLY THE TIME WEIGHT (#3356). Subtracted from p_win after scoring rather
+      // than added as a convergence-ev feature, because it applies to exactly one
+      // instrument class (economic shorts) and would otherwise dilute the shared
+      // weight table for every 1x symbol. EV and the decision are re-derived from
+      // the adjusted p_win so the whole verdict stays self-consistent.
+      if (convergence && _timePenaltyPp > 0 && Number.isFinite(convergence.p_win)) {
+        const _before = convergence.p_win;
+        const _after = Math.max(0.05, _before - _timePenaltyPp / 100);
+        const _tr = convergence.target_r || 2;
+        convergence.p_win = Math.round(_after * 10000) / 10000;
+        convergence.p_win_pre_time = _before;
+        convergence.time_penalty_pp = _timePenaltyPp;
+        convergence.ev_r = Math.round((_after * _tr - (1 - _after)) * 1000) / 1000;
+        if (convergence.decision === "ENTER" && (convergence.ev_r < 0.15 || _after < 0.45)) {
+          convergence.decision = "SKIP";
+        }
+        convergence.size_mult = ev.edgeRiskMultiplier(_after, _tr);
+        logs.push({ time: nowIso, agent: "sigma0", symbol: t,
+          body: `${t} — early wrapper fire priced, not blocked: p_win ${_before} -> ${convergence.p_win} (-${_timePenaltyPp}pp), ${convergence.decision} (#3356)` });
+      }
 
       // ── Trend/regime filter (TRADER_REGIME_FILTER, on by default) ──────────────
       // The engine buys oversold DIPS; in a downtrend that's catching a falling knife —
@@ -434,11 +706,35 @@ async function scanAll(watchlist) {
       const dailyMove = (a || price * 0.005) * 5.1; // 15m ATR → ~daily (√26)
       const holdDays = Math.max(1, Math.min(15, Math.round((tr * riskAbs) / dailyMove)));
 
+      // WHAT THE DECISION WAS MADE ON (#3374 follow-up). Every gate downstream is
+      // judged against these numbers, and until now none of them survived the
+      // decision — the ledger recorded the VERDICT and not the evidence, so
+      // asking "was that veto right?" months later meant rebuilding the inputs
+      // from a stored bar corpus. Measured, that reconstruction reproduces the
+      // falling-knife predicate on only 70% of its own recorded fires, which is
+      // far too loose to audit a gate with: a model shown the rebuilt values
+      // correctly objected that the rule's premise was unmet on 11 of 47 fires.
+      //
+      // All of it is already computed above for the signal itself, so this costs
+      // one object per candidate and no extra math.
+      const _spyCtxSig = spyTapeContext(bars15.SPY && bars15.SPY.bars) || {};
+      const _decisionContext = {
+        ibs: _sessionIbs == null ? null : Math.round(_sessionIbs * 1e3) / 1e3,
+        spy_tape: _spyCtxSig.tape == null ? null : r2(_spyCtxSig.tape),
+        spy_mom30: _spyCtxSig.mom30 == null ? null : r2(_spyCtxSig.mom30),
+        regime: (marketStatus && marketStatus.market) || null,
+        et_min: barEtMinute(b15),
+        macd_hist: convergence && convergence._ev ? convergence._ev.macd_hist : null,
+        in_zone: convergence && convergence._ev ? !!convergence._ev.in_zone : null,
+        sign: convergence ? convergence._sign : null,
+      };
+
       signals.push({
         symbol: t,
         direction,
         confidence: gate.confidence,
         entry_price: price,
+        decision_context: _decisionContext,
         support: sr.support,
         resistance: sr.resistance,
         zone_mid: sr.mid,
@@ -476,6 +772,85 @@ async function scanAll(watchlist) {
   }
 
   signals.sort((a, b) => b.confidence - a.confidence);
+    // ── ANALYST PASS (#3355) ────────────────────────────────────────────────
+    // The 9% `claude_conf` weight has been fed a neutral 50 since PR #1959
+    // deleted the agent layer on 2026-07-03. This is the only place that sets
+    // it. Bounded by construction: ENTER candidates only (never the whole
+    // watchlist), one call each, hard timeout, and any failure returns 50 —
+    // which reproduces exactly the behaviour of the last six weeks. It moves
+    // p_win by at most +/-4.5pp and cannot veto: every auto-trader gate still
+    // runs afterwards.
+    const _haiku = require("./haiku-analyst");
+    if (_haiku.enabled()) {
+      const _cands = signals.filter((s2) => s2.convergence && s2.convergence.decision === "ENTER" && s2.convergence._ev);
+      const _spy = spyTapeContext(bars15.SPY && bars15.SPY.bars);
+      const _dl = require("../direction-lock");
+      await Promise.all(_cands.map(async (s2) => {
+        try {
+          const _b15 = (bars15[s2.symbol] && bars15[s2.symbol].bars) || [];
+          const _proxy = _dl.underlyingProxy(s2.symbol);
+          const _uBars = _proxy && _proxy !== s2.symbol && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
+          const _m = barEtMinute(_b15);
+          const r = await _haiku.analyze({
+            symbol: s2.symbol,
+            direction: s2.direction,
+            price: s2.entry_price,
+            stop: s2.plan && s2.plan.stop,
+            target: s2.plan && s2.plan.target1,
+            p_win: s2.convergence.p_win,
+            ev_r: s2.convergence.ev_r,
+            ibs: sessionIbs(_b15),
+            underlying: _proxy,
+            underlying_tape: _uBars ? sessionDrawdownPct(_uBars) : null,
+            spy_tape: _spy.tape,
+            spy_mom30: _spy.mom30,
+            regime: marketStatus && marketStatus.market,
+            volume_ratio: s2.volume_ratio,
+            macd_hist: s2.convergence._ev.macd_hist,
+            news_sentiment: s2.convergence._ev.news_sentiment,
+            sector_trend: s2.convergence._ev.sector_trend,
+            in_zone: s2.convergence._ev.in_zone,
+            et_time: _m == null ? null : Math.floor(_m / 60) + ":" + String(_m % 60).padStart(2, "0"),
+            sign: s2.convergence._sign,
+            leverage: _dl.leverageOf(s2.symbol),
+            family: _dl.instrumentSign(s2.symbol).family,
+          });
+          s2.analyst = { conviction: r.conviction, reason: r.reason, degraded: !!r.degraded, latency_ms: r.latency_ms };
+          if (r.degraded || r.conviction === _haiku.NEUTRAL) return;   // no view -> leave the verdict untouched
+          // BOUND THE INFLUENCE HERE, not by trusting convergence-ev's internal
+          // weight. Measured: claude_conf 50->0 moves p_win a full 9.00pp, which
+          // near P_MIN (0.45) is enough to flip a verdict on its own — a weight
+          // that large is a gate wearing a weight's clothes, and the whole reason
+          // this slot was demoted from gate to weight is that a model must not
+          // decide alone. The swing is capped at TRADER_HAIKU_MAX_SWING_PP (4.5
+          // by default = half the available pull). The relationship is linear in
+          // conviction, so one interpolation toward neutral lands exactly on the
+          // cap, and the cap holds even if the underlying weight is retuned.
+          const _capPp = Number(process.env.TRADER_HAIKU_MAX_SWING_PP);
+          const _cap = (Number.isFinite(_capPp) ? _capPp : 4.5) / 100;
+          let c2 = ev.scoreConvergence({ ...s2.convergence._ev, claude_conf: r.conviction });
+          const _swing = c2.p_win - s2.convergence.p_win;
+          if (_cap > 0 && Math.abs(_swing) > _cap) {
+            const _scaled = 50 + (r.conviction - 50) * (_cap / Math.abs(_swing));
+            c2 = ev.scoreConvergence({ ...s2.convergence._ev, claude_conf: _scaled });
+            s2.analyst.conviction_applied = Math.round(_scaled * 10) / 10;
+            s2.analyst.capped = true;
+          }
+          s2.convergence.p_win_before = s2.convergence.p_win;
+          s2.convergence.p_win = c2.p_win;
+          s2.convergence.ev_r = c2.ev_r;
+          s2.convergence.decision = c2.decision;
+          s2.convergence.size_mult = ev.edgeRiskMultiplier(c2.p_win, c2.target_r);
+          logs.push({ time: nowIso, agent: "haiku", symbol: s2.symbol,
+            body: `analyst ${r.conviction}/100 — ${r.reason} (p_win ${s2.convergence.p_win_before} -> ${c2.p_win}, ${c2.decision})` });
+        } catch (_e) { /* the analyst must never break a scan */ }
+      }));
+    }
+    // strip the retained scoring input — not part of the signal contract
+    for (const s2 of signals) {
+      if (s2.convergence) { delete s2.convergence._ev; delete s2.convergence._sign; }
+    }
+
   return {
     signals,
     zones,
@@ -492,4 +867,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, sessionIbs, applyPolarity, gateAllows, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, sessionIbs, sessionDrawdownPct, barEtMinute, applyPolarity, spyTapeContext, gateAllows, rileyGate, candleGrade, convergenceVerdict };

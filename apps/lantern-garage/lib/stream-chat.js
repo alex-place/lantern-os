@@ -1511,6 +1511,12 @@ async function handleStreamChat(req, url, res) {
 
   // Coding-change patch directive (#2218 SWE-bench leak) — see codingPatchDirective().
   systemPrompt += codingPatchDirective(isCodingIntent, routeIntent);
+  // #3331: the user's own watchlist rides along with every turn, so trading advice
+  // starts from THEIR symbols instead of a generic list the way the removed Advisor
+  // tab's fixed card did. Fail-soft and cached in lib/trader-context — a chat turn
+  // must never be slower, or fail, because the trading endpoint is busy.
+  try { systemPrompt += await require("./trader-context").watchlistContext(userId); }
+  catch (_e) { /* no trader context is always better than a broken turn */ }
   // #3065 prepareStep seam: freeze the stable base. The dispatch loop recomposes the
   // per-attempt prompt from it (prepending the actual serving-model line) each iteration.
   const _stepBasePrompt = systemPrompt;

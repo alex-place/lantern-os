@@ -7,6 +7,59 @@
  * bindings arrive via the ctx object built in trading.js.
  */
 
+// SESSION STATE, ET (#3326). Manual orders were built as plain MARKET orders,
+// which simply do not execute outside regular hours — IBKR needs a LIMIT with
+// outsideRth. The ENGINE has known this since 2026-08-12 (its extended-hours
+// exits are marketable limits at ±0.2% with outsideRth:true); the manual paths
+// never learned it, so every operator Flatten placed pre-market sat until the
+// 09:30 auction, and the dust probe's "accepted" order went Inactive at the
+// broker instead of working. Same order, different fate, purely because a human
+// pressed the button.
+//   rth      weekday 09:30-16:00 — market orders are fine
+//   extended weekday 04:00-09:30 / 16:00-20:00 — LMT + outsideRth required
+//   closed   otherwise — nothing executes; the order queues to the next session
+function _sessionState(now = Date.now()) {
+  const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const dow = d.getDay();
+  const min = d.getHours() * 60 + d.getMinutes();
+  if (dow < 1 || dow > 5) return 'closed';
+  if (min >= 570 && min < 960) return 'rth';
+  if (min >= 240 && min < 1200) return 'extended';
+  return 'closed';
+}
+
+// THE ANSWER WE ALREADY HAD (#3327 follow-up). On 2026-08-15 this probe asked
+// IBKR to sell 0.8 SOXS and IBKR replied verbatim: "IBKR cancelled: fractional
+// not supported on this account". That is a complete answer, and it sat unread
+// for four days while the same question was asked three more ways — a weekend
+// probe, an RTH probe, and a manual 1-share round trip that spent a real order —
+// because the verdict went into agent-log.jsonl and nothing ever read it back.
+//
+// The probe now keeps its OWN journal. That matters more than it sounds: the
+// shared agent log is ~90MB and grows by megabytes a day, so a broker verdict
+// written there is unfindable within days without scanning the file. A dedicated
+// file holds a handful of rows forever, so the lookup is exact and costs nothing.
+function _dustProbeLog(agentLogPath) {
+  return require('path').join(require('path').dirname(agentLogPath), 'dust-probes.jsonl');
+}
+
+/** The most recent recorded broker REJECTION for `sym`, or null. Advisory only. */
+function _lastFractionalRejection(agentLogPath, sym) {
+  try {
+    const rows = require('fs').readFileSync(_dustProbeLog(agentLogPath), 'utf8').split('\n');
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (!rows[i]) continue;
+      let row;
+      try { row = JSON.parse(rows[i]); } catch (_e) { continue; }
+      if (row.symbol !== sym || row.result !== 'error' || !row.reason) continue;
+      return { ts: row.ts, account: row.account, broker_said: String(row.reason).slice(0, 200) };
+    }
+    return null;
+  } catch (_e) {
+    return null;                    // no file yet, or unreadable — never break the probe
+  }
+}
+
 module.exports = async function ordersRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent, tradingMemory, tradingStore, getEffectiveUserId } = ctx;
 
@@ -95,6 +148,152 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       }
       return true;
     }
+  }
+
+  // POST /api/trading/orders/dust-clear  { ticker }
+  //
+  // THE DUST PROBE (#3325). A sub-1-share remnant cannot be closed through the
+  // normal path: the bridge floors every quantity, so floor(0.8)=0 and the exit
+  // is unexpressible. That floor was inferred from 2026-07-28 (a 838.8 sell the
+  // broker cancelled 28 times) and has been treated as settled fact ever since —
+  // but the SAME ledger shows the account HOLDING fractional size, so fractional
+  // fills reached it somehow (paper-engine fill, or a corporate action; SOXS has
+  // reverse-split history). The floor makes that claim untestable by
+  // construction. This endpoint sends the EXACT held quantity, unfloored, and
+  // reports the broker's verdict verbatim — a measurement, not a workaround.
+  //
+  // Deliberately NOT a flag on /orders/place: this is the only way to set
+  // allowFractional, and it is boxed in on every side —
+  //   • SELL only, and only the position's own quantity (no caller-supplied qty)
+  //   • sub-1-share ONLY: >=1 is refused, so it can never become a general
+  //     fractional-order path or touch a real position
+  //   • verified against the live book first — no position, no order
+  //   • admin only, operator-driven; the engine never calls it
+  // Whatever IBKR answers is recorded either way, so the constraint stops being
+  // folklore and becomes evidence.
+  if (url.pathname === '/api/trading/orders/dust-clear' && req.method === 'POST') {
+    try {
+      const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+      if (!isAdminFn(req)) { sendJson(res, { ok: false, error: 'admin_only' }, 403); return true; }
+      const body = await collectRequestBody(req);
+      const { ticker } = body ? JSON.parse(body) : {};
+      if (!ticker) { sendJson(res, { ok: false, error: 'ticker required' }, 400); return true; }
+      const sym = String(ticker).toUpperCase();
+
+      // Resolve the holding on the account that actually owns it (admin → operator).
+      const uid = getEffectiveUserId(req);
+      const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+      let acct = uid;
+      let pos = (await bridge.getIBKRPositions(uid).catch(() => null)) || [];
+      let row = Array.isArray(pos) ? pos.find((p) => String(p && p.symbol).toUpperCase() === sym) : null;
+      if (!row && uid !== OPERATOR_UID) {
+        pos = (await bridge.getIBKRPositions(OPERATOR_UID).catch(() => null)) || [];
+        row = Array.isArray(pos) ? pos.find((p) => String(p && p.symbol).toUpperCase() === sym) : null;
+        if (row) acct = OPERATOR_UID;
+      }
+      if (!row) { sendJson(res, { ok: false, error: 'not_held', ticker: sym }, 404); return true; }
+
+      const held = Math.abs(Number(row.qty) || 0);
+      if (!(held > 0)) { sendJson(res, { ok: false, error: 'not_held', ticker: sym }, 404); return true; }
+      if (held >= 1) {
+        sendJson(res, { ok: false, error: 'not_dust', ticker: sym, held,
+          detail: 'this endpoint only ever sends sub-1-share remnants — use Flatten for a real position' }, 400);
+        return true;
+      }
+
+      // Same extended-hours conversion as /orders/place (#3326): the first probe
+      // returned "accepted" and then sat Inactive at the broker, because a market
+      // order outside RTH does not work. Price a marketable limit when we can.
+      const _dSess = _sessionState();
+      const _dOrder = { ticker: sym, side: 'sell', qty: held, type: 'market',
+        acceptWarnings: true,        // risk-reducing by construction
+        allowFractional: true };     // THE probe: unfloored
+      let _dNote = null;
+      if (_dSess !== 'rth') {
+        let px = 0;
+        try {
+          const q = await require('../../lib/market-data-yahoo').getQuotes([sym]);
+          px = Number(q && q[0] && q[0].price) || 0;
+        } catch (_e) { /* fall through to market */ }
+        if (px > 0 && _dSess === 'extended') {
+          _dOrder.type = 'limit';
+          _dOrder.limitPrice = Math.round(px * 0.998 * 100) / 100;
+          _dOrder.outsideRth = true;
+          _dNote = `extended hours: marketable limit @ ${_dOrder.limitPrice} with outsideRth`;
+        } else if (px > 0) {
+          // CLOSED MARKET NEEDS GTC (#3327). The previous note claimed the order
+          // "QUEUES until the next session" — it did not. The bridge defaults
+          // non-STP orders to TIF=DAY, and a DAY order placed on a day with no
+          // session EXPIRES at that day's end rather than surviving to the next
+          // open. Live proof: the 0.8-share SOXS dust order was accepted Saturday,
+          // reported as queued, and by Monday 11:38 the position was untouched
+          // with no order anywhere. A marketable GTC limit genuinely survives the
+          // weekend and executes at the open.
+          _dOrder.type = 'limit';
+          _dOrder.limitPrice = Math.round(px * 0.98 * 100) / 100;   // deeply marketable: fills at the open print
+          _dOrder.timeInForce = 'gtc';
+          _dNote = `market closed: GTC limit @ ${_dOrder.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
+        } else {
+          _dNote = 'market closed and no quote available to price a resting order — try again during market hours';
+        }
+      }
+      const _priorRejection = _lastFractionalRejection(
+        require('../../lib/trading-store').agentLogPath(), sym);
+
+      const r = await bridge.placeIBKROrder(acct, _dOrder)
+        .catch((e) => ({ status: 'error', reason: e.message }));
+
+      // ACCEPTED IS NOT FILLED, and this path is where that keeps being forgotten.
+      // `placed` means only that the broker took the order. On an account without
+      // fractional permission IBKR accepts it and then cancels it, which is what
+      // the 2026-08-15 rows show. Three conclusions have been drawn from a
+      // `placed` here — "fractional sells DO work", "the order queues to Monday",
+      // "the position will clear at the open" — and all three were wrong. So this
+      // response reports acceptance and nothing more; only re-reading the book
+      // can say whether the position actually went away.
+      const accepted = !!(r && r.status === 'placed');
+      // Recorded either way — the point is the evidence, not the fill.
+      const _probeRow = {
+        ts: new Date().toISOString(), kind: 'dust_clear_probe', symbol: sym, qty: held,
+        account: acct === OPERATOR_UID ? 'operator' : 'self',
+        result: r && r.status, reason: (r && (r.reason || r.error)) || null,
+      };
+      try {
+        require('../../lib/trading-store').appendLogEntry(_probeRow);
+      } catch (_e) { /* logging must never break the probe */ }
+      // ...and to the probe's own journal, which is what _lastFractionalRejection
+      // reads. Same row, small file, so the next attempt can actually find it.
+      try {
+        require('fs').appendFileSync(
+          _dustProbeLog(require('../../lib/trading-store').agentLogPath()),
+          JSON.stringify(_probeRow) + '\n');
+      } catch (_e) { /* logging must never break the probe */ }
+
+      // Record it like any other order, so it appears in the Orders tab instead
+      // of vanishing — the first probe was accepted by the broker and then had
+      // no row anywhere, which is indistinguishable from "nothing happened".
+      if (accepted && r.order_id) {
+        try {
+          await tradingMemory.recordNewOrders([{
+            id: r.order_id, symbol: sym, side: 'sell', qty: held,
+            status: 'submitted', order_type: _dOrder.type,
+          }]);
+        } catch (_e) { /* the order is placed; bookkeeping must not fail it */ }
+      }
+      sendJson(res, {
+        ok: accepted, ticker: sym, qty: held, order_id: (r && r.order_id) || null,
+        accepted,                    // the broker TOOK the order
+        confirmed_cleared: null,     // never knowable here — re-read the position
+        broker_status: (r && r.status) || null,
+        broker_says: (r && (r.reason || r.error)) || null,   // verbatim — this IS the finding
+        prior_rejection: _priorRejection,                    // what this account already answered
+        operator_account: acct === OPERATOR_UID && uid !== OPERATOR_UID,
+        session: _dSess, session_note: _dNote,
+      }, accepted ? 200 : 502);
+    } catch (error) {
+      sendJson(res, { ok: false, error: error.message }, 500);
+    }
+    return true;
   }
 
   // GET /api/trading/orders
@@ -308,6 +507,42 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         _autoAccepted = 'risk_reducing_sell';
       }
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings };
+      // EXTENDED-HOURS CONVERSION (#3326). A MARKET order does not execute
+      // outside RTH, so a manual Flatten placed pre-market just sat there — the
+      // operator saw "✓ Flattened" and a position that never left. The engine
+      // already converts (marketable LMT + outsideRth); do the same here so a
+      // human's order behaves like the engine's. Marketable = cross the spread
+      // by 0.2% in the direction of the trade, matching auto-trader's constant.
+      let _sessionNote = null;
+      const _sess = _sessionState();
+      if (_sess !== 'rth' && String(type || 'market').toLowerCase() === 'market') {
+        let px = 0;
+        try {
+          const q = await require('../../lib/market-data-yahoo').getQuotes([ticker]);
+          px = Number(q && q[0] && q[0].price) || 0;
+        } catch (_e) { /* no quote → cannot price a limit */ }
+        if (px > 0 && _sess === 'extended') {
+          const isBuy = String(side).toLowerCase() === 'buy';
+          orderReq.type = 'limit';
+          orderReq.limitPrice = Math.round(px * (isBuy ? 1.002 : 0.998) * 100) / 100;
+          orderReq.outsideRth = true;
+          _sessionNote = `extended hours: sent as a marketable limit @ ${orderReq.limitPrice} with outsideRth (a market order would not execute until 09:30)`;
+        } else if (_sess === 'closed') {
+          // Same DAY-expiry trap as the dust path (#3327): "queues" was false —
+          // TIF=DAY on a closed day expires unfilled. Make it genuinely rest.
+          if (px > 0) {
+            const isBuy = String(side).toLowerCase() === 'buy';
+            orderReq.type = 'limit';
+            orderReq.limitPrice = Math.round(px * (isBuy ? 1.02 : 0.98) * 100) / 100;
+            orderReq.timeInForce = 'gtc';
+            _sessionNote = `market closed: GTC limit @ ${orderReq.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
+          } else {
+            _sessionNote = 'market closed and no quote available to price a resting order — this order may expire unfilled; place it during market hours';
+          }
+        } else {
+          _sessionNote = 'extended hours: no quote available to price a limit — sent as market, which will not fill until 09:30';
+        }
+      }
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
@@ -366,6 +601,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // than a human, the response says so — the journal and any audit can tell
       // the two apart.
       if (_autoAccepted) result.auto_warnings = _autoAccepted;
+      // The session caveat rides on the response so the toast can tell the truth
+      // about WHEN this order will act — "placed" and "will fill" are different
+      // claims, and conflating them is what made a pre-market Flatten look done.
+      if (_sessionNote) { result.session = _sess; result.session_note = _sessionNote; }
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,

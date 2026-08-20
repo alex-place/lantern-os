@@ -299,7 +299,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 | home-load | Verify home page renders + no console errors | `/` |
 | dream-chat-init | Verify the chat loads + textarea ready | `/chat.html` |
 | dream-chat-first-message | Send test message + verify response stream | `/chat.html` |
-| theme-toggle | Light ↔ dark mode works bidirectionally | All pages |
+| theme-toggle | Light ↔ dark switches bidirectionally and persists via `localStorage['lantern-theme']` / OS `prefers-color-scheme`. Set it in **Settings → Appearance** (System/Light/Dark); `auth.html` also carries a standalone toggle. There is intentionally **no** per-page chrome toggle (removed 2026-07-25, `site-chrome.js`) — do not assert one on home/chat (#3011). | `settings.html`, `auth.html` |
 | chat-provider-select | Switch the provider dropdown + verify the route label changes | `/chat.html` |
 | dream-chat-error-handling | Send malformed input + verify error state | `/chat.html` |
 | home-nav-links | Click all nav links + verify page loads | `/` → all targets |

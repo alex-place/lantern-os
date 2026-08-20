@@ -63,6 +63,13 @@ function readRows(p) {
 }
 
 test("a position that vanished from the book is logged as a loss", async () => {
+  // TWO scans since #3378: one absence is a data point, not a close — a single
+  // flapped read booked three still-held positions as exits on 2026-08-19. The
+  // first scan records the absence and defers; the second consecutive absence
+  // books the reconstructed exit.
+  await runAutoTrade({ signals: [] }, { bridge, userId: "t" });
+  assert.strictEqual(readRows(LOG).filter((r) => r.event === "exit").length, 0,
+    "one absent read must not book anything (#3378)");
   await runAutoTrade({ signals: [] }, { bridge, userId: "t" });
 
   const exits = readRows(LOG).filter((r) => r.event === "exit");
@@ -111,6 +118,7 @@ test("an unconfirmed exit of our own is NOT reconstructed on top of", async () =
   const { runAutoTrade: run2 } = require("../lib/auto-trader");
 
   await run2({ signals: [] }, { bridge, userId: "t" });
+  await run2({ signals: [] }, { bridge, userId: "t" });   // #3378: a second absent scan must not convert it either
   const recon = readRows(LOG2).filter((r) => r.status === "reconstructed");
   assert.strictEqual(recon.length, 0, "we already logged this exit — do not add a second row");
 });

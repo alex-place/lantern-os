@@ -1,0 +1,3 @@
+### Added
+
+- trader: charts have indicators. Fourteen of them — SMA/EMA/WMA, Bollinger, Donchian and Keltner drawn on the price, and RSI, MACD, Stochastic, ATR, ADX/DMI, CCI, MFI and OBV each in their own strip below it, sharing the price pane's time axis. Add them from an Indicators menu built like the Patterns one; every instance has its own periods and colour, the same indicator can be added more than once (EMA 9 + EMA 21 + EMA 200), and the setup is remembered. Formulas are implemented from their public definitions and checked against reference values — RSI(14) against Wilder's own worked example (#3333)

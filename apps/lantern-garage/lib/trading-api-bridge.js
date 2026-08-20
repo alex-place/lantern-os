@@ -106,6 +106,8 @@ class TradingAPIBridge {
     if (!client) return null;                 // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return null;
+    // #3378: equity from the wrong account would size positions off another book.
+    this._assertPinnedAccount(status, 'an account/equity read');
     const summary = await client.getAccountSummary(status.accountId);
     if (!summary) return null;
     const { equity, cash, buyingPower, unrealizedPnl, realizedPnl: summaryRpl } = summary;
@@ -140,11 +142,17 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
     if (!status.connected) return null;
+    // #3378: never place an order into an account this engine is not pinned to.
+    const _pin = this._pinnedAccount();
+    if (_pin && status.accountId && String(status.accountId) !== _pin) {
+      const reason = `ibkr account mismatch: gateway is serving ${status.accountId} but this engine is pinned to ${_pin} — refusing to place orders into another account`;
+      return { status: 'error', order_id: null, ticker, side, qty, type: type || 'market', dry: false, reason, error: reason, source: 'ibkr-cpapi' };
+    }
     // Crypto pairs (BTCUSD/ETHUSD/SOLUSD…) don't trade through this path: IBKR's
     // hosted crypto (Paxos) requires cash-quantity orders on a US crypto-enabled
     // account, and the share-quantity order path here doesn't support it. Fail with
@@ -160,8 +168,18 @@ class TradingAPIBridge {
     // canceled orders while +44% ran to +50% unrealized). Floor to whole shares;
     // the sub-share remainder (<1 share of dust) is left and reported in `reason`
     // rather than silently blocking the entire exit.
+    // allowFractional (#3325): send the quantity UNFLOORED. The floor above rests
+    // on 2026-07-28 evidence, and that inference has since been over-applied — the
+    // ledger's own history shows the account HOLDING fractional size (the first
+    // fractional row is a SELL of 838.8, which requires holding 838.8), so
+    // fractional fills reached this account by some path (paper-engine fill or a
+    // corporate action; SOXS has reverse-split history). "Rejected a month ago"
+    // is not "impossible now", and the floor makes the claim untestable by
+    // construction. This flag exists ONLY for the operator-driven dust probe,
+    // which the route restricts to sub-1-share SELLs; nothing else may set it,
+    // and the engine's own paths never do.
     let fracNote = null;
-    if (!Number.isInteger(Number(qty))) {
+    if (!Number.isInteger(Number(qty)) && !allowFractional) {
       const floored = Math.floor(Number(qty));
       fracNote = `qty floored ${qty} -> ${floored} (IBKR rejects fractional orders; ~${(Number(qty) - floored).toFixed(4)} sh dust remains)`;
       qty = floored;
@@ -267,6 +285,26 @@ class TradingAPIBridge {
   /**
    * Open positions from the IBKR gateway (CPAPI). Returns [] when disconnected.
    */
+  /** ACCOUNT PIN (#3378, live 2026-08-19 17:26 ET). The OAuth consumer can see
+   *  more than one paper account, and ibkr-cpapi resolves "first discovered"
+   *  when nothing is configured. During IBKR's daily maintenance the accounts
+   *  list came back reordered, the client silently repinned to the OVERNIGHT
+   *  book's account, and for two minutes this engine read — and booked five
+   *  phantom exits against — another engine's book, including an attempted sell
+   *  of a position it never owned. With TRADER_IBKR_ACCOUNT (or IBKR_ACCOUNT_ID)
+   *  set, any read or order against a different account is refused loudly; the
+   *  engine's never-trade-blind path turns that refusal into a stood-down scan.
+   */
+  _pinnedAccount() {
+    return (process.env.TRADER_IBKR_ACCOUNT || process.env.IBKR_ACCOUNT_ID || '').trim() || null;
+  }
+  _assertPinnedAccount(status, what) {
+    const pin = this._pinnedAccount();
+    if (pin && status && status.accountId && String(status.accountId) !== pin) {
+      throw new Error(`ibkr account mismatch: gateway is serving ${status.accountId}, this engine is pinned to ${pin} — refusing ${what}`);
+    }
+  }
+
   async getIBKRPositions(userId) {
     return this._cached('pos:' + userId, 4000, () => this._getIBKRPositionsRaw(userId));
   }
@@ -275,6 +313,7 @@ class TradingAPIBridge {
     if (!client) return [];                   // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return [];
+    this._assertPinnedAccount(status, 'a positions read');
     const positions = await client.getPositions(status.accountId);
     return positions.map((p) => {
       const qty = Number(p.qty) || 0;
@@ -306,7 +345,34 @@ class TradingAPIBridge {
     if (!client) return [];
     const status = await client.getStatus();
     if (!status.connected) return [];
+    this._assertPinnedAccount(status, 'an open-orders read');   // #3378: alien order ids must never reach a cancel loop
     return client.getLiveOrders();
+  }
+
+  /**
+   * Status of ONE order by id (#3379). This exists because /iserver/account/orders
+   * does not reliably list a GTC order placed in a PRIOR session once it fills:
+   * on 2026-08-19 the SMH ladder stop (placed 08-18, filled 10:12) never appeared
+   * in the feed, so the fill reconciler saw nothing and the position's exit was
+   * booked as `closed_externally` — a real stop-out the books then denied
+   * (stops_fired 0 while the post-stop cooldown armed). The engine KNOWS its own
+   * stop order ids, and the per-order endpoint answers for any id you can name.
+   */
+  async getIBKROrderStatus(userId, orderId) {
+    if (!orderId) return null;
+    const client = this._clientFor(userId);
+    if (!client || !client.getOrderStatus) return null;
+    const status = await client.getStatus();
+    if (!status.connected) return null;
+    const j = await client.getOrderStatus(orderId).catch(() => null);
+    if (!j) return null;
+    const num = (...vals) => { for (const v of vals) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; } return null; };
+    return {
+      order_id: String(orderId),
+      status: String(j.order_status ?? j.status ?? ''),
+      avgPrice: num(j.average_price, j.avgPrice, j.avg_price),
+      filledQty: num(j.cum_fill, j.filledQuantity, j.filled_quantity, j.filledQty),
+    };
   }
 
   /** Cancel a working IBKR order (e.g. an orphaned protective stop). */

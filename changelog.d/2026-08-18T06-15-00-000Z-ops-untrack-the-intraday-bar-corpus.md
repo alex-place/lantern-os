@@ -1,0 +1,3 @@
+### Fixed
+
+- ops: the intraday bar corpus (`data/lantern-garage/trading/bars/`) is no longer git-tracked. `bar-archive.js` exists to accumulate history beyond Yahoo's ~30-day cap, but the directory sat outside the runtime-data ignore rules (`*.jsonl` does not cross into a subdirectory), so every `git reset --hard` in the 5-minute auto-deploy reverted it to its committed snapshot — on 2026-08-17 SPY/QQQ/SMH/DIA-5m were rolled back from Aug 17 to the Aug 4 commit. The corpus could never hold anything Yahoo no longer serves, defeating the module's purpose. The deploy script's own contract ("preserves all UNTRACKED runtime data") now actually covers it

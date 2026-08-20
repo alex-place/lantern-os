@@ -1,0 +1,3 @@
+### Changed
+
+- trader: the falling-knife entry veto now records the evidence behind it. It was the engine's highest-firing gate (182 skips in one session) and its only justification was one sentence plus a `(#c)` placeholder referencing nothing — the gate most open to the objection that it fights the strategy, since IBS mean-reversion buys washouts and a washout is where MACD is negative and deepening. Replaying 565 first-IBS fires over 29 sessions and 35 symbols: vetoed n=312, −0.038%/trade, −11.9% total; allowed n=253, +0.041%/trade, +10.4% total. It earns its place, and it works by avoiding magnitude rather than by picking winners (hit rates within 2pp)

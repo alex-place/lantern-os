@@ -1,0 +1,3 @@
+### Added
+
+- trader: `TRADER_HAIKU_ANALYST=1` restores the Claude council slot that PR #1959 orphaned on 2026-07-03. That port kept Riley's deterministic TA and deleted the 9,449-line Grok/Claude agent layer, but `convergence-ev.js` still reserved 9% of the p_win weight for `claude_conf` — so for six weeks it defaulted to a neutral 50 and contributed nothing while 34 hard skip sites accumulated in its place. Haiku now scores ENTER candidates only, one bounded call each, and the applied swing is capped at `TRADER_HAIKU_MAX_SWING_PP` (4.5 by default). Default OFF; every call is journalled with the situation it judged, and `experiments/haiku_analyst_replay.js` scores recorded round trips offline first

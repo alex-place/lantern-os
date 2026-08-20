@@ -254,8 +254,15 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           // small gap to the broker's own dpl, in that direction only.
           try {
             const fs = require('fs'), path = require('path');
-            const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
-            const { computeDayPnl } = require('../../lib/day-pnl');
+            const dayPnlLib = require('../../lib/day-pnl');
+            // #3380: honour TRADER_TRADES_LOG / TRADER_BARS_DIR like the engine
+            // does — a dev checkout serving the real account must be pointable at
+            // the tree the engine actually writes, or its "today" figures are
+            // computed against a stale ledger and silently fall back to broker
+            // numbers with the wrong meaning.
+            const _dataDir = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading');
+            const logPath = dayPnlLib.resolveTradesLog(_dataDir);
+            const { computeDayPnl } = dayPnlLib;
             const _d = await computeDayPnl({
               positions: ibkrPositions,
               ledgerText: fs.readFileSync(logPath, 'utf8'),
@@ -264,7 +271,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
               // hour, and pre-market it can still serve the SESSION-BEFORE-LAST as
               // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
-              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars')),
+              getPrevClose: dayPnlLib.prevCloseFromBarsFactory(dayPnlLib.resolveBarsDir(_dataDir)),
             });
             ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
             ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
@@ -281,7 +288,18 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               const _x = _dayBySym.get(String(p.symbol).toUpperCase());
               if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
             }
-          } catch (_e) { /* keep the broker figures if the ledger isn't readable */ }
+          } catch (_e) {
+            // FALLBACK MUST SAY SO (#3380). Keeping the broker figures is fine —
+            // silently serving them under fields whose tooltips promise "TODAY"
+            // is not: IBKR's dpl re-baselines at its ~17:15 ET reset and its
+            // paper-CPAPI rpl reads $0 permanently, so on 2026-08-19 the footer
+            // showed -$174.07 / +$0.00 on a +$1,901.14 session. Stamp the basis
+            // so the UI can label the number for what it is, and never let the
+            // broker's constant $0 masquerade as "realized today".
+            ibkrAccount.pnl_basis = 'broker (dpl — re-baselines at the IBKR ~17:15 ET daily reset; ledger unavailable: ' + String(_e && _e.message).slice(0, 80) + ')';
+            ibkrAccount.pnl_today_source = 'broker_reset';
+            ibkrAccount.realized_today = null;   // the paper API's rpl is a known constant $0, not a measurement
+          }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;

@@ -140,6 +140,16 @@ jobs:
           node tests/test_secure_cookie_guard.js
           node apps/lantern-garage/test/user-provider-keys.test.js
 
+      # The whole apps/lantern-garage/test suite, globbed rather than listed.
+      # Until 2026-08-18 this job named five files by hand and the other 300 in that
+      # directory had never run in CI once — including every suite written for the
+      # 1.15.4 trader work. A hand-written list guarantees that: it is correct the day
+      # it is written and every test added afterwards is dark. The runner globs, so a
+      # new test file is protected the moment it lands, and it ratchets the
+      # .quarantine list (a parked test that starts passing fails the build).
+      - name: Run the lantern-garage test suite (globbed + quarantine ratchet)
+        run: node scripts/run-garage-tests.mjs --concurrency 4
+
       - name: Start server
         run: node apps/lantern-garage/server.js &
 

@@ -60,11 +60,25 @@ const patentHit = [{ id: "US1234567B2", title: "Recurrent inference apparatus", 
     assert.strictEqual(out.confidence, 0.9);
   });
 
-  await check("default retrievers (no corpus mounted on this box) → capped, never throws", async () => {
-    const out = await groundRecordEvidence(REC); // uses live arxiv-index/patent-index; corpus absent → []
-    assert.strictEqual(out.corroboration_score, 0);
-    assert.strictEqual(out.needs_review, true);
-    assert.strictEqual(out.allowed_max_confidence, NO_SUPPORT_CEILING);
+  await check("default retrievers never throw, and cap only when nothing corroborates", async () => {
+    // This exercises the LIVE arxiv-index/patent-index path. Whether a corpus is
+    // mounted is a property of the box, not of the behaviour under test: a CI
+    // runner has none, while a dev machine may have the arXiv corpus on F:. The
+    // old assertion hard-coded "corpus absent → 0" and so passed in CI and failed
+    // on exactly the machines that do the research.
+    const out = await groundRecordEvidence(REC);
+    assert.strictEqual(typeof out.corroboration_score, "number",
+      "the default retriever path must score rather than throw");
+    if (out.corroboration_score === 0) {
+      // Nothing corroborated it — the cap is the whole point.
+      assert.strictEqual(out.needs_review, true);
+      assert.strictEqual(out.allowed_max_confidence, NO_SUPPORT_CEILING);
+    } else {
+      // A corpus answered. It must not then be capped as unsupported.
+      assert.ok(out.corroboration_score > 0, "a corroborated record scores above zero");
+      assert.notStrictEqual(out.allowed_max_confidence, NO_SUPPORT_CEILING,
+        "a record with real corpus support must not carry the no-support ceiling");
+    }
   });
 
   console.log(failures ? `\n${failures} FAILED` : "\nall passed");
