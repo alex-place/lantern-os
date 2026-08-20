@@ -243,6 +243,21 @@ ok("both indexes get a narrowing ladder, because a multi-term query is a conjunc
   assert.ok(o.length >= 2 && o[o.length - 1].split(/\s+/).length <= 2, "openalex needs the same ladder");
 });
 
+ok("rungs come from distinctive pairs, not sentence position", () => {
+  // "parameter-efficient spectral rewiring reasoning": the LEADING two terms are "parameter
+  // efficient", which returns generic PEFT work; the pair that finds the restated paper is
+  // "spectral rewiring", sitting in the middle. Position says nothing about which words carry
+  // the idea, so the domain-generic words are dropped instead.
+  const pairs = websearch.distinctivePairs("parameter-efficient spectral rewiring reasoning");
+  assert.deepStrictEqual(pairs, [["spectral", "rewiring"]]);
+  const rungs = websearch.arxivQueries("parameter-efficient spectral rewiring reasoning")
+    .map((q) => decodeURIComponent(q));
+  assert.ok(rungs.some((r) => r.includes("spectral") && r.includes("rewiring")),
+            `no rung carries the distinctive pair: ${rungs.join(" | ")}`);
+  assert.ok(!rungs.some((r) => /all:parameter\+AND\+all:efficient/.test(r)),
+            "a rung of two domain-generic words matches everything and stops the ladder early");
+});
+
 ok("a leg that did not run is never reported as a leg that found nothing", async () => {
   process.env.ROBIN_WEB_NOCACHE = "1";
   process.env.ROBIN_WEB_GAP_MS = "0";

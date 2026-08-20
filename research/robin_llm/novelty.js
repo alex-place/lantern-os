@@ -116,9 +116,11 @@ async function judgeOnce(idea, c, llm) {
     + `describes? If a listed title says the same thing as the idea's title, that is RESTATES. `
     + `An idea whose title appears in the lists above is NEVER "UNVERIFIED".\n`
     + `2. Is it a method from a paper above, applied to our setting? PORT.\n`
-    + `3. Did OUR OWN prior work measure it? ANSWERED-HERE if it did, REFUTED-HERE if it measured `
-    + `it and the signal failed. Only choose these if you can name WHAT that file measured -- if `
-    + `you cannot say what was measured, it is not the same investigation.\n`
+    + `3. Did OUR OWN prior work measure THE SAME SIGNAL? ANSWERED-HERE if it did, REFUTED-HERE `
+    + `if it measured it and the signal failed. Name what that file measured. If the honest `
+    + `description is "related to", "closely related", "similar to" or "a different signal in `
+    + `the same family", that is INCREMENTAL, not ANSWERED-HERE -- a probe on neuron `
+    + `activations has not measured attention-head sparsity.\n`
     + `4. Is something above adjacent, with the idea adding to it? INCREMENTAL.\n`
     + `5. Otherwise UNVERIFIED. This does NOT mean novel; it means nothing here matched.\n\n`
     + `For 2-4, match on MECHANISM rather than shared vocabulary: two files about "activations" `
@@ -149,7 +151,9 @@ async function auditIdea(idea, { llm, web = true } = {}, shown = []) {
     return { ...first, web: null, first_pass: first.verdict };
   }
   // Local silence: this is exactly where a novelty claim would have been invented. Search.
-  const w = await websearch.searchAll(first.web_queries);
+  // k=8, not the default 5: on the case that exposed the ladder bug the correct paper came back
+  // SIXTH. A prior-art search truncated at five is a search that reports absence for rank six.
+  const w = await websearch.searchAll(first.web_queries, 8);
   if (!w.searched || !w.hits.length) {
     return { ...first, web: w, first_pass: first.verdict };
   }

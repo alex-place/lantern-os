@@ -1,0 +1,520 @@
+{
+  "goal": "raise reasoning capability per parameter in a small in-house language model we can serve on 8GB, using open-weight models and verification we can run ourselves",
+  "malformed": 0,
+  "lit": {
+    "relevant": [
+      {
+        "id": "2605.00334",
+        "title": "AgentFloor: How Far Up the tool use Ladder Can Small Open-Weight Models Go?",
+        "published": "2026-05",
+        "snippet": "Production agentic systems make many model calls per user request, and most of those calls are short, structured, and routine. This raises a practical routing question that existing evaluations do not directly answer: which parts of an agent workflow truly require large frontier intelligence, and which can be handled by smaller models? We introduce AgentFloor, a deterministic 30-task benchmark org…",
+        "url": "https://arxiv.org/abs/2605.00334",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.04719",
+        "title": "Diagnosing Tool-Selection Reasoning in LLM Agents with Canary Tools",
+        "published": "2026-08",
+        "snippet": "Agent evaluations tell us that a model picked the wrong tool, but rarely why. We introduce canary tools: diagnostic probe tools planted in an agent's Model Context Protocol (MCP) tool set, each engineered to probe one specific tool-selection weakness. A six-type taxonomy (semantic decoys, parameter traps, capability mirages, prerequisite blindness, temporal decoys, and granularity traps) turns a s…",
+        "url": "https://arxiv.org/abs/2608.04719",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2510.17498",
+        "title": "Deep Self-Evolving Reasoning",
+        "published": "2025-10",
+        "snippet": "Long-form chain-of-thought reasoning has become a cornerstone of advanced reasoning in large language models. While recent verification-refinement frameworks have enabled proprietary models to solve Olympiad-level problems, their effectiveness hinges on strong, reliable verification and correction capabilities, which remain fragile in open-weight, smaller-scale models. This work demonstrates that…",
+        "url": "https://arxiv.org/abs/2510.17498",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.03065",
+        "title": "Spectral Rewiring for Exploration, Purification, and Model Merging",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning has become a standard post-training recipe for large language models, but dense full-parameter updates create two deployment-relevant bottlenecks: suppressed reasoning performance, often reflected by premature saturation of test-time scaling, and interference when consolidating multiple capabilities through multi-domain training or model merging. We show that the reasoning-e…",
+        "url": "https://arxiv.org/abs/2607.03065",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2603.00729",
+        "title": "Qwen3-Coder-Next Technical Report",
+        "published": "2026-03",
+        "snippet": "We present Qwen3-Coder-Next, an open-weight language model specialized for coding agents. Qwen3-Coder-Next is an 80-billion-parameter model that activates only 3 billion parameters during inference, enabling strong coding capability with efficient inference. In this work, we explore how far strong training recipes can push the capability limits of models with small parameter footprints. To achieve…",
+        "url": "https://arxiv.org/abs/2603.00729",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2606.21638",
+        "title": "Toward Open Weight Models Without Risks: Separating Public and Private Capabilities in LLMs",
+        "published": "2026-06",
+        "snippet": "Open-weight Large Language Models (LLMs) enable scientific progress and broad deployment. However, they make it difficult to control access to sensitive capabilities. Current practice either suppresses dangerous capabilities before release or mediates access through closed services that use specialized model variants, input/output monitors, and API permissions. The former is susceptible to jailbre…",
+        "url": "https://arxiv.org/abs/2606.21638",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2507.10182",
+        "title": "Breaking the Myth: Can Small Models Infer Postconditions Too?",
+        "published": "2025-07",
+        "snippet": "Formal specifications are essential for ensuring software correctness, yet manually writing them is tedious and error-prone. Large Language Models (LLMs) have shown promise in generating such specifications from natural language intents, but the giant model size and high computational demands raise a fundamental question: Do we really need large models for this task? In this paper, we show that a…",
+        "url": "https://arxiv.org/abs/2507.10182",
+        "primary_category": "cs.SE"
+      },
+      {
+        "id": "2607.20448",
+        "title": "Domyn-Small: A European 10B Reasoning Language Model",
+        "published": "2026-07",
+        "snippet": "We introduce Domyn-Small, a 10-billion-parameter open-weight reasoning language model released under the MIT license. Domyn-Small is the product of an initial pre-training phase on 9 trillion tokens multilingual data, followed by a post-training pipeline for reasoning, instruction following, and context extension. For the latter, we performed a Continued Pre-Training (CPT) phase that doubles the n…",
+        "url": "https://arxiv.org/abs/2607.20448",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2510.25055",
+        "title": "GAPMAP: Mapping Scientific Knowledge Gaps in Biomedical Literature Using Large Language Models",
+        "published": "2025-10",
+        "snippet": "Scientific progress is driven by the deliberate articulation of what remains unknown. This study investigates the ability of large language models (LLMs) to identify research knowledge gaps in the biomedical literature. We define two categories of knowledge gaps: explicit gaps, clear declarations of missing knowledge; and implicit gaps, context-inferred missing knowledge. While prior work has focu…",
+        "url": "https://arxiv.org/abs/2510.25055",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2603.00842",
+        "title": "MedGPT-oss: Training a General-Purpose Vision-Language Model for Biomedicine",
+        "published": "2026-03",
+        "snippet": "Biomedical multimodal assistants have the potential to unify radiology, pathology, and clinical-text reasoning, yet a critical deployment gap remains: top-performing systems are either closed-source or computationally prohibitive, precluding the on-premises deployment required for patient privacy and PHI compliance. We introduce MEDGPT-OSS, an open-weight, 20B-parameter generalist vision-language…",
+        "url": "https://arxiv.org/abs/2603.00842",
+        "primary_category": "cs.CL"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2608.06756",
+        "title": "Capek 0.5: An Execution-Centric Vision-Language Model for Embodied Intelligence",
+        "published": "2026-08",
+        "snippet": "Vision-language models are increasingly serving as the reasoning core of embodied agents. Robot execution is inherently iterative: each action reshapes the scene and physical state, continually renewing what must be perceived, reasoned about, and verified. Meeting these demands requires complementary capabilities that differ in supervision signals, prediction formats, and verification criteria. Ex…",
+        "url": "https://arxiv.org/abs/2608.06756",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.08654",
+        "title": "The Scaffolding Matters More Than the Interface: A Controlled Comparison of MCP and CLI Tool Use Across Seven Agent Scaffoldings, Five Language Models, and One Software Task",
+        "published": "2026-08",
+        "snippet": "How much an AI coding agent costs to run can depend more on the agent scaffolding that drives it than on the interface through which it reaches its tools. We set out to measure the cost of tool use over the Model Context Protocol (MCP) against tool use over an ordinary command-line interface (CLI), a difference on which published estimates disagree by more than an order of magnitude while resting…",
+        "url": "https://arxiv.org/abs/2608.08654",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.13272",
+        "title": "Sovereign by necessity? Frontier AI export controls, cyber security, and the limits of national AI capability",
+        "published": "2026-08",
+        "snippet": "A small number of firms based in two states produce the most capable frontier AI models. The governments of those states have shown both the legal power and the political will to decide which other countries may use these systems. In June 2026 the United States required a leading developer to obtain licences before releasing its most advanced models to any foreign person, including foreign nationa…",
+        "url": "https://arxiv.org/abs/2608.13272",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.01017",
+        "title": "Why LLMs Give In: Conversational Factors and Reasoning Behind Medical Sycophancy",
+        "published": "2026-08",
+        "snippet": "A language model that abandons a correct medical answer under user pushback is more dangerous than one that was simply wrong, because it lends the credibility of a correct answer to the user's misinformation. Such model behavior, described as medical sycophancy, is usually reported as a single rate per model, but we find it is a property of the conversation, not the model. We study medical sycopha…",
+        "url": "https://arxiv.org/abs/2608.01017",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2608.00004",
+        "title": "Cost-Effective Automated Judging of Natural-Language Mathematical Proofs",
+        "published": "2026-08",
+        "snippet": "Grading natural-language mathematical proofs is a recurring cost in evaluating math-reasoning systems, and frontier LLM judges are expensive. We ask whether cheap open-weight models can serve as reliable judges given a candidate proof, a ground-truth proof, and a human-grading rubric. On a 200-instance validation sample of IMO-GradingBench, three cheap judges (GPT-OSS 120B, DeepSeek-V4 Flash, Gemm…",
+        "url": "https://arxiv.org/abs/2608.00004",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.13332",
+        "title": "Agora: Collective and Permissionless Internet-Scale Pretraining of Large Language Models",
+        "published": "2026-07",
+        "snippet": "Training large language models at the multi-billion to trillion parameter scale is confined to datacenters, where data-parallel (DP) and model-parallel (MP) techniques presume homogeneous accelerators, high-speed interconnects, and a single orchestrating entity. Frontier model development is thereby concentrated among the few groups able to assemble such clusters. Meanwhile, an enormous pool of co…",
+        "url": "https://arxiv.org/abs/2607.13332",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2607.20062",
+        "title": "Solar Open 2 Technical Report",
+        "published": "2026-07",
+        "snippet": "We present Solar Open 2, a 250B-A15B Mixture-of-Experts language model built for long-horizon agentic tasks, scaled up from Solar Open 1 (Solar Open 100B). To hold entire agent trajectories in a single context, Solar Open 2 reaches a 1M-token window through a hybrid attention stack that interleaves one softmax layer among every three linear-attention layers, using no positional encoding and a gate…",
+        "url": "https://arxiv.org/abs/2607.20062",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.09693",
+        "title": "Depth-Entropy Guided Sampling for Training-Free LLM Reasoning",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning (RL) has become the dominant paradigm for improving the reasoning capabilities of large language models, but it requires expensive training, curated data, and reward signals. Recent work shows that sampling from sharpened base-model distributions at test time recovers much of the RL gain, yet existing methods rely solely on output-layer likelihoods and ignore the transformer…",
+        "url": "https://arxiv.org/abs/2607.09693",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "pairs": 36,
+  "sham_rank": 9,
+  "of": 9,
+  "sham_control_held": true,
+  "audit": {
+    "counts": {
+      "ANSWERED-HERE": 1,
+      "INCREMENTAL": 3,
+      "PORT": 1,
+      "UNVERIFIED": 2,
+      "RESTATES": 1
+    },
+    "controls": {
+      "plants": [
+        {
+          "plant": "restatement",
+          "verdict": "RESTATES",
+          "pass": true,
+          "why": "The idea title and mechanism exactly match the 2026-05 paper 'AgentFloor' listed in retrieved literature."
+        },
+        {
+          "plant": "answered-here",
+          "verdict": "ANSWERED-HERE",
+          "pass": true,
+          "why": "Our prior work trained logistic probes on mid-layer hidden states to separate truthful from hallucinated answers with high AUROC."
+        }
+      ],
+      "trusted": true
+    }
+  },
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.5071,
+      "wins": 8,
+      "comparisons": 8,
+      "title": "Verification-Driven Self-Correction in 8GB Models",
+      "mechanism": "Use a small open-weight model to generate chain-of-thought, then verify and refine outputs iteratively with a lightweight verifier module to boost reasoning per parameter",
+      "experiment": "Run iterative generate-verify-refine loops on math reasoning tasks, measuring accuracy gains per iteration",
+      "falsifier": "No accuracy improvement or degradation after 3 refinement cycles",
+      "needs": "8GB GPU, curated reasoning dataset, coding time for verifier integration",
+      "cost": "medium",
+      "review": "MECHANISM:  \nVerification-driven self-correction leverages a small model’s ability to generate chain-of-thought (CoT) reasoning, then applies a lightweight verifier module to identify and iteratively refine errors. This structured feedback loop can reduce reasoning errors by explicitly localizing and correcting flawed intermediate steps, effectively amplifying reasoning quality per parameter without increasing model size. The verifier acts as a focused critic, enabling targeted improvements rather than blind regeneration, which is critical in constrained 8GB models where brute-force scaling is impossible.\n\nEVIDENCE:  \nThe literature supports iterative self-correction and verification improving reasoning in LLMs, including smaller models. DISC [1] shows test-time denoising loops reduce errors; DICE [2] and [3] demonstrate structured error localization and correction; CoRefine [7] uses a lightweight controller for confidence-guided refinement; and GIER [8] iteratively improves outputs via gap-driven self-reflection. However, [4] cautions that verification-refinement frameworks remain fragile in smaller open-weight models, indicating partial but not definitive support.\n\nWHAT WOULD FALSIFY IT:  \nIf iterative verification and refinement fail to improve or even degrade reasoning accuracy on benchmark tasks—especially when controlling for compute and token budget—it would falsify the claim. Additionally, if the verifier cannot reliably detect errors or introduces new errors, the mechanism would be ineffective.\n\nRISK:  \nThis approach might improve headline accuracy by overfitting to verification heuristics or producing superficially consistent but semantically incorrect outputs. Iterative loops could amplify subtle verifier biases or hallucinations, leading to brittle reasoning that appears better on benchmarks but performs worse in real-world or adversarial scenarios.",
+      "citations": [
+        "2606.21724",
+        "2510.09211",
+        "2602.02416",
+        "2510.17498",
+        "2510.16374",
+        "2602.12279",
+        "2602.08948",
+        "2509.00325"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "ANSWERED-HERE",
+        "evidence": "docs\\adr\\0030-spiral-verified-cascade-harness.md",
+        "why": "Our ADR-0030 Spiral verified-cascade loop implements iterative verification and refinement in a small model core, matching the idea's mechanism.",
+        "web_queries": [
+          "verification-driven self-correction in 8GB language models",
+          "iterative chain-of-thought verification small open-weight models"
+        ],
+        "trusted": true,
+        "first_pass": "ANSWERED-HERE",
+        "web_searched": false,
+        "web_hits": 0,
+        "web_legs": null
+      }
+    },
+    {
+      "rank": 2,
+      "strength": 0.2515,
+      "wins": 7,
+      "comparisons": 8,
+      "title": "Instruction-Tuned Context Distillation",
+      "mechanism": "Use a frontier API to generate detailed chain-of-thought explanations for reasoning tasks, then fine-tune a small open-weight model on these distilled contexts to improve reasoning per parameter.",
+      "experiment": "Fine-tune a 7-10B model on 100k API-generated CoT examples, then benchmark reasoning on held-out tasks against baseline.",
+      "falsifier": "No statistically significant reasoning accuracy gain over baseline after fine-tuning.",
+      "needs": "Cloud API calls for data generation, GPU hours for fine-tuning, evaluation time.",
+      "cost": "medium",
+      "review": "**MECHANISM:**  \nInstruction-tuned context distillation leverages a large, capable teacher model (via API) to generate detailed chain-of-thought (CoT) explanations for reasoning tasks. Fine-tuning a smaller open-weight model on these rich, stepwise reasoning traces could teach it to internalize reasoning patterns, improving reasoning per parameter. This approach effectively transfers latent reasoning strategies rather than just final answers, potentially boosting sample efficiency and interpretability in a constrained 8GB model.\n\n**EVIDENCE:**  \nSeveral papers support aspects of this idea. [4] shows CoT can help distill reasoning from large to smaller LLMs, improving student performance. [3] demonstrates knowledge distillation combined with guided CoT reinforcement learning can compress models while retaining reasoning. However, [6] warns that conditioning on correct answers to generate CoT can degrade data quality, harming distillation. [2] highlights uncertainty about the provenance of distilled reasoning capabilities, suggesting incomplete understanding of what is transferred. Overall, evidence is cautiously positive but nuanced.\n\n**WHAT WOULD FALSIFY IT:**  \nIf fine-tuning on teacher-generated CoT explanations fails to improve or even degrades the small model’s reasoning accuracy on held-out benchmarks—especially when controlling for data quantity and quality—this would falsify the claim. Also, if improvements come solely from memorizing patterns rather than genuine reasoning, it would undermine the mechanism.\n\n**RISK:**  \nThe method might improve benchmark scores by overfitting to teacher-generated CoT styles or superficial heuristics, inflating headline reasoning metrics while reducing robustness, generalization, or verifiability. This could produce brittle models that appear better but fail in real-world or adversarial reasoning tasks.",
+      "citations": [
+        "2607.10666",
+        "2512.20908",
+        "2603.13765",
+        "2511.05184",
+        "2510.18817",
+        "2607.14552",
+        "2603.20510",
+        "2605.20201"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "INCREMENTAL",
+        "evidence": "experiments\\sigma0_ouro_honesty_eval.py",
+        "why": "Prior work measures QLoRA-tuned Ouro honesty adapter on reasoning prompts, related but not identical to instruction-tuned context distillation.",
+        "web_queries": [
+          "instruction-tuned context distillation for reasoning tasks",
+          "fine-tuning small models on chain-of-thought explanations"
+        ],
+        "trusted": true,
+        "first_pass": "INCREMENTAL",
+        "web_searched": false,
+        "web_hits": 0,
+        "web_legs": null
+      }
+    },
+    {
+      "rank": 3,
+      "strength": 0.1243,
+      "wins": 6,
+      "comparisons": 8,
+      "title": "Context Window Extension with Retrieval-Augmented Reasoning",
+      "mechanism": "Augment small model input with retrieved verified reasoning snippets from a local database to extend effective context and improve reasoning without increasing model size.",
+      "experiment": "Build retrieval index of verified reasoning chains, integrate retrieval into prompt, measure reasoning accuracy gains on complex tasks.",
+      "falsifier": "No measurable improvement in reasoning accuracy despite retrieval augmentation.",
+      "needs": "Storage for retrieval index, GPU for retrieval integration and evaluation, time for dataset curation.",
+      "cost": "medium",
+      "review": "MECHANISM:  \nRetrieval-Augmented Reasoning extends a small model’s effective context by prepending verified reasoning snippets from a local database, allowing the model to leverage external knowledge without increasing parameter count or native context window. This can improve reasoning by providing relevant facts or intermediate steps that the model alone might not recall or infer, effectively offloading memory and reasoning complexity to retrieval and verification components.\n\nEVIDENCE:  \nThe literature supports retrieval augmentation as a promising approach to extend context and improve factual accuracy ([1], [4], [7]). SARA [1] highlights balancing precision and compression in retrieval, while [7] compares domain fine-tuning versus retrieval for small models, showing retrieval can be competitive. Domyn-Small [3] demonstrates context extension via continued pretraining but does not isolate retrieval. None directly confirm that retrieval-augmented reasoning reliably raises reasoning capability per parameter in small models on 8GB hardware.\n\nWHAT WOULD FALSIFY IT:  \nIf retrieval-augmented inputs fail to improve or degrade reasoning accuracy compared to baseline prompts of equal length, or if the overhead of retrieval and verification introduces latency or noise that confuses the model, then the mechanism does not work as intended. Also, if the model cannot effectively integrate retrieved snippets due to limited capacity or context window constraints, the approach fails.\n\nRISK:  \nThis design could inflate headline reasoning scores by cherry-picking or overfitting retrieved snippets, masking the model’s intrinsic reasoning limits. It may also increase inference complexity and latency, reduce robustness to retrieval errors, or cause over-reliance on external data, degrading generalization and interpretability despite improved benchmark numbers.",
+      "citations": [
+        "2507.05633",
+        "2603.06593",
+        "2607.20448",
+        "2604.02259",
+        "2607.07740",
+        "2606.01899",
+        "2604.23801",
+        "2605.30365"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "INCREMENTAL",
+        "evidence": "experiments/csf_converge_rkd_probe.py",
+        "why": "Prior work tests retrieval-anchored compression, related but not identical to augmenting small model input with retrieved reasoning snippets.",
+        "web_queries": [
+          "retrieval augmented reasoning context window extension",
+          "small LLM retrieval augmented reasoning snippet augmentation"
+        ],
+        "trusted": true,
+        "first_pass": "INCREMENTAL",
+        "web_searched": false,
+        "web_hits": 0,
+        "web_legs": null
+      }
+    },
+    {
+      "rank": 4,
+      "strength": 0.0618,
+      "wins": 5,
+      "comparisons": 8,
+      "title": "Parameter-Efficient Spectral Rewiring for Reasoning",
+      "mechanism": "Apply spectral rewiring to selectively update model weights post-training to reduce interference and enhance reasoning without full retraining",
+      "experiment": "Fine-tune a 7-10B open-weight model with spectral rewiring on reasoning benchmarks, compare reasoning metrics before/after",
+      "falsifier": "No statistically significant reasoning improvement or loss in baseline tasks",
+      "needs": "8GB GPUs for fine-tuning, reasoning benchmark data, 1-2 weeks of compute",
+      "cost": "medium",
+      "review": "MECHANISM:  \nSpectral rewiring aims to selectively update model weights along dominant spectral directions post-training, reducing interference between learned features and preserving useful capabilities. By focusing updates on key eigenmodes, it can enhance reasoning-related subspaces without full retraining, potentially improving reasoning per parameter efficiently in a small model.\n\nEVIDENCE:  \n[1] demonstrates spectral rewiring reduces interference and improves reasoning saturation in RL fine-tuning. [6] shows spectral decomposition clarifies preference tuning updates, supporting spectral methods for targeted post-training adaptation. [8] proposes spectral unforgetting to recover capabilities post-fine-tuning, indicating spectral methods can preserve or enhance capabilities without full retraining. Other papers focus on related but distinct methods or training regimes.\n\nWHAT WOULD FALSIFY IT:  \nIf applying spectral rewiring post-training fails to improve reasoning benchmarks or causes degradation in reasoning performance compared to baseline fine-tuning or LoRA, especially when controlling for parameter count and compute, it would falsify the claim. Also, if spectral rewiring cannot be reliably applied on small 8GB models or leads to unstable or inconsistent results, that would disprove its practical utility.\n\nRISK:  \nSpectral rewiring might improve headline reasoning scores by overfitting to benchmark artifacts or by selectively boosting certain spectral modes that do not generalize, masking degradation in broader capabilities or robustness. It could also reduce model diversity or flexibility, harming performance on out-of-distribution inputs despite improved in-distribution metrics.",
+      "citations": [
+        "2607.03065",
+        "2606.31092",
+        "2602.12429",
+        "2512.04457",
+        "2607.09800",
+        "2607.20438",
+        "2605.18822",
+        "2605.20296"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "INCREMENTAL",
+        "evidence": "[2607.03065] Spectral Rewiring for Exploration, Purification, and Model Merging",
+        "why": "Paper applies spectral rewiring broadly; our idea focuses on parameter-efficient post-training weight updates for reasoning, a related but distinct mechanism.",
+        "web_queries": [
+          "parameter-efficient spectral rewiring reasoning",
+          "post-training spectral rewiring model weights"
+        ],
+        "trusted": true,
+        "first_pass": "INCREMENTAL",
+        "web_searched": false,
+        "web_hits": 0,
+        "web_legs": null
+      }
+    },
+    {
+      "rank": 5,
+      "strength": 0.0305,
+      "wins": 4,
+      "comparisons": 8,
+      "title": "Test-Time Sampling Sharpening for Reasoning Enhancement",
+      "mechanism": "Modify sampling temperature and distribution sharpening at inference to mimic RL gains in reasoning without retraining",
+      "experiment": "Evaluate reasoning accuracy on chain-of-thought tasks across sampling parameters, identify optimal sharpening",
+      "falsifier": "No improvement or consistent degradation in reasoning accuracy across all tested parameters",
+      "needs": "8GB GPU for inference, reasoning datasets, scripting for sampling control",
+      "cost": "low",
+      "review": "MECHANISM:  \nTest-time sampling sharpening works by concentrating probability mass on higher-likelihood sequences, effectively mimicking the effect of RL fine-tuning without weight updates. By lowering temperature or applying power transformations to the output distribution, the model favors more confident, coherent reasoning paths, potentially improving reasoning accuracy per parameter in a small model constrained to 8GB. This leverages the pretrained model’s latent capabilities rather than requiring costly retraining.\n\nEVIDENCE:  \nThe literature consistently supports that distribution sharpening at inference recovers much of the reasoning gains attributed to RL, e.g., [1], [3], and [5] show power sampling concentrates on high-likelihood sequences, improving reasoning without retraining. [2] confirms that sampling methods guided by entropy or depth metrics enhance reasoning. However, [8] cautions that sharpening full completions may entangle reasoning traces with final answers, suggesting limits. None report dramatic gains beyond modest improvements, especially in small models.\n\nWHAT WOULD FALSIFY IT:  \nIf test-time sharpening fails to improve reasoning accuracy on standard benchmarks compared to baseline sampling, or if gains vanish when controlling for output diversity, it would falsify the claim. Also, if sharpening reduces reasoning robustness or leads to overconfident but incorrect answers, that would disprove its utility.\n\nRISK:  \nSharpening can reduce output diversity, causing the model to repeat confident but flawed reasoning patterns, inflating headline accuracy while degrading real-world reliability. It may also mask underlying model weaknesses, giving a false sense of improved reasoning without true capability gains.",
+      "citations": [
+        "2601.21590",
+        "2607.09693",
+        "2602.10273",
+        "2602.19169",
+        "2605.04542",
+        "2510.02611",
+        "2606.00755",
+        "2605.28142"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "PORT",
+        "evidence": "[2601.21590] (2026-01) Scalable Power Sampling: Unlocking Efficient, Training-Free Reasoning for LLMs via Distribution Sharpening",
+        "why": "The idea matches test-time distribution sharpening and temperature modification for reasoning without retraining as in this paper.",
+        "web_queries": [
+          "test-time sampling temperature reasoning enhancement",
+          "distribution sharpening inference reasoning large language models"
+        ],
+        "trusted": true,
+        "first_pass": "UNVERIFIED",
+        "web_searched": true,
+        "web_hits": 103,
+        "web_legs": {
+          "arxiv": {
+            "ok": true,
+            "n": 56
+          },
+          "openalex": {
+            "ok": true,
+            "n": 48
+          }
+        }
+      }
+    },
+    {
+      "rank": 6,
+      "strength": 0.0147,
+      "wins": 3,
+      "comparisons": 8,
+      "title": "Sparse Expert Routing via Frontier API Feedback",
+      "mechanism": "Use frontier API to identify reasoning subtask clusters, then train a small model with sparse expert modules specialized per cluster, routing inputs accordingly to boost reasoning efficiency.",
+      "experiment": "Cluster reasoning tasks, train sparse experts on each, evaluate reasoning accuracy and parameter efficiency against dense baseline.",
+      "falsifier": "Sparse expert model shows no accuracy or efficiency improvement over dense baseline on reasoning tasks.",
+      "needs": "Cloud API for clustering, GPU for sparse expert training, task dataset.",
+      "cost": "high",
+      "review": "**MECHANISM:**  \nSparse Expert Routing via Frontier API Feedback could work by decomposing complex reasoning into subtasks, each handled by specialized expert modules. The Frontier API clusters inputs by reasoning type, enabling targeted routing that leverages parameter efficiency—small experts focus on narrow skills, boosting reasoning per parameter. This modularity can reduce interference and improve generalization within each cluster, fitting a capable model within 8GB.\n\n**EVIDENCE:**  \nThe retrieved literature provides partial support. Papers on MoE dynamics and routing [4,7] highlight benefits of expert specialization and dynamic clustering, addressing load balancing and parameter redundancy. [5] shows task-oriented expert specialization improves complex task handling. [6] discusses routing smaller models for subtask efficiency, aligning with the Frontier API idea. However, none directly validate Frontier API feedback for reasoning subtask clustering or demonstrate gains in small, open-weight models under strict memory constraints.\n\n**WHAT WOULD FALSIFY IT:**  \nIf routing inputs by Frontier API clusters fails to improve reasoning accuracy or efficiency compared to a dense baseline of similar size, or if expert specialization leads to overfitting on subtasks and poor generalization, the mechanism would be falsified. Also, if routing overhead or cluster misclassification negates parameter savings, the approach would not work.\n\n**RISK:**  \nThis design could inflate headline reasoning metrics by optimizing for clustered subtasks but degrade overall robustness and flexibility. Over-specialized experts might fail on out-of-distribution inputs or subtasks not well captured by Frontier clusters, reducing real-world utility despite apparent parameter efficiency gains.",
+      "citations": [
+        "2604.13694",
+        "2602.02685",
+        "2606.02502",
+        "2508.02587",
+        "2608.09251",
+        "2605.00334",
+        "2510.02345",
+        "2605.02960"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No exact or close match found in papers or own work for sparse expert routing via Frontier API feedback clustering.",
+        "web_queries": [
+          "sparse expert routing reasoning subtask clustering",
+          "Frontier API feedback sparse mixture of experts"
+        ],
+        "trusted": true,
+        "first_pass": "UNVERIFIED",
+        "web_searched": true,
+        "web_hits": 63,
+        "web_legs": {
+          "arxiv": {
+            "ok": true,
+            "n": 39
+          },
+          "openalex": {
+            "ok": true,
+            "n": 24
+          }
+        }
+      }
+    },
+    {
+      "rank": 7,
+      "strength": 0.0067,
+      "wins": 2,
+      "comparisons": 8,
+      "title": "Modular Verification Head Addition",
+      "mechanism": "Attach a lightweight verification head to a frozen small model to explicitly score reasoning step correctness, enabling iterative refinement without full retraining.",
+      "experiment": "Train verification head on reasoning step correctness labels, measure improvement in final reasoning accuracy via self-correction loops.",
+      "falsifier": "Verification head fails to improve final reasoning accuracy or harms inference speed beyond usability.",
+      "needs": "GPU for head training, labeled verification data from API or heuristics, inference benchmarking.",
+      "cost": "low",
+      "review": "MECHANISM:  \nAdding a lightweight verification head to a frozen small model could work by explicitly scoring the correctness of intermediate reasoning steps, enabling targeted iterative refinement without retraining the entire model. This modular approach isolates verification from generation, potentially improving reasoning per parameter by focusing compute on error detection and correction, which is cheaper than full model updates and can be run within 8GB constraints.\n\nEVIDENCE:  \n[1] shows a lightweight controller atop a frozen LLM can guide self-refinement efficiently, supporting modular verification heads. [2] highlights that verification-refinement frameworks rely on strong verifiers, but these are fragile in small open models, suggesting challenges. [5] discusses expensive verification in large models, implying lightweight heads could reduce cost. [6] reports difficulty instilling verification behaviors in small models, indicating potential fragility. Overall, evidence is mixed but leans toward feasibility with caveats.\n\nWHAT WOULD FALSIFY IT:  \nIf adding a verification head does not improve reasoning accuracy or iterative refinement quality beyond baseline frozen models, or if verification scores fail to correlate with actual reasoning correctness, the mechanism would be invalidated. Also, if the verification head cannot be trained reliably on small models or leads to no gains under 8GB constraints, that would falsify the claim.\n\nRISK:  \nThe verification head might improve headline metrics by overfitting to superficial signals or heuristics, giving false confidence in reasoning steps without true understanding. This could cause iterative refinement to reinforce errors or waste compute, degrading real-world robustness despite apparent metric gains.",
+      "citations": [
+        "2602.08948",
+        "2510.17498",
+        "2607.18343",
+        "2607.08775",
+        "2511.06209",
+        "2604.11867",
+        "2606.30185",
+        "2607.23806"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No prior or external work explicitly attaches a lightweight verification head to frozen small models for reasoning step correctness scoring.",
+        "web_queries": [
+          "modular verification head for reasoning correctness in language models",
+          "lightweight verification head frozen model iterative refinement"
+        ],
+        "trusted": true,
+        "first_pass": "UNVERIFIED",
+        "web_searched": true,
+        "web_hits": 40,
+        "web_legs": {
+          "arxiv": {
+            "ok": true,
+            "n": 40
+          },
+          "openalex": {
+            "ok": true,
+            "n": 16
+          }
+        }
+      }
+    },
+    {
+      "rank": 8,
+      "strength": 0.0027,
+      "wins": 1,
+      "comparisons": 8,
+      "title": "Tool-Selection Canary Probes to Improve Small Model Reasoning",
+      "mechanism": "Embed diagnostic canary tools in model context to identify and correct tool-selection errors that limit reasoning",
+      "experiment": "Augment a small model agent with canary tools, measure reasoning task success and error types with/without canaries",
+      "falsifier": "No reduction in tool-selection errors or reasoning task success rate",
+      "needs": "8GB GPU, agent scaffolding code, time to implement canary tools and evaluation",
+      "cost": "low",
+      "review": "MECHANISM: Embedding diagnostic canary tools in the model’s context aims to expose specific tool-selection weaknesses by triggering identifiable failure modes. This targeted probing can help the model recognize and correct its tool choices during reasoning, potentially improving accuracy per parameter by reducing misrouted reasoning steps without retraining the core model.\n\nEVIDENCE: Paper [1] directly introduces canary tools as diagnostic probes to identify tool-selection errors in LLM agents, supporting the mechanism. Papers [3] and [7] discuss related improvements in tool selection and dynamic adaptation but do not focus on canary probes specifically. The rest do not address this mechanism. Thus, only [1] provides direct evidence.\n\nWHAT WOULD FALSIFY IT: If embedding canary probes fails to reduce tool-selection errors or does not improve downstream reasoning accuracy in a small, resource-constrained model, despite clear diagnostic signals, this would falsify the claim. Also, if the probes confuse the model or increase error rates, it would show the approach does not work.\n\nRISK: Canary probes might improve measured tool-selection metrics or benchmark scores by overfitting to probe patterns, while actually increasing context complexity and confusion. This could degrade real-world reasoning or generalization, inflating headline numbers but worsening overall system robustness and efficiency.",
+      "citations": [
+        "2608.04719",
+        "2608.15579",
+        "2602.17046",
+        "2509.23426",
+        "2601.05366",
+        "2606.04141",
+        "2606.30185",
+        "2605.13706"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "RESTATES",
+        "evidence": "2608.04719",
+        "why": "The idea matches the paper titled 'Diagnosing Tool-Selection Reasoning in LLM Agents with Canary Tools' exactly.",
+        "web_queries": [
+          "Tool-Selection Canary Probes for Small Model Reasoning",
+          "Diagnosing tool-selection errors in small LLMs with canary probes"
+        ],
+        "trusted": true,
+        "first_pass": "RESTATES",
+        "web_searched": false,
+        "web_hits": 0,
+        "web_legs": null
+      }
+    }
+  ],
+  "wall_s": 246
+}

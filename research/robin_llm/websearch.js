@@ -83,6 +83,13 @@ function stripTags(s) { return String(s).replace(/<[^>]+>/g, "").replace(/\s+/g,
 const STOP = new Set(["the", "and", "for", "with", "from", "that", "this", "using", "via", "into",
                       "when", "what", "how", "does", "can", "are", "its", "our", "per", "than"]);
 
+// Words so common in this literature that a query built from them matches everything and
+// therefore nothing. Distinct from STOP, which is ordinary English: these are domain-generic.
+const GENERIC = new Set(["model", "models", "language", "large", "learning", "method", "methods",
+                         "parameter", "parameters", "efficient", "efficiency", "training", "train",
+                         "reasoning", "detection", "detect", "token", "tokens", "neural", "network",
+                         "approach", "based", "task", "tasks", "performance", "small", "test"]);
+
 function terms(query) {
   return String(query).toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
     .filter((w) => w.length > 3 && !STOP.has(w));
@@ -97,20 +104,38 @@ function terms(query) {
 // Looser rungs return looser matches, and that is fine here: the judge decides relevance, and a
 // candidate it can reject beats a silence it would read as novelty. The rung that matched is
 // recorded so a loose match can be seen for what it is.
+// The DISTINCTIVE adjacent pairs of a query -- both words outside the domain-generic list. This
+// is what the leading-N ladder got wrong: for "parameter-efficient spectral rewiring reasoning"
+// the leading two terms are "parameter efficient", which returns generic PEFT work and stops the
+// ladder before it ever reaches "spectral rewiring" -- the pair that finds the paper the idea was
+// restating. Position in the sentence says nothing about which words carry the idea.
+function distinctivePairs(query, cap = 3) {
+  const t = terms(query);
+  const pairs = [];
+  for (let i = 0; i + 1 < t.length; i++) {
+    if (!GENERIC.has(t[i]) && !GENERIC.has(t[i + 1])) pairs.push([t[i], t[i + 1]]);
+  }
+  return pairs.slice(0, cap);
+}
+
 function arxivQueries(query) {
   const t = terms(query);
   const out = [`all:${encodeURIComponent(`"${query}"`)}`];
-  for (const n of [6, 3, 2]) {
-    if (t.length > n) out.push(t.slice(0, n).map((x) => `all:${encodeURIComponent(x)}`).join("+AND+"));
+  if (t.length > 6) out.push(t.slice(0, 6).map((x) => `all:${encodeURIComponent(x)}`).join("+AND+"));
+  for (const [a, b] of distinctivePairs(query)) {
+    out.push(`all:${encodeURIComponent(a)}+AND+all:${encodeURIComponent(b)}`);
   }
-  if (t.length >= 2 && !out.length) out.push(t.slice(0, 2).map((x) => `all:${encodeURIComponent(x)}`).join("+AND+"));
+  if (out.length === 1 && t.length >= 2) {
+    out.push(t.slice(0, 2).map((x) => `all:${encodeURIComponent(x)}`).join("+AND+"));
+  }
   return out;
 }
 
 function openalexQueries(query) {
   const t = terms(query);
   const out = [query];
-  for (const n of [3, 2]) if (t.length > n) out.push(t.slice(0, n).join(" "));
+  for (const [a, b] of distinctivePairs(query)) out.push(`${a} ${b}`);
+  if (out.length === 1 && t.length > 2) out.push(t.slice(0, 2).join(" "));
   return out;
 }
 
@@ -120,18 +145,32 @@ async function arxivOnce(searchQuery, k) {
   return r;
 }
 
+// UNION the rungs rather than stopping at the first that returns anything. Stopping early is
+// what hid the spectral-rewiring paper: a broad rung returned plenty of irrelevant PEFT work, the
+// ladder halted, and the narrow rung that would have found it was never tried. A rung returning
+// hits is not evidence that it returned the RIGHT hits.
 async function arxiv(query, k = 5) {
-  let r = null;
-  let rung = 0;
   const ladder = arxivQueries(query);
-  for (let i = 0; i < ladder.length; i++) {
-    r = await arxivOnce(ladder[i], k);
-    rung = i;
-    if (r.status === 200 && r.body.includes("<entry>")) break;
-  }
-  if (!r || r.status !== 200) return { ok: false, reason: `arxiv ${r ? r.status : "no-response"}`, hits: [], rung };
   const hits = [];
-  for (const entry of r.body.split("<entry>").slice(1)) {
+  const seen = new Set();
+  let anyOk = false;
+  let lastStatus = "no-response";
+  for (let i = 0; i < ladder.length; i++) {
+    const r = await arxivOnce(ladder[i], k);
+    lastStatus = r.status;
+    if (r.status !== 200) continue;
+    anyOk = true;
+    for (const h of parseArxiv(r.body, i)) {
+      if (!seen.has(h.id)) { seen.add(h.id); hits.push(h); }
+    }
+  }
+  if (!anyOk) return { ok: false, reason: `arxiv ${lastStatus}`, hits: [], rung: 0 };
+  return { ok: true, reason: "", hits, rung: hits.length ? Math.min(...hits.map((h) => h.rung)) : 0 };
+}
+
+function parseArxiv(body, rung) {
+  const hits = [];
+  for (const entry of body.split("<entry>").slice(1)) {
     const id = (entry.match(/<id>([^<]+)<\/id>/) || [])[1] || "";
     const title = stripTags((entry.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || "");
     const summary = stripTags((entry.match(/<summary>([\s\S]*?)<\/summary>/) || [])[1] || "");
@@ -139,7 +178,7 @@ async function arxiv(query, k = 5) {
     if (title) hits.push({ source: "arxiv", id: id.split("/abs/")[1] || id, year: pub, title,
                           abstract: summary.slice(0, 400), rung });
   }
-  return { ok: true, reason: "", hits, rung };
+  return hits;
 }
 
 async function openalexOnce(query, k) {
@@ -150,25 +189,32 @@ async function openalexOnce(query, k) {
 
 async function openalex(query, k = 5) {
   const ladder = openalexQueries(query);
-  let last = null;
+  const hits = [];
+  const seen = new Set();
+  let anyOk = false;
+  let lastStatus = "no-response";
   for (let i = 0; i < ladder.length; i++) {
     const r = await openalexOnce(ladder[i], k);
-    last = r;
+    lastStatus = r.status;
     if (r.status !== 200) continue;
+    anyOk = true;
     try {
       const j = JSON.parse(r.body);
-      const hits = (j.results || []).map((w) => ({
-        source: "openalex", id: (w.ids && w.ids.doi) || w.id || "", year: String(w.publication_year || ""),
-        title: String(w.title || ""), abstract: "", rung: i,
-        venue: (w.primary_location && w.primary_location.source
-          && w.primary_location.source.display_name) || "",
-      })).filter((h) => h.title);
-      if (hits.length || i === ladder.length - 1) return { ok: true, reason: "", hits, rung: i };
+      for (const w of j.results || []) {
+        const id = (w.ids && w.ids.doi) || w.id || String(w.title || "");
+        if (!w.title || seen.has(id)) continue;
+        seen.add(id);
+        hits.push({ source: "openalex", id, year: String(w.publication_year || ""),
+                    title: String(w.title), abstract: "", rung: i,
+                    venue: (w.primary_location && w.primary_location.source
+                      && w.primary_location.source.display_name) || "" });
+      }
     } catch (e) {
-      return { ok: false, reason: `openalex parse: ${e.message}`, hits: [], rung: i };
+      return { ok: false, reason: `openalex parse: ${e.message}`, hits, rung: i };
     }
   }
-  return { ok: false, reason: `openalex ${last ? last.status : "no-response"}`, hits: [], rung: 0 };
+  if (!anyOk) return { ok: false, reason: `openalex ${lastStatus}`, hits: [], rung: 0 };
+  return { ok: true, reason: "", hits, rung: hits.length ? Math.min(...hits.map((h) => h.rung)) : 0 };
 }
 
 // One query across both legs. Returns hits plus WHICH LEGS ACTUALLY RAN -- the audit must be able
@@ -208,5 +254,5 @@ async function searchAll(queries, k = 5) {
   return { queries: queries.slice(0, 3), legs, searched: legs.arxiv.ok || legs.openalex.ok, hits };
 }
 
-module.exports = { search, searchAll, arxiv, openalex, arxivQueries, openalexQueries,
+module.exports = { search, searchAll, arxiv, openalex, arxivQueries, openalexQueries, distinctivePairs,
                    _setFetch, _resetFetch, REQUEST_GAP, CACHE };

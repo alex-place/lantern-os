@@ -1,0 +1,2150 @@
+{
+ "T::8": {
+  "query": "T",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 8,
+    "rung": 0
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 8,
+    "rung": 0
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "1406.6311v4",
+    "year": "2014",
+    "title": "The Physics of the B Factories",
+    "abstract": "This work is on the Physics of the B Factories. Part A of this book contains a brief description of the SLAC and KEK B Factories as well as their detectors, BaBar and Belle, and data taking related issues. Part B discusses tools and methods used by the experiments in order to obtain results. The results themselves can be found in Part C. Please note that version 3 on the archive is the auxiliary v",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "0901.0512v4",
+    "year": "2008",
+    "title": "Expected Performance of the ATLAS Experiment - Detector, Trigger and Physics",
+    "abstract": "A detailed study is presented of the expected performance of the ATLAS detector. The reconstruction of tracks, leptons, photons, missing energy and jets is investigated, together with the performance of b-tagging and the trigger. The physics potential for a variety of interesting physics processes, within the Standard Model and beyond, is examined. The study comprises a series of notes based on si",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "1411.4413v2",
+    "year": "2014",
+    "title": "Observation of the rare $B^0_s\\toμ^+μ^-$ decay from the combined analysis of CMS and LHCb data",
+    "abstract": "A joint measurement is presented of the branching fractions $B^0_s\\toμ^+μ^-$ and $B^0\\toμ^+μ^-$ in proton-proton collisions at the LHC by the CMS and LHCb experiments. The data samples were collected in 2011 at a centre-of-mass energy of 7 TeV, and in 2012 at 8 TeV. The combined analysis produces the first observation of the $B^0_s\\toμ^+μ^-$ decay, with a statistical significance exceeding six sta",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.07595v3",
+    "year": "2026",
+    "title": "Deep Search for Joint Sources of Gravitational Waves and High-Energy Neutrinos with IceCube During the Third Observing Run of LIGO and Virgo",
+    "abstract": "The discovery of joint sources of high-energy neutrinos and gravitational waves has been a primary target for the LIGO, Virgo, KAGRA, and IceCube observatories. The joint detection of high-energy neutrinos and gravitational waves would provide insight into cosmic processes, from the dynamics of compact object mergers and stellar collapses to the mechanisms driving relativistic outflows. The joint ",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "1610.08142v2",
+    "year": "2016",
+    "title": "Measurement of forward $t\\overline{t}$, $W+b\\overline{b}$ and $W+c\\overline{c}$ production in $pp$ collisions at $\\sqrt{s}=8$ TeV",
+    "abstract": "The production of $t\\overline{t}$, $W+b\\overline{b}$ and $W+c\\overline{c}$ is studied in the forward region of proton-proton collisions collected at a centre-of-mass energy of 8 TeV by the LHCb experiment, corresponding to an integrated luminosity of 1.98 $\\pm$ 0.02 $\\mbox{fb}^{-1}$. The $W$ bosons are reconstructed in the decays $W\\rightarrow\\ellν$, where $\\ell$ denotes muon or electron, while th",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "2402.01568v3",
+    "year": "2024",
+    "title": "Doping Liquid Argon with Xenon in ProtoDUNE Single-Phase: Effects on Scintillation Light",
+    "abstract": "Doping of liquid argon TPCs (LArTPCs) with a small concentration of xenon is a technique for light-shifting and facilitates the detection of the liquid argon scintillation light. In this paper, we present the results of the first doping test ever performed in a kiloton-scale LArTPC. From February to May 2020, we carried out this special run in the single-phase DUNE Far Detector prototype (ProtoDUN",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "1710.05839v2",
+    "year": "2017",
+    "title": "Search for High-energy Neutrinos from Binary Neutron Star Merger GW170817 with ANTARES, IceCube, and the Pierre Auger Observatory",
+    "abstract": "The Advanced LIGO and Advanced Virgo observatories recently discovered gravitational waves from a binary neutron star inspiral. A short gamma-ray burst (GRB) that followed the merger of this binary was also recorded by the Fermi Gamma-ray Burst Monitor (Fermi-GBM), and the Anticoincidence Shield for the Spectrometer for the International Gamma-Ray Astrophysics Laboratory (INTEGRAL), indicating par",
+    "rung": 0
+   },
+   {
+    "source": "arxiv",
+    "id": "2509.18817v2",
+    "year": "2025",
+    "title": "Measurement of the $W \\to μν_μ$ cross-sections as a function of the muon transverse momentum in $pp$ collisions at 5.02 TeV",
+    "abstract": "The $pp \\to W^{\\pm} (\\to μ^{\\pm} ν_μ) X$ cross-sections are measured at a proton-proton centre-of-mass energy $\\sqrt{s} = 5.02$ TeV using a dataset corresponding to an integrated luminosity of 100 pb$^{-1}$ recorded by the LHCb experiment. Considering muons in the pseudorapidity range $2.2 &lt; η&lt; 4.4$, the cross-sections are measured differentially in twelve intervals of muon transverse moment",
+    "rung": 0
+   },
+   {
+    "source": "openalex",
+    "id": "https://openalex.org/W2187089797",
+    "year": "2008",
+    "title": "Visualizing Data using t-SNE",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Journal of Machine Learning Research"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1056/nejmoa1415061",
+    "year": "2015",
+    "title": "Stent-Retriever Thrombectomy after Intravenous t-PA vs. t-PA Alone in Stroke",
+    "abstract": "",
+    "rung": 0,
+    "venue": "New England Journal of Medicine"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/j.cell.2008.05.009",
+    "year": "2008",
+    "title": "Regulatory T Cells and Immune Tolerance",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Cell"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1038/ni904",
+    "year": "2003",
+    "title": "Foxp3 programs the development and function of CD4+CD25+ regulatory T cells",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Nature Immunology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1126/science.1079490",
+    "year": "2003",
+    "title": "Control of Regulatory T Cell Development by the Transcription Factor <i>Foxp3</i>",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Science"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1038/ni.2035",
+    "year": "2011",
+    "title": "T cell exhaustion",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Nature Immunology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.3389/fpsyg.2013.00863",
+    "year": "2013",
+    "title": "Calculating and reporting effect sizes to facilitate cumulative science: a practical primer for t-tests and ANOVAs",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Frontiers in Psychology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1038/ni.1840",
+    "year": "2010",
+    "title": "Signaling by intrathymic cytokines, not T cell antigen receptors, specifies CD8 lineage choice and promotes the differentiation of cytotoxic-lineage T cells",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Nature Immunology"
+   }
+  ]
+ },
+ "test-time sampling temperature sharpening reasoning enhancement::8": {
+  "query": "test-time sampling temperature sharpening reasoning enhancement",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 24,
+    "rung": 2
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 16,
+    "rung": 1
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "1201.3974v3",
+    "year": "2012",
+    "title": "Perfect Sampling with Unitary Tensor Networks",
+    "abstract": "Tensor network states are powerful variational ansätze for many-body ground states of quantum lattice models. The use of Monte Carlo sampling techniques in tensor network approaches significantly reduces the cost of tensor contractions, potentially leading to a substantial increase in computational efficiency. Previous proposals are based on a Markov chain Monte Carlo scheme generated by locally u",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2308.05816v1",
+    "year": "2023",
+    "title": "Snowballing Nested Sampling",
+    "abstract": "A new way to run nested sampling, combined with realistic MCMC proposals to generate new live points, is presented. Nested sampling is run with a fixed number of MCMC steps. Subsequently, snowballing nested sampling extends the run to more and more live points. This stabilizes MCMC proposals over time, and leads to pleasant properties, including that the number of live points and number of MCMC st",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2003.10976v3",
+    "year": "2020",
+    "title": "A Model-Free Sampling Method for Estimating Basins of Attraction Using Hybrid Active Learning (HAL)",
+    "abstract": "Understanding the basins of attraction (BoA) is often a paramount consideration for nonlinear systems. Most existing approaches to determining a high-resolution BoA require prior knowledge of the system's dynamical model (e.g., differential equation or point mapping for continuous systems, cell mapping for discrete systems, etc.), which allows derivation of approximate analytical solutions or para",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2303.08242v1",
+    "year": "2023",
+    "title": "Optimal Sampling Designs for Multi-dimensional Streaming Time Series with Application to Power Grid Sensor Data",
+    "abstract": "The Internet of Things (IoT) system generates massive high-speed temporally correlated streaming data and is often connected with online inference tasks under computational or energy constraints. Online analysis of these streaming time series data often faces a trade-off between statistical efficiency and computational cost. One important approach to balance this trade-off is sampling, where only ",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2406.04318v1",
+    "year": "2024",
+    "title": "Adaptive Sampling of k-Space in Magnetic Resonance for Rapid Pathology Prediction",
+    "abstract": "Magnetic Resonance (MR) imaging, despite its proven diagnostic utility, remains an inaccessible imaging modality for disease surveillance at the population level. A major factor rendering MR inaccessible is lengthy scan times. An MR scanner collects measurements associated with the underlying anatomy in the Fourier space, also known as the k-space. Creating a high-fidelity image requires collectin",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2606.28661v1",
+    "year": "2026",
+    "title": "When More Sampling Hurts: The Modal Ceiling and Correlation Ceiling of Test-Time Scaling",
+    "abstract": "People overthink; language models over-sample, and the extra effort can talk both into a worse answer. Reasoning systems answer a hard question by sampling it many times (test-time scaling), and the more they draw, the more often a correct answer turns up somewhere, so coverage, the fraction of problems with at least one correct try, climbs and appears to be progress. But a deployed system must re",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "1602.02052v3",
+    "year": "2016",
+    "title": "A Comparison of 10 Sampling Algorithms for Configurable Systems",
+    "abstract": "Almost every software system provides configuration options to tailor the system to the target platform and application scenario. Often, this configurability renders the analysis of every individual system configuration infeasible. To address this problem, researchers have proposed a diverse set of sampling algorithms. We present a comparative study of 10 state-of-the-art sampling algorithms regar",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.30330v1",
+    "year": "2026",
+    "title": "When, why, and how do diffusion posterior samplers fail? A finite-sample lens",
+    "abstract": "Diffusion models have excellent capacity to model complex distributions of natural data, which has made them a popular and effective choice for posterior sampling in imaging inverse problems. Existing methods can incorporate any measurement model at inference time but must use an inexact approximation for the likelihood at intermediate timesteps for computational tractability. Although these appro",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "1510.07611v4",
+    "year": "2015",
+    "title": "Estimation of effective temperatures in quantum annealers for sampling applications: A case study with possible applications in deep learning",
+    "abstract": "An increase in the efficiency of sampling from Boltzmann distributions would have a significant impact on deep learning and other machine-learning applications. Recently, quantum annealers have been proposed as a potential candidate to speed up this task, but several limitations still bar these state-of-the-art technologies from being used effectively. One of the main limitations is that, while th",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2005.10665v1",
+    "year": "2020",
+    "title": "Study of Silicon Photomultiplier Performance at Different Temperatures",
+    "abstract": "Decreasing the operation temperature of a Silicon Photo-Multiplier (SiPM) leads to a drop in its dark noise. Some experiments consider cold temperatures as an option for low noise applications of SiPM. One of those is the TAO detector, which requires operation at $T\\approx -50~^\\circ$C. A significant dependence of the Photon Detection Efficiency (PDE) of a SiPM on different temperatures was report",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1805.03924v8",
+    "year": "2018",
+    "title": "Unbiased and Consistent Nested Sampling via Sequential Monte Carlo",
+    "abstract": "We introduce a new class of sequential Monte Carlo methods which reformulates the essence of the nested sampling method of Skilling (2006) in terms of sequential Monte Carlo techniques. Two new algorithms are proposed, nested sampling via sequential Monte Carlo (NS-SMC) and adaptive nested sampling via sequential Monte Carlo (ANS-SMC). The new framework allows convergence results to be obtained in",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2511.16481v1",
+    "year": "2025",
+    "title": "Effect of a magnetic field up to 9 T on the temperature dependence of the pseudogap in YBa$_2$Cu$_3$O$_{7-δ}$ films",
+    "abstract": "The work analyzes the effect of a magnetic field $B$ directed along the $c$ axis ($B \\parallel c$) up to 9~T on the resistivity $ρ(T)$, fluctuation conductivity (FLC) $σ'(T)$ and pseudogap $Δ^*(T)$ in thin films of YBa$_2$Cu$_3$O$_{7-δ}$ with a critical temperature of the superconducting transition $T_c = 88.8$~K. In contrast to previous work, where the magnetic field was directed along the $ab$ p",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1409.7309v1",
+    "year": "2014",
+    "title": "Effect of quenched disorder in the entropy-jump at the first-order vortex phase transition of Bi$_{2}$Sr$_{2}$CaCu$_{2}$O$_{8 + δ}$",
+    "abstract": "We study the effect of quenched disorder in the thermodynamic magnitudes entailed in the first-order vortex phase transition of the extremely layered Bi$_{2}$Sr$_{2}$CaCu$_{2}$O$_{8 + δ}$ compound. We track the temperature-evolution of the enthalpy and the entropy-jump at the vortex solidification transition by means of AC local magnetic measurements. Quenched disorder is introduced to the pristin",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "cond-mat/0409446v1",
+    "year": "2004",
+    "title": "Magnetothermal Transport of Oriented Graphite at Low Temperatures",
+    "abstract": "We have studied the magnetic field dependence of the thermal conductivity $κ(T,B)$ of highly oriented pyrolytic graphite samples at temperatures 0.2K$ \\le T &lt; 10$K and fields 0T$ \\le B \\le 9$T. The samples show clear deviations from the Wiedemann-Franz law with a kink behavior at fields $B \\sim 0.1 $T near the metal-insulator transition observed in electrical resistivity measurements. We furthe",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1703.02378v1",
+    "year": "2017",
+    "title": "Calorimetric Measurements at Low Temperatures in Toluene Glass and Crystal",
+    "abstract": "The specific heat of toluene in glass and crystal states, has been measured both at low temperatures down to 1.8 K (using the thermal relaxation method) and in a wide temperature range up to the liquid state (using a quasiadiabatic continuous method). Our measurements therefore extend earlier published data to much lower temperatures, thereby allowing to explore the low temperature glassy anomalie",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1505.07567v1",
+    "year": "2015",
+    "title": "Steady shear magnetorheology in Co0.9Ni0.1 nanocluster-based MR fluids at elevated temperatures",
+    "abstract": "In this paper, we present the study of magnetorheological properties of magnetic fluids containing Co0.9Ni0.1 nanocluster that have been measured as a function of both magnetic field and temperature. Co-rich nanoclusters were synthesized by conventional homogeneous nucleation in liquid polyol. Morphological characterization using FESEM revealed the non-aggregated nature of nanoclusters with an ave",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "hep-lat/0309118v1",
+    "year": "2003",
+    "title": "The Phase Diagram of High Temperature QCD with Three Flavors of Improved Staggered Quarks",
+    "abstract": "We report on progress in our study of high temperature QCD with three flavors of improved staggered quarks. Simulations are being carried out with three degenerate quarks with masses less than or equal to the strange quark mass, $m_s$, and with degenerate up and down quarks with masses in the range $0.1 m_s \\leq m_{u,d}\\leq 0.6 m_s$, and the strange quark mass fixed near its physical value. For th",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "1809.05920v4",
+    "year": "2018",
+    "title": "Interface Sharpening in Miscible and Isotopic Multilayers: Role of Short-Circuit Diffusion",
+    "abstract": "Atomic diffusion at nanometer length scale may differ significantly from bulk diffusion, and may sometimes even exhibit counterintuitive behavior. In the present work, taking Cu/Ni as a model system, a general phenomenon is reported which results in sharpening of interfaces upon thermal annealing, even in miscible systems. Anomalous x-ray reflectivity from a Cu/Ni multilayer has been used to study",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2010.15797v2",
+    "year": "2020",
+    "title": "Broadening and sharpening of the Drude peak through antiferromagnetic fluctuations",
+    "abstract": "Antiferromagnetic or charge density wave fluctuations couple with light through the recently discovered π-ton contribution to the optical conductivity, and quite generically constitute the dominant vertex corrections in low-dimensional correlated electron systems. Here we study the arguably simplest version of these $π$-tons based on the semi-analytical random phase approximation (RPA) ladder in t",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.21590v1",
+    "year": "2026",
+    "title": "Scalable Power Sampling: Unlocking Efficient, Training-Free Reasoning for LLMs via Distribution Sharpening",
+    "abstract": "Reinforcement learning (RL) post-training is a dominant approach for improving the reasoning performance of large language models (LLMs), yet growing evidence suggests that its gains arise primarily from distribution sharpening rather than the acquisition of new capabilities. Recent work has shown that sampling from the power distribution of LLMs using Markov chain Monte Carlo (MCMC) can recover p",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "0901.3268v2",
+    "year": "2009",
+    "title": "Two-level atom at finite temperature",
+    "abstract": "Properties of a two-level atom coupled to the quantized electromagnetic field at finite temperature are determined. The analysis is based on a new method (inspired by QED) of describing qubits, developed previously at zero temperature (Phys. Rev. A 76, 062106 (2007)). In this paper, we make a generalization to finite temperature by introducing the Matsubara formalism and the temperature propagator",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "0706.3963v2",
+    "year": "2007",
+    "title": "Carbonates in space - The challenge of low temperature data",
+    "abstract": "Carbonates have repeatedly been discussed as possible carriers of stardust emission bands. However, the band assignments proposed so far were mainly based on room temperature powder transmission spectra of the respective minerals. Since very cold calcite grains have been claimed to be present in protostars and in Planetary Nebulae such as NGC 6302, the changes of their dielectric functions at low ",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "1004.2007v1",
+    "year": "2010",
+    "title": "Density of Phonon States in Superconducting FeSe as a Function of Temperature and Pressure",
+    "abstract": "The temperature and pressure dependence of the partial density of phonon states of iron atoms in superconducting Fe1.01Se was studied by 57Fe nuclear inelastic scattering (NIS). The high energy resolution allows for a detailed observation of spectral properties. A sharpening of the optical phonon modes and shift of all spectral features towards higher energies by ~4% with decreasing temperature fr",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2512.23934v2",
+    "year": "2025",
+    "title": "Fluctuations of Temperature in the Polyakov-loop extended Nambu--Jona-Lasinio Model",
+    "abstract": "We investigate temperature fluctuations in hot QCD matter using a 3-flavor Polyakov-loop extended Nambu--Jona-Lasinio (PNJL) model. The high-order cumulant ratios $R_{n2}$ ($n&gt;2$) exhibit non-monotonic variations across the chiral phase transition, characterized by slight fluctuations in the chiral crossover region and significant oscillations around the critical point. In contrast, distinct pe",
+    "rung": 4
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1006/meth.2001.1262",
+    "year": "2001",
+    "title": "Analysis of Relative Gene Expression Data Using Real-Time Quantitative PCR and the 2−ΔΔCT Method",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Methods"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1152/ajpheart.2000.278.6.h2039",
+    "year": "2000",
+    "title": "Physiological time-series analysis using approximate entropy and sample entropy",
+    "abstract": "",
+    "rung": 1,
+    "venue": "American Journal of Physiology-Heart and Circulatory Physiology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1093/biomet/76.2.297",
+    "year": "1989",
+    "title": "Regression and time series model selection in small samples",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Biometrika"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1017/s0266466604203073",
+    "year": "2004",
+    "title": "PANEL COINTEGRATION: ASYMPTOTIC AND FINITE SAMPLE PROPERTIES OF POOLED TIME SERIES TESTS WITH AN APPLICATION TO THE PPP HYPOTHESIS",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Econometric Theory"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1093/nar/29.9.e45",
+    "year": "2001",
+    "title": "A new mathematical model for relative quantification in real-time RT-PCR",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Nucleic Acids Research"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1086/164037",
+    "year": "1986",
+    "title": "A prescription for period analysis of unevenly sampled time series",
+    "abstract": "",
+    "rung": 1,
+    "venue": "The Astrophysical Journal"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1111/1462-2920.13023",
+    "year": "2015",
+    "title": "Every base matters: assessing small subunit <scp>rRNA</scp> primers for marine microbiomes with mock communities, time series and global field samples",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Environmental Microbiology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1901/jaba.1975.8-463",
+    "year": "1975",
+    "title": "AN EVALUATION OF TIME‐SAMPLE MEASURES OF BEHAVIOR1",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Journal of Applied Behavior Analysis"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.3390/rs9080836",
+    "year": "2017",
+    "title": "Estimating Subpixel Surface Heat Fluxes through Applying Temperature-Sharpening Methods to MODIS Data",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Remote Sensing"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1002/adma.201806095",
+    "year": "2019",
+    "title": "Low‐Temperature In Situ Amino Functionalization of TiO<sub>2</sub> Nanoparticles Sharpens Electron Management Achieving over 21% Efficient Planar Perovskite Solar Cells",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Advanced Materials"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1116/1.586059",
+    "year": "1992",
+    "title": "Low temperature thermal oxidation sharpening of microcast tips",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Journal of Vacuum Science & Technology B Microelectronics and Nanometer Structures Processing Measurement and Phenomena"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/j.rse.2006.10.006",
+    "year": "2006",
+    "title": "A vegetation index based technique for spatial sharpening of thermal imagery",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Remote Sensing of Environment"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.3758/bf03204192",
+    "year": "1982",
+    "title": "Temperature can sharpen tactile acuity",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Perception & Psychophysics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/j.rse.2020.112055",
+    "year": "2020",
+    "title": "Sharpening ECOSTRESS and VIIRS land surface temperature using harmonized Landsat-Sentinel surface reflectances",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Remote Sensing of Environment"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.3390/rs4113287",
+    "year": "2012",
+    "title": "A Data Mining Approach for Sharpening Thermal Satellite Imagery over Land",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Remote Sensing"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/0003-2697(80)90212-2",
+    "year": "1980",
+    "title": "High-voltage isoelectric focusing with pharmalyte: Field strength and temperature distribution, zone sharpening, isoelectric spectra, and pI determinations",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Analytical Biochemistry"
+   }
+  ]
+ },
+ "inference-time distribution sharpening large language models reasoning::8": {
+  "query": "inference-time distribution sharpening large language models reasoning",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 32,
+    "rung": 1
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 32,
+    "rung": 0
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "2605.09853v1",
+    "year": "2026",
+    "title": "Exploration-Driven Optimization for Test-Time Large Language Model Reasoning",
+    "abstract": "Post-training techniques combined with inference-time scaling significantly enhance the reasoning and alignment capabilities of large language models (LLMs). However, a fundamental tension arises: inference-time methods benefit from diverse sampling from a relatively flattened probability distribution, whereas reinforcement learning (RL)-based post-training inherently sharpens these distributions.",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2606.00739v1",
+    "year": "2026",
+    "title": "Score $\\times$ Decoder: A Unified View of Unsupervised Inference-Time Scaling for Hallucination Mitigation",
+    "abstract": "Large language models hallucinate even when the answer lies within their parameters. While inference-time scaling can surface this latent knowledge, the most effective methods require supervision: a trained verifier or reward model. We ask what can be done with only a base language model: which intrinsic signal best identifies correct outputs, and how should it be decoded? We cast this as a score~",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.04542v1",
+    "year": "2026",
+    "title": "Power Distribution Bridges Sampling, Self-Reward RL, and Self-Distillation",
+    "abstract": "Recent analyses question whether reinforcement learning (RL) is responsible for strong reasoning in large language models (LLMs). At the same time, distillation and inference-time sampling, including power sampling, have emerged as effective ways to improve LLM performance. However, the relationship among RL, distillation, and sampling remains unclear. In this study, we focus on the power distribu",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2510.17472v2",
+    "year": "2025",
+    "title": "Certified Self-Consistency: Statistical Guarantees and Test-Time Training for Reliable Reasoning in LLMs",
+    "abstract": "Recent advances such as self-consistency and test-time reinforcement learning (TTRL) improve the reliability of large language models (LLMs) without additional supervision, yet their underlying mechanisms and statistical guarantees remain poorly understood. We present a unified framework for certifiable inference in LLMs, showing that majority voting provides a statistical certificate of self-cons",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2509.25204v2",
+    "year": "2025",
+    "title": "Spectral Logit Sculpting: Adaptive Low-Rank Logit Transformation for Controlled Text Generation",
+    "abstract": "Entropy-based inference methods have gained traction for improving the reliability of Large Language Models (LLMs). However, many existing approaches, such as entropy minimization techniques, suffer from high computational overhead and fail to leverage historical token context effectively. To address these limitations, we propose Spectral Logit Sculpting (SLS), a lightweight inference-time optimiz",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2503.01773v3",
+    "year": "2025",
+    "title": "Why Is Spatial Reasoning Hard for VLMs? An Attention Mechanism Perspective on Focus Areas",
+    "abstract": "Large Vision Language Models (VLMs) have long struggled with spatial reasoning tasks. Surprisingly, even simple spatial reasoning tasks, such as recognizing \"under\" or \"behind\" relationships between only two objects, pose significant challenges for current VLMs. In this work, we study the spatial reasoning challenge from the lens of mechanistic interpretability, diving into the model's internal st",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2510.14901v1",
+    "year": "2025",
+    "title": "Reasoning with Sampling: Your Base Model is Smarter Than You Think",
+    "abstract": "Frontier reasoning models have exhibited incredible capabilities across a wide array of disciplines, driven by posttraining large language models (LLMs) with reinforcement learning (RL). However, despite the widespread success of this paradigm, much of the literature has been devoted to disentangling truly novel behaviors that emerge during RL but are not present in the base models. In our work, w",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.14473v1",
+    "year": "2026",
+    "title": "Response-Aware User Memory Selection for LLM Personalization",
+    "abstract": "A common approach to personalization in large language models (LLMs) is to incorporate a subset of the user memory into the prompt at inference time to guide the model's generation. Existing methods select these subsets primarily using similarity between user memory items and input queries, ignoring how features actually affect the model's response distribution. We propose Response-Utility optimiz",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2503.19385v5",
+    "year": "2025",
+    "title": "Inference-Time Scaling for Flow Models via Stochastic Generation and Rollover Budget Forcing",
+    "abstract": "We propose an inference-time scaling approach for pretrained flow models. Recently, inference-time scaling has gained significant attention in LLMs and diffusion models, improving sample quality or better aligning outputs with user preferences by leveraging additional computation. For diffusion models, particle sampling has allowed more efficient scaling due to the stochasticity at intermediate de",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2508.04435v2",
+    "year": "2025",
+    "title": "Cognitive Effort in the Two-Step Task: An Active Inference Drift-Diffusion Model Approach",
+    "abstract": "High-level theories rooted in the Bayesian Brain Hypothesis often frame cognitive effort as the cost of resolving the conflict between habits and optimal policies. In parallel, evidence accumulator models (EAMs) provide a mechanistic account of how effort arises from competition between the subjective values of available options. Although EAMs have been combined with frameworks like Reinforcement ",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2608.17095v1",
+    "year": "2026",
+    "title": "Inference-Time Attention Steering for Vision-Language-Action Driving Models",
+    "abstract": "Vision-language-action (VLA) driving models couple a reasoning stage with a diffusion-based trajectory decoder, but do not give a direct way to redirect attention toward safety-critical actors at inference time without retraining. We studied a bounded additive pre-softmax attention bias on the visual tokens of detector localized traffic actors on Alpamayo-R1's Qwen3-VL backbone. It is applied as a",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2208.10601v1",
+    "year": "2022",
+    "title": "Deriving time-averaged active inference from control principles",
+    "abstract": "Active inference offers a principled account of behavior as minimizing average sensory surprise over time. Applications of active inference to control problems have heretofore tended to focus on finite-horizon or discounted-surprise problems, despite deriving from the infinite-horizon, average-surprise imperative of the free-energy principle. Here we derive an infinite-horizon, average-surprise fo",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2607.08774v1",
+    "year": "2026",
+    "title": "CogniConsole: Externalizing Inference-Time Control as a Formal Abstraction for Reliable LLM Interactions",
+    "abstract": "Reliability in large language model (LLM) systems is typically framed as a function of model capability. We challenge this by demonstrating that reliability is significantly influenced by \\emph{inference-time control} -- the computational layer governing task framing and context selection. We introduce \\emph{CogniConsole}, an architectural instantiation that externalizes this control into a struct",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2409.15080v1",
+    "year": "2024",
+    "title": "Integrating Optimal Transport and Structural Inference Models for GRN Inference from Single-cell Data",
+    "abstract": "We introduce a novel gene regulatory network (GRN) inference method that integrates optimal transport (OT) with a deep-learning structural inference model. Advances in next-generation sequencing enable detailed yet destructive gene expression assays at the single-cell level, resulting in the loss of cell evolutionary trajectories. Due to technological and cost constraints, single-cell experiments ",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2505.23614v2",
+    "year": "2025",
+    "title": "Inference-time Scaling of Diffusion Models through Classical Search",
+    "abstract": "Classical search algorithms have long underpinned modern artificial intelligence. In this work, we tackle the challenge of inference-time control in diffusion models -- adapting generated outputs to meet diverse test-time objectives -- using principles from classical search. We propose a general framework that orchestrates local and global search to efficiently navigate the generative space. It em",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2508.15773v1",
+    "year": "2025",
+    "title": "Scaling Group Inference for Diverse and High-Quality Generation",
+    "abstract": "Generative models typically sample outputs independently, and recent inference-time guidance and scaling algorithms focus on improving the quality of individual samples. However, in real-world applications, users are often presented with a set of multiple images (e.g., 4-8) for each prompt, where independent sampling tends to lead to redundant results, limiting user choices and hindering idea expl",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "gr-qc/9810059v1",
+    "year": "1998",
+    "title": "Space-time distributions",
+    "abstract": "The space-time foliation Sigma compatible with the gravitational field g on a 4-manifold M determines a fibration pi of M, pi : M -&gt; N is a surjective submersion over the 1-dimensional leaves space N. M is then written as a disjoint union of the leaves of Sigma, which are 3-dimensional spacelike surfaces on M. The decomposition, TM=Sigma + T^0 M, also implies that we can define a lift of the cu",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2303.14295v1",
+    "year": "2023",
+    "title": "Clustering Multivariate Time Series using Energy Distance",
+    "abstract": "A novel methodology is proposed for clustering multivariate time series data using energy distance defined in Székely and Rizzo (2013). Specifically, a dissimilarity matrix is formed using the energy distance statistic to measure separation between the finite dimensional distributions for the component time series. Once the pairwise dissimilarity matrix is calculated, a hierarchical clustering met",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2207.11486v1",
+    "year": "2022",
+    "title": "Time Series Prediction under Distribution Shift using Differentiable Forgetting",
+    "abstract": "Time series prediction is often complicated by distribution shift which demands adaptive models to accommodate time-varying distributions. We frame time series prediction under distribution shift as a weighted empirical risk minimisation problem. The weighting of previous observations in the empirical risk is determined by a forgetting mechanism which controls the trade-off between the relevancy a",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1410.3860v2",
+    "year": "2014",
+    "title": "An econophysical approach of polynomial distribution applied to income and expenditure",
+    "abstract": "Polynomial distribution can be applied to dynamical systems in certain situations. Macroeconomic systems characterized by economic variables such as income and wealth can be modelled similarly using polynomials. We extend our previous work to data regarding income from a more diversified pool of countries, which contains developed countries with high income, developed countries with middle income,",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1802.00625v1",
+    "year": "2018",
+    "title": "Real-Time-Data Analytics in Raw Materials Handling",
+    "abstract": "This paper proposes a system for the ingestion and analysis of real-time sensor and actor data of bulk materials handling plants and machinery. It references issues that concern mining sensor data in cyber physical systems (CPS). The advance of cyber physical systems has created a significant change in the architecture of sensor and actor data. It affects the complexity of the observed systems in ",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1410.3851v2",
+    "year": "2014",
+    "title": "An Econophysical dynamical approach of expenditure and income distribution in the UK",
+    "abstract": "We extend the exploration regarding dynamical approach of macroeconomic variables by tackling systematically expenditure using Statistical Physics models (for the first time to the best of our knowledge). Also, using polynomial distribution which characterizes the behavior of dynamical systems in certain situations, we extend also our analysis to mean income data from the UK that span for a time i",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "1702.08262v5",
+    "year": "2017",
+    "title": "Sequential Discrete Kalman Filter for Real-Time State Estimation in Power Distribution Systems: Theory and Implementation",
+    "abstract": "This paper demonstrates the feasibility of implementing Real-Time State Estimators (RTSEs) for Active Distribution Networks (ADNs) in Field-Programmable Gate Arrays (FPGAs) by presenting an operational prototype. The prototype is based on a Linear State Estimator (LSE) that uses synchrophasor measurements from Phasor Measurement Units (PMUs). The underlying algorithm is the Sequential Discrete Kal",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2211.14238v2",
+    "year": "2022",
+    "title": "Wild-Time: A Benchmark of in-the-Wild Distribution Shift over Time",
+    "abstract": "Distribution shift occurs when the test distribution differs from the training distribution, and it can considerably degrade performance of machine learning models deployed in the real world. Temporal shifts -- distribution shifts arising from the passage of time -- often occur gradually and have the additional structure of timestamp metadata. By leveraging timestamp metadata, models can potential",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2108.07372v3",
+    "year": "2021",
+    "title": "Density Sharpening: Principles and Applications to Discrete Data Analysis",
+    "abstract": "This article introduces a general statistical modeling principle called \"Density Sharpening\" and applies it to the analysis of discrete count data. The underlying foundation is based on a new theory of nonparametric approximation and smoothing methods for discrete distributions which play a useful role in explaining and uniting a large class of applied statistical methods. The proposed modeling fr",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.16259v1",
+    "year": "2026",
+    "title": "Beyond Distribution Sharpening: The Importance of Task Rewards",
+    "abstract": "Frontier models have demonstrated exceptional capabilities following the integration of task-reward-based reinforcement learning (RL) into their training pipelines, enabling systems to evolve from pure reasoning models into sophisticated agents. However, debate persists regarding whether RL genuinely instills new skills within a base model or merely sharpens its existing distribution to elicit lat",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2107.14765v1",
+    "year": "2021",
+    "title": "A guided edge-aware smoothing-sharpening filter based on patch interpolation model and generalized Gamma distribution",
+    "abstract": "Smoothing and sharpening are two fundamental image processing operations. The latter is usually related to the former through the unsharp masking algorithm. In this paper, we develop a new type of filter which performs smoothing or sharpening via a tuning parameter. The development of the new filter is based on (1) a new Laplacian-based filter formulation which unifies the smoothing and sharpening",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.21590v1",
+    "year": "2026",
+    "title": "Scalable Power Sampling: Unlocking Efficient, Training-Free Reasoning for LLMs via Distribution Sharpening",
+    "abstract": "Reinforcement learning (RL) post-training is a dominant approach for improving the reasoning performance of large language models (LLMs), yet growing evidence suggests that its gains arise primarily from distribution sharpening rather than the acquisition of new capabilities. Recent work has shown that sampling from the power distribution of LLMs using Markov chain Monte Carlo (MCMC) can recover p",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2506.02355v2",
+    "year": "2025",
+    "title": "Rewarding the Unlikely: Lifting GRPO Beyond Distribution Sharpening",
+    "abstract": "Reinforcement learning is emerging as a primary driver for improving language model reasoning capabilities. A fundamental question is whether current reinforcement learning algorithms -- such as Group Relative Policy Optimization (GRPO), the de facto standard algorithm used to improve language model reasoning -- merely sharpen the base model's distribution around problems it can already solve. We ",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.28142v1",
+    "year": "2026",
+    "title": "Self-Consistency via Marginal Sharpening",
+    "abstract": "Inference-time sampling can elicit strong reasoning abilities from language models without additional training. Existing power-sampling methods do so by sharpening the distribution over full generated outputs, favoring completions that are individually likely under the model. We argue that this is the wrong object to target for reasoning: a completion entangles a reasoning trace with a final answe",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "1110.3627v3",
+    "year": "2011",
+    "title": "A sharpening of Tusnády's inequality",
+    "abstract": "Let ~$\\veps_1, ..., \\veps_m$ be i.i.d. random variables with $$P(\\veps_i=1)= P(\\veps_i= -1)=1/2,$$ and $X_m = \\sum_{i=1}^m \\veps_i.$ Let $Y_m $ be a normal random variable with the same first two moments as that of $X_m.$ There is a uniquely determined function $Ψ_m$ such that the distribution of $Ψ_m(Y_m)$ equals to the distribution of $X_m$. Tusnády's inequality states that $$ \\mid Ψ_m(Y_m) - Y_",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2503.02809v1",
+    "year": "2025",
+    "title": "A Minimalist Example of Edge-of-Stability and Progressive Sharpening",
+    "abstract": "Recent advances in deep learning optimization have unveiled two intriguing phenomena under large learning rates: Edge of Stability (EoS) and Progressive Sharpening (PS), challenging classical Gradient Descent (GD) analyses. Current research approaches, using either generalist frameworks or minimalist examples, face significant limitations in explaining these phenomena. This paper advances the mini",
+    "rung": 4
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2503.01773",
+    "year": "2025",
+    "title": "Why Is Spatial Reasoning Hard for VLMs? An Attention Mechanism Perspective on Focus Areas",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2605.09853",
+    "year": "2026",
+    "title": "Exploration-Driven Optimization for Test-Time Large Language Model Reasoning",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://openalex.org/W7161090979",
+    "year": "2026",
+    "title": "Exploration-Driven Optimization for Test-Time Large Language Model Reasoning",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.5281/zenodo.20770786",
+    "year": "2026",
+    "title": "Sampling as Reasoning, Reasoning as Sampling: Structural Bridges and Their Limits Across Generative Inference",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Zenodo (CERN European Organization for Nuclear Research)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.5281/zenodo.20770785",
+    "year": "2026",
+    "title": "Sampling as Reasoning, Reasoning as Sampling: Structural Bridges and Their Limits Across Generative Inference",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Zenodo (CERN European Organization for Nuclear Research)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.5281/zenodo.20773287",
+    "year": "2026",
+    "title": "Sampling as Reasoning, Reasoning as Sampling: Structural Bridges and Their Limits Across Generative Inference",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Zenodo (CERN European Organization for Nuclear Research)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2510.14901",
+    "year": "2025",
+    "title": "Reasoning with Sampling: Your Base Model is Smarter Than You Think",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2510.17472",
+    "year": "2025",
+    "title": "Certified Self-Consistency: Statistical Guarantees and Test-Time Training for Reliable Reasoning in LLMs",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1080/07474939208800229",
+    "year": "1992",
+    "title": "Quasi-maximum likelihood estimation and inference in dynamic models with time-varying covariances",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Econometric Reviews"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.2307/2938337",
+    "year": "1990",
+    "title": "Inference in Linear Time Series Models with some Unit Roots",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Econometrica"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1093/sysbio/sys029",
+    "year": "2012",
+    "title": "MrBayes 3.2: Efficient Bayesian Phylogenetic Inference and Model Choice Across a Large Model Space",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Systematic Biology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/21.256541",
+    "year": "1993",
+    "title": "ANFIS: adaptive-network-based fuzzy inference system",
+    "abstract": "",
+    "rung": 1,
+    "venue": "IEEE Transactions on Systems Man and Cybernetics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://openalex.org/W1730782591",
+    "year": "2001",
+    "title": "Experimental and Quasi-Experimental Designs for Generalized Causal Inference",
+    "abstract": "",
+    "rung": 1,
+    "venue": ""
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.18653/v1/2020.acl-main.537",
+    "year": "2020",
+    "title": "FastBERT: a Self-distilling BERT with Adaptive Inference Time",
+    "abstract": "",
+    "rung": 1,
+    "venue": ""
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1111/j.1468-0084.1990.mp52002003.x",
+    "year": "1990",
+    "title": "MAXIMUM LIKELIHOOD ESTIMATION AND INFERENCE ON COINTEGRATION — WITH APPLICATIONS TO THE DEMAND FOR MONEY",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Oxford Bulletin of Economics and Statistics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/s0304-4076(98)00076-1",
+    "year": "1999",
+    "title": "Inference for unit roots in dynamic panels where the time dimension is fixed",
+    "abstract": "",
+    "rung": 1,
+    "venue": "Journal of Econometrics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1080/01621459.1979.10482531",
+    "year": "1979",
+    "title": "Distribution of the Estimators for Autoregressive Time Series with a Unit Root",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Journal of the American Statistical Association"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.2307/2286348",
+    "year": "1979",
+    "title": "Distribution of the Estimators for Autoregressive Time Series With a Unit Root",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Journal of the American Statistical Association"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1037/0033-2909.86.3.446",
+    "year": "1979",
+    "title": "Group reaction time distributions and an analysis of distribution statistics.",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Psychological Bulletin"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1063/1.1750631",
+    "year": "1940",
+    "title": "Kinetics of Phase Change. II Transformation-Time Relations for Random Distribution of Nuclei",
+    "abstract": "",
+    "rung": 2,
+    "venue": "The Journal of Chemical Physics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1146/annurev.ecolsys.110308.120159",
+    "year": "2009",
+    "title": "Species Distribution Models: Ecological Explanation and Prediction Across Space and Time",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Annual Review of Ecology Evolution and Systematics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/5.30749",
+    "year": "1989",
+    "title": "Time-frequency distributions-a review",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Proceedings of the IEEE"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1029/wr003i004p01007",
+    "year": "1967",
+    "title": "Time distribution of rainfall in heavy storms",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Water Resources Research"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1093/biomet/73.3.671",
+    "year": "1986",
+    "title": "A class of multivanate failure time distributions",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Biometrika"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1080/014311698214659",
+    "year": "1998",
+    "title": "Sharpening fuzzy classification output to refine the representation of sub-pixel land cover distribution",
+    "abstract": "",
+    "rung": 3,
+    "venue": "International Journal of Remote Sensing"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/0021-9797(91)90385-l",
+    "year": "1991",
+    "title": "Self-sharpening distributions revisited—polydispersity in growth by monomer addition",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Journal of Colloid and Interface Science"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1063/1.2358822",
+    "year": "2006",
+    "title": "Sharpening the shape distribution of gold nanoparticles by laser irradiation",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Journal of Applied Physics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1021/acsami.0c11136",
+    "year": "2020",
+    "title": "Sharpening Nanofiltration: Strategies for Enhanced Membrane Selectivity",
+    "abstract": "",
+    "rung": 3,
+    "venue": "ACS Applied Materials & Interfaces"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1175/jhm-d-20-0225.1",
+    "year": "2020",
+    "title": "SHARPEN: A Scheme to Restore the Distribution of Averaged Precipitation Fields",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Journal of Hydrometeorology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1162/089976699300016809",
+    "year": "1999",
+    "title": "Neuronal Tuning: To Sharpen or Broaden?",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Neural Computation"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/ojsp.2021.3063076",
+    "year": "2021",
+    "title": "A Guided Edge-Aware Smoothing-Sharpening Filter Based on Patch Interpolation Model and Generalized Gamma Distribution",
+    "abstract": "",
+    "rung": 3,
+    "venue": "IEEE Open Journal of Signal Processing"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1038/nn1321",
+    "year": "2004",
+    "title": "Tuning curve sharpening for orientation selectivity: coding efficiency and the impact of correlations",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Nature Neuroscience"
+   }
+  ]
+ },
+ "sparse expert routing reasoning subtasks frontier API::8": {
+  "query": "sparse expert routing reasoning subtasks frontier API",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 23,
+    "rung": 1
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 8,
+    "rung": 3
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "2407.09590v4",
+    "year": "2024",
+    "title": "Diversifying the Expert Knowledge for Task-Agnostic Pruning in Sparse Mixture-of-Experts",
+    "abstract": "By increasing model parameters but activating them sparsely when performing a task, the use of Mixture-of-Experts (MoE) architecture significantly improves the performance of Large Language Models (LLMs) without increasing the inference cost. However, the memory consumption due to the growing number of experts presents a challenge to the deployment of these models in many real world settings. Our ",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2603.11114v1",
+    "year": "2026",
+    "title": "Task-Conditioned Routing Signatures in Sparse Mixture-of-Experts Transformers",
+    "abstract": "Sparse Mixture-of-Experts (MoE) architectures enable efficient scaling of large language models through conditional computation, yet the routing mechanisms responsible for expert selection remain poorly understood. In this work, we introduce routing signatures, a vector representation summarizing expert activation patterns across layers for a given prompt, and use them to study whether MoE routing",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "1901.10668v2",
+    "year": "2019",
+    "title": "Doubly Sparse: Sparse Mixture of Sparse Experts for Efficient Softmax Inference",
+    "abstract": "Computations for the softmax function are significantly expensive when the number of output classes is large. In this paper, we present a novel softmax inference speedup method, Doubly Sparse Softmax (DS-Softmax), that leverages sparse mixture of sparse experts to efficiently retrieve top-k classes. Different from most existing methods that require and approximate a fixed softmax, our method is le",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2206.00277v2",
+    "year": "2022",
+    "title": "Task-Specific Expert Pruning for Sparse Mixture-of-Experts",
+    "abstract": "The sparse Mixture-of-Experts (MoE) model is powerful for large-scale pre-training and has achieved promising results due to its model capacity. However, with trillions of parameters, MoE is hard to be deployed on cloud or mobile environment. The inference of MoE requires expert parallelism, which is not hardware-friendly and communication expensive. Especially for resource-limited downstream task",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2510.16138v2",
+    "year": "2025",
+    "title": "Expert Merging in Sparse Mixture of Experts with Nash Bargaining",
+    "abstract": "Existing expert merging strategies for Sparse Mixture of Experts (SMoE) typically rely on input-dependent or input-independent averaging of expert parameters, but often lack a principled weighting mechanism. In this work, we reinterpret expert merging through the lens of game theory, revealing cooperative and competitive dynamics among experts. Based on this perspective, we introduce Nash Merging ",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2308.00951v2",
+    "year": "2023",
+    "title": "From Sparse to Soft Mixtures of Experts",
+    "abstract": "Sparse mixture of expert architectures (MoEs) scale model capacity without significant increases in training or inference costs. Despite their success, MoEs suffer from a number of issues: training instability, token dropping, inability to scale the number of experts, or ineffective finetuning. In this work, we propose Soft MoE, a fully-differentiable sparse Transformer that addresses these challe",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2209.01667v1",
+    "year": "2022",
+    "title": "A Review of Sparse Expert Models in Deep Learning",
+    "abstract": "Sparse expert models are a thirty-year old concept re-emerging as a popular architecture in deep learning. This class of architecture encompasses Mixture-of-Experts, Switch Transformers, Routing Networks, BASE layers, and others, all with the unifying idea that each example is acted on by a subset of the parameters. By doing so, the degree of sparsity decouples the parameter count from the compute",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2506.12597v1",
+    "year": "2025",
+    "title": "Automatic Expert Discovery in LLM Upcycling via Sparse Interpolated Mixture-of-Experts",
+    "abstract": "We present Sparse Interpolated Mixture-of-Experts (SIMoE) instruction-tuning, an end-to-end algorithm designed to fine-tune a dense pre-trained Large Language Model (LLM) into a MoE-style model that possesses capabilities in multiple specialized domains. During instruction-tuning, SIMoE automatically identifies multiple specialized experts under a specified sparsity constraint, with each expert re",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2606.01509v1",
+    "year": "2026",
+    "title": "ProbMoE: Differentiable Probabilistic Routing for Mixture-of-Experts",
+    "abstract": "Mixture-of-Experts (MoE) models scale by activating only a small subset of experts per token. However, training such models remains challenging because top-$k$ routing is discrete and non-differentiable, requiring gradient estimators for expert selection whose design remains a central open problem. We introduce ProbMoE, a probabilistic routing framework that models expert selection as a distributi",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2306.03745v2",
+    "year": "2023",
+    "title": "Soft Merging of Experts with Adaptive Routing",
+    "abstract": "Sparsely activated neural networks with conditional computation learn to route their inputs through different \"expert\" subnetworks, providing a form of modularity that densely activated models lack. Despite their possible benefits, models with learned routing often underperform their parameter-matched densely activated counterparts as well as models that use non-learned heuristic routing strategie",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.00421v3",
+    "year": "2026",
+    "title": "Self-Routing: Parameter-Free Expert Routing from Hidden States",
+    "abstract": "Mixture-of-Experts (MoE) layers increase model capacity by activating only a small subset of experts per token, and typically rely on a learned router to map hidden states to expert assignments. In this work, we ask whether a dedicated learned router is strictly necessary for MoE routing. We propose Self-Routing, a parameter-free routing mechanism that uses a designated subspace of the token hidde",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.14434v1",
+    "year": "2026",
+    "title": "Geometric Routing Enables Causal Expert Control in Mixture of Experts",
+    "abstract": "Sparse Mixture-of-Experts (MoE) models scale parameters while fixing active computation per token, but the specialization of individual experts remains opaque. In a companion paper we showed that routing topology is quality-neutral: five structurally different configurations converge to statistically equivalent language modeling quality. Here we show that expert identity is nonetheless causally me",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.17571v1",
+    "year": "2026",
+    "title": "Stable Routing for Mixture-of-Experts in Class-Incremental Learning",
+    "abstract": "Class-incremental learning (CIL) requires models to learn new classes sequentially while preserving prior knowledge. Recently, approaches that combine pre-trained models with mixture-of-experts (MoE) have received increasing attention in CIL: they typically expand experts during learning and employ a router to assign weights across experts. However, existing MoE methods often overlook routing drif",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2406.17716v3",
+    "year": "2024",
+    "title": "A New Benchmark Dataset and Mixture-of-Experts Language Models for Adversarial Natural Language Inference in Vietnamese",
+    "abstract": "Existing Vietnamese Natural Language Inference (NLI) datasets lack adversarial complexity, limiting their ability to evaluate model robustness against challenging linguistic phenomena. In this article, we address the gap in robust Vietnamese NLI resources by introducing ViANLI, the first adversarial NLI dataset for Vietnamese, and propose NLIMoE, a Mixture-of-Experts model to tackle its complexity",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.20610v1",
+    "year": "2026",
+    "title": "Beyond Routing: Characterising Expert Tuning and Representation in Vision Mixture-of-Experts",
+    "abstract": "Mixture-of-Experts (MoE) models are often interpreted by analysing which categories are routed to which experts. However, routing alone does not reveal what each expert actually encodes. We train sparsely-gated convolutional MoE models with a contrastive objective on natural images and characterise expert specialisation using tools from visual neuroscience. Extending from gating-level to expert-le",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2510.09872v2",
+    "year": "2025",
+    "title": "WARC-Bench: Web Archive Based Benchmark for GUI Subtask Executions",
+    "abstract": "Training web agents to navigate complex, real-world websites requires them to master $\\textit{subtasks}$ - short-horizon interactions on multiple UI components (e.g., choosing the correct date in a date picker, or scrolling in a container to extract information). We introduce WARC-Bench (Web Archive Benchmark), a novel web navigation benchmark featuring 438 tasks designed to evaluate multimodal AI",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.03195v2",
+    "year": "2026",
+    "title": "Terminus-4B: Can a Smaller Model Replace Frontier LLMs at Agentic Execution Tasks?",
+    "abstract": "Modern coding agents increasingly delegate specialized subtasks to subagents, which are smaller, focused agentic loops that handle narrow responsibilities like search, debugging or terminal execution. This architectural pattern keeps the main agent's context window clean by isolating verbose outputs (e.g. build logs, test results, etc.) within the subagent context. Typically when agents employ sub",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2406.14595v2",
+    "year": "2024",
+    "title": "Adversaries Can Misuse Combinations of Safe Models",
+    "abstract": "Developers try to evaluate whether an AI system can be misused by adversaries before releasing it; for example, they might test whether a model enables cyberoffense, user manipulation, or bioterrorism. In this work, we show that individually testing models for misuse is inadequate; adversaries can misuse combinations of models even when each individual model is safe. The adversary accomplishes thi",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2603.18210v1",
+    "year": "2026",
+    "title": "GoalVLM: VLM-driven Object Goal Navigation for Multi-Agent System",
+    "abstract": "Object-goal navigation has traditionally been limited to ground robots with closed-set object vocabularies. Existing multi-agent approaches depend on precomputed probabilistic graphs tied to fixed category sets, precluding generalization to novel goals at test time. We present GoalVLM, a cooperative multi-agent framework for zero-shot, open-vocabulary object navigation. GoalVLM integrates a Vision",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.17450v3",
+    "year": "2026",
+    "title": "Compiling Deterministic Structure into SLM Harnesses",
+    "abstract": "Enterprise SLM deployment faces epistemic asymmetry: small models cannot self-correct reasoning errors, while frontier LLMs incur prohibitive costs and data sovereignty risks at scale. We propose Semantic Gradient Descent (SGDe), a teacher-student framework that compiles agentic workflows into discrete execution plans--DAG topologies, system prompts, and deterministic code. The trailing e distingu",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2606.10662v1",
+    "year": "2026",
+    "title": "Decentralized Multi-Agent Systems with Shared Context",
+    "abstract": "Multi-agent systems (MAS) can scale large language model reasoning at test time by decomposing complex problems into parallel subtasks. However, most existing MAS rely on centralized orchestration, where a main agent assigns work, collects outputs, and merges results. As the number of subtasks grows, this controller becomes a communication and integration bottleneck. We propose Decentralized Langu",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2506.10949v2",
+    "year": "2025",
+    "title": "Monitoring Decomposition Attacks in LLMs with Lightweight Sequential Monitors",
+    "abstract": "Current LLM safety defenses fail under decomposition attacks, where a malicious goal is decomposed into benign subtasks that circumvent refusals. The challenge lies in the existing shallow safety alignment techniques: they only detect harm in the immediate prompt and do not reason about long-range intent, leaving them blind to malicious intent that emerges over a sequence of seemingly benign instr",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.06110v2",
+    "year": "2026",
+    "title": "On Time, Within Budget: Constraint-Driven Online Resource Allocation for Agentic Workflows",
+    "abstract": "Agentic systems increasingly solve complex user requests by executing orchestrated workflows, where subtasks are assigned to specialized models or tools and coordinated according to their dependencies. While recent work improves agent efficiency by optimizing the performance--cost--latency frontier, real deployments often impose concrete requirements: a workflow must be completed within a specifie",
+    "rung": 3
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1093/bib/bbae338",
+    "year": "2024",
+    "title": "A survey of generative AI for <i>de novo</i> drug design: new frontiers in molecule and protein generation",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Briefings in Bioinformatics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1007/3-540-45657-0_12",
+    "year": "2002",
+    "title": "Property Checking via Structural Analysis",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Lecture notes in computer science"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1007/3-540-36235-5_5",
+    "year": "2002",
+    "title": "Task Modelling in Multiple Contexts of Use",
+    "abstract": "",
+    "rung": 3,
+    "venue": "Lecture notes in computer science"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2402.08703",
+    "year": "2024",
+    "title": "A Survey of Generative AI for de novo Drug Design: New Frontiers in Molecule and Protein Generation",
+    "abstract": "",
+    "rung": 3,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1186/s12911-017-0563-9",
+    "year": "2017",
+    "title": "A multiple distributed representation method based on neural network for biomedical event extraction",
+    "abstract": "",
+    "rung": 3,
+    "venue": "BMC Medical Informatics and Decision Making"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2304.08354",
+    "year": "2023",
+    "title": "Tool Learning with Foundation Models",
+    "abstract": "",
+    "rung": 3,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/jiot.2025.3577233",
+    "year": "2025",
+    "title": "SerFlow: A Multistage Service-Enhanced Mechanism for Workflow Applications in CPSs With End-Edge–Cloud Collaboration",
+    "abstract": "",
+    "rung": 3,
+    "venue": "IEEE Internet of Things Journal"
+   },
+   {
+    "source": "openalex",
+    "id": "https://openalex.org/W2466425043",
+    "year": "2002",
+    "title": "Property Checking via Structural Analysis",
+    "abstract": "",
+    "rung": 3,
+    "venue": ""
+   }
+  ]
+ },
+ "mixture of experts clustering reasoning tasks::8": {
+  "query": "mixture of experts clustering reasoning tasks",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 16,
+    "rung": 1
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 16,
+    "rung": 0
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "2410.17954v2",
+    "year": "2024",
+    "title": "ExpertFlow: Efficient Mixture-of-Experts Inference via Predictive Expert Caching and Token Scheduling",
+    "abstract": "Sparse Mixture-of-Experts (MoE) models can outperform dense large language models at similar computation by activating only a small set of experts per token. However, stacking many expert modules introduces substantial parameter memory, which makes MoE models difficult to deploy in memory-constrained environments such as single-GPU devices. Offloading alleviates this issue by storing inactive expe",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2402.14800v2",
+    "year": "2024",
+    "title": "Not All Experts are Equal: Efficient Expert Pruning and Skipping for Mixture-of-Experts Large Language Models",
+    "abstract": "A pivotal advancement in the progress of large language models (LLMs) is the emergence of the Mixture-of-Experts (MoE) LLMs. Compared to traditional LLMs, MoE LLMs can achieve higher performance with fewer parameters, but it is still hard to deploy them due to their immense parameter sizes. Different from previous weight pruning methods that rely on specifically designed hardware, this paper mainl",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2312.04693v3",
+    "year": "2023",
+    "title": "GraphMETRO: Mitigating Complex Graph Distribution Shifts via Mixture of Aligned Experts",
+    "abstract": "Graph data are inherently complex and heterogeneous, leading to a high natural diversity of distributional shifts. However, it remains unclear how to build machine learning architectures that generalize to the complex distributional shifts naturally occurring in the real world. Here, we develop GraphMETRO, a Graph Neural Network architecture that models natural diversity and captures complex distr",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "1806.08200v1",
+    "year": "2018",
+    "title": "Mixtures of Experts Models",
+    "abstract": "Mixtures of experts models provide a framework in which covariates may be included in mixture models. This is achieved by modelling the parameters of the mixture model as functions of the concomitant covariates. Given their mixture model foundation, mixtures of experts models possess a diverse range of analytic uses, from clustering observations to capturing parameter heterogeneity in cross-sectio",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2503.03213v1",
+    "year": "2025",
+    "title": "Convergence Rates for Softmax Gating Mixture of Experts",
+    "abstract": "Mixture of experts (MoE) has recently emerged as an effective framework to advance the efficiency and scalability of machine learning models by softly dividing complex tasks among multiple specialized sub-models termed experts. Central to the success of MoE is an adaptive softmax gating mechanism which takes responsibility for determining the relevance of each expert to a given input and then dyna",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.15021v1",
+    "year": "2026",
+    "title": "Mixture-of-Experts Models in Vision: Routing, Optimization, and Generalization",
+    "abstract": "Mixture-of-Experts (MoE) architectures enable conditional computation by routing inputs to multiple expert subnetworks and are often motivated as a mechanism for scaling large language models. In this project, we instead study MoE behavior in an image classification setting, focusing on predictive performance, expert utilization, and generalization. We compare dense, SoftMoE, and SparseMoE classif",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "1902.11104v3",
+    "year": "2019",
+    "title": "Tensor-variate Mixture of Experts for Proportional Myographic Control of a Robotic Hand",
+    "abstract": "When data are organized in matrices or arrays of higher dimensions (tensors), classical regression methods first transform these data into vectors, therefore ignoring the underlying structure of the data and increasing the dimensionality of the problem. This flattening operation typically leads to overfitting when only few training data is available. In this paper, we present a mixture-of-experts ",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.21478v1",
+    "year": "2026",
+    "title": "Rethinking Cross-Domain Evaluation for Face Forgery Detection with Semantic Fine-grained Alignment and Mixture-of-Experts",
+    "abstract": "Nowadays, visual data forgery detection plays an increasingly important role in social and economic security with the rapid development of generative models. Existing face forgery detectors still can't achieve satisfactory performance because of poor generalization ability across datasets. The key factor that led to this phenomenon is the lack of suitable metrics: the commonly used cross-dataset A",
+    "rung": 1
+   },
+   {
+    "source": "arxiv",
+    "id": "2006.16701v3",
+    "year": "2020",
+    "title": "Hierarchical Qualitative Clustering: clustering mixed datasets with critical qualitative information",
+    "abstract": "Clustering can be used to extract insights from data or to verify some of the assumptions held by the domain experts, namely data segmentation. In the literature, few methods can be applied in clustering qualitative values using the context associated with other variables present in the data, without losing interpretability. Moreover, the metrics for calculating dissimilarity between qualitative v",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2502.15315v3",
+    "year": "2025",
+    "title": "Tight Clusters Make Specialized Experts",
+    "abstract": "Sparse Mixture-of-Experts (MoE) architectures have emerged as a promising approach to decoupling model capacity from computational cost. At the core of the MoE model is the router, which learns the underlying clustering structure of the input distribution in order to send input tokens to appropriate experts. However, latent clusters may be unidentifiable in high dimension, which causes slow conver",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2404.16030v1",
+    "year": "2024",
+    "title": "MoDE: CLIP Data Experts via Clustering",
+    "abstract": "The success of contrastive language-image pretraining (CLIP) relies on the supervision from the pairing between images and captions, which tends to be noisy in web-crawled data. We present Mixture of Data Experts (MoDE) and learn a system of CLIP data experts via clustering. Each data expert is trained on one data cluster, being less sensitive to false negative noises in other clusters. At inferen",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2504.07807v1",
+    "year": "2025",
+    "title": "Cluster-Driven Expert Pruning for Mixture-of-Experts Large Language Models",
+    "abstract": "Mixture-of-Experts (MoE) architectures have emerged as a promising paradigm for scaling large language models (LLMs) with sparse activation of task-specific experts. Despite their computational efficiency during inference, the massive overall parameter footprint of MoE models (e.g., GPT-4) introduces critical challenges for practical deployment. Current pruning approaches often fail to address two",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2207.09094v1",
+    "year": "2022",
+    "title": "MoEC: Mixture of Expert Clusters",
+    "abstract": "Sparsely Mixture of Experts (MoE) has received great interest due to its promising scaling capability with affordable computational overhead. MoE converts dense layers into sparse experts, and utilizes a gated routing network to make experts conditionally activated. However, as the number of experts grows, MoE with outrageous parameters suffers from overfitting and sparse data allocation. Such pro",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2105.01899v1",
+    "year": "2021",
+    "title": "MiCE: Mixture of Contrastive Experts for Unsupervised Image Clustering",
+    "abstract": "We present Mixture of Contrastive Experts (MiCE), a unified probabilistic clustering framework that simultaneously exploits the discriminative representations learned by contrastive learning and the semantic structures captured by a latent mixture model. Motivated by the mixture of experts, MiCE employs a gating function to partition an unlabeled dataset into subsets according to the latent semant",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2103.00255v2",
+    "year": "2021",
+    "title": "Expert Decision Support System for aeroacoustic source type identification using clustering",
+    "abstract": "This paper presents an Expert Decision Support System for the identification of time-invariant, aeroacoustic source types. The system comprises two steps: first, acoustic properties are calculated based on spectral and spatial information. Second, clustering is performed based on these properties. The clustering aims at helping and guiding an expert for quick identification of different source typ",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2110.06703v1",
+    "year": "2021",
+    "title": "Expert-driven Trace Clustering with Instance-level Constraints",
+    "abstract": "Within the field of process mining, several different trace clustering approaches exist for partitioning traces or process instances into similar groups. Typically, this partitioning is based on certain patterns or similarity between the traces, or driven by the discovery of a process model for each cluster. The main drawback of these techniques, however, is that their solutions are usually hard t",
+    "rung": 2
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1145/2429069.2429119",
+    "year": "2013",
+    "title": "A model-learner pattern for bayesian reasoning",
+    "abstract": "",
+    "rung": 0,
+    "venue": ""
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1145/2480359.2429119",
+    "year": "2013",
+    "title": "A model-learner pattern for bayesian reasoning",
+    "abstract": "",
+    "rung": 0,
+    "venue": "ACM SIGPLAN Notices"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1002/aic.16489",
+    "year": "2018",
+    "title": "The promise of artificial intelligence in chemical engineering: Is it here, finally?",
+    "abstract": "",
+    "rung": 0,
+    "venue": "AIChE Journal"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/isoirs70157.2026.11545243",
+    "year": "2026",
+    "title": "CED-MoE: Task Scheduling and Offloading Strategy for Embodied Intelligent Agents Based on Cloud-Edge-Device Mixture of Experts Architecture",
+    "abstract": "",
+    "rung": 0,
+    "venue": ""
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48550/arxiv.2511.19822",
+    "year": "2025",
+    "title": "Mosaic Pruning: A Hierarchical Framework for Generalizable Pruning of Mixture-of-Experts Models",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1609/aaai.v40i26.39341",
+    "year": "2026",
+    "title": "Mosaic Pruning: A Hierarchical Framework for Generalizable Pruning of Mixture-of-Experts Models",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Proceedings of the AAAI Conference on Artificial Intelligence"
+   },
+   {
+    "source": "openalex",
+    "id": "https://openalex.org/W7106862520",
+    "year": "2025",
+    "title": "Mosaic Pruning: A Hierarchical Framework for Generalizable Pruning of Mixture-of-Experts Models",
+    "abstract": "",
+    "rung": 0,
+    "venue": "arXiv (Cornell University)"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.48448/gdwc-g611",
+    "year": "2026",
+    "title": "Mosaic Pruning: A Hierarchical Framework for Generalizable Pruning of Mixture-of-Experts Models",
+    "abstract": "",
+    "rung": 0,
+    "venue": "Underline Science Inc."
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1093/jnci/djw253",
+    "year": "2016",
+    "title": "Advancing Symptom Science Through Symptom Cluster Research: Expert Panel Proceedings and Recommendations",
+    "abstract": "",
+    "rung": 2,
+    "venue": "JNCI Journal of the National Cancer Institute"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1007/s12160-013-9486-6",
+    "year": "2013",
+    "title": "The Behavior Change Technique Taxonomy (v1) of 93 Hierarchically Clustered Techniques: Building an International Consensus for the Reporting of Behavior Change Interventions",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Annals of Behavioral Medicine"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/0370-1573(79)90060-7",
+    "year": "1979",
+    "title": "Scaling theory of percolation clusters",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Physics Reports"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1145/1572272.1572296",
+    "year": "2009",
+    "title": "Clustering test cases to achieve effective and scalable prioritisation incorporating expert knowledge",
+    "abstract": "",
+    "rung": 2,
+    "venue": ""
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1609/aaai.v37i11.26617",
+    "year": "2023",
+    "title": "MoEC: Mixture of Expert Clusters",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Proceedings of the AAAI Conference on Artificial Intelligence"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1007/s40747-021-00369-y",
+    "year": "2021",
+    "title": "Large-scale group decision-making based on Pythagorean linguistic preference relations using experts clustering and consensus measure with non-cooperative behavior analysis of clusters",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Complex & Intelligent Systems"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/s0306-4379(00)00022-3",
+    "year": "2000",
+    "title": "Rock: A robust clustering algorithm for categorical attributes",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Information Systems"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/tem.2024.3402949",
+    "year": "2024",
+    "title": "An FMEA Risk Assessment Method Based on Social Networks Considering Expert Clustering and Risk Attitudes",
+    "abstract": "",
+    "rung": 2,
+    "venue": "IEEE Transactions on Engineering Management"
+   }
+  ]
+ },
+ "modular verification head for reasoning correctness in small frozen models::8": {
+  "query": "modular verification head for reasoning correctness in small frozen models",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 16,
+    "rung": 2
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 8,
+    "rung": 2
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "1211.4093v1",
+    "year": "2012",
+    "title": "Towards modular verification of pathways: fairness and assumptions",
+    "abstract": "Modular verification is a technique used to face the state explosion problem often encountered in the verification of properties of complex systems such as concurrent interactive systems. The modular approach is based on the observation that properties of interest often concern a rather small portion of the system. As a consequence, reduced models can be constructed which approximate the overall s",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2302.01613v10",
+    "year": "2023",
+    "title": "Classification of integral modular data up to rank 13",
+    "abstract": "This paper classifies the modular data of integral modular fusion categories up to rank 13, and integral half-Frobenius fusion rings up to rank 12. We establish that every perfect case within these bounds is trivial. Furthermore, we refine the non-pointed odd-dimensional modular data at ranks below 25 to exactly three items, all of rank 17, FPdim 225, and type [[1,3],[3,8],[5,6]], filling existing",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2204.10303v2",
+    "year": "2022",
+    "title": "Modular Control Plane Verification via Temporal Invariants",
+    "abstract": "Monolithic control plane verification cannot scale to hyperscale network architectures with tens of thousands of nodes, heterogeneous network policies and thousands of network changes a day. Instead, modular verification offers improved scalability, reasoning over diverse behaviors, and robustness following policy updates. We introduce Timepiece, a new modular control plane verification system. Wh",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2012.01648v1",
+    "year": "2020",
+    "title": "Towards Compositional Verification for Modular Robotic Systems",
+    "abstract": "Software engineering of modular robotic systems is a challenging task, however, verifying that the developed components all behave as they should individually and as a whole presents its own unique set of challenges. In particular, distinct components in a modular robotic system often require different verification techniques to ensure that they behave as expected. Ensuring whole system consistenc",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "0907.4316v1",
+    "year": "2009",
+    "title": "Modular Verification of Recursive Programs",
+    "abstract": "We argue that verification of recursive programs by means of the assertional method of C.A.R. Hoare can be conceptually simplified using a modular reasoning. In this approach some properties of the program are established first and subsequently used to establish other program properties. We illustrate this approach by providing a modular correctness proof of the Quicksort program.",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2401.08385v1",
+    "year": "2024",
+    "title": "An Efficient VCGen-based Modular Verification of Relational Properties",
+    "abstract": "Deductive verification typically relies on function contracts that specify the behavior of each function for a single function call. Relational properties link several function calls together within a single specification. They can express more advanced properties of a given function, such as non-interference, continuity, or monotonicity, or relate calls to different functions, possibly run in par",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "1908.05799v1",
+    "year": "2019",
+    "title": "Modular Verification of Heap Reachability Properties in Separation Logic",
+    "abstract": "The correctness of many algorithms and data structures depends on reachability properties, that is, on the existence of chains of references between objects in the heap. Reasoning about reachability is difficult for two main reasons. First, any heap modification may affect an unbounded number of reference chains, which complicates modular verification, in particular, framing. Second, general graph",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2204.09635v2",
+    "year": "2022",
+    "title": "LIGHTYEAR: Using Modularity to Scale BGP Control Plane Verification",
+    "abstract": "Current network control plane verification tools cannot scale to large networks, because of the complexity of jointly reasoning about the behaviors of all nodes in the network. In this paper we present a modular approach to control plane verification, whereby end-to-end network properties are verified via a set of purely local checks on individual nodes and edges. The approach targets the verifica",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2007.13199v2",
+    "year": "2020",
+    "title": "Double Multi-Head Attention for Speaker Verification",
+    "abstract": "Most state-of-the-art Deep Learning systems for speaker verification are based on speaker embedding extractors. These architectures are commonly composed of a feature extractor front-end together with a pooling layer to encode variable-length utterances into fixed-length speaker vectors. In this paper we present Double Multi-Head Attention pooling, which extends our previous approach based on Self",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2408.01566v1",
+    "year": "2024",
+    "title": "Full-range Head Pose Geometric Data Augmentations",
+    "abstract": "Many head pose estimation (HPE) methods promise the ability to create full-range datasets, theoretically allowing the estimation of the rotation and positioning of the head from various angles. However, these methods are only accurate within a range of head angles; exceeding this specific range led to significant inaccuracies. This is dominantly explained by unclear specificity of the coordinate s",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2508.00748v2",
+    "year": "2025",
+    "title": "Is It Really You? Exploring Biometric Verification Scenarios in Photorealistic Talking-Head Avatar Videos",
+    "abstract": "Photorealistic talking-head avatars are becoming increasingly common in virtual meetings, gaming, and social platforms. These avatars allow for more immersive communication, but they also introduce serious security risks. One emerging threat is impersonation: an attacker can steal a user's avatar, preserving his appearance and voice, making it nearly impossible to detect its fraudulent usage by si",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2409.15234v1",
+    "year": "2024",
+    "title": "CA-MHFA: A Context-Aware Multi-Head Factorized Attentive Pooling for SSL-Based Speaker Verification",
+    "abstract": "Self-supervised learning (SSL) models for speaker verification (SV) have gained significant attention in recent years. However, existing SSL-based SV systems often struggle to capture local temporal dependencies and generalize across different tasks. In this paper, we propose context-aware multi-head factorized attentive pooling (CA-MHFA), a lightweight framework that incorporates contextual infor",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2111.03842v2",
+    "year": "2021",
+    "title": "Class Token and Knowledge Distillation for Multi-head Self-Attention Speaker Verification Systems",
+    "abstract": "This paper explores three novel approaches to improve the performance of speaker verification (SV) systems based on deep neural networks (DNN) using Multi-head Self-Attention (MSA) mechanisms and memory layers. Firstly, we propose the use of a learnable vector called Class token to replace the average global pooling mechanism to extract the embeddings. Unlike global average pooling, our proposal t",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2505.12268v2",
+    "year": "2025",
+    "title": "$K$-MSHC: Unmasking Minimally Sufficient Head Circuits in Large Language Models with Experiments on Syntactic Classification Tasks",
+    "abstract": "Understanding which neural components drive specific capabilities in mid-sized language models ($\\leq$10B parameters) remains a key challenge. We introduce the $(\\bm{K}, ε)$-Minimum Sufficient Head Circuit ($K$-MSHC), a methodology to identify minimal sets of attention heads crucial for classification tasks as well as Search-K-MSHC, an efficient algorithm for discovering these circuits. Applying o",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2310.16808v1",
+    "year": "2023",
+    "title": "Fingervein Verification using Convolutional Multi-Head Attention Network",
+    "abstract": "Biometric verification systems are deployed in various security-based access-control applications that require user-friendly and reliable person verification. Among the different biometric characteristics, fingervein biometrics have been extensively studied owing to their reliable verification performance. Furthermore, fingervein patterns reside inside the skin and are not visible outside; therefo",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2201.06945v2",
+    "year": "2022",
+    "title": "It's All in the Head: Representation Knowledge Distillation through Classifier Sharing",
+    "abstract": "Representation knowledge distillation aims at transferring rich information from one model to another. Common approaches for representation distillation mainly focus on the direct minimization of distance metrics between the models' embedding vectors. Such direct methods may be limited in transferring high-order dependencies embedded in the representation vectors, or in handling the capacity gap b",
+    "rung": 3
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1177/0363546517724754",
+    "year": "2017",
+    "title": "Characterizing Verified Head Impacts in High School Girls’ Lacrosse",
+    "abstract": "",
+    "rung": 2,
+    "venue": "The American Journal of Sports Medicine"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1186/s40798-019-0182-3",
+    "year": "2019",
+    "title": "Verifying Head Impacts Recorded by a Wearable Sensor using Video Footage in Rugby League: a Preliminary Study",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Sports Medicine - Open"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/j.oceaneng.2012.12.016",
+    "year": "2013",
+    "title": "CFD verification and validation of added resistance and motions of KVLCC2 with fixed and free surge in short and long head waves",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Ocean Engineering"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1177/0363546517706703",
+    "year": "2017",
+    "title": "Video Analysis Verification of Head Impact Events Measured by Wearable Sensors",
+    "abstract": "",
+    "rung": 2,
+    "venue": "The American Journal of Sports Medicine"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1074/mcp.m700500-mcp200",
+    "year": "2008",
+    "title": "Discovery and Verification of Head-and-neck Cancer Biomarkers by Differential Protein Expression Analysis Using iTRAQ Labeling, Multidimensional Liquid Chromatography, and Tandem Mass Spectrometry",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Molecular & Cellular Proteomics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/tmtt.2014.2342669",
+    "year": "2014",
+    "title": "Microwave System to Detect Traumatic Brain Injuries Using Compact Unidirectional Antenna and Wideband Transceiver With Verification on Realistic Head Phantom",
+    "abstract": "",
+    "rung": 2,
+    "venue": "IEEE Transactions on Microwave Theory and Techniques"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1097/nen.0b013e3181a9d503",
+    "year": "2009",
+    "title": "Chronic Traumatic Encephalopathy in Athletes: Progressive Tauopathy After Repetitive Head Injury",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Journal of Neuropathology & Experimental Neurology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/s0167-8140(98)00087-5",
+    "year": "1998",
+    "title": "Three-dimensional dosimetry using polymer gel and magnetic resonance imaging applied to the verification of conformal radiation therapy in head-and-neck cancer",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Radiotherapy and Oncology"
+   }
+  ]
+ },
+ "lightweight verification head iterative refinement without retraining::8": {
+  "query": "lightweight verification head iterative refinement without retraining",
+  "legs": {
+   "arxiv": {
+    "ok": true,
+    "reason": "",
+    "n": 24,
+    "rung": 2
+   },
+   "openalex": {
+    "ok": true,
+    "reason": "",
+    "n": 8,
+    "rung": 2
+   }
+  },
+  "searched": true,
+  "hits": [
+   {
+    "source": "arxiv",
+    "id": "2007.08566v3",
+    "year": "2020",
+    "title": "SqueezeFacePoseNet: Lightweight Face Verification Across Different Poses for Mobile Platforms",
+    "abstract": "Virtual applications through mobile platforms are one of the most critical and ever-growing fields in AI, where ubiquitous and real-time person authentication has become critical after the breakthrough of all services provided via mobile devices. In this context, face verification technologies can provide reliable and robust user authentication, given the availability of cameras in these devices, ",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2110.04438v2",
+    "year": "2021",
+    "title": "Towards Lightweight Applications: Asymmetric Enroll-Verify Structure for Speaker Verification",
+    "abstract": "With the development of deep learning, automatic speaker verification has made considerable progress over the past few years. However, to design a lightweight and robust system with limited computational resources is still a challenging problem. Traditionally, a speaker verification system is symmetrical, indicating that the same embedding extraction model is applied for both enrollment and verifi",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.23180v1",
+    "year": "2026",
+    "title": "TriSpec: Ternary Speculative Decoding via Lightweight Proxy Verification",
+    "abstract": "Inference efficiency in Large Language Models (LLMs) is fundamentally limited by their serial, autoregressive generation, especially as reasoning becomes a key capability and response sequences grow longer. Speculative decoding (SD) offers a powerful solution, providing significant speed-ups through its lightweight drafting and parallel verification mechanism. While existing work has nearly satura",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2508.18913v1",
+    "year": "2025",
+    "title": "A Framework for Robust Speaker Verification in Highly Noisy Environments Leveraging Both Noisy and Enhanced Audio",
+    "abstract": "Recent advancements in speaker verification techniques show promise, but their performance often deteriorates significantly in challenging acoustic environments. Although speech enhancement methods can improve perceived audio quality, they may unintentionally distort speaker-specific information, which can affect verification accuracy. This problem has become more noticeable with the increasing us",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "1410.5782v3",
+    "year": "2014",
+    "title": "Lightweight Monte Carlo Verification of Markov Decision Processes with Rewards",
+    "abstract": "Markov decision processes are useful models of concurrency optimisation problems, but are often intractable for exhaustive verification methods. Recent work has introduced lightweight approximative techniques that sample directly from scheduler space, bringing the prospect of scalable alternatives to standard numerical model checking algorithms. The focus so far has been on optimising the probabil",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2510.07629v1",
+    "year": "2025",
+    "title": "Toward Reliable Clinical Coding with Language Models: Verification and Lightweight Adaptation",
+    "abstract": "Accurate clinical coding is essential for healthcare documentation, billing, and decision-making. While prior work shows that off-the-shelf LLMs struggle with this task, evaluations based on exact match metrics often overlook errors where predicted codes are hierarchically close but incorrect. Our analysis reveals that such hierarchical misalignments account for a substantial portion of LLM failur",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2312.03324v1",
+    "year": "2023",
+    "title": "Lightweight Speaker Verification Using Transformation Module with Feature Partition and Fusion",
+    "abstract": "Although many efforts have been made on decreasing the model complexity for speaker verification, it is still challenging to deploy speaker verification systems with satisfactory result on low-resource terminals. We design a transformation module that performs feature partition and fusion to implement lightweight speaker verification. The transformation module consists of multiple simple but effec",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2501.00248v1",
+    "year": "2024",
+    "title": "Combining Type Checking and Formal Verification for Lightweight OS Correctness",
+    "abstract": "This paper reports our experience of providing lightweight correctness guarantees to an open-source Rust OS, Theseus. First, we report new developments in intralingual design that leverage Rust's type system to enforce additional invariants at compile time, trusting the Rust compiler. Second, we develop a hybrid approach that combines formal verification, type checking, and informal reasoning, sho",
+    "rung": 2
+   },
+   {
+    "source": "arxiv",
+    "id": "2007.13199v2",
+    "year": "2020",
+    "title": "Double Multi-Head Attention for Speaker Verification",
+    "abstract": "Most state-of-the-art Deep Learning systems for speaker verification are based on speaker embedding extractors. These architectures are commonly composed of a feature extractor front-end together with a pooling layer to encode variable-length utterances into fixed-length speaker vectors. In this paper we present Double Multi-Head Attention pooling, which extends our previous approach based on Self",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2408.01566v1",
+    "year": "2024",
+    "title": "Full-range Head Pose Geometric Data Augmentations",
+    "abstract": "Many head pose estimation (HPE) methods promise the ability to create full-range datasets, theoretically allowing the estimation of the rotation and positioning of the head from various angles. However, these methods are only accurate within a range of head angles; exceeding this specific range led to significant inaccuracies. This is dominantly explained by unclear specificity of the coordinate s",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2508.00748v2",
+    "year": "2025",
+    "title": "Is It Really You? Exploring Biometric Verification Scenarios in Photorealistic Talking-Head Avatar Videos",
+    "abstract": "Photorealistic talking-head avatars are becoming increasingly common in virtual meetings, gaming, and social platforms. These avatars allow for more immersive communication, but they also introduce serious security risks. One emerging threat is impersonation: an attacker can steal a user's avatar, preserving his appearance and voice, making it nearly impossible to detect its fraudulent usage by si",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2409.15234v1",
+    "year": "2024",
+    "title": "CA-MHFA: A Context-Aware Multi-Head Factorized Attentive Pooling for SSL-Based Speaker Verification",
+    "abstract": "Self-supervised learning (SSL) models for speaker verification (SV) have gained significant attention in recent years. However, existing SSL-based SV systems often struggle to capture local temporal dependencies and generalize across different tasks. In this paper, we propose context-aware multi-head factorized attentive pooling (CA-MHFA), a lightweight framework that incorporates contextual infor",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2111.03842v2",
+    "year": "2021",
+    "title": "Class Token and Knowledge Distillation for Multi-head Self-Attention Speaker Verification Systems",
+    "abstract": "This paper explores three novel approaches to improve the performance of speaker verification (SV) systems based on deep neural networks (DNN) using Multi-head Self-Attention (MSA) mechanisms and memory layers. Firstly, we propose the use of a learnable vector called Class token to replace the average global pooling mechanism to extract the embeddings. Unlike global average pooling, our proposal t",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2505.12268v2",
+    "year": "2025",
+    "title": "$K$-MSHC: Unmasking Minimally Sufficient Head Circuits in Large Language Models with Experiments on Syntactic Classification Tasks",
+    "abstract": "Understanding which neural components drive specific capabilities in mid-sized language models ($\\leq$10B parameters) remains a key challenge. We introduce the $(\\bm{K}, ε)$-Minimum Sufficient Head Circuit ($K$-MSHC), a methodology to identify minimal sets of attention heads crucial for classification tasks as well as Search-K-MSHC, an efficient algorithm for discovering these circuits. Applying o",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2310.16808v1",
+    "year": "2023",
+    "title": "Fingervein Verification using Convolutional Multi-Head Attention Network",
+    "abstract": "Biometric verification systems are deployed in various security-based access-control applications that require user-friendly and reliable person verification. Among the different biometric characteristics, fingervein biometrics have been extensively studied owing to their reliable verification performance. Furthermore, fingervein patterns reside inside the skin and are not visible outside; therefo",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2201.06945v2",
+    "year": "2022",
+    "title": "It's All in the Head: Representation Knowledge Distillation through Classifier Sharing",
+    "abstract": "Representation knowledge distillation aims at transferring rich information from one model to another. Common approaches for representation distillation mainly focus on the direct minimization of distance metrics between the models' embedding vectors. Such direct methods may be limited in transferring high-order dependencies embedded in the representation vectors, or in handling the capacity gap b",
+    "rung": 3
+   },
+   {
+    "source": "arxiv",
+    "id": "2604.01206v2",
+    "year": "2026",
+    "title": "RELISH: LLM REgression with a Latent Iterative State Head",
+    "abstract": "We present RELISH (REgression with a Latent Iterative State Head), a novel, lightweight architecture designed for text regression with large language models. Rather than decoding numeric targets as text or aggregating multiple generated outputs, RELISH predicts scalar values directly from frozen LLM representations by iteratively refining a learned latent state through cross-attention over token-l",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2406.02128v2",
+    "year": "2024",
+    "title": "Iteration Head: A Mechanistic Study of Chain-of-Thought",
+    "abstract": "Chain-of-Thought (CoT) reasoning is known to improve Large Language Models both empirically and in terms of theoretical approximation power. However, our understanding of the inner workings and conditions of apparition of CoT capabilities remains limited. This paper helps fill this gap by demonstrating how CoT reasoning emerges in transformers in a controlled and interpretable setting. In particul",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2003.11536v1",
+    "year": "2020",
+    "title": "HP2IFS: Head Pose estimation exploiting Partitioned Iterated Function Systems",
+    "abstract": "Estimating the actual head orientation from 2D images, with regard to its three degrees of freedom, is a well known problem that is highly significant for a large number of applications involving head pose knowledge. Consequently, this topic has been tackled by a plethora of methods and algorithms the most part of which exploits neural networks. Machine learning methods, indeed, achieve accurate h",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2011.10688v1",
+    "year": "2020",
+    "title": "Iterative Text-based Editing of Talking-heads Using Neural Retargeting",
+    "abstract": "We present a text-based tool for editing talking-head video that enables an iterative editing workflow. On each iteration users can edit the wording of the speech, further refine mouth motions if necessary to reduce artifacts and manipulate non-verbal aspects of the performance by inserting mouth gestures (e.g. a smile) or changing the overall performance style (e.g. energetic, mumble). Our tool r",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2412.01295v1",
+    "year": "2024",
+    "title": "FedAH: Aggregated Head for Personalized Federated Learning",
+    "abstract": "Recently, Federated Learning (FL) has gained popularity for its privacy-preserving and collaborative learning capabilities. Personalized Federated Learning (PFL), building upon FL, aims to address the issue of statistical heterogeneity and achieve personalization. Personalized-head-based PFL is a common and effective PFL method that splits the model into a feature extractor and a head, where the f",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2109.02740v2",
+    "year": "2021",
+    "title": "Single-Camera 3D Head Fitting for Mixed Reality Clinical Applications",
+    "abstract": "We address the problem of estimating the shape of a person's head, defined as the geometry of the complete head surface, from a video taken with a single moving camera, and determining the alignment of the fitted 3D head for all video frames, irrespective of the person's pose. 3D head reconstructions commonly tend to focus on perfecting the face reconstruction, leaving the scalp to a statistical a",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2602.04491v1",
+    "year": "2026",
+    "title": "Greedy-Gnorm: A Gradient Matrix Norm-Based Alternative to Attention Entropy for Head Pruning",
+    "abstract": "Attention head pruning has emerged as an effective technique for transformer model compression, an increasingly important goal in the era of Green AI. However, existing pruning methods often rely on static importance scores, which fail to capture the evolving role of attention heads during iterative removal. We propose Greedy-Gradient norm (Greedy-Gnorm), a novel head pruning algorithm that dynami",
+    "rung": 4
+   },
+   {
+    "source": "arxiv",
+    "id": "2305.10945v1",
+    "year": "2023",
+    "title": "An Android Robot Head as Embodied Conversational Agent",
+    "abstract": "This paper describes, how current Machine Learning (ML) techniques combined with simple rule-based animation routines make an android robot head an embodied conversational agent with ChatGPT as its core component. The android robot head is described, technical details are given of how lip-sync animation is being achieved, and general software design decisions are presented. A public presentation o",
+    "rung": 4
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1177/0363546517724754",
+    "year": "2017",
+    "title": "Characterizing Verified Head Impacts in High School Girls’ Lacrosse",
+    "abstract": "",
+    "rung": 2,
+    "venue": "The American Journal of Sports Medicine"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1186/s40798-019-0182-3",
+    "year": "2019",
+    "title": "Verifying Head Impacts Recorded by a Wearable Sensor using Video Footage in Rugby League: a Preliminary Study",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Sports Medicine - Open"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/j.oceaneng.2012.12.016",
+    "year": "2013",
+    "title": "CFD verification and validation of added resistance and motions of KVLCC2 with fixed and free surge in short and long head waves",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Ocean Engineering"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1177/0363546517706703",
+    "year": "2017",
+    "title": "Video Analysis Verification of Head Impact Events Measured by Wearable Sensors",
+    "abstract": "",
+    "rung": 2,
+    "venue": "The American Journal of Sports Medicine"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1074/mcp.m700500-mcp200",
+    "year": "2008",
+    "title": "Discovery and Verification of Head-and-neck Cancer Biomarkers by Differential Protein Expression Analysis Using iTRAQ Labeling, Multidimensional Liquid Chromatography, and Tandem Mass Spectrometry",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Molecular & Cellular Proteomics"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1109/tmtt.2014.2342669",
+    "year": "2014",
+    "title": "Microwave System to Detect Traumatic Brain Injuries Using Compact Unidirectional Antenna and Wideband Transceiver With Verification on Realistic Head Phantom",
+    "abstract": "",
+    "rung": 2,
+    "venue": "IEEE Transactions on Microwave Theory and Techniques"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1097/nen.0b013e3181a9d503",
+    "year": "2009",
+    "title": "Chronic Traumatic Encephalopathy in Athletes: Progressive Tauopathy After Repetitive Head Injury",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Journal of Neuropathology & Experimental Neurology"
+   },
+   {
+    "source": "openalex",
+    "id": "https://doi.org/10.1016/s0167-8140(98)00087-5",
+    "year": "1998",
+    "title": "Three-dimensional dosimetry using polymer gel and magnetic resonance imaging applied to the verification of conformal radiation therapy in head-and-neck cancer",
+    "abstract": "",
+    "rung": 2,
+    "venue": "Radiotherapy and Oncology"
+   }
+  ]
+ }
+}
