@@ -397,7 +397,7 @@
   .hgroup .chart-ctrl:hover{background:var(--bg2)}
   .hgroup-sep{width:1px;height:16px;background:var(--border);flex:0 0 auto}
   /* ── Hamburger (sandwich) menu: on narrow screens the chart controls + secondary
-     actions collapse into a ☰ dropdown instead of a long sideways-scrolling row.
+     actions collapse into a  dropdown instead of a long sideways-scrolling row.
      The SAME elements move into the panel (JS), so ids/handlers/state survive. ── */
   /* The ☰ is PERMANENT: the feed stamp, Pre/After, Kalshi, Explore, Connect broker,
      and Chat live in it at every width; on narrow screens it additionally swallows
@@ -1225,7 +1225,7 @@
   <span class="hgroup-sep" aria-hidden="true"></span>
   <button id="drawToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="toggleDrawMenu(this)"
-    title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">✏ Draw ▾</button>
+    title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">Draw ▾</button>
   </div><!-- /hgroup -->
   <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
@@ -1235,19 +1235,19 @@
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
   <a href="/trader-guide.html" class="nav-link" title="Trader guide — set up your account, connect Alpaca, turn the autopilot on and off"
-    data-hmenu-desc="Step-by-step guide: sign up, connect Alpaca, choose a strategy, turn the trader on and off.">📖 Guide</a>
-  <!-- Trader pill: shows the ACTIVE TRADER (📈 Stock / 🏆 Champion) running your
+    data-hmenu-desc="Step-by-step guide: sign up, connect Alpaca, choose a strategy, turn the trader on and off.">Guide</a>
+  <!-- Trader pill: shows the ACTIVE TRADER ( Stock /  Champion) running your
        connected account, and links to Settings → Connections to add keys / switch. -->
   <a href="/settings.html#connections" class="nav-link" id="brokerBtn" style="display:none"
     title="Which trader runs your account — click to add an account or switch traders in Settings"
-    data-hmenu-desc="Shows the active trader running your account. Click to add an account or switch traders in Settings."><span id="brokerLabel">📈 Trader</span></a>
+    data-hmenu-desc="Shows the active trader running your account. Click to add an account or switch traders in Settings."><span id="brokerLabel">Trader</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
-    data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
+    data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">Chat</button>
   <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu"
     aria-label="Menu — extended hours, Kalshi, broker, and chat"
-    title="Menu — extended hours, Kalshi, broker, and chat">☰</button>
+    title="Menu — extended hours, Kalshi, broker, and chat" data-ico="menu"></button>
 </div>
 
 <!-- Mobile-only view switch (#2501): chart deck, ticker list, and account panel can't
@@ -1417,7 +1417,7 @@
 <div class="dc-bg hidden" id="dcPanel">
   <aside class="dc-modal" role="dialog" aria-label="Unisona assistant chat" aria-hidden="true">
     <div class="dc-head">
-      <span class="dc-title">💬 Unisona <span class="dc-sub">Assistant</span></span>
+      <span class="dc-title">Unisona <span class="dc-sub">Assistant</span></span>
       <a class="dc-x" href="/chat.html" title="Open the full chat — files, models, voice">Full chat ↗</a>
       <button type="button" class="dc-x" onclick="dcToggle(false)" aria-label="Close chat" title="Close">✕ Close</button>
     </div>
@@ -1427,9 +1427,9 @@
         <div class="dc-hero-t">Ask Unisona</div>
         <div class="dc-tag">Your local AI that remembers you — right beside your charts.</div>
         <div class="dc-chips" role="group" aria-label="Suggested prompts">
-          <button type="button" class="dc-chip" data-q="What's moving in the market today?">📈 What's moving today?</button>
-          <button type="button" class="dc-chip" data-q="Explain what the SPY chart is doing right now.">🔍 Explain SPY's chart</button>
-          <button type="button" class="dc-chip" data-q="How do I place a paper trade here?">🧭 How do paper trades work?</button>
+          <button type="button" class="dc-chip" data-q="What's moving in the market today?">What's moving today?</button>
+          <button type="button" class="dc-chip" data-q="Explain what the SPY chart is doing right now.">Explain SPY's chart</button>
+          <button type="button" class="dc-chip" data-q="How do I place a paper trade here?">How do paper trades work?</button>
         </div>
       </div>
     </div>
@@ -1496,7 +1496,7 @@
 <div class="sym-bg hidden" id="symSearchBg" onclick="if(event.target===this)closeSymbolSearch()">
   <div class="sym-modal" role="dialog" aria-modal="true" aria-label="Symbol search">
     <div class="sym-head">
-      <span aria-hidden="true">🔍</span>
+      <span aria-hidden="true"></span>
       <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
       <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
     </div>
@@ -1593,7 +1593,7 @@
       <!-- #2445: rapid mode — explicit opt-in; skips confirms + arms Shift+B/S -->
       <div class="ot-exit-head" style="margin-top:2px">
         <input type="checkbox" id="otRapid" aria-label="Rapid mode — skip order confirmations" onchange="setRapidMode(this.checked)">
-        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">⚡ Rapid mode — no confirms</span>
+        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">Rapid mode — no confirms</span>
       </div>
 
       <div class="ot-submit" id="otSubmit" onclick="submitOrderTicket()">Buy 1 — MARKET</div>
@@ -4407,9 +4407,9 @@ document.addEventListener('DOMContentLoaded', () => _paintIcons());
 const DRAW_CATS = [
   { id:'cursor', name:'Cursors', groups:[
     { name:'Cursors', tools:[
-      ['cross',  { name:'Cross',        icon:'✛', cursor:true,  k:'Alt+C', why:'The normal chart cursor: pan, zoom and read the crosshair. Nothing is drawn.' }],
+      ['cross',  { name:'Cross',        icon:ico('cursor'), cursor:true,  k:'Alt+C', why:'The normal chart cursor: pan, zoom and read the crosshair. Nothing is drawn.' }],
       ['dot',    { name:'Dot',          icon:'·', cursor:true,             why:'A small dot cursor — the same navigation as Cross with a less intrusive pointer.' }],
-      ['pointer',{ name:'Arrow',        icon:'➤', cursor:true,             why:'A plain arrow pointer. Use it when the crosshair lines get in the way of reading candles.' }],
+      ['pointer',{ name:'Arrow',        icon:ico('arrowUp'), cursor:true,             why:'A plain arrow pointer. Use it when the crosshair lines get in the way of reading candles.' }],
     ]},
     { name:'Editing', tools:[
       ['eraser', { name:'Eraser',       icon:'⌫', erase:true,   k:'Alt+E', why:'Click any drawing to delete it. Stays armed so you can clear several in a row.' }],
@@ -4425,7 +4425,7 @@ const DRAW_CATS = [
       ['h',      { name:'Horizontal line',  icon:'—',  pts:1, k:'Alt+H', why:'A price level across the whole chart. The simplest way to mark support, resistance or a target.' }],
       ['hray',   { name:'Horizontal ray',   icon:'⊢',  pts:1, k:'Alt+J', why:'A price level that starts where you click and only projects to the right — it does not claim history it was not there for.' }],
       ['v',      { name:'Vertical line',    icon:'|',  pts:1, k:'Alt+V', why:'Marks a moment in time: an open, a print, an earnings release.' }],
-      ['crossline',{ name:'Cross line',     icon:'✚',  pts:1,            why:'A horizontal and a vertical line through one point — marks a price AND the time it happened.' }],
+      ['crossline',{ name:'Cross line',     icon:ico('target'),  pts:1,            why:'A horizontal and a vertical line through one point — marks a price AND the time it happened.' }],
     ]},
     { name:'Channels', tools:[
       ['chan',   { name:'Parallel channel', icon:'⫽',  pts:3,            why:'Two parallel lines: draw the trend with the first two clicks, the third sets the channel width.' }],
@@ -4480,11 +4480,11 @@ const DRAW_CATS = [
   ]},
   { id:'brushes', name:'Brushes', groups:[
     { name:'Brushes', tools:[
-      ['pen',    { name:'Brush',            icon:'✎',  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
+      ['pen',    { name:'Brush',            icon:ico('pencil'),  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
       ['hl',     { name:'Highlighter',      icon:ico('marker'), pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
     ]},
     { name:'Arrows', tools:[
-      ['arrow',  { name:'Arrow',            icon:'➚',  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
+      ['arrow',  { name:'Arrow',            icon:ico('fan'),  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
       ['arrowup',{ name:'Arrow up',           icon:ico('arrowUp'),  pts:1,            why:'A marker under a bar — the quickest way to flag an entry or a signal you want to find again.' }],
       ['arrowdn',{ name:'Arrow down',         icon:ico('arrowDown'),  pts:1,            why:'The same marker above a bar, for exits and rejections.' }],
     ]},
@@ -4554,7 +4554,7 @@ function _setDrawBtn() {
   const b = document.getElementById('drawToggle');
   if (!b) return;
   const d = DRAW_TOOLS[_drawTool];
-  b.textContent = d ? ('✏ ' + d.name + ' ▾') : '✏ Draw ▾';
+  b.textContent = d ? (d.name + ' ▾') : 'Draw ▾';
   b.classList.toggle('on', !!_drawTool);
 }
 function _canvasTicker(canvas) { return canvas.id === 'chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/, ''); }
@@ -5556,12 +5556,12 @@ async function placeMarketOrder(sym, side, qty, source){
       body: JSON.stringify({ ticker:sym, side, qty, type:'market' })
     });
     const result = await r.json();
-    if(!r.ok || result.status!=='placed'){ _alertToast('⚠ '+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
-    _alertToast(`⚡ ${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
+    if(!r.ok || result.status!=='placed'){ _alertToast(''+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
+    _alertToast(`${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
     journalLog({ symbol:sym, side, qty, type:'market', source: source||'rapid' });
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
-  }catch(e){ _alertToast('⚠ order failed: '+e.message); return false; }
+  }catch(e){ _alertToast('order failed: '+e.message); return false; }
 }
 
 // #2439: risk-based sizing — units = floor(risk$ / |entry − stop|). Entry is the
@@ -5633,21 +5633,21 @@ async function submitOrderTicket(){
       const fill = result.fill_price ? ` @ $${result.fill_price}` : '';
       const sim = result.mode==='paper' ? ' (paper)' : '';
       const verb = result.fill_price ? 'filled' : 'placed';
-      _alertToast(`✓ ${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
+      _alertToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
       journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
       closeOrderTicket();
       await Promise.all([loadOrders(), loadPortfolio()]);
     } else if(result && result.status === 'dry_run'){
       // Real broker connected but not armed — NOT a failure; explain plainly.
-      _alertToast(`⚠ Not placed — your broker isn’t armed for real orders. ${result.reason||''}`.trim());
+      _alertToast(`Not placed — your broker isn’t armed for real orders. ${result.reason||''}`.trim());
       if(submit.dataset.prev) submit.textContent=submit.dataset.prev;
     } else {
-      _alertToast('⚠ Order didn’t go through: ' + (result.reason || result.error || r.statusText));
+      _alertToast('Order didn’t go through: ' + (result.reason || result.error || r.statusText));
       if(submit.dataset.prev) submit.textContent=submit.dataset.prev;
     }
   }catch(e){
     submit.style.pointerEvents='';
-    _alertToast('⚠ Order didn’t go through: ' + e.message);
+    _alertToast('Order didn’t go through: ' + e.message);
   }
 }
 let _otArmed=false, _otArmTimer=null;
@@ -5797,7 +5797,7 @@ function renderSymbolInfo(ticker){
     <div class="wi-sect">About</div>
     <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>
     <div class="wi-sect">Alerts</div>
-    <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ 🔔 Alert</button></div>`;
+    <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ Alert</button></div>`;
   if(!_symNames[ticker] && kind==='Equity'){
     fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
       if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
@@ -6388,13 +6388,13 @@ const s0Status = { equity:null, pnl:null, positions:0, market:null, marketOpen:n
 function renderS0StatusHtml(){
   const pnl = s0Status.pnl||0;
   const reg = s0Status.market || '—';
-  const dot = reg==='BULLISH'?'🟢':reg==='BEARISH'?'🔴':'⚪';
+  const dot = reg==='BULLISH'?'●':reg==='BEARISH'?'●':'○';
   const openTxt = s0Status.marketOpen===false?' · closed':(s0Status.marketOpen?' · open':'');
   const scanned = Object.keys(zonesData||{}).length;
   return `<div class="s0-status">`+
-    `<span>💼 ${s0Status.equity!=null?'$'+fmt(s0Status.equity,0):'—'}</span>`+
+    `<span>${s0Status.equity!=null?'$'+fmt(s0Status.equity,0):'—'}</span>`+
     `<span class="${pnl>=0?'pos':'neg'}">${pnl>=0?'▲':'▼'} ${pnl>=0?'+':'-'}$${fmt(Math.abs(pnl),0)} today</span>`+
-    `<span>${s0Status.positions?('📌 '+s0Status.positions+' open'):'📭 flat'}</span>`+
+    `<span>${s0Status.positions?(''+s0Status.positions+' open'):'flat'}</span>`+
     `<span>${dot} ${reg}${openTxt}</span>`+
     `<span>⏱ ${scanned} scanned · 1m</span>`+
   `</div>`;
@@ -6445,7 +6445,7 @@ function renderSigma0Signals(){
     </div>`).join('');
   const watchHtml = watching.slice(0,6).map(w=>`
     <div class="s0-watch${w.isShort?' short':''}">
-      <span class="s0-eye">👀</span> Looking for a <b>${w.label}</b> on <b>${newsEsc(w.ticker)}</b>${w.why?` — ${newsEsc(w.why)}`:''} · ${w.p}%
+      <span class="s0-eye" data-ico="eye" data-ico-size="12"></span> Looking for a <b>${w.label}</b> on <b>${newsEsc(w.ticker)}</b>${w.why?` — ${newsEsc(w.why)}`:''} · ${w.p}%
     </div>`).join('');
 
   if(!enters.length && !watching.length){
@@ -6453,7 +6453,7 @@ function renderSigma0Signals(){
     // the panel is honest instead of implying an active scan that can't run.
     let msg;
     if(zonesStatus.failed){
-      msg = `⚠ Market data unavailable${zonesStatus.reason?` — ${newsEsc(zonesStatus.reason.replace(/^market data unavailable — /i,''))}`:''}. Zone overlays paused until the data backend reconnects.`;
+      msg = ` Market data unavailable${zonesStatus.reason?` — ${newsEsc(zonesStatus.reason.replace(/^market data unavailable — /i,''))}`:''}. Zone overlays paused until the data backend reconnects.`;
     } else if(!zonesStatus.available){
       msg = 'Warming up the market scan — zone overlays and signals appear once the first scan completes.';
     } else {
@@ -6584,7 +6584,7 @@ function checkPriceAlerts(){
     for(let i=list.length-1;i>=0;i--){
       const a=list[i];
       if((a.dir==='above' && px>=a.price) || (a.dir==='below' && px<=a.price)){
-        const msg=`🔔 ${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
+        const msg=`${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
         _alertToast(msg);
         if(window.Notification && Notification.permission==='granted') try{ new Notification('Unisona Trader', {body:msg}); }catch(e){}
         list.splice(i,1); _saveAlerts();
@@ -7234,7 +7234,7 @@ function renderDrawRail() {
     h += '<button class="dr-btn util" type="button" aria-pressed="' + (drawUtilOn(k) ? 'true' : 'false')
       + '" title="' + _esc(u.label) + '" onclick="toggleDrawUtil(\'' + k + '\')">' + u.icon + '</button>';
   h += '<span class="dr-sep"></span><button class="dr-btn" type="button" title="Remove all drawings on this symbol"'
-    + ' onclick="setDrawTool(\'clear\');renderDrawRail()">🗑</button>';
+    + ' onclick="setDrawTool(\'clear\');renderDrawRail()">' + ico('trash') + '</button>';
   rail.innerHTML = h;
   renderFavBar();
 }
@@ -7903,7 +7903,7 @@ function _accountDegraded(kind, reason){
     const b = document.createElement('span');
     b.id = 'staleBadge';
     b.style.cssText = 'align-self:center;margin-right:10px;padding:2px 7px;border-radius:4px;background:#f59e0b;color:#1a1a1a;font-size:10px;font-weight:800;letter-spacing:.05em';
-    b.textContent = kind === 'session' ? '⚠ STALE — SIGN IN' : '⚠ STALE';
+    b.textContent = kind === 'session' ? ' STALE — SIGN IN' : ' STALE';
     b.title = 'These figures are NOT live' + (reason ? ' — ' + reason : '') + '.';
     host.insertBefore(b, host.firstChild);
   }
@@ -7912,8 +7912,8 @@ function _accountDegraded(kind, reason){
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
     _staleKind = kind;
     _alertToast(kind === 'session'
-      ? '⚠ Session expired — account data is paused (showing last known). Sign in again to resume; it will not recover on its own.'
-      : '⚠ Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
+      ? ' Session expired — account data is paused (showing last known). Sign in again to resume; it will not recover on its own.'
+      : ' Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
   }
 }
 function _accountFresh(){
@@ -8019,9 +8019,9 @@ async function dustClear(symbol, btn){
     // seconds later. Say what is actually known — the order went in — and tell the
     // operator the one thing that settles it, which is the position row itself.
     if(j && j.ok){
-      _alertToast(`${j.session_note?'⏳':'✓'} Dust order ACCEPTED for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — accepted is not filled; re-check the position to confirm it cleared${j.session_note?' — '+j.session_note:''}`);
+      _alertToast(`${j.session_note?'':''} Dust order ACCEPTED for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — accepted is not filled; re-check the position to confirm it cleared${j.session_note?' — '+j.session_note:''}`);
     }else{
-      _alertToast(`⚠ ${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
+      _alertToast(`${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
     }
     // What this account has already answered, surfaced at the point of decision —
     // IBKR's "fractional not supported on this account" verdict sat in the probe
@@ -8029,7 +8029,7 @@ async function dustClear(symbol, btn){
     if(j && j.prior_rejection){
       _alertToast(`ℹ ${symbol}: this account previously rejected a fractional order — IBKR said "${j.prior_rejection.broker_said}" (${String(j.prior_rejection.ts).slice(0,10)}). Enable Fractional Trading in Client Portal, or have IBKR sweep the residue.`);
     }
-  }catch(e){ _alertToast('⚠ Dust probe failed: '+e.message); }
+  }catch(e){ _alertToast('Dust probe failed: '+e.message); }
   await Promise.all([loadOrders(), loadPortfolio()]);
 }
 async function flattenPosition(symbol, side, qty, skipConfirm, btn){
@@ -8052,14 +8052,14 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
         result = await _placeFlatten(symbol, exitSide, q, true);
       }
     }
-    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
+    if(!(result && result.status==='placed')){ _alertToast('Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
     const fill=result.fill_price?` @ ${result.fill_price}`:'';
     // 'Placed' is not 'filled' outside RTH — say which one happened (#3326).
-    _alertToast(`${result.session_note?'⏳ Order placed for':'✓ Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
+    _alertToast(`${result.session_note?'Order placed for':'Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
-  }catch(e){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+e.message); return false; }
+  }catch(e){ _alertToast('Couldn’t flatten '+symbol+': '+e.message); return false; }
 }
 // One flatten POST. acceptWarnings goes on the wire ONLY after the user has read
 // and confirmed IBKR's warning text above — never on the first attempt.
@@ -8081,7 +8081,7 @@ async function flattenAll(btn){
   const mv = totalMV ? ` (~$${totalMV.toLocaleString(undefined,{maximumFractionDigits:0})})` : '';
   if(!window.confirm(`Close ALL ${snapshot.length} open position${snapshot.length===1?'':'s'}${mv}?\n\nThis market-sells everything at once and can't be undone.`)) return;
   for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
-  _alertToast(`✓ Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
+  _alertToast(`Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
 }
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
@@ -8153,9 +8153,9 @@ async function cancelOrder(id, btn){
   try{
     const r = await fetch('/api/trading/orders/'+encodeURIComponent(id), { method:'DELETE' });
     const j = await r.json().catch(()=>({}));
-    if(j && j.ok) _alertToast('✓ Canceled '+id+(j.broker?' ('+j.broker+')':''));
-    else _alertToast('⚠ Cancel failed: '+((j && j.error) || r.statusText || r.status));
-  }catch(e){ _alertToast('⚠ Cancel failed: '+e.message); }
+    if(j && j.ok) _alertToast('Canceled '+id+(j.broker?' ('+j.broker+')':''));
+    else _alertToast('Cancel failed: '+((j && j.error) || r.statusText || r.status));
+  }catch(e){ _alertToast('Cancel failed: '+e.message); }
   await loadOrders();
 }
 function renderOrders(orders){
@@ -8703,20 +8703,20 @@ async function refreshBrokerButton(){
     ]);
     const connected = !!(alRes && (alRes.connected || alRes.status==='connected')) || !!(ibRes && ibRes.live && ibRes.live.connected);
     if(!connected){
-      label.textContent = '⚡ Connect account';
+      label.textContent = 'Connect account';
       btn.style.color = '';
       btn.title = 'No trading account connected — click to add your Alpaca API keys in Settings.';
       return;
     }
     const champion = modeRes && modeRes.mode === 'champion';
-    label.textContent = champion ? '🏆 Champion' : '📈 Stock trader';
+    label.textContent = champion ? 'Champion' : 'Stock trader';
     btn.style.color = 'var(--green)';
     btn.title = (champion
       ? 'Champion (auto ETF allocation) is running your account — the day-trader is paused.'
       : 'The stock day-trader is active (signals + your manual buy/sell).')
       + ' Click to switch the active trader in Settings.';
   }catch(e){
-    label.textContent = '📈 Trader';      // network hiccup → neutral, still links to Settings
+    label.textContent = 'Trader';      // network hiccup → neutral, still links to Settings
   }
 }
 // OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected
@@ -8726,10 +8726,10 @@ async function refreshBrokerButton(){
   const st = q.get('alpaca');
   if(!st) return;
   if(st === 'connected'){
-    setTimeout(()=>alert('⚡ Alpaca connected — your trades now route to your own Alpaca account (paper by default).'), 300);
+    setTimeout(()=>alert('Alpaca connected — your trades now route to your own Alpaca account (paper by default).'), 300);
   } else {
     const reason = q.get('reason') || 'unknown';
-    setTimeout(()=>alert(`Alpaca connect failed: ${reason}. You can retry from the ☰ menu.`), 300);
+    setTimeout(()=>alert(`Alpaca connect failed: ${reason}. You can retry from the  menu.`), 300);
   }
   q.delete('alpaca'); q.delete('reason');
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
@@ -8754,7 +8754,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 
 /* ── Hamburger (sandwich) menu ─────────────────────────────────────────────────
    On narrow screens the chart-controls cluster + secondary actions (Pre/After,
-   Kalshi, Explore, Connect broker) MOVE into a ☰ dropdown; on wide screens they
+   Kalshi, Explore, Connect broker) MOVE into a  dropdown; on wide screens they
    move back inline. Comment markers remember each element's original slot, so
    ids, event handlers, and select state all survive the round-trip. */
 (function(){
@@ -8932,7 +8932,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 </script>
 <!-- Global header (#1579) + theme toggle (#1577). site-chrome injects the shared
      <nav class="site-nav"> at the top of <body>; theme-toggle defines toggleTheme()
-     for the ☀/🌙 button; both run before auth-gate (which highlights the active link). -->
+     for the / button; both run before auth-gate (which highlights the active link). -->
 <script>
   /* Mobile view switch (#2255): toggle between the charts and the ticker list, since both
      can't fit at phone width. Chart is the default; the tab bar only shows on mobile. */
