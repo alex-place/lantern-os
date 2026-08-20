@@ -257,9 +257,14 @@ function renderMarkdown(result, meta = {}) {
          + (i.grounded ? "" : " · **ungrounded — no supporting paper retrieved**"));
     if (i.audit) {
       L.push("");
+      const web = i.audit.verdict === "UNVERIFIED"
+        ? (i.audit.web_searched
+            ? ` arXiv and OpenAlex were searched (${i.audit.web_hits} hits) and none matched.`
+            : " **The live search did not run**, so this is unchecked, not unmatched.")
+        : "";
       L.push(`**Prior art: ${i.audit.verdict}**`
            + (i.audit.evidence ? ` — \`${i.audit.evidence}\`` : "")
-           + (i.audit.why ? `. ${i.audit.why}` : ""));
+           + (i.audit.why ? `. ${i.audit.why}` : "") + web);
     }
     L.push("");
     L.push(`**Mechanism.** ${i.mechanism}`);
@@ -289,9 +294,12 @@ function renderMarkdown(result, meta = {}) {
     L.push("");
     L.push("## Verify before starting");
     L.push("");
-    L.push(`${unverified.length} idea(s) matched nothing locally. That is not novelty — it is an `
-         + `unanswered question. Run these searches first; if any comes back with the same `
-         + `mechanism, the idea is a port, not a discovery.`);
+    const searched = unverified.filter((i) => i.audit.web_searched).length;
+    L.push(`${unverified.length} idea(s) matched nothing — ${searched} of them after arXiv and `
+         + `OpenAlex were actually searched. That is still not novelty: both indexes miss `
+         + `OpenReview submissions and unindexed preprints, which is where one of the two papers `
+         + `that killed a novelty claim on 2026-08-20 lives. Re-run these by hand before `
+         + `committing real time.`);
     for (const i of unverified) {
       L.push("");
       L.push(`**${i.rank}. ${i.title}**`);

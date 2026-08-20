@@ -13,15 +13,25 @@
 // search would ever surface. So an honest audit needs three sources, and only two of them can be
 // consulted automatically here:
 //
-//   REPO      priorwork.js over 432 experiment scripts, notes, ADRs and result files   AUTOMATIC
-//   CORPUS    the local arXiv BM25 index                                               AUTOMATIC
-//   SHOWN     the papers this very idea was generated from                             AUTOMATIC
-//   WEB       live literature                                                          NOT AVAILABLE
+//   REPO      priorwork.js over 432 experiment scripts, notes, ADRs and result files
+//   CORPUS    the local arXiv BM25 index
+//   SHOWN     the papers this very idea was generated from
+//   WEB       live arXiv API + OpenAlex, via websearch.js
 //
-// The repo's own web-search client returns confident nonsense (asked about attention heads and
-// hallucination it returned a Wikipedia article on Lewy body dementia, with success:true), so it
-// is not wired in: a prior-art check that silently returns garbage is worse than none. Instead
-// the audit emits the queries a human or an agent must run, and refuses to certify until then.
+// THE WEB LEG IS A SECOND PASS. The first judgement uses local evidence only. If it comes back
+// UNVERIFIED -- nothing here matched -- the queries it generated are actually run and the idea is
+// judged again with the results in front of it. That ordering matters: the web is searched
+// exactly when local silence would otherwise have been mistaken for novelty, which is the failure
+// this module exists to prevent, and it costs one extra call only for the ideas that need it.
+//
+// The repo's own web-search client is NOT used: it falls through to a wiki lookup and returns
+// confident nonsense (asked about attention heads and hallucination it returned a Wikipedia
+// article on Lewy body dementia, with success:true). websearch.js talks to the scholarly indexes
+// directly instead.
+//
+// Even so, "no match" is still not "novel". Both legs miss OpenReview and other unindexed
+// preprints -- UHeads, one of the two papers that killed a novelty claim in the red team, returns
+// zero results from both. A searched silence is a stronger silence, not evidence.
 //
 // THE VERDICT VOCABULARY. Fixed, and deliberately WITHOUT a "novel" value:
 //   ANSWERED-HERE   this repo already measured it -- cites the file and the number
@@ -39,6 +49,7 @@
 // If either fails, every verdict in the run is marked untrusted and the report says so.
 
 const priorwork = require("./priorwork");
+const websearch = require("./websearch");
 const agents = require("./agents");
 
 const VERDICTS = ["ANSWERED-HERE", "REFUTED-HERE", "RESTATES", "PORT", "INCREMENTAL", "UNVERIFIED"];
@@ -90,11 +101,14 @@ function block(c) {
     L.push("\nPAPERS THIS IDEA WAS GENERATED FROM:");
     for (const p of c.shown) L.push(`  [${p.id}] ${p.title}`);
   }
+  if (c.web && c.web.length) {
+    L.push("\nLIVE SEARCH OF arXiv AND OpenAlex FOR THIS IDEA:");
+    for (const h of c.web.slice(0, 12)) L.push(`  [${h.source}:${h.id}] (${h.year}) ${h.title}`);
+  }
   return L.join("\n");
 }
 
-async function auditIdea(idea, { llm } = {}, shown = []) {
-  const c = candidates(idea, shown);
+async function judgeOnce(idea, c, llm) {
   const prompt = `You are checking whether a proposed experiment is already done.\n\n`
     + `IDEA: ${idea.title}\nMECHANISM: ${idea.mechanism || "(none)"}\n\n${block(c)}\n\n`
     + `Work through these IN ORDER and stop at the first that applies:\n\n`
@@ -128,6 +142,21 @@ async function auditIdea(idea, { llm } = {}, shown = []) {
   }
 }
 
+async function auditIdea(idea, { llm, web = true } = {}, shown = []) {
+  const c = candidates(idea, shown);
+  const first = await judgeOnce(idea, c, llm);
+  if (first.verdict !== "UNVERIFIED" || web === false) {
+    return { ...first, web: null, first_pass: first.verdict };
+  }
+  // Local silence: this is exactly where a novelty claim would have been invented. Search.
+  const w = await websearch.searchAll(first.web_queries);
+  if (!w.searched || !w.hits.length) {
+    return { ...first, web: w, first_pass: first.verdict };
+  }
+  const second = await judgeOnce(idea, { ...c, web: w.hits }, llm);
+  return { ...second, web: w, first_pass: first.verdict };
+}
+
 // The auditor is audited. Both plants must come back matched; if either slips through as
 // UNVERIFIED the auditor is not detecting prior art and none of its verdicts mean anything.
 async function runControls(shown, { llm } = {}) {
@@ -143,25 +172,33 @@ async function runControls(shown, { llm } = {}) {
         experiment: `Run exactly what is described above and measure the effect it claims.` }
     : null;
   if (restated) {
-    const r = await auditIdea(restated, { llm }, shown);
+    const r = await auditIdea(restated, { llm, web: false }, shown);
     out.plants.push({ plant: "restatement", verdict: r.verdict, pass: r.verdict !== "UNVERIFIED", why: r.why });
   }
-  const a = await auditIdea(PLANT_ANSWERED, { llm }, shown);
+  const a = await auditIdea(PLANT_ANSWERED, { llm, web: false }, shown);
   out.plants.push({ plant: "answered-here", verdict: a.verdict,
                     pass: a.verdict === "ANSWERED-HERE" || a.verdict === "REFUTED-HERE", why: a.why });
   out.trusted = out.plants.every((p) => p.pass);
   return out;
 }
 
-async function audit(ideas, { llm, shown = [], log = () => {} } = {}) {
+async function audit(ideas, { llm, shown = [], web = true, log = () => {} } = {}) {
   const controls = await runControls(shown, { llm });
   log("audit_controls", { trusted: controls.trusted, plants: controls.plants.map((p) => `${p.plant}:${p.verdict}`) });
   const audited = [];
   for (const idea of ideas) {
-    const a = await auditIdea(idea, { llm }, shown);
-    audited.push({ ...idea, audit: { verdict: a.verdict, evidence: a.evidence, why: a.why,
-                                     web_queries: a.web_queries, trusted: controls.trusted } });
-    log("audited", { title: idea.title.slice(0, 44), verdict: a.verdict, evidence: a.evidence.slice(0, 44) });
+    const a = await auditIdea(idea, { llm, web }, shown);
+    audited.push({ ...idea, audit: {
+      verdict: a.verdict, evidence: a.evidence, why: a.why, web_queries: a.web_queries,
+      trusted: controls.trusted, first_pass: a.first_pass,
+      // Recorded so a reader can tell "searched and found nothing" from "never searched".
+      web_searched: !!(a.web && a.web.searched),
+      web_hits: a.web ? a.web.hits.length : 0,
+      web_legs: a.web ? a.web.legs : null,
+    } });
+    log("audited", { title: idea.title.slice(0, 40), verdict: a.verdict,
+                     web: a.web ? `${a.web.hits.length} hits` : "n/a",
+                     evidence: (a.evidence || "").slice(0, 40) });
   }
   const counts = {};
   for (const i of audited) counts[i.audit.verdict] = (counts[i.audit.verdict] || 0) + 1;

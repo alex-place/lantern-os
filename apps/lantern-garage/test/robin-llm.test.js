@@ -20,6 +20,7 @@ const agents = require(path.join(R, "agents"));
 const bench = require(path.join(R, "bench"));
 const novelty = require(path.join(R, "novelty"));
 const priorwork = require(path.join(R, "priorwork"));
+const websearch = require(path.join(R, "websearch"));
 
 // Tests are queued and awaited: an async assertion invoked without await is a test that cannot
 // fail, which is worse than no test.
@@ -223,6 +224,51 @@ ok("an unparseable audit reply degrades to UNVERIFIED with queries, never to a n
   const r = await novelty.auditIdea({ title: "T", mechanism: "M" }, { llm: junk }, []);
   assert.strictEqual(r.verdict, "UNVERIFIED");
   assert.ok(r.web_queries.length > 0, "an unverified idea must carry the searches that would settle it");
+});
+
+// ── the live search leg ──────────────────────────────────────────────────────────────────
+ok("arXiv gets a phrase query and a term fallback, because long phrases return nothing", () => {
+  const q = websearch.arxivQueries("uncertainty aware attention heads hallucination detection tokens");
+  assert.strictEqual(q.length, 2, "a phrase query alone silently returns zero on long questions");
+  assert.ok(decodeURIComponent(q[0]).includes('"'), "first attempt is the exact phrase");
+  assert.ok(q[1].includes("+AND+"), "fallback ANDs the distinctive terms");
+  assert.ok(!decodeURIComponent(q[1]).includes(" the "), "stopwords must not eat the term budget");
+});
+
+ok("a leg that did not run is never reported as a leg that found nothing", async () => {
+  process.env.ROBIN_WEB_NOCACHE = "1";
+  process.env.ROBIN_WEB_GAP_MS = "0";
+  websearch._setFetch(async () => ({ status: 503, body: "" }));
+  try {
+    const r = await websearch.search("anything at all", 3);
+    assert.strictEqual(r.searched, false, "both legs down means the search did not happen");
+    assert.strictEqual(r.legs.arxiv.ok, false);
+    assert.ok(String(r.legs.arxiv.reason).includes("503"), "the failure reason must survive");
+    assert.strictEqual(r.hits.length, 0);
+  } finally {
+    websearch._resetFetch();
+    delete process.env.ROBIN_WEB_NOCACHE;
+    delete process.env.ROBIN_WEB_GAP_MS;
+  }
+});
+
+ok("one live leg is enough to count as searched", async () => {
+  process.env.ROBIN_WEB_NOCACHE = "1";
+  process.env.ROBIN_WEB_GAP_MS = "0";
+  websearch._setFetch(async (url) => (url.includes("openalex")
+    ? { status: 200, body: JSON.stringify({ results: [{ title: "A Real Paper", publication_year: 2026 }] }) }
+    : { status: -2, body: "timeout" }));
+  try {
+    const r = await websearch.search("anything at all", 3);
+    assert.strictEqual(r.searched, true);
+    assert.strictEqual(r.legs.arxiv.ok, false);
+    assert.strictEqual(r.hits.length, 1);
+    assert.strictEqual(r.hits[0].title, "A Real Paper");
+  } finally {
+    websearch._resetFetch();
+    delete process.env.ROBIN_WEB_NOCACHE;
+    delete process.env.ROBIN_WEB_GAP_MS;
+  }
 });
 
 ok("the bench sham is inert and cannot be mistaken for a real proposal", () => {
