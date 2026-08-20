@@ -126,7 +126,7 @@
      the surfaces. Tabs stay a touch larger than labels because they are hit targets,
      but everything shares the same rhythm, colour and border. */
   :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
-  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,384px)}
+  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,340px)}
   .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
   body.ticket-closed{--col-t:0px}
@@ -518,7 +518,7 @@
      signal on a tight second line. */
   /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
      right-aligned tracks so figures line up down the whole list. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(52px,1fr) 68px 62px 60px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px max-content 1fr 66px 60px 58px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -535,13 +535,13 @@
   /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
      exactly over the figures they name. */
   .wl-head{position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px minmax(52px,1fr) 68px 62px 60px;align-items:center;gap:8px;
+    grid-template-columns:18px max-content 1fr 66px 60px 58px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
     padding:var(--hdr-py) calc(var(--hdr-px) + var(--wl-sb, 0px)) 5px var(--hdr-px);
     background:var(--bg1);border-bottom:1px solid var(--border)}
-  .wl-h-sym{grid-column:2;font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg)}
+  .wl-h-sym{grid-column:2;white-space:nowrap;font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg)}
   .wl-h-num{font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg);text-align:right}
   /* Symbol, then any signal marker, in ONE grid cell -- a seventh child in a five-track
      grid was wrapping to its own line and making every row three lines tall. */
@@ -1366,6 +1366,7 @@
       </div>
       <div class="wl-head" aria-hidden="true">
         <span class="wl-h-sym">Symbol</span>
+        <span></span>
         <span class="wl-h-num">Last</span>
         <span class="wl-h-num">Chg</span>
         <span class="wl-h-num">Chg%</span>
@@ -1386,12 +1387,12 @@
 
 <!-- Right widget rail — TradingView's right-hand switcher. -->
 <nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
-  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">' + ico('menu') + '</button>
-  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">' + ico('bell') + '</button>
+  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist" data-ico="menu"></button>
+  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts" data-ico="bell"></button>
   <span class="rail-sep"></span>
-  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">' + ico('swap') + '</button>
+  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket" data-ico="swap"></button>
   <span class="rail-sep"></span>
-  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)">' + ico('chat') + '</button>
+  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)" data-ico="chat"></button>
 </nav>
 </div><!-- /layout -->
 
@@ -4392,6 +4393,17 @@ function ico(name, size, opts) {
     + 'stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>';
 }
 
+/* Static markup cannot call ico() inline -- writing the call into HTML renders it as
+   literal text. Elements declare data-ico and are filled once the set is available. */
+function _paintIcons(root) {
+  (root || document).querySelectorAll('[data-ico]').forEach(el => {
+    if (el.firstElementChild && el.firstElementChild.tagName === 'svg') return;
+    const svg = ico(el.dataset.ico, Number(el.dataset.icoSize) || 15);
+    if (svg) el.innerHTML = svg;
+  });
+}
+document.addEventListener('DOMContentLoaded', () => _paintIcons());
+
 const DRAW_CATS = [
   { id:'cursor', name:'Cursors', groups:[
     { name:'Cursors', tools:[
@@ -5695,6 +5707,7 @@ function renderWatchlist(){
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
       <span class="wl-sym">${t.ticker}</span>
+      <span></span>
       <span class="wl-price">${_wlPx(t.price)}</span>
       <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
       <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
