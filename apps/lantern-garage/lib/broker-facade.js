@@ -101,9 +101,16 @@ async function brokerFacadeFor(userId, ibkrBridge) {
     const facade = {
       getIBKRAccount: (uid) => alpaca.getAccount(uid),
       getIBKRPositions: async (uid) => ((await alpaca.getPositions(uid)) || { positions: [] }).positions,
-      getIBKROpenOrders: (uid) => alpaca.getOpenOrders(uid),
+      // ENGINE feed, not the UI feed (#3381): rows carry `orderId` (the field
+      // cancelRestingStops reads — with `order_id`-only rows the engine could
+      // never cancel a resting stop on Alpaca) and include the last ~30h of
+      // CLOSED orders so _reconcileFills books exits at the actual fill price.
+      getIBKROpenOrders: (uid) => alpaca.getEngineOrders(uid),
       getIBKRDayPnl: (uid) => alpaca.getDayPnl(uid),
       placeIBKROrder: (uid, order) => alpaca.placeOrder(uid, order),
+      // Per-order status for stop reconciliation (#3379) — without it the sweep's
+      // lookup would be an undefined function on this leg.
+      getIBKROrderStatus: (uid, orderId) => alpaca.getOrder(uid, orderId),
       // Cancel was missing from the facade (the IBKR bridge has it natively), so any
       // engine cancelling a resting stop through the facade silently couldn't on
       // Alpaca — leaving orphaned GTC sell-stops that can fire on a flat position
