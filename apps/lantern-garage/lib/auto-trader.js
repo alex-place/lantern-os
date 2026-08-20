@@ -534,6 +534,19 @@ const _exitStatus = new Map();  // sym -> broker status of the last exit order (
 // without an autopilot exit of our own, this is the only record of what we held and
 // where it was marked. Persisted, so an overnight stop-out is still landed at boot.
 const _lastPos = new Map();
+// FEED-FLAP GUARD STATE (#3378). Both maps demand agreement between two
+// consecutive snapshots before anything irreversible happens:
+//   _absentStreak — a tracked position books as externally CLOSED only after it
+//                   is missing twice in a row (a single-read absence booked
+//                   DIA/XLK/SOXS as closed on 2026-08-19 17:26 ET; all three
+//                   were confirmed held two minutes later).
+//   _seenStreak   — a position with no engine state is ADOPTED for tracking and
+//                   exit management only after it is seen held twice in a row
+//                   (one foreign snapshot injected another book's GLD/TLT; they
+//                   were adopted on sight and their disappearance two minutes
+//                   later was booked as our exits, at alien cost bases).
+const _absentStreak = new Map();
+const _seenStreak = new Map();
 function _round2(n) { return Math.round(n * 100) / 100; }
 
 // An exit whose broker result is non-terminal: the order is resting, queued, or awaiting
@@ -691,6 +704,16 @@ function _isPinned(sym) {
   return _pinCache.set.has(String(sym || '').toUpperCase());
 }
 
+/**
+ * How many held rows in a position snapshot does this engine have NO state for?
+ * Pure so the 2026-08-19 flap is replayable in a test. `isKnown` receives the
+ * uppercased symbol. (#3378)
+ */
+function snapshotForeignRows(rows, isKnown) {
+  return (rows || []).filter((p) => Math.abs(Number(p && p.qty) || 0) > 0
+    && !isKnown(String((p && p.symbol) || '').toUpperCase())).length;
+}
+
 /** Round for the ledger — MACD histograms live in the third decimal. */
 const r4 = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 1e4) / 1e4 : null);
 
@@ -788,6 +811,13 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
   // at IBKR after EVERY restart (the failure-freeze is per-process-lifecycle in
   // practice). Skip by construction: qty < 1 = unfillable, full stop. Real
   // fractional positions ≥1 share still exit via the whole-share floor.
+  // DELIBERATELY UNFILTERED (#3378). An early draft gated this on engine state,
+  // which broke the max-loss backstop for any position whose bookkeeping was
+  // lost (a restart with a stale state file would have left a -10% loser
+  // unmanaged for two scans). Safety exits run on whatever the account truly
+  // holds; the foreign-book problem this draft chased is handled UPSTREAM — the
+  // bridge account pin refuses the wrong account's book outright, and the
+  // foreign-snapshot tell stands the whole scan down before this function runs.
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) >= 1);
   if (!longs.length) return;
 
@@ -1098,6 +1128,20 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   for (const [k, p] of Object.entries(heldPos)) {
     if (!(Number(heldQty[k]) > 0)) continue;
     if (_ourSyms.size && !_ourSyms.has(k)) continue;   // another engine's position
+    // ADOPTION DWELL (#3378). Being in the watchlist is not proof a position is
+    // ours: a foreign snapshot put GLD/TLT rows — another book's lots, other
+    // cost bases — into heldPos and they were adopted on sight. A symbol with no
+    // engine state must be seen held on two consecutive snapshots before this
+    // engine tracks (and therefore later manages or books) it. Our own entries
+    // carry state and are tracked immediately; a manual buy in our account is
+    // adopted one scan later than before.
+    const _stateful = _lastPos.has(k) || _entryAt.has(k) || _zoneLadder.has(k)
+      || _exitStatus.has(k) || _stopDistPct.has(k);
+    if (!_stateful) {
+      const _seen = (_seenStreak.get(k) || 0) + 1;
+      if (_seen < 2) { _seenStreak.set(k, _seen); continue; }
+    }
+    _seenStreak.delete(k);
     _lastPos.set(k, {
       qty: Number(p.qty) || 0,
       entry: p.avg_entry_price ?? p.avg_fill_price ?? null,
@@ -1105,6 +1149,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       ts: now,
     });
   }
+  // consecutive means CONSECUTIVE: a dwell candidate that skips a scan starts
+  // over — otherwise two one-off flap sightings days apart would sum to adoption.
+  for (const k of [..._seenStreak.keys()]) if (!(Number(heldQty[k]) > 0)) _seenStreak.delete(k);
 
   // ── External-close sweep: THE LOSS PATH ────────────────────────────────────────
   // Broker orders are fetched HERE (before the reconstruct loop) because the
@@ -1139,27 +1186,70 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // genuine simultaneous multi-symbol external close is vanishingly rare — real
   // stop fills arrive through _reconcileFills, which runs first and marks them.
   const _vanished = [..._lastPos.keys()].filter((k) => !(Number(heldQty[k]) > 0));
+  // FOREIGN-BOOK TELL (#3378, live 2026-08-19 17:26 ET). During IBKR's daily
+  // maintenance the gateway re-resolved "first discovered" and served the
+  // OVERNIGHT book — 7 rows including an options leg — to this engine for two
+  // minutes. The 2026-08-13 heuristic below (vanished>=3 && vanished>rows)
+  // missed it because the alien snapshot was BIG: 3 vanished against 7 rows.
+  // The tell that survives both shapes: several tracked positions gone WHILE
+  // several rows appear that this engine has no state for. A legit mass
+  // stop-out has only the first half; a legitimately growing book only the
+  // second.
+  const _knownSym = (k) => _lastPos.has(k) || _entryAt.has(k) || _zoneLadder.has(k)
+    || _exitStatus.has(k) || _stopDistPct.has(k);
+  const _foreignRows = snapshotForeignRows(positions, _knownSym);
+  const _snapshotForeign = _vanished.length >= 2 && _foreignRows >= 2;
   const _snapshotSuspect = !_positionsOk
     || (positions.length === 0 && _lastPos.size > 0)
-    || (_vanished.length >= 3 && _vanished.length > positions.length);
+    || (_vanished.length >= 3 && _vanished.length > positions.length)
+    || _snapshotForeign;
+  if (_snapshotForeign) {
+    // The FOREIGN shape is the only suspect flavor where NOTHING in the snapshot
+    // can be trusted — not the sweep, not 'already long', not the exit loops
+    // (this is the scan that tried to trailing-stop XMMO, a position this engine
+    // never owned). Stand the whole scan down, same contract as a failed fetch.
+    // Real fills were already reconciled above (they come from orders, not this
+    // snapshot); broker-side protective stops keep guarding the real book. The
+    // OTHER suspect flavors (empty book, mass-vanish) keep their 2026-08-13
+    // behavior — sweep deferred, scan continues — because an empty-but-honest
+    // book must still clear exit freezes and manage what remains.
+    out.skipped.push({ symbol: '*', why: `foreign snapshot: ${_vanished.length} tracked position(s) absent while ${_foreignRows} unrecognised row(s) appeared — standing down this scan` });
+    logTrade({ event: 'skip', symbol: '*', reason: `foreign snapshot: ${_vanished.length} tracked absent, ${_foreignRows} unrecognised rows — standing down this scan` });
+    out.reason = 'position snapshot looks like another account\'s book — standing down this scan (never trade blind)';
+    return out;
+  }
   if (_snapshotSuspect && _vanished.length) {
-    out.skipped.push({ symbol: '*', why: `external-close sweep deferred: ${_vanished.length} position(s) absent from a ${_positionsOk ? positions.length + '-row' : 'FAILED'} snapshot — treating as unreadable, not closed` });
+    out.skipped.push({ symbol: '*', why: `external-close sweep deferred: ${_vanished.length} position(s) absent from a ${_positionsOk ? positions.length + '-row' : 'FAILED'} snapshot (${_foreignRows} foreign row(s)) — treating as unreadable, not closed` });
   }
   for (const sym of (_snapshotSuspect ? [] : [..._lastPos.keys()])) {
-    if (Number(heldQty[sym]) > 0) continue;           // still held → nothing to reconcile
-    if (exclude.has(sym)) { _lastPos.delete(sym); continue; }  // another engine owns it
+    if (Number(heldQty[sym]) > 0) { _absentStreak.delete(sym); continue; }           // still held → nothing to reconcile
+    if (exclude.has(sym)) { _lastPos.delete(sym); _absentStreak.delete(sym); continue; }  // another engine owns it
+    // An absence that is EXPLAINED needs no second read and no reconstruction:
+    // our own exit already produced a row (this must catch every status — an
+    // exit logged as needs_confirmation/dry_run is still a row, and
+    // reconstructing on top of one produced two rows for one SHOP position),
+    // and a broker fill reconciled this cycle is authoritative and priced at
+    // the fill (reconstructing over it is the QQQ double-count of 2026-08-07).
+    // Acknowledge these immediately, exactly as before #3378.
+    if (_exitStatus.has(sym) || (_filledSyms && _filledSyms.has(sym))) {
+      _lastPos.delete(sym);
+      _absentStreak.delete(sym);
+      continue;
+    }
+    // TWO CONSECUTIVE ABSENCES (#3378) — for the INFERENCE path only. One
+    // missing read is a data point, not a close: single-read absences booked
+    // three still-held positions as closed on 2026-08-19. A real stop-out still
+    // books — one scan later — which delays the post-stop cooldown by that same
+    // scan and changes nothing else.
+    const _miss = (_absentStreak.get(sym) || 0) + 1;
+    if (_miss < 2) {
+      _absentStreak.set(sym, _miss);
+      out.skipped.push({ symbol: sym, why: 'absent from one snapshot — awaiting a second consecutive absence before booking an external close' });
+      continue;
+    }
+    _absentStreak.delete(sym);
     const snap = _lastPos.get(sym) || {};
     _lastPos.delete(sym);
-    // Our own exit already produced a row — don't double-count it. This must catch
-    // EVERY status, not just the confirmed ones: an exit logged as
-    // needs_confirmation/dry_run is still a row in the ledger, and reconstructing on
-    // top of it produced two rows for one SHOP position. The presence of a status at
-    // all means we decided (and logged) an exit for this symbol.
-    if (_exitStatus.has(sym)) continue;
-    // A real broker fill was reconciled for this symbol this cycle — that row is
-    // authoritative and priced at the fill. Reconstructing from a mark on top of
-    // it is exactly the double-count that logged QQQ twice on 2026-08-07.
-    if (_filledSyms && _filledSyms.has(sym)) continue;
     const entry = Number(snap.entry);
     const mark = Number(snap.mark);
     const qty = Number(snap.qty);
@@ -2150,4 +2240,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

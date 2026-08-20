@@ -106,6 +106,8 @@ class TradingAPIBridge {
     if (!client) return null;                 // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return null;
+    // #3378: equity from the wrong account would size positions off another book.
+    this._assertPinnedAccount(status, 'an account/equity read');
     const summary = await client.getAccountSummary(status.accountId);
     if (!summary) return null;
     const { equity, cash, buyingPower, unrealizedPnl, realizedPnl: summaryRpl } = summary;
@@ -145,6 +147,12 @@ class TradingAPIBridge {
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
     if (!status.connected) return null;
+    // #3378: never place an order into an account this engine is not pinned to.
+    const _pin = this._pinnedAccount();
+    if (_pin && status.accountId && String(status.accountId) !== _pin) {
+      const reason = `ibkr account mismatch: gateway is serving ${status.accountId} but this engine is pinned to ${_pin} — refusing to place orders into another account`;
+      return { status: 'error', order_id: null, ticker, side, qty, type: type || 'market', dry: false, reason, error: reason, source: 'ibkr-cpapi' };
+    }
     // Crypto pairs (BTCUSD/ETHUSD/SOLUSD…) don't trade through this path: IBKR's
     // hosted crypto (Paxos) requires cash-quantity orders on a US crypto-enabled
     // account, and the share-quantity order path here doesn't support it. Fail with
@@ -277,6 +285,26 @@ class TradingAPIBridge {
   /**
    * Open positions from the IBKR gateway (CPAPI). Returns [] when disconnected.
    */
+  /** ACCOUNT PIN (#3378, live 2026-08-19 17:26 ET). The OAuth consumer can see
+   *  more than one paper account, and ibkr-cpapi resolves "first discovered"
+   *  when nothing is configured. During IBKR's daily maintenance the accounts
+   *  list came back reordered, the client silently repinned to the OVERNIGHT
+   *  book's account, and for two minutes this engine read — and booked five
+   *  phantom exits against — another engine's book, including an attempted sell
+   *  of a position it never owned. With TRADER_IBKR_ACCOUNT (or IBKR_ACCOUNT_ID)
+   *  set, any read or order against a different account is refused loudly; the
+   *  engine's never-trade-blind path turns that refusal into a stood-down scan.
+   */
+  _pinnedAccount() {
+    return (process.env.TRADER_IBKR_ACCOUNT || process.env.IBKR_ACCOUNT_ID || '').trim() || null;
+  }
+  _assertPinnedAccount(status, what) {
+    const pin = this._pinnedAccount();
+    if (pin && status && status.accountId && String(status.accountId) !== pin) {
+      throw new Error(`ibkr account mismatch: gateway is serving ${status.accountId}, this engine is pinned to ${pin} — refusing ${what}`);
+    }
+  }
+
   async getIBKRPositions(userId) {
     return this._cached('pos:' + userId, 4000, () => this._getIBKRPositionsRaw(userId));
   }
@@ -285,6 +313,7 @@ class TradingAPIBridge {
     if (!client) return [];                   // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return [];
+    this._assertPinnedAccount(status, 'a positions read');
     const positions = await client.getPositions(status.accountId);
     return positions.map((p) => {
       const qty = Number(p.qty) || 0;
@@ -316,6 +345,7 @@ class TradingAPIBridge {
     if (!client) return [];
     const status = await client.getStatus();
     if (!status.connected) return [];
+    this._assertPinnedAccount(status, 'an open-orders read');   // #3378: alien order ids must never reach a cancel loop
     return client.getLiveOrders();
   }
 
