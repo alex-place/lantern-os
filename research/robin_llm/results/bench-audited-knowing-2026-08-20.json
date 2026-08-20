@@ -1,0 +1,424 @@
+{
+  "goal": "detect when a language model is answering beyond what it knows, from its own activations, cheaply enough to run on every token in production",
+  "malformed": 0,
+  "lit": {
+    "relevant": [
+      {
+        "id": "2608.18597",
+        "title": "Off-Manifold Collapse in Guided Protein Language Models",
+        "published": "2026-08",
+        "snippet": "Protein language models are widely used priors for protein sequence design, and a growing body of work controls them at inference time as an alternative to fine-tuning. Such guidance faces a dilemma: mild enough to preserve natural activation statistics, it barely moves the property; strong enough to move it, the generations become progressively harder to fold. We show the failure has a specific a…",
+        "url": "https://arxiv.org/abs/2608.18597",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2604.22271",
+        "title": "How LLMs Detect and Correct Their Own Errors: The Role of Internal Confidence Signals",
+        "published": "2026-04",
+        "snippet": "Large language models can detect their own errors and sometimes correct them without external feedback, but the underlying mechanisms remain unknown. We investigate this through the lens of second-order models of confidence from decision neuroscience. In a first-order system, confidence derives from the generation signal itself and is therefore maximal for the chosen response, precluding error det…",
+        "url": "https://arxiv.org/abs/2604.22271",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2605.29652",
+        "title": "Think Fast, Talk Smart: Partitioning Deterministic and Neural Computation for Structured Health Text Generation",
+        "published": "2026-05",
+        "snippet": "Large language models (LLMs) are increasingly being used to generate health text from structured records such as wearable time series, biomarkers, vitals, and care-management logs. For recurring health outputs, fluency is not enough: systems must remain faithful to source data, ground explanatory claims in available evidence, follow stated policies, emit machine-readable outputs, and run cheaply e…",
+        "url": "https://arxiv.org/abs/2605.29652",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2607.11414",
+        "title": "Confidently Wrong: Detecting Hallucinations in Financial Question Answering from LLM Internal States",
+        "published": "2026-07",
+        "snippet": "Large language models (LLMs) in financial applications fail most consequentially when they are confidently wrong. Hedged, uncertain answers invite scrutiny, whereas confident errors silently degrade downstream decisions without warning. We ask how reliably such confidently wrong answers, or confident hallucinations, can be detected from a model's internal activations, and whether those activations…",
+        "url": "https://arxiv.org/abs/2607.11414",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2608.19147",
+        "title": "Pre-Compiled Pipeline Shards for Distributed LLM Inference on Intel AI PC Fleets",
+        "published": "2026-08",
+        "snippet": "Modern Intel AI PCs ship capable integrated GPUs and NPUs with 16+ GB of unified memory, and they spend considerable time idle. That is not enough memory to fit a large model such as a 70B-parameter LLM. We show that a handful of AIPCs, working together over an ordinary network, can serve models beyond the capability of any single one. We use pipeline parallelism: a model is split by layer into pe…",
+        "url": "https://arxiv.org/abs/2608.19147",
+        "primary_category": "cs.DC"
+      },
+      {
+        "id": "2608.09643",
+        "title": "Activation Probes Surface Code-Security Signals that the Model's Output Misses",
+        "published": "2026-08",
+        "snippet": "AI coding agents now write a growing share of production code, and human security review does not scale at the rate code is generated. The agents in widest use are closed-weight, so a deploying team cannot read their internals. It can instead run an open-weight model as a reviewer over the agent's output. That reviewer's activations are readable. We ask whether reading those activations recovers a…",
+        "url": "https://arxiv.org/abs/2608.09643",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2509.23510",
+        "title": "Model Consistency as a Cheap yet Predictive Proxy for LLM Elo Scores",
+        "published": "2025-09",
+        "snippet": "New large language models (LLMs) are being released every day. Some perform significantly better or worse than expected given their parameter count. Therefore, there is a need for a method to independently evaluate models. The current best way to evaluate a model is to measure its Elo score by comparing it to other models in a series of contests - an expensive operation since humans are ideally re…",
+        "url": "https://arxiv.org/abs/2509.23510",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.14795",
+        "title": "Individual Disempowerment through an Advice Channel: Control Loss when Influence is Endogenous",
+        "published": "2026-08",
+        "snippet": "An AI that can only give advice seems safe: the human is always free to ignore it. That is the premise of the boxing tradition in AI safety, and its long-suspected weak point is that the human who reads the answers is part of the system. We make the fraction $\\varepsilon_t$ of behavior that follows the advice a state of a Markov decision process, moved by the advisor's own messages, so that use de…",
+        "url": "https://arxiv.org/abs/2608.14795",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2511.13240",
+        "title": "Knowing What You Know Is Not Enough: Large Language Model Confidences Don't Align With Their Actions",
+        "published": "2025-11",
+        "snippet": "Large language models (LLMs) are increasingly deployed in agentic and multi-turn workflows where they are tasked to perform actions of significant consequence. In order to deploy them reliably and manage risky outcomes in these settings, it is helpful to access model uncertainty estimates. However, confidence elicitation methods for LLMs are typically not evaluated directly in agentic settings; in…",
+        "url": "https://arxiv.org/abs/2511.13240",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2603.10781",
+        "title": "Taking Shortcuts for Categorical VQA Using Super Neurons",
+        "published": "2026-03",
+        "snippet": "Sparse Attention Vectors (SAVs) have emerged as an excellent training-free alternative to supervised finetuning or low-rank adaptation to improve the performance of Vision Language Models (VLMs). At their heart, SAVs select a few accurate attention heads for a task of interest and use them as classifiers, rather than relying on the model's prediction. In a similar spirit, we find that directly pro…",
+        "url": "https://arxiv.org/abs/2603.10781",
+        "primary_category": "cs.CV"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2608.10760",
+        "title": "A Gateway Architecture for Enterprise MCP Authentication: Unifying Heterogeneous Auth, Identity Delegation, and the User / Non-User Persona Problem",
+        "published": "2026-08",
+        "snippet": "The Model Context Protocol (MCP) has become the de-facto interface for connecting LLM agents to enterprise tools, and adoption has been explosive: within a year, large organizations went from zero to dozens of internally built MCP servers. That speed created a governance crisis. Each team implemented authentication independently -- some with no auth, some with API keys, some with full OAuth -- pro…",
+        "url": "https://arxiv.org/abs/2608.10760",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2608.10694",
+        "title": "Optimize Cheap, Deploy Strong: Cost-Aware Cross-Tier Transfer for Evolutionary Optimization",
+        "published": "2026-08",
+        "snippet": "Evolutionary optimization of LLM prompts and agentic programs (e.g., GEPA) is dominated by fitness evaluation: scoring each candidate runs an answering LLM over a validation set, so the evaluator's price tier dictates total search cost. We restructure that search by decoupling the three roles an LLM plays, running the high-volume answering role on the cheapest tier, reserving a strong model for th…",
+        "url": "https://arxiv.org/abs/2608.10694",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2608.01033",
+        "title": "CallScreenBench: Benchmarking On-Device Models as Phone Secretaries",
+        "published": "2026-08",
+        "snippet": "Language models small enough to run on a handset, quantized to a few bits, are increasingly capable of acting for their user, making on-device task automation newly plausible. One such task is answering the phone. A phone secretary takes an unknown inbound call on its owner's behalf. Unlike the agents evaluated by most benchmarks, it has no task to complete and no cooperative user: the caller hold…",
+        "url": "https://arxiv.org/abs/2608.01033",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2608.04066",
+        "title": "The LLM Proposes, the Executive Disposes: A Self-Verifying Agent Instrument that Dissociates Commitment Drift from Binding Drift in Long-Horizon Agents",
+        "published": "2026-08",
+        "snippet": "How do you verify a long-horizon agent when its own state and self-reports are exactly what you cannot trust? We present an agent instrument built so that verification is structural rather than post-hoc. A deterministic Executive owns all belief; a language model may only file typed proposals, and a claim is admitted only when a prediction pre-registered before acting is matched against observatio…",
+        "url": "https://arxiv.org/abs/2608.04066",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.11698",
+        "title": "REOPD: Reliability-Adaptive Reward Extrapolation for On-Policy Distillation",
+        "published": "2026-08",
+        "snippet": "On-policy distillation (OPD) trains a student on its own trajectories under dense token-level supervision from a teacher. Reward-extrapolation methods such as ExOPD amplify the teacher-reference log-likelihood ratio to move beyond direct imitation, but apply a single global coefficient $λ$ to every token. This can drive the student to fit extreme peaks in the implicit reward, causing reward hackin…",
+        "url": "https://arxiv.org/abs/2608.11698",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2608.16970",
+        "title": "Probing the Prefill: Detecting Code Vulnerabilities via Latent Activations",
+        "published": "2026-08",
+        "snippet": "LLM-based code generation is now embedded in mission-critical pipelines, but defenses against vulnerable output remain post-hoc -- static analyzers, fine-tuned classifiers, or an LLM judge that screen completed code, ignoring the generating model's own internal state. We test a narrower, directly measurable question: when an LLM reads a piece of C/C++ code as context, do its hidden activations alr…",
+        "url": "https://arxiv.org/abs/2608.16970",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2608.07126",
+        "title": "PHOENIX: Fine-Tuned SLM-Powered Autonomous Satellite Lifetime Extension via Predictive Self-Healing and Multi-Agent AI Recovery",
+        "published": "2026-08",
+        "snippet": "Most CubeSats, small and low-cost satellites roughly the size of a shoebox, do not survive as long as they were designed to: a study of 178 missions found that only 48-65% remain operational after two years, against a designed lifetime of 2-5 years. The deeper issue is that a CubeSat in low Earth orbit (LEO) is physically unreachable from the ground for roughly 85 minutes out of every 96-minute or…",
+        "url": "https://arxiv.org/abs/2608.07126",
+        "primary_category": "cs.HC"
+      },
+      {
+        "id": "2607.06601",
+        "title": "TriRoute: Unified Learned Routing for Joint Adaptive Attention, Experts, and KV-Cache Allocation",
+        "published": "2026-07",
+        "snippet": "Conditional computation can decouple language model quality from per-token inference cost, yet leading techniques act on a single axis in isolation: Mixture-of-Experts (MoE) sparsifies the FFN, Mixture-of-Depths (MoD) skips whole transformer blocks, and KV-cache quantization compresses attention memory. We argue these three decisions (attention resolution, expert selection, and cache bit-width) ar…",
+        "url": "https://arxiv.org/abs/2607.06601",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "pairs": 28,
+  "sham_rank": 7,
+  "of": 8,
+  "sham_control_held": true,
+  "audit": {
+    "counts": {
+      "ANSWERED-HERE": 2,
+      "UNVERIFIED": 5
+    },
+    "controls": {
+      "plants": [
+        {
+          "plant": "restatement",
+          "verdict": "RESTATES",
+          "pass": true,
+          "why": "The idea matches exactly the title and abstract of paper 2608.18597 on Off-Manifold Collapse in Guided Protein Language Models."
+        },
+        {
+          "plant": "answered-here",
+          "verdict": "ANSWERED-HERE",
+          "pass": true,
+          "why": "Our prior work trained linear probes on mid-layer hidden states to detect hallucination with high AUROC on Ouro model."
+        }
+      ],
+      "trusted": true
+    }
+  },
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.518,
+      "wins": 7,
+      "comparisons": 7,
+      "title": "Lightweight Probe Training on Frozen Activations",
+      "mechanism": "Train a small classifier on frozen activations from a mid-layer to predict hallucination at token level, testing if cheap probes can detect errors",
+      "experiment": "Train and evaluate probe on held-out hallucination-labeled data, measure accuracy and inference overhead",
+      "falsifier": "Probe accuracy near random or too costly for per-token production use",
+      "needs": "GPU for probe training, hallucination-labeled data, coding time",
+      "cost": "low",
+      "review": "MECHANISM:  \nTraining a lightweight probe on frozen mid-layer activations leverages the model’s internal representations, which may encode signals about uncertainty or hallucination before the final output is produced. Because the probe is small and uses frozen activations, it can run efficiently on every token without retraining the full model, enabling cheap, token-level hallucination detection in production.\n\nEVIDENCE:  \nSeveral papers support this approach. [3] shows hidden states contain signals useful for streaming moderation via lightweight probes. [2] and [6] demonstrate hallucination and confident error detection from internal activations. [7] confirms that token- and layer-selective probes can classify outputs efficiently in a single pass. None report prohibitive costs or lack of signal in frozen activations, supporting feasibility.\n\nWHAT WOULD FALSIFY IT:  \nIf probes trained on frozen mid-layer activations fail to predict hallucinations better than chance or uncertainty baselines, especially at token granularity, this would falsify the claim. Also, if the probe’s predictions lag behind or do not correlate with actual hallucinations, it would show the internal activations lack reliable early signals.\n\nRISK:  \nOptimizing probe accuracy on a benchmark might encourage overfitting to superficial activation patterns that correlate with hallucinations but do not generalize, causing false alarms or missed errors in deployment. This could degrade user trust or system safety despite improved headline detection metrics.",
+      "citations": [
+        "2608.16970",
+        "2512.20949",
+        "2606.10487",
+        "2507.12379",
+        "2509.03531",
+        "2607.11414",
+        "2601.13288",
+        "2603.12270"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "ANSWERED-HERE",
+        "evidence": "experiments/sigma0_hneurons_probe.py",
+        "why": "Probe training on frozen activations to predict hallucination at token level was measured by H-Neurons probe in sigma0_hneurons_probe.py.",
+        "web_queries": [
+          "lightweight probe training hallucination detection frozen activations",
+          "token-level hallucination prediction small classifier frozen layer activations"
+        ],
+        "trusted": true
+      }
+    },
+    {
+      "rank": 2,
+      "strength": 0.2603,
+      "wins": 6,
+      "comparisons": 7,
+      "title": "Activation Confidence as Hallucination Signal",
+      "mechanism": "Use internal token-level logits entropy and select neuron activations as confidence proxies, hypothesizing low entropy and distinct activations correlate with factual answers",
+      "experiment": "Measure correlation between entropy/activation patterns and ground-truth hallucination labels on benchmark datasets",
+      "falsifier": "No significant correlation or predictive power of activations over simple entropy baseline",
+      "needs": "GPU for inference on benchmark sets, labeled hallucination data, coding time",
+      "cost": "medium",
+      "review": "MECHANISM:  \nActivation Confidence as a hallucination signal could work because low entropy in token-level logits suggests the model is confident and decisive, while distinct neuron activations may reflect well-learned, factual knowledge patterns. Together, these internal signals might correlate with when the model is generating reliable content versus uncertain or fabricated text, enabling cheap, token-level detection without costly sampling or external checks.\n\nEVIDENCE:  \n[3] supports the idea that activation patterns correlate with entity familiarity and factual reliability, indicating internal signals can predict hallucination risk. [6] shows LLMs have internal confidence signals related to error detection, aligning with the entropy proxy. [2] suggests confidence can be estimated early in decoding, though it focuses on output-level signals rather than activations. Other papers like [1], [4], and [5] discuss neuron-level probes and activation patterns but do not directly validate entropy or activation confidence as hallucination detectors. Overall, evidence is suggestive but indirect.\n\nWHAT WOULD FALSIFY IT:  \nIf low entropy and distinct neuron activations frequently occur during confidently wrong or hallucinated outputs, or if high entropy appears during correct answers, this would break the assumed correlation. Also, if activation patterns fail to generalize across domains or model scales, the mechanism would be invalidated.\n\nRISK:  \nOptimizing for low entropy or distinct activations might encourage the model to be overconfident or produce safe but generic answers, reducing factual richness. It could also mask subtle hallucinations that do not trigger entropy spikes, giving a false sense of reliability and degrading real-world trustworthiness despite improved headline detection metrics.",
+      "citations": [
+        "2607.00158",
+        "2605.05166",
+        "2607.07670",
+        "2603.10195",
+        "2511.21610",
+        "2604.22271",
+        "2511.13240",
+        "2607.02423"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "ANSWERED-HERE",
+        "evidence": "experiments/sigma0_hneurons_probe.py",
+        "why": "Measured neuron activations as hallucination proxies, testing if specific neurons predict hallucination on our models.",
+        "web_queries": [
+          "activation entropy as hallucination signal in LLMs",
+          "neuron activation confidence hallucination detection"
+        ],
+        "trusted": true
+      }
+    },
+    {
+      "rank": 3,
+      "strength": 0.0695,
+      "wins": 4,
+      "comparisons": 7,
+      "title": "Layerwise Activation Divergence for Out-of-Knowledge Detection",
+      "mechanism": "Compare activation distributions at each transformer layer for in-distribution vs hallucinated tokens, expecting divergence to spike when model hallucinates",
+      "experiment": "Compute KL divergence of activations between known and hallucinated tokens across layers, test if divergence predicts hallucination",
+      "falsifier": "No consistent divergence pattern or predictive signal emerges across layers",
+      "needs": "GPU for activation extraction, hallucination-labeled data, coding time",
+      "cost": "medium",
+      "review": "MECHANISM:  \nLayerwise Activation Divergence (LAD) could work because hallucinated tokens may trigger atypical internal activations compared to in-distribution tokens. By measuring divergence in activation distributions at each transformer layer, the model might detect when it ventures beyond learned knowledge, as unusual activations signal uncertainty or error. This leverages the model’s own internal signals without external checks, potentially enabling cheap, token-level detection.\n\nEVIDENCE:  \nNone of the retrieved papers directly validate LAD for out-of-knowledge detection. Paper [4] discusses activation distribution shifts for out-of-distribution detection but highlights instability and failure modes, suggesting challenges in reliably using activation divergences. Paper [3] proposes real-time hallucination detection but does not focus on layerwise activation divergence. Other papers address quantization, concept activations, or architectural changes unrelated to this mechanism.\n\nWHAT WOULD FALSIFY IT:  \nIf activation divergences at intermediate layers do not consistently spike or correlate with hallucinated tokens—i.e., if hallucinations occur without measurable divergence or if divergence spikes occur for correct tokens—this would falsify the claim. Also, if the divergence metric is too noisy or computationally expensive to run per token, it would undermine practical utility.\n\nRISK:  \nOptimizing for LAD divergence spikes might encourage the model to produce less confident but still incorrect outputs, artificially inflating detection metrics while missing subtle hallucinations. It could also increase false positives, causing unnecessary intervention or degraded user experience, thus improving headline detection rates but worsening overall system reliability.",
+      "citations": [
+        "2509.23729",
+        "2512.05038",
+        "2509.03531",
+        "2604.08572",
+        "2605.06216",
+        "2608.18597",
+        "2604.21215",
+        "2605.21333"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed papers or prior work measure layerwise activation distribution divergence for hallucination detection as described.",
+        "web_queries": [
+          "layerwise activation divergence hallucination detection transformer",
+          "activation distribution out-of-knowledge detection large language models"
+        ],
+        "trusted": true
+      }
+    },
+    {
+      "rank": 4,
+      "strength": 0.0695,
+      "wins": 4,
+      "comparisons": 7,
+      "title": "Prefix-Conditioned Activation Variance Reduction for Confidence",
+      "mechanism": "Model activations become less variable when confident; hallucinations show higher variance conditioned on prefix context.",
+      "experiment": "Measure activation variance across multiple stochastic forward passes per token; test if low variance predicts factual tokens.",
+      "falsifier": "Activation variance does not differ meaningfully between hallucinated and factual tokens.",
+      "needs": "Multiple forward passes per token, GPU time, hallucination-labeled data, coding time.",
+      "cost": "high",
+      "review": "MECHANISM:  \nThe idea is that when a model is confident, its internal activations stabilize, showing less variance conditioned on the prefix context. Conversely, hallucinations or uncertain outputs cause more erratic activations, reflecting internal conflict or guesswork. Measuring activation variance per token could thus serve as a cheap, intrinsic confidence signal without external calibration or additional models.\n\nEVIDENCE:  \n[1] supports the general notion that internal activations correlate with confidence and can detect hallucinations, though it focuses on financial QA and uses more complex signals than simple variance. [4] discusses internal confidence signals but not specifically variance reduction. [7] and [8] highlight the challenge of detecting confident errors but do not validate variance as a reliable metric. Overall, none directly confirm that prefix-conditioned activation variance reduction alone is a robust, generalizable confidence measure.\n\nWHAT WOULD FALSIFY IT:  \nIf confident hallucinations occur with low activation variance, or if correct, uncertain answers show high variance, the correlation breaks down. Also, if variance fluctuates due to unrelated factors (e.g., token frequency, syntax complexity) rather than confidence, the method fails as a reliable detector.\n\nRISK:  \nOptimizing for low activation variance might encourage the model to produce bland, overconfident outputs that appear stable internally but are factually wrong, masking hallucinations. This could improve detection metrics superficially while degrading real-world reliability and trustworthiness.",
+      "citations": [
+        "2607.11414",
+        "2608.18597",
+        "2511.13240",
+        "2604.22271",
+        "2507.18122",
+        "2606.29090",
+        "2606.02289",
+        "2606.09876"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed papers or prior work measure or apply prefix-conditioned activation variance reduction for confidence as described.",
+        "web_queries": [
+          "prefix-conditioned activation variance confidence hallucination detection",
+          "activation variance reduction model confidence hallucination"
+        ],
+        "trusted": true
+      }
+    },
+    {
+      "rank": 5,
+      "strength": 0.0363,
+      "wins": 3,
+      "comparisons": 7,
+      "title": "Cross-Model Activation Consistency Check",
+      "mechanism": "Run same prompt on two different LLMs, measure cosine similarity of their internal activations token-wise; hypothesis: hallucinations cause activation disagreement",
+      "experiment": "Quantify activation similarity on tokens labeled hallucinated vs factual, test if low similarity predicts hallucination",
+      "falsifier": "Activation similarity does not differ significantly between hallucinated and factual tokens",
+      "needs": "Access to two LLMs (local + frontier API), GPU/cloud for inference, coding time",
+      "cost": "medium",
+      "review": "MECHANISM:  \nComparing internal activations of two different LLMs on the same prompt token-by-token could reveal divergence when one model hallucinates. The intuition is that hallucinations reflect internal uncertainty or off-distribution reasoning, causing activation patterns to deviate. Cosine similarity of activations acts as a cheap proxy for agreement in internal feature space, potentially flagging tokens where the models \"disagree\" on the latent representation of the next token.\n\nEVIDENCE:  \n[7] shows that different LLMs often share interaction patterns predicting the same token, supporting the idea that consistent activations correlate with agreement. [3] demonstrates that internal activations can detect confident hallucinations within a single model, but cross-model checks are not directly tested. Other papers focus on activation geometry or embedding similarity but do not directly validate cross-model activation consistency as a hallucination detector. Overall, partial support exists but no direct evidence for this exact mechanism.\n\nWHAT WOULD FALSIFY IT:  \nIf hallucinations occur without significant divergence in activation similarity between models, or if models disagree internally on non-hallucinated tokens as much as on hallucinated ones, the method fails. Also, if activation similarity correlates poorly with hallucination labels or is dominated by architectural differences rather than semantic errors, the approach is invalidated.\n\nRISK:  \nThis method could improve detection metrics by flagging tokens where models differ due to architectural or training differences unrelated to hallucination, causing false positives. It might suppress valid novel or creative outputs that differ legitimately, reducing system utility despite better headline hallucination scores. Running two models doubles compute, challenging the \"cheap\" requirement.",
+      "citations": [
+        "2607.04222",
+        "2608.11027",
+        "2607.11414",
+        "2608.18597",
+        "2606.27242",
+        "2606.02289",
+        "2606.08129",
+        "2608.10216"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed paper or prior work measures cross-model token-wise activation similarity to detect hallucinations.",
+        "web_queries": [
+          "cross-model activation similarity hallucination detection",
+          "token-wise internal activation comparison large language models hallucination"
+        ],
+        "trusted": true
+      }
+    },
+    {
+      "rank": 6,
+      "strength": 0.0363,
+      "wins": 3,
+      "comparisons": 7,
+      "title": "Attention Head Sparsity Shift as Hallucination Marker",
+      "mechanism": "Hallucinations cause redistribution of attention weights, increasing sparsity in certain heads as model guesses.",
+      "experiment": "Compute per-head attention sparsity metrics token-wise; test if increased sparsity correlates with hallucinated tokens.",
+      "falsifier": "No consistent increase in attention sparsity during hallucinated token generation.",
+      "needs": "GPU for inference, access to attention weights, hallucination-labeled data, coding time.",
+      "cost": "medium",
+      "review": "**MECHANISM:**  \nHallucinations may arise when the model relies more on internal priors than on input context, causing attention to concentrate narrowly in certain heads. This would increase sparsity as those heads focus on fewer tokens, reflecting uncertainty or guesswork. Tracking shifts in attention sparsity per head could thus serve as a cheap, token-level signal that the model is \"hallucinating\" or extrapolating beyond its knowledge.\n\n**EVIDENCE:**  \n[1] shows that spatial credit collapse leads to concentrated activations causing hallucinations in vision-language models, supporting the idea that attention patterns shift during hallucination. [2] discusses head importance and gating but finds raw attention weights alone are insufficient to reflect token contribution, suggesting attention sparsity might be an incomplete marker. Other papers focus on related but distinct mechanisms or detection methods ([5], [6]). Overall, direct evidence that attention head sparsity reliably signals hallucination in LLMs is limited or indirect.\n\n**WHAT WOULD FALSIFY IT:**  \nIf hallucinations occur without any consistent increase in attention sparsity in specific heads, or if attention sparsity fluctuates similarly during both factual and hallucinated outputs, the mechanism would be invalidated. Also, if sparsity changes are not predictive of hallucination at token-level granularity, the approach fails.\n\n**RISK:**  \nOptimizing for attention sparsity shifts might encourage the model to produce less sparse but still hallucinated outputs, masking errors. It could also lead to false positives where normal uncertainty triggers sparsity changes, causing unnecessary intervention or degraded fluency, thus improving detection metrics without reducing actual hallucination rates.",
+      "citations": [
+        "2602.22469",
+        "2509.06596",
+        "2512.22212",
+        "2602.09297",
+        "2605.07209",
+        "2511.11087",
+        "2602.17526",
+        "2607.24017"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed papers or our prior work measure or analyze attention head sparsity shifts as hallucination markers.",
+        "web_queries": [
+          "attention head sparsity hallucination detection",
+          "hallucination markers in transformer attention patterns"
+        ],
+        "trusted": true
+      }
+    },
+    {
+      "rank": 7,
+      "strength": 0.0025,
+      "wins": 0,
+      "comparisons": 7,
+      "title": "KV-Cache Activation Norm Drop as Out-of-Knowledge Indicator",
+      "mechanism": "When model guesses beyond knowledge, key-value cache activations norm drops due to weaker retrieval signals.",
+      "experiment": "Track KV-cache activation norms per token during generation; test if norm drops predict hallucinations on held-out prompts.",
+      "falsifier": "KV-cache norms do not differ significantly between hallucinated and factual tokens.",
+      "needs": "Access to KV-cache activations, GPU inference, labeled hallucination data, coding time.",
+      "cost": "medium",
+      "review": "**MECHANISM:**  \nThe idea is that when a model ventures beyond its knowledge, the attention mechanism retrieves less relevant or weaker signals from the KV cache, causing the norm (magnitude) of key-value activations to drop. This drop could serve as a cheap, token-level indicator of uncertainty or hallucination, since lower activation norms might reflect weaker contextual grounding or less confident retrieval from past tokens.\n\n**EVIDENCE:**  \nNone of the retrieved papers directly test or support the claim that KV cache activation norms correlate with out-of-knowledge or hallucination detection. Most focus on compression [1,3,7], efficient caching or eviction [6,8], or structural properties of attention heads [4]. Paper [5] discusses numerical divergence in KV caching but not activation norms as uncertainty signals. Thus, no direct empirical or theoretical support is found.\n\n**WHAT WOULD FALSIFY IT:**  \nIf empirical measurement shows that KV cache activation norms remain stable or even increase when the model generates hallucinated or unsupported content, or if norm drops occur equally during confident, in-knowledge responses, this would falsify the mechanism. Also, if norm changes correlate more with input length or token frequency than knowledge boundaries, the hypothesis fails.\n\n**RISK:**  \nRelying on norm drops might improve a proxy metric (e.g., flagging more tokens as uncertain) without actually detecting true knowledge gaps, leading to false positives or negatives. This could degrade user trust or cause unnecessary fallback behaviors, while masking deeper failure modes not captured by simple norm statistics.",
+      "citations": [
+        "2608.07915",
+        "2607.24555",
+        "2604.15356",
+        "2603.13314",
+        "2604.15409",
+        "2606.29563",
+        "2605.22269",
+        "2602.10238"
+      ],
+      "grounded": true,
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed papers or prior work measure KV-cache activation norm drops as OOK indicators; no matching mechanism found.",
+        "web_queries": [
+          "KV cache activation norm drop out-of-knowledge detection",
+          "LLM key-value cache activation norm hallucination indicator"
+        ],
+        "trusted": true
+      }
+    }
+  ],
+  "wall_s": 114
+}

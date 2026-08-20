@@ -18,6 +18,8 @@ const assays = require(path.join(R, "assays"));
 const pipeline = require(path.join(R, "pipeline"));
 const agents = require(path.join(R, "agents"));
 const bench = require(path.join(R, "bench"));
+const novelty = require(path.join(R, "novelty"));
+const priorwork = require(path.join(R, "priorwork"));
 
 // Tests are queued and awaited: an async assertion invoked without await is a test that cannot
 // fail, which is worse than no test.
@@ -171,6 +173,56 @@ ok("near-duplicate ideas are collapsed, so a restated idea cannot vote for itsel
                                          "Test-Time Depth-Entropy Sampling on Small Models"), true);
   assert.strictEqual(bench.nearDuplicate("Verification-Refinement Loop on 135M Model",
                                          "Sparse Activation Routing with Small MoE"), false);
+});
+
+// ── the novelty audit: the failure it exists to prevent ──────────────────────────────────
+ok("the audit has no verdict that means 'novel'", () => {
+  // On 2026-08-20 two ideas were called novel because the local corpus retrieved nothing, and a
+  // single web search killed both. Silence is not evidence, so there is nothing to say it with.
+  for (const v of novelty.VERDICTS) {
+    assert.ok(!/novel|original|new/i.test(v), `verdict "${v}" would let silence read as novelty`);
+  }
+  assert.ok(novelty.VERDICTS.includes("UNVERIFIED"));
+});
+
+ok("the prior-work index finds what the red team found by hand", () => {
+  const cases = [
+    ["train a small classifier on frozen activations to predict hallucination per token", /hneurons|probe/i],
+    ["generate multiple reasoning chains then rerank with a lightweight scorer to select the best", /rerank/i],
+    ["hidden state surprise canary versus logprob gate for routing which items to ground", /canary|surprise/i],
+  ];
+  for (const [q, want] of cases) {
+    const hits = priorwork.search(q, 5);
+    assert.ok(hits.length, `no repo hit at all for: ${q}`);
+    assert.ok(hits.some((h) => want.test(h.file)), `expected ${want} in: ${hits.map((h) => h.file).join(", ")}`);
+  }
+});
+
+ok("the prior-work index reports nothing rather than noise for work we have never done", () => {
+  const hits = priorwork.search("crystallography diffraction refinement of small molecule unit cells", 5);
+  assert.ok(hits.length === 0 || hits.every((h) => h.score >= priorwork.FLOOR),
+            "anything returned must clear the relevance floor");
+});
+
+ok("stemming is what stops a plural from costing a prior-art hit", () => {
+  assert.strictEqual(priorwork.stem("reranking"), priorwork.stem("rerank"));
+  assert.strictEqual(priorwork.stem("activations"), priorwork.stem("activation"));
+});
+
+ok("the audit's own controls are what make its verdicts mean anything", async () => {
+  // A stub auditor that always answers UNVERIFIED must be caught by the plants, not trusted.
+  const blind = async () => JSON.stringify({ verdict: "UNVERIFIED", evidence: "", why: "stub", web_queries: ["q"] });
+  const shown = [{ id: "2601.00001", title: "A Paper About Something", snippet: "x".repeat(200) }];
+  const c = await novelty.runControls(shown, { llm: blind });
+  assert.strictEqual(c.trusted, false, "an auditor that never finds prior art must not be trusted");
+  assert.ok(c.plants.some((p) => p.plant === "restatement" && !p.pass));
+});
+
+ok("an unparseable audit reply degrades to UNVERIFIED with queries, never to a novelty claim", async () => {
+  const junk = async () => "I think this is probably new!";
+  const r = await novelty.auditIdea({ title: "T", mechanism: "M" }, { llm: junk }, []);
+  assert.strictEqual(r.verdict, "UNVERIFIED");
+  assert.ok(r.web_queries.length > 0, "an unverified idea must carry the searches that would settle it");
 });
 
 ok("the bench sham is inert and cannot be mistaken for a real proposal", () => {

@@ -39,7 +39,8 @@ async function main() {
   const t0 = Date.now();
   const result = await bench.millIdeas(goal, {
     n, seed: Number(arg("seed", 1)),
-    log: (stage, data) => console.log(`  [${stage}] ${JSON.stringify(data)}`),
+    audit: !process.argv.includes("--no-audit"),
+    log: (stage, data) => console.log(`  [${stage}] ${JSON.stringify(data).slice(0, 190)}`),
   });
   if (!result.ideas.length) {
     console.error("no parseable ideas were produced");
@@ -58,6 +59,10 @@ async function main() {
     console.log(`${String(i.rank).padStart(2)}. [${(i.cost || "?").padEnd(6)}] ${i.title}${i.grounded ? "" : "  (ungrounded)"}`);
   }
   console.log(`\nsham placed ${result.sham_rank} of ${result.of} — ${result.sham_control_held ? "control held" : "CONTROL FAILED, ignore the order"}`);
+  if (result.audit) {
+    console.log(`novelty audit ${result.audit.controls.trusted ? "trusted" : "UNTRUSTED (its controls failed)"}: ` +
+      Object.entries(result.audit.counts).map(([k, v]) => `${v} ${k}`).join(", "));
+  }
   console.log(`-> ${base}.md  (${wall}s)`);
 }
 

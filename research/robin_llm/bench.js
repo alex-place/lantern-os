@@ -23,6 +23,7 @@
 // keyword-dense papers.
 
 const btl = require("./btl");
+const novelty = require("./novelty");
 const agents = require("./agents");
 
 const SHAM = {
@@ -183,6 +184,20 @@ async function millIdeas(goal, opts = {}) {
 
   const shamRank = ranked.order.findIndex((r) => r.item.sham) + 1;
   log("ranked", { pairs: ranked.pairs, sham_rank: shamRank, of: pool.length });
+
+  // THE NOVELTY AUDIT. Runs after ranking so it cannot perturb the measured ordering: an idea is
+  // ranked on merit, then labelled with whether anyone has already done it. Opt out with
+  // {audit:false} -- but a list with no audit is a list of ideas nobody checked.
+  let ideasOut = ranked.order.filter((r) => !r.item.sham).map((r, i) => ({
+    rank: i + 1, strength: Number(r.strength.toFixed(4)), wins: r.wins, comparisons: r.comparisons, ...r.item,
+  }));
+  let auditReport = null;
+  if (opts.audit !== false) {
+    const shownPapers = [...lit.relevant, ...lit.recent];
+    auditReport = await novelty.audit(ideasOut, { llm, shown: shownPapers, log });
+    ideasOut = auditReport.ideas;
+  }
+
   return {
     goal,
     malformed: parsed.malformed,
@@ -191,9 +206,8 @@ async function millIdeas(goal, opts = {}) {
     sham_rank: shamRank,
     of: pool.length,
     sham_control_held: shamRank > Math.ceil(pool.length / 2),
-    ideas: ranked.order.filter((r) => !r.item.sham).map((r, i) => ({
-      rank: i + 1, strength: Number(r.strength.toFixed(4)), wins: r.wins, comparisons: r.comparisons, ...r.item,
-    })),
+    audit: auditReport ? { counts: auditReport.counts, controls: auditReport.controls } : null,
+    ideas: ideasOut,
   };
 }
 
@@ -211,6 +225,21 @@ function renderMarkdown(result, meta = {}) {
     : `**SHAM CONTROL FAILED.** An inert proposal placed ${result.sham_rank} of ${result.of}. The `
       + `ranking below is measuring plausibility, not merit — read the ideas, ignore the order.`;
   L.push(c);
+  if (result.audit) {
+    const c = result.audit.counts;
+    const labels = Object.entries(c).map(([k, v]) => `${v} ${k}`).join(", ");
+    L.push("");
+    L.push(result.audit.controls.trusted
+      ? `**Novelty audit ran** and both of its own controls passed (a planted restatement was `
+        + `caught, a planted already-answered idea was caught): ${labels}.`
+      : `**NOVELTY AUDIT UNTRUSTED.** Its controls failed `
+        + `(${result.audit.controls.plants.map((p) => `${p.plant}:${p.verdict}`).join(", ")}), so the `
+        + `verdicts below mean nothing. Treat every idea as unchecked.`);
+    L.push("");
+    L.push(`No verdict below says "novel", because nothing here can establish that. \`UNVERIFIED\` `
+         + `means the local corpus and our own notebook did not match it — the same silence that, `
+         + `read as novelty on 2026-08-20, produced two recommendations a single web search killed.`);
+  }
   const ungrounded = result.ideas.filter((i) => !i.grounded).length;
   L.push("");
   L.push(`Corpus: ${result.lit.available ? `${result.lit.pool} papers retrieved, `
@@ -226,6 +255,12 @@ function renderMarkdown(result, meta = {}) {
     L.push("");
     L.push(`**Cost:** ${i.cost || "unstated"} · **BTL strength** ${i.strength} (${i.wins}/${i.comparisons} pairwise wins)`
          + (i.grounded ? "" : " · **ungrounded — no supporting paper retrieved**"));
+    if (i.audit) {
+      L.push("");
+      L.push(`**Prior art: ${i.audit.verdict}**`
+           + (i.audit.evidence ? ` — \`${i.audit.evidence}\`` : "")
+           + (i.audit.why ? `. ${i.audit.why}` : ""));
+    }
     L.push("");
     L.push(`**Mechanism.** ${i.mechanism}`);
     L.push("");
@@ -245,6 +280,22 @@ function renderMarkdown(result, meta = {}) {
       L.push(i.review);
       L.push("");
       L.push("</details>");
+    }
+  }
+  const unverified = result.ideas.filter((i) => i.audit && i.audit.verdict === "UNVERIFIED");
+  if (unverified.length) {
+    L.push("");
+    L.push("---");
+    L.push("");
+    L.push("## Verify before starting");
+    L.push("");
+    L.push(`${unverified.length} idea(s) matched nothing locally. That is not novelty — it is an `
+         + `unanswered question. Run these searches first; if any comes back with the same `
+         + `mechanism, the idea is a port, not a discovery.`);
+    for (const i of unverified) {
+      L.push("");
+      L.push(`**${i.rank}. ${i.title}**`);
+      for (const q of i.audit.web_queries || []) L.push(`- \`${q}\``);
     }
   }
   L.push("");
