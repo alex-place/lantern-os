@@ -120,6 +120,12 @@
      the combinations was wrong: `body.leftdock-closed` and `body.ticket-closed` have equal
      specificity, so with both set the later rule won and re-expanded the left column --
      closing the chat left its 360px behind. Per-flag variables cannot collide. */
+  /* One header language for every panel chrome. Before this the dock headers, the
+     bottom tab strip, the account summary and the in-panel section labels each had
+     their own padding (10 / 12 / 16px) and type scale, so nothing lined up across
+     the surfaces. Tabs stay a touch larger than labels because they are hit targets,
+     but everything shares the same rhythm, colour and border. */
+  :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
   :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,320px)}
   .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
@@ -147,8 +153,8 @@
 
   .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
   .dock-panel[hidden]{display:none}
-  .dock-head{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);flex:0 0 auto}
-  .dock-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);flex:1}
+  .dock-head{display:flex;align-items:center;gap:8px;padding:var(--hdr-py) var(--hdr-px);border-bottom:1px solid var(--border);flex:0 0 auto;min-height:30px}
+  .dock-title{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);flex:1}
   .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
   .dock-x:hover{color:var(--text0);background:var(--bg3)}
   .dock-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
@@ -264,18 +270,18 @@
   .dsel-pop{min-width:170px}
   /* Alert dialog -- a real modal, centred, with the reference's label/field rows. */
   /* Alerts in the rail: a single stack sized for a ~320px column. */
-  .al-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .al-bar{display:flex;align-items:center;gap:8px;padding:8px var(--hdr-px);border-bottom:1px solid var(--border)}
   .al-new{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);
     font-family:var(--mono);font-size:11.5px;padding:6px 8px;cursor:pointer}
   .al-new:hover{background:var(--bg3);color:var(--text0);border-color:var(--accent)}
   .al-count{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
-  .al-deliv{display:flex;align-items:center;gap:7px;padding:8px 10px 4px;font-size:12px;color:var(--text1)}
-  .al-sec{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  .al-deliv{display:flex;align-items:center;gap:7px;padding:8px var(--hdr-px) 4px;font-size:12px;color:var(--text1)}
+  .al-sec{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);padding:10px var(--hdr-px) 4px;
     color:var(--text2);padding:10px 10px 4px;border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
-  .al-pad{padding:0 10px 4px}
-  .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px 10px 10px;margin:0}
+  .al-pad{padding:0 var(--hdr-px) 4px}
+  .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px var(--hdr-px) 10px;margin:0}
   .al-link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
-  .al-item{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px 10px;
+  .al-item{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px var(--hdr-px);
     border-bottom:1px solid rgba(255,255,255,.03)}
   .al-item:hover{background:var(--bg2)}
   .al-item.off{opacity:.55}
@@ -287,7 +293,7 @@
   .al-item-act button{width:22px;height:22px;background:none;border:0;border-radius:4px;color:var(--text2);
     font-size:10px;cursor:pointer;line-height:1}
   .al-item-act button:hover{color:var(--text0);background:var(--bg3)}
-  .al-fire{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .al-fire{padding:5px var(--hdr-px);border-bottom:1px solid rgba(255,255,255,.03)}
   .al-fire-when{display:block;font-family:var(--mono);font-size:9.5px;color:var(--text2)}
   .al-fire-msg{display:block;font-size:11.5px;color:var(--text1);line-height:1.4;white-space:normal}
   .al-teaser{padding:12px 10px;font-size:12px;line-height:1.55;color:var(--text1)}
@@ -422,13 +428,13 @@
   .main{grid-column:3;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
   .footer{position:relative;grid-column:3;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
-  .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
+  .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:9px var(--hdr-px);border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
   .tp-stat .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text0)}
   .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
-  .tp-tabs{display:flex;gap:2px;padding:6px 12px 0;border-bottom:1px solid var(--border);overflow-x:auto}
-  .tp-tab{font-family:var(--mono);font-size:12px;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;padding:6px 12px 8px;cursor:pointer;white-space:nowrap}
+  .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;min-height:30px;align-items:stretch}
+  .tp-tab{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--hdr-fg);background:none;border:none;border-bottom:2px solid transparent;padding:0 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:color .12s,border-color .12s}
   .tp-tab:hover{color:var(--text1)}
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
   .tp-badge{font-size:11px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
@@ -512,7 +518,7 @@
      signal on a tight second line. */
   /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
      right-aligned tracks so figures line up down the whole list. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;padding:6px 10px;min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -532,11 +538,11 @@
     grid-template-columns:18px minmax(44px,1fr) 66px 58px 56px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
-       runtime because the width differs by platform and by overlay-scrollbar setting. */
-    padding:6px calc(10px + var(--wl-sb, 0px)) 5px 10px;
+       runtime because the width differs by platform and overlay-scrollbar setting. */
+    padding:var(--hdr-py) calc(var(--hdr-px) + var(--wl-sb, 0px)) 5px var(--hdr-px);
     background:var(--bg1);border-bottom:1px solid var(--border)}
-  .wl-h-sym{grid-column:2;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--text2)}
-  .wl-h-num{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--text2);text-align:right}
+  .wl-h-sym{grid-column:2;font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg)}
+  .wl-h-num{font-family:var(--mono);text-transform:uppercase;font-size:var(--hdr-size);letter-spacing:var(--hdr-track);color:var(--hdr-fg);text-align:right}
   /* Symbol, then any signal marker, in ONE grid cell -- a seventh child in a five-track
      grid was wrapping to its own line and making every row three lines tall. */
   .wl-symcell{display:flex;align-items:center;gap:5px;min-width:0}
