@@ -39,8 +39,17 @@ async function main() {
   });
   const wall = Math.round((Date.now() - t0) / 1000);
   if (!r.ideas.length) {
-    console.log(`\nNOTHING SURVIVED: ${r.placed || 0} of ${r.proposed || 0} proposals were already done.`);
-    console.log(`That is a result, not a failure -- it is what "the mill does not invent" looks like.`);
+    // Two very different endings, and the first version printed the flattering one for both.
+    const proposed = r.proposed || 0;
+    if (!proposed) {
+      console.error(`\nTHE GENERATOR RETURNED NOTHING USABLE across ${r.perRound.length} round(s) `
+        + `(malformed ${r.malformed}, no-difference ${r.no_difference}, evasion ${r.evasion}, `
+        + `no-effect ${r.no_effect}). That is a FAILED RUN, not a finding -- check the empty_reply `
+        + `lines above for what actually came back.`);
+      process.exit(1);
+    }
+    console.log(`\nNOTHING SURVIVED: ${r.placed} of ${proposed} proposals were already done.`);
+    console.log(`That is a result -- it is what "the mill does not invent" looks like.`);
     process.exit(0);
   }
   const dir = path.join(__dirname, "results");

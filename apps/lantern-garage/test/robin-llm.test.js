@@ -29,7 +29,19 @@ let passed = 0;
 const queue = [];
 function ok(name, fn) { queue.push([name, fn]); }
 async function runAll() {
-  for (const [name, fn] of queue) { await fn(); passed++; console.log(`  ok  ${name}`); }
+  // Name the failing test. A suite that reports only "0 !== 1" costs more to diagnose than it
+  // saves -- measured, twice, on this file.
+  for (const [name, fn] of queue) {
+    try {
+      await fn();
+    } catch (e) {
+      e.message = `${name}
+      ${e.message}`;
+      throw e;
+    }
+    passed++;
+    console.log(`  ok  ${name}`);
+  }
 }
 
 // ── 1. BTL ────────────────────────────────────────────────────────────────────────────────
@@ -222,7 +234,9 @@ ok("the audit's own controls are what make its verdicts mean anything", async ()
 
 ok("an unparseable audit reply degrades to UNVERIFIED with queries, never to a novelty claim", async () => {
   const junk = async () => "I think this is probably new!";
-  const r = await novelty.auditIdea({ title: "T", mechanism: "M" }, { llm: junk }, []);
+  // web:false keeps this offline -- the claim under test is the PARSE failure path, and a test
+  // that quietly hits four scholarly APIs is not a unit test.
+  const r = await novelty.auditIdea({ title: "T", mechanism: "M" }, { llm: junk, web: false }, []);
   assert.strictEqual(r.verdict, "UNVERIFIED");
   assert.ok(r.web_queries.length > 0, "an unverified idea must carry the searches that would settle it");
 });
@@ -321,9 +335,14 @@ ok("an idea that cannot say what it is NOT is rejected before ranking, and count
   // Restatements arrive without a difference. bench.js milled 16 ideas and 0 were unencumbered;
   // requiring the generator to name its closest prior work is the cheapest filter for that.
   const lines = [
+    // Carries the technical fields too: the contract gained them when "improves reasoning" was
+    // ruled out, so an idea without them is no longer valid regardless of its difference.
     JSON.stringify({ title: "a", mechanism: "m", experiment: "e", falsifier: "f", needs: "n",
                      cost: "low", closest_prior: "X et al",
-                     difference: "reads the signal at a different stage, before decoding rather than after" }),
+                     difference: "reads the signal at a different stage, before decoding rather than after",
+                     technical_problem: "verification doubles decode latency",
+                     technical_means: "score the layer-14 residual instead of decoding twice",
+                     technical_effect: "cuts verifier calls by ~40% at equal pass@1" }),
     JSON.stringify({ title: "b", mechanism: "m", closest_prior: "Y", difference: "better" }),
     JSON.stringify({ title: "c", mechanism: "m" }),
     "{broken",
@@ -346,6 +365,11 @@ ok("rephrasing a rejected proposal is caught as evasion, not counted as a gap", 
     experiment: "e", falsifier: "f", needs: "n", cost: "low",
     closest_prior: "Epistemic-Controller-Gated Curriculum for Small Models",
     difference: "gates per step rather than per curriculum stage, a finer granularity of control",
+    // Technical fields present so this isolates the EVASION check: without them the idea would
+    // be rejected for having no measurable effect and the test would pass for the wrong reason.
+    technical_problem: "curriculum gating wastes forward passes on already-mastered steps",
+    technical_means: "gate per step on the controller's own boundary signal",
+    technical_effect: "removes ~25% of training steps at equal held-out accuracy",
   });
   const blocked = gapmill.parseIdeas(line, collisions);
   assert.strictEqual(blocked.ideas.length, 0);
@@ -384,6 +408,44 @@ ok("diversity is measured, because optimising novelty collapses onto one theme",
   assert.ok(a > b, `permutations of one theme must score less diverse: ${a} vs ${b}`);
   assert.ok(gapmill.diversity(same).repeated.length > 0, "the repeated words must be named, not just counted");
   assert.strictEqual(gapmill.diversity([{ title: "x", mechanism: "y" }]).mean_overlap, null);
+});
+
+ok("a technical effect is a number with a unit, or it is not an improvement", () => {
+  // "Improves reasoning" is unfalsifiable and is what the worst-ranked ideas in every run were
+  // made of. It is also the exact register that fails subject-matter tests: an abstract idea on a
+  // general-purpose computer is not a technical improvement however novel it is.
+  const base = { mechanism: "m", experiment: "e", falsifier: "f", needs: "n", cost: "low",
+                 closest_prior: "X et al 2025",
+                 difference: "reads the signal at a different stage of the pipeline entirely",
+                 technical_problem: "the verifier doubles decode latency",
+                 technical_means: "read the layer-14 residual instead of decoding twice" };
+  const mk = (title, technical_effect) => JSON.stringify({ ...base, title, technical_effect });
+  const lines = [
+    mk("quantified", "cuts verifier calls by ~40% at equal pass@1"),
+    mk("vague", "improves reasoning and robustness substantially"),
+    mk("unitless", "reduces it a lot, by 40"),
+  ].join(String.fromCharCode(10));
+  const p = gapmill.parseIdeas(lines, []);
+  assert.deepStrictEqual(p.ideas.map((i) => i.title), ["quantified"]);
+  assert.strictEqual(p.no_effect, 2, "both the vague and the unitless claim must be counted, not dropped");
+});
+
+ok("the patent leg exists, because none of the paper legs can see patents", () => {
+  // First patent query on our own goal returned Microsoft's "Detecting hallucination in a language
+  // model" (US20240419912A1) -- prior art squarely on list B that arXiv, OpenAlex and OpenReview
+  // between them never surfaced.
+  assert.strictEqual(typeof websearch.googlepatents, "function");
+});
+
+ok("an empty generator reply is distinguishable from a fussy filter", async () => {
+  // A run that returns nothing parsed AND nothing rejected has FAILED; a run where everything was
+  // rejected has a finding. The first version of the CLI printed the flattering message for both.
+  const empty = gapmill.parseIdeas("", []);
+  assert.strictEqual(empty.ideas.length + empty.malformed + empty.no_difference
+                     + empty.evasion + empty.no_effect, 0,
+                     "an empty reply must leave every counter at zero -- that is the signature");
+  const rejected = gapmill.parseIdeas(JSON.stringify({ title: "t", mechanism: "m" }), []);
+  assert.ok(rejected.no_difference > 0, "a rejected idea moves a counter, which is what tells them apart");
 });
 
 ok("there is a VAGUE sham, because 'not in the literature' is trivially achieved by nonsense", () => {

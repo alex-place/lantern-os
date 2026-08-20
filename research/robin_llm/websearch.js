@@ -14,6 +14,17 @@
 //                    filter, not `search`: plain search is citation-weighted and returned YOLOv10
 //                    for a hallucination-detection query, while the filter returned exactly one
 //                    result and it was the right one.
+//   Google Patents   THE PATENT LITERATURE, which none of the paper legs can see and which is
+//                    where a large part of applied ML actually lands. First query on our own
+//                    goal returned four granted/published patents on LLM hallucination detection
+//                    that arXiv, OpenAlex and OpenReview between them never surfaced.
+//                    CAVEAT, stated because it is load-bearing: this is the undocumented XHR
+//                    endpoint Google Patents' own front end calls, not a published API. It has no
+//                    stability guarantee and its terms are not the terms of a research API. It is
+//                    used here at low volume with the same politeness gap as everything else, and
+//                    it should be replaced by EPO OPS -- documented, free, worldwide -- the moment
+//                    someone registers the key (scripts/patent_harvest.py is written and waiting;
+//                    F:/patent-corpus currently holds 22 documents from one seed file).
 //   OpenReview       conference submissions under review, which neither of the above can see.
 //                    Added after an audited run left "Modular Verification Head Addition" as
 //                    UNVERIFIED with 40 arXiv and 16 OpenAlex hits searched -- while UHeads, an
@@ -235,6 +246,49 @@ async function openreview(query, k = 5) {
   return { ok: true, reason: "", hits, rung: hits.length ? Math.min(...hits.map((h) => h.rung)) : 0 };
 }
 
+function stripHtml(s) { return String(s).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); }
+
+async function googlepatentsOnce(query, k) {
+  await polite("googlepatents");
+  return get(`https://patents.google.com/xhr/query?url=${encodeURIComponent(`q=${query}&num=${k}`)}`);
+}
+
+async function googlepatents(query, k = 5) {
+  // Patent titles are terse and claim-shaped, so the phrase rung rarely hits; the distinctive
+  // pairs do most of the work here.
+  const ladder = [query, ...distinctivePairs(query, 2).map(([a, b]) => `"${a} ${b}"`)];
+  const hits = [];
+  const seen = new Set();
+  let anyOk = false;
+  let lastStatus = "no-response";
+  for (let i = 0; i < ladder.length; i++) {
+    const r = await googlepatentsOnce(ladder[i], k);
+    lastStatus = r.status;
+    if (r.status !== 200) continue;
+    anyOk = true;
+    try {
+      const j = JSON.parse(r.body);
+      for (const cluster of (j.results && j.results.cluster) || []) {
+        for (const row of cluster.result || []) {
+          const pt = row.patent || {};
+          const id = pt.publication_number || row.id;
+          const title = stripHtml(pt.title);
+          if (!id || !title || seen.has(id)) continue;
+          seen.add(id);
+          hits.push({ source: "patent", id, title,
+                      year: String(pt.grant_date || pt.publication_date || "").slice(0, 4),
+                      abstract: stripHtml(pt.snippet || pt.abstract || "").slice(0, 300),
+                      venue: pt.assignee || "", rung: i });
+        }
+      }
+    } catch (e) {
+      return { ok: false, reason: `patents parse: ${e.message}`, hits, rung: i };
+    }
+  }
+  if (!anyOk) return { ok: false, reason: `patents ${lastStatus}`, hits: [], rung: 0 };
+  return { ok: true, reason: "", hits, rung: hits.length ? Math.min(...hits.map((h) => h.rung)) : 0 };
+}
+
 async function openalexOnce(query, k) {
   await polite("openalex");
   return get(`https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)}`
@@ -273,18 +327,27 @@ async function openalex(query, k = 5) {
 
 // One query across both legs. Returns hits plus WHICH LEGS ACTUALLY RAN -- the audit must be able
 // to tell "searched and found nothing" apart from "did not search".
+// The cache key carries the LEG SET. Adding the patent leg made every stored entry a record of a
+// search that no longer exists -- and searchAll then read r.legs.patent off an entry written
+// before that leg had a name, which threw. A cache that outlives a change in what is cached is a
+// correctness bug, not a stale-data inconvenience.
+const LEGS = ["arxiv", "openalex", "openreview", "patent"];
+const CACHE_VERSION = LEGS.join("+");
+
 async function search(query, k = 5) {
-  const key = `${query}::${k}`;
+  const key = `${CACHE_VERSION}::${query}::${k}`;
   const c = cache();
   if (c[key]) return c[key];
-  const [a, o, v] = [await arxiv(query, k), await openalex(query, k), await openreview(query, k)];
+  const [a, o, v, g] = [await arxiv(query, k), await openalex(query, k),
+                        await openreview(query, k), await googlepatents(query, k)];
   const out = {
     query,
     legs: { arxiv: { ok: a.ok, reason: a.reason, n: a.hits.length, rung: a.rung },
             openalex: { ok: o.ok, reason: o.reason, n: o.hits.length, rung: o.rung },
-            openreview: { ok: v.ok, reason: v.reason, n: v.hits.length, rung: v.rung } },
-    searched: a.ok || o.ok || v.ok,
-    hits: [...a.hits, ...o.hits, ...v.hits],
+            openreview: { ok: v.ok, reason: v.reason, n: v.hits.length, rung: v.rung },
+            patent: { ok: g.ok, reason: g.reason, n: g.hits.length, rung: g.rung } },
+    searched: a.ok || o.ok || v.ok || g.ok,
+    hits: [...a.hits, ...o.hits, ...v.hits, ...g.hits],
   };
   c[key] = out;
   saveCache();
@@ -292,23 +355,23 @@ async function search(query, k = 5) {
 }
 
 async function searchAll(queries, k = 5) {
-  const legs = { arxiv: { ok: false, n: 0 }, openalex: { ok: false, n: 0 }, openreview: { ok: false, n: 0 } };
+  const legs = Object.fromEntries(LEGS.map((l) => [l, { ok: false, n: 0 }]));
   const seen = new Set();
   const hits = [];
   for (const q of queries.slice(0, 3)) {
     const r = await search(q, k);
-    for (const leg of ["arxiv", "openalex", "openreview"]) {
-      legs[leg].ok = legs[leg].ok || r.legs[leg].ok;
-      legs[leg].n += r.legs[leg].n;
+    for (const leg of LEGS) {
+      const got = r.legs[leg] || { ok: false, n: 0 };   // an entry from an older leg set
+      legs[leg].ok = legs[leg].ok || got.ok;
+      legs[leg].n += got.n;
     }
     for (const h of r.hits) {
       const id = `${h.source}:${h.id || h.title}`;
       if (!seen.has(id)) { seen.add(id); hits.push(h); }
     }
   }
-  return { queries: queries.slice(0, 3), legs,
-           searched: legs.arxiv.ok || legs.openalex.ok || legs.openreview.ok, hits };
+  return { queries: queries.slice(0, 3), legs, searched: LEGS.some((l) => legs[l].ok), hits };
 }
 
-module.exports = { search, searchAll, arxiv, openalex, openreview, arxivQueries, openalexQueries, distinctivePairs,
+module.exports = { search, searchAll, arxiv, openalex, openreview, googlepatents, LEGS, arxivQueries, openalexQueries, distinctivePairs,
                    _setFetch, _resetFetch, REQUEST_GAP, CACHE };

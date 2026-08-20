@@ -54,6 +54,22 @@
 // among the ideas themselves -- precisely because optimising novelty collapses onto one theme.
 // So diversity is measured and reported here, and a run that produces six permutations of one
 // asset is called what it is.
+//
+// TECHNICAL IMPROVEMENT, ARTICULATED. Every idea must now state a technical problem, the specific
+// technical means, and a MEASURABLE technical effect -- a number with a unit, not "better
+// reasoning". Two reasons, and only one of them is about patents:
+//
+//   Engineering: "improves reasoning" is unfalsifiable and it is what the ideas that scored worst
+//   in every run were made of. A stated effect in ms, MB, tokens or points is a claim reality can
+//   refuse, which is the bar everything else in this directory is held to.
+//
+//   Subject matter: an abstract idea implemented on a general-purpose computer is not patentable
+//   in the US regardless of novelty (the Alice problem), and the EPO requires technical character.
+//   "Train a classifier on signal X" sits squarely in that hole; "reduce verification latency by N
+//   ms at fixed accuracy by reading signal X at layer L instead of decoding twice" does not. This
+//   does NOT make an idea patentable -- novelty over prior art is a separate bar this mill has
+//   never once cleared -- it makes the idea ARTICULATE about what it improves, which is a
+//   precondition for that conversation and good engineering either way.
 
 const btl = require("./btl");
 const novelty = require("./novelty");
@@ -87,11 +103,23 @@ const VAGUE_SHAM = {
 };
 
 const FIELDS = ["title", "mechanism", "experiment", "falsifier", "needs", "cost",
-                "closest_prior", "difference"];
+                "closest_prior", "difference",
+                "technical_problem", "technical_means", "technical_effect"];
+
+// A technical effect is a number with a unit. This is the cheapest possible check for it, and it
+// rejects exactly the register that produced the worst-ranked ideas in every previous run:
+// "improves reasoning", "enhances robustness", "boosts efficiency".
+const HAS_QUANTITY = /\d/;
+const UNITS = /\b(ms|milliseconds?|seconds?|s\b|MB|GB|VRAM|memory|tokens?|FLOPs?|%|percent|points?|pp|AUROC|accuracy|latency|throughput|calls?|x\b|fold)\b/i;
+
+function hasTechnicalEffect(o) {
+  const e = String(o.technical_effect || "");
+  return e.length > 20 && HAS_QUANTITY.test(e) && UNITS.test(e);
+}
 
 function parseIdeas(text, avoid = []) {
   const out = [];
-  let malformed = 0, no_difference = 0, evasion = 0;
+  let malformed = 0, no_difference = 0, evasion = 0, no_effect = 0;
   const body = String(text || "").replace(/```[a-zA-Z]*/g, "").trim();
   for (const line of body.split(/\r?\n/)) {
     const s = line.trim();
@@ -108,12 +136,14 @@ function parseIdeas(text, avoid = []) {
       // survivor named another survivor of the same run as its closest prior work, which is the
       // same dodge one level over.
       if (avoid.some((c) => nearDuplicate(c.title, String(o.closest_prior)))) { evasion++; continue; }
+      // No measurable technical effect: not an improvement, just an intention.
+      if (!o.technical_problem || !o.technical_means || !hasTechnicalEffect(o)) { no_effect++; continue; }
       const idea = {};
       for (const f of FIELDS) idea[f] = String(o[f] || "").slice(0, 900);
       out.push(idea);
     } catch { malformed++; }
   }
-  return { ideas: out, malformed, no_difference, evasion };
+  return { ideas: out, malformed, no_difference, evasion, no_effect };
 }
 
 // Mean pairwise vocabulary overlap across the surviving ideas. The established evaluation
@@ -204,12 +234,23 @@ async function genGap(llm, goal, lit, mine, axes, want, collisions, already) {
     + `Each must still be something reality could refuse: a concrete mechanism, a concrete `
     + `measurement, and a result that would kill it. Vagueness is not novelty -- an idea that `
     + `cannot be falsified will be discarded.\n\n`
+    + `EACH MUST ALSO BE A TECHNICAL IMPROVEMENT, stated as three things:\n`
+    + `  technical_problem - the concrete technical problem, in terms of a system limit: latency, `
+    + `memory, compute, throughput, or accuracy at a fixed budget. Not a business goal, not `
+    + `"models hallucinate".\n`
+    + `  technical_means   - the specific technical step that addresses it: which signal, read at `
+    + `which layer or stage, feeding which decision. Not "train a model on it".\n`
+    + `  technical_effect  - the improvement AS A NUMBER WITH A UNIT: ms, MB, VRAM, tokens, FLOPs, `
+    + `percentage points, AUROC, calls saved. "Improves reasoning" is rejected without being read; `
+    + `"cuts verifier calls by ~40% at equal pass@1" is accepted.\n\n`
     + `Output exactly ${want} lines, each ONE JSON object, no code fence, no other text, every `
     + `field under 45 words:\n`
     + `{"title":"...","mechanism":"why this changes the quantity","experiment":"what to run",`
     + `"falsifier":"the result that kills it","needs":"hardware, data, time",`
     + `"cost":"low|medium|high","closest_prior":"the nearest existing work, named",`
-    + `"difference":"what this does that the closest prior work does not"}`, 1800);
+    + `"difference":"what this does that the closest prior work does not",`
+    + `"technical_problem":"the system limit, concretely","technical_means":"the specific step",`
+    + `"technical_effect":"the improvement as a number with a unit"}`, 2400);
 }
 
 const PLACED = new Set(["RESTATES", "PORT", "ANSWERED-HERE", "REFUTED-HERE"]);
@@ -229,26 +270,39 @@ async function millGaps(goal, opts = {}) {
   const shown = [...lit.relevant, ...lit.recent];
   const kept = [];          // survived the audit unplaced
   const collisions = [];    // proposed and found to exist; fed back
-  let malformed = 0, no_difference = 0, evasion = 0;
+  let malformed = 0, no_difference = 0, evasion = 0, no_effect = 0;
   const perRound = [];
 
   for (let round = 1; round <= rounds && kept.length < n; round++) {
-    const want = Math.min(4, n - kept.length);
+    // TWO at a time, not four. bench.js learned this at six fields and this file has eleven:
+    // asking for four returned an empty reply on every round, which parses to zero ideas and
+    // zero malformed -- indistinguishable from "the model had nothing to say" until you print
+    // the raw reply. Fewer per call, more calls.
+    const want = Math.min(2, n - kept.length);
     const text = await genGap(llm, goal, lit, mine, axes.axes, want, collisions,
                               [...kept, ...collisions].map((i) => i.title));
     const got = parseIdeas(text, [...collisions, ...kept]);
     malformed += got.malformed;
     no_difference += got.no_difference;
     evasion += got.evasion;
+    no_effect += got.no_effect;
     const fresh = got.ideas.filter((i) => ![...kept, ...collisions].some((x) => nearDuplicate(x.title, i.title)));
     log("proposed", { round, parsed: got.ideas.length, malformed: got.malformed,
-                      no_difference: got.no_difference, evasion: got.evasion, fresh: fresh.length });
+                      no_difference: got.no_difference, evasion: got.evasion,
+                      no_effect: got.no_effect, fresh: fresh.length });
+    // Zero parsed AND zero rejected means nothing came back at all -- a failed call, not a
+    // fussy filter. Say so with the evidence, in the round it happens.
+    if (!got.ideas.length && !got.malformed && !got.no_difference && !got.evasion && !got.no_effect) {
+      log("empty_reply", { round, reply_chars: String(text || "").trim().length,
+                           head: String(text || "").trim().slice(0, 120) });
+    }
 
     let placedThisRound = 0;
     for (const idea of fresh) {
       const a = await novelty.auditIdea(idea, { llm }, shown);
       idea.audit = { verdict: a.verdict, evidence: a.evidence, why: a.why, web_queries: a.web_queries,
-                     web_searched: !!(a.web && a.web.searched), web_hits: a.web ? a.web.hits.length : 0 };
+                     web_searched: !!(a.web && a.web.searched), web_hits: a.web ? a.web.hits.length : 0,
+                     web_legs: a.web ? a.web.legs : null };
       if (PLACED.has(a.verdict)) {
         collisions.push({ title: idea.title, verdict: a.verdict, evidence: a.evidence });
         placedThisRound++;
@@ -261,7 +315,8 @@ async function millGaps(goal, opts = {}) {
   }
 
   if (!kept.length) {
-    return { goal, ideas: [], collisions, perRound, malformed, no_difference, evasion, lit, axes: axes.axes };
+    return { goal, ideas: [], collisions, perRound, malformed, no_difference, evasion, no_effect,
+             lit, axes: axes.axes };
   }
 
   // Reviews and ranking, with BOTH shams: the inert-plausible one bench.js uses, and a vague one
@@ -289,7 +344,7 @@ async function millGaps(goal, opts = {}) {
   const proposed = perRound.reduce((s, r) => s + r.proposed, 0);
   const placed = collisions.length;
   return {
-    goal, lit, axes: axes.axes, perRound, malformed, no_difference, evasion,
+    goal, lit, axes: axes.axes, perRound, malformed, no_difference, evasion, no_effect,
     diversity: diversity(kept),
     proposed, placed, placed_rate: proposed ? placed / proposed : null,
     collisions,

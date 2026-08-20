@@ -120,3 +120,39 @@ the assets exclusion list was built to produce.
 
 **Suggested verdict: worth one bounded day**, framed as "does market-implied uncertainty supervise
 a hidden-state probe better than the labels we already use", not as a discovery.
+
+---
+
+## Third review (same day): the four-leg mill with the technical gate
+
+`gapmill.js` now requires every idea to state a technical problem, specific means, and a
+MEASURABLE effect (a number with a unit), and the audit's live search includes a patent leg.
+Run on goal B: 8 proposed, 5 placed during milling, 3 survived. Hand review with live search:
+
+**1. Ledger-conditioned sparse activation sampling** — audit said `INCREMENTAL` vs our own
+`sigma0_hneurons_probe.py`, and that is right: it is a compute optimisation of our probe
+(read ~20% of neurons, chosen by ledger priors) with a stated effect (−75% read FLOPs at ≤2pt
+AUROC). Legitimate engineering ticket on our own stack. Not novel, plausibly worth a day.
+
+**2. Ledger-guided online calibration via trading-outcome feedback** — audit `UNVERIFIED` after
+155 hits. Hand search places the NEIGHBOURHOOD firmly: online recalibration is a known framework
+([1607.03594](https://arxiv.org/pdf/1607.03594)), verbalized-confidence calibration is settled
+([2305.14975](https://arxiv.org/abs/2305.14975)), and there is a **granted US patent on
+post-calibration of LLM confidence scoring**
+([US12032919](https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/12032919)) — found
+BY the hand search, which is exactly what the patent leg exists to surface. The unplaced residue
+is the same one as the second review: **live settled market/trading outcomes as the continuous
+ground-truth stream calibrating INTERNAL signals**. This family has now survived two independent
+mill runs and two hand reviews. Still not a novelty claim — but it is the only idea in 30+ milled
+that keeps surviving, and it survives because it needs our asset.
+
+**3. Cross-modal activation alignment** — audit `UNVERIFIED` after 134 hits; hand search places
+it in one query: [DHCP](https://arxiv.org/pdf/2411.18659) detects hallucinations from cross-modal
+attention patterns token-level; CLAP probes cross-layer activations; a full survey exists
+([2507.19024](https://arxiv.org/html/2507.19024v2)). **`PORT` at best.** Also the weakest fit for
+us: we serve no multimodal model in production.
+
+**Running tally: 30+ ideas milled, zero clear novelty claims.** One family (market-outcome
+supervision of internal signals) unplaced twice. The technical gate did its job visibly — every
+survivor states a falsifiable, unit-bearing effect, which is what turns even the non-novel ones
+into runnable engineering tickets rather than prose.

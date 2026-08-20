@@ -16,7 +16,7 @@
 //   REPO      priorwork.js over 432 experiment scripts, notes, ADRs and result files
 //   CORPUS    the local arXiv BM25 index
 //   SHOWN     the papers this very idea was generated from
-//   WEB       live arXiv API + OpenAlex + OpenReview, via websearch.js
+//   WEB       live arXiv API + OpenAlex + OpenReview + Google Patents, via websearch.js
 //
 // THE WEB LEG IS A SECOND PASS. The first judgement uses local evidence only. If it comes back
 // UNVERIFIED -- nothing here matched -- the queries it generated are actually run and the idea is
@@ -125,7 +125,7 @@ function block(c) {
     for (const p of c.shown) L.push(`  [${p.id}] ${p.title}`);
   }
   if (c.web && c.web.length) {
-    L.push("\nLIVE SEARCH OF arXiv, OpenAlex AND OpenReview FOR THIS IDEA:");
+    L.push("\nLIVE SEARCH OF arXiv, OpenAlex, OpenReview AND THE PATENT LITERATURE:");
     for (const h of webSlice(c.web, 21)) L.push(`  [${h.source}:${h.id}] (${h.year}) ${h.title}`);
   }
   return L.join("\n");
