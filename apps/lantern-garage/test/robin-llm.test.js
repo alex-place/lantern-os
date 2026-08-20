@@ -17,6 +17,7 @@ const btl = require(path.join(R, "btl"));
 const assays = require(path.join(R, "assays"));
 const pipeline = require(path.join(R, "pipeline"));
 const agents = require(path.join(R, "agents"));
+const bench = require(path.join(R, "bench"));
 
 // Tests are queued and awaited: an async assertion invoked without await is a test that cannot
 // fail, which is worse than no test.
@@ -135,6 +136,44 @@ ok("the noise band is computed from the run's own counts, not assumed", () => {
 ok("the sham candidate sets no knob, so it cannot accidentally be a real experiment", () => {
   assert.deepStrictEqual(pipeline.SHAM.params, {});
   assert.strictEqual(pipeline.SHAM.sham, true);
+});
+
+// ── the bench list: ideas for a human, which is where a pipeline flatters itself most ────
+ok("a bench idea needs a title AND a mechanism, and the rest are counted", () => {
+  const text = [
+    '{"title":"t","mechanism":"m","experiment":"e","falsifier":"f","needs":"n","cost":"low"}',
+    '{"title":"no mechanism"}',
+    "{broken",
+  ].join(String.fromCharCode(10));
+  const p = bench.parseIdeas(text);
+  assert.strictEqual(p.ideas.length, 1);
+  assert.strictEqual(p.malformed, 2);
+});
+
+ok("the bench sham is inert and cannot be mistaken for a real proposal", () => {
+  assert.strictEqual(bench.SHAM.sham, true);
+  assert.ok(/no change/i.test(bench.SHAM.falsifier), "an inert proposal's falsifier is 'nothing moves'");
+});
+
+ok("the rendered list says nothing has been run, and disowns its own order when the sham wins", () => {
+  const base = { goal: "g", pairs: 10, of: 4, lit: { available: true, pool: 9, relevant: 3, recent: 2 },
+                 ideas: [{ rank: 1, strength: 0.4, wins: 2, comparisons: 3, title: "T", mechanism: "M",
+                           experiment: "E", falsifier: "F", needs: "N", cost: "low", grounded: true, citations: ["2501.00001"] }] };
+  const held = bench.renderMarkdown({ ...base, sham_rank: 4, sham_control_held: true });
+  assert.ok(/NOTHING HERE HAS BEEN RUN/.test(held), "the banner is not optional");
+  assert.ok(/Sham control held/.test(held));
+  const failed = bench.renderMarkdown({ ...base, sham_rank: 1, sham_control_held: false });
+  assert.ok(/SHAM CONTROL FAILED/.test(failed) && /ignore the order/.test(failed),
+            "a failed control must disown the ranking, not bury the note");
+});
+
+ok("retrieval shows the generator both the most relevant and the most recent, without overlap", () => {
+  const r = bench.retrieve("long context sparse attention language model efficiency", 40);
+  if (!r.available) return;                    // no corpus on this machine: nothing to assert
+  const ids = new Set(r.relevant.map((p) => p.id));
+  assert.ok(r.recent.every((p) => !ids.has(p.id)), "the recent bucket must not repeat the relevant one");
+  const dates = r.recent.map((p) => String(p.published || ""));
+  assert.deepStrictEqual(dates, [...dates].sort().reverse(), "the recent bucket must be newest-first");
 });
 
 runAll().then(() => console.log(String.fromCharCode(10) + passed + " passed"))
