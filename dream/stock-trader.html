@@ -328,6 +328,11 @@
   .al-sym{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;
     border-radius:999px;background:var(--bg2);border:1px solid var(--border);
     font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--text0);letter-spacing:.02em}
+  .al-sym select{appearance:none;-webkit-appearance:none;background:transparent;border:0;
+    color:inherit;font:inherit;letter-spacing:inherit;cursor:pointer;padding:0 14px 0 0;outline:none;
+    background-image:url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23828a99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right center}
+  .al-sym:hover{border-color:var(--text2)}
   .al-sym i{width:20px;height:20px;border-radius:50%;background:var(--bg0);border:1px solid var(--border);
     display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:700;color:var(--text1)}
   .al-head .dock-x{margin-left:auto}
@@ -3263,14 +3268,21 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const risk = Math.abs(e0.price - st.price), reward = Math.abs(tg.price - e0.price);
               const rr = risk > 0 ? reward/risk : 0;
               const x1 = Math.min(e0.x, tg.x, st.x), x2 = Math.max(e0.x, tg.x, st.x, x1 + 40);
-              ctx.globalAlpha = base*0.16;
-              ctx.fillStyle = drawOptOf(d, 'targetColor') || CHART_CANDLE_UP;
+              const tgCol = drawOptOf(d, 'targetColor') || CHART_CANDLE_UP;
+              const stCol = drawOptOf(d, 'stopColor')   || CHART_CANDLE_DOWN;
+              ctx.globalAlpha = base*0.18;
+              ctx.fillStyle = tgCol;
               ctx.fillRect(x1, Math.min(e0.y, tg.y), x2 - x1, Math.abs(tg.y - e0.y));
-              ctx.fillStyle = drawOptOf(d, 'stopColor') || CHART_CANDLE_DOWN;
+              ctx.fillStyle = stCol;
               ctx.fillRect(x1, Math.min(e0.y, st.y), x2 - x1, Math.abs(st.y - e0.y));
               ctx.globalAlpha = base;
+              // Each level is a DIFFERENT promise -- target, stop, entry -- so each gets
+              // its own colour, the way TradingView does. Painting all three in the
+              // drawing's colour made a profit target and a stop-loss look identical.
+              for (const [q, c] of [[tg, tgCol], [st, stCol], [e0, '#b3b9c5']]) {
+                ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(x1, q.y); ctx.lineTo(x2, q.y); ctx.stroke();
+              }
               ctx.strokeStyle = col;
-              for (const q of [e0, st, tg]) { ctx.beginPath(); ctx.moveTo(x1, q.y); ctx.lineTo(x2, q.y); ctx.stroke(); }
               tag((d.t === 'pos' ? 'LONG' : 'SHORT') + '  ' + rr.toFixed(2) + 'R', x1 + 3, tg.y - 2);
               tag('entry ' + fmt(e0.price, 2), x1 + 3, e0.y - 2);
               tag('stop ' + fmt(st.price, 2), x1 + 3, st.y - 2);
@@ -5218,7 +5230,10 @@ function openAlertDialog(opts) {
   _alertDlg.innerHTML =
     '<div class="al-modal" role="dialog" aria-modal="true" aria-label="Create alert">'
   + '  <header class="al-head"><span class="al-title">' + (_alertEditId ? 'Edit alert on' : 'Create alert on') + '</span>'
-  + '    <span class="al-sym"><i aria-hidden="true">' + esc(sym.charAt(0)) + '</i>' + esc(sym) + '</span>'
+  + '    <label class="al-sym" title="Choose the symbol this alert watches">'
+  + '      <i aria-hidden="true" id="alSymMono">' + esc(sym.charAt(0)) + '</i>'
+  + '      <select id="alSym" aria-label="Alert symbol" onchange="_alertSymChanged()">' + _alertSymOptions(sym) + '</select>'
+  + '    </label>'
   + '    <button type="button" class="dock-x" onclick="closeAlertDialog()" aria-label="Close">✕</button></header>'
   + '  <div class="al-body">'
   + '    <div class="al-row"><label for="alCondType">Condition</label><div class="al-fields">'
@@ -5244,13 +5259,41 @@ function openAlertDialog(opts) {
   + '    <p class="al-err" id="alErr" hidden></p>'
   + '  </div>'
   + '  <footer class="al-foot"><button type="button" class="al-btn" onclick="closeAlertDialog()">Cancel</button>'
-  + '    <button type="button" class="al-btn primary" onclick="submitAlertDialog(\'' + esc(sym) + '\')">'
+  + '    <button type="button" class="al-btn primary" onclick="submitAlertDialog()">'
   +      (_alertEditId ? 'Save' : 'Create') + '</button></footer>'
   + '</div>';
   _alertDlg.hidden = false;
   _alertCondChanged(o);
   _alertEmailAvailability();
   const f = _alertDlg.querySelector('select, input'); if (f) f.focus();
+}
+/* Symbols the user can pick: their watchlist, plus whatever the dialog opened on so a
+   chart-launched alert never loses its own ticker. */
+function _alertSymOptions(cur) {
+  const esc2 = (x) => String(x).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const set = [];
+  try { for (const w of (wlPrices || [])) if (w && w.ticker) set.push(String(w.ticker).toUpperCase()); } catch (_e) {}
+  if (cur) set.push(String(cur).toUpperCase());
+  const seen = [];
+  for (const t of set) if (t && seen.indexOf(t) < 0) seen.push(t);
+  seen.sort();
+  const c0 = String(cur || '').toUpperCase();
+  return seen.map(t => '<option value="' + esc2(t) + '"' + (t === c0 ? ' selected' : '') + '>' + esc2(t) + '</option>').join('');
+}
+/* Changing the symbol re-seeds the monogram AND the price, so the value box does not keep
+   the previous ticker's level -- an alert at SPY's price on SOXS is a wrong alert. */
+function _alertSymChanged() {
+  const sel = document.getElementById('alSym'); if (!sel) return;
+  const sym = sel.value;
+  const mono = document.getElementById('alSymMono'); if (mono) mono.textContent = sym.charAt(0);
+  const v = document.getElementById('alVal');
+  if (v) {
+    let px = null;
+    try { const w = (wlPrices || []).find(x => String(x.ticker).toUpperCase() === sym); if (w && w.price != null) px = Number(w.price); } catch (_e) {}
+    if (px == null && typeof getCurrentPrice === 'function') { const g = getCurrentPrice(sym); if (g) px = Number(g); }
+    if (px != null && isFinite(px)) v.value = px.toFixed(2);
+  }
+  if (typeof _alertEmailAvailability === 'function') _alertEmailAvailability();
 }
 function closeAlertDialog() { if (_alertDlg) _alertDlg.hidden = true; _alertEditId = null; }
 
@@ -5308,6 +5351,10 @@ async function _alertEmailAvailability() {
 }
 
 async function submitAlertDialog(sym) {
+  // Read the picker. The symbol used to be baked into the button's onclick when the
+  // dialog opened, so whatever ticker it launched with was the only one it could ever
+  // create an alert for.
+  { const el = document.getElementById('alSym'); if (el && el.value) sym = el.value; }
   const err = document.getElementById('alErr');
   const val = (id) => { const el = document.getElementById(id); return el ? el.value : undefined; };
   const type = val('alCondType');
