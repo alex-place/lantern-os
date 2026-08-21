@@ -1,0 +1,23 @@
+# Pin the build to Node.
+#
+# This repo carries markers for several Nixpacks providers — requirements.txt
+# (Python) at the root, and until 2026-08-21 a nested Unisona.Shell.csproj
+# (.NET) that won auto-detection and failed the build on `dotnet restore`.
+# Pinning removes the guess: the deployed artifact is the Node web server, and
+# nothing else in the tree gets a vote.
+providers = ["node"]
+
+[phases.install]
+# --ignore-scripts is required, not cosmetic: the root `prepare` script runs
+# scripts/setup-hooks.mjs, which needs a .git directory that .railwayignore
+# deliberately excludes from the upload. Without the flag, install dies here.
+# Deps live in apps/lantern-garage/node_modules (13 of them); the root install
+# only exists to satisfy the `file:../..` self-dependency link.
+cmds = [
+  "npm ci --ignore-scripts",
+  "npm ci --omit=dev --ignore-scripts --prefix apps/lantern-garage",
+]
+
+[phases.build]
+# Nothing to compile - the server is plain JS and the UI ships as static files.
+cmds = []

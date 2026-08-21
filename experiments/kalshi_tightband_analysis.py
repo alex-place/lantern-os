@@ -1,4 +1,4 @@
-﻿"""
+"""
 Kalshi tight-band trajectory analysis — does CIO have EARLY lead-time value?
 
 The tight-band JSONL (data/kalshi/tight-band-*.jsonl) captures live in-game
@@ -35,6 +35,7 @@ except Exception:
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from kalshi_cio_backtest import Snapshot, MarketTrajectory, CIOConvergenceModel  # noqa: E402
+from kalshi_snapshot_codec import iter_snapshots, find_snapshot_files  # noqa: E402
 
 DT = torch.float64
 RESOLVED_THRESHOLD = 0.95
@@ -49,32 +50,28 @@ def load_trajectories(path: Path) -> dict:
     by_ticker: dict[str, list] = defaultdict(list)
     meta: dict[str, dict] = {}
 
-    with path.open(encoding="utf-8") as f:
-        for raw in f:
-            raw = raw.strip()
-            if not raw:
+    # Decodes v1, v2 (keyframe+delta) and .gz transparently.
+    for row in iter_snapshots(path):
+        ts = (row.get("ts") or "")[:19]
+        snap = row.get("snapshot", {})
+        for m in snap.get("markets", []):
+            ticker = m.get("ticker", "")
+            if not ticker:
                 continue
-            row = json.loads(raw)
-            ts = row.get("ts", "")[:19]
-            snap = row.get("snapshot", {})
-            for m in snap.get("markets", []):
-                ticker = m.get("ticker", "")
-                if not ticker:
-                    continue
-                ya_c = m.get("yes_ask") or 0
-                na_c = m.get("no_ask") or 0
-                ya = ya_c / 100.0
-                na = na_c / 100.0
-                if ya <= 0 and na <= 0:
-                    continue
-                s = ya + na
-                yes_mid = ya / s if s > 0 else 0.5
-                by_ticker[ticker].append((ts, yes_mid, ya, na))
-                if ticker not in meta:
-                    meta[ticker] = {
-                        "close_time": m.get("close_time", ""),
-                        "title": m.get("title") or m.get("ticker", ""),
-                    }
+            ya_c = m.get("yes_ask") or 0
+            na_c = m.get("no_ask") or 0
+            ya = ya_c / 100.0
+            na = na_c / 100.0
+            if ya <= 0 and na <= 0:
+                continue
+            s = ya + na
+            yes_mid = ya / s if s > 0 else 0.5
+            by_ticker[ticker].append((ts, yes_mid, ya, na))
+            if ticker not in meta:
+                meta[ticker] = {
+                    "close_time": m.get("close_time", ""),
+                    "title": m.get("title") or m.get("ticker", ""),
+                }
 
     trajs = {}
     for ticker, rows in by_ticker.items():
@@ -135,11 +132,11 @@ def main() -> None:
         path = Path(path_arg)
     else:
         data_dir = Path(__file__).resolve().parents[1] / "data" / "kalshi"
-        candidates = sorted(data_dir.glob("tight-band-*.jsonl"), reverse=True)
+        candidates = find_snapshot_files(data_dir)  # includes .gz
         if not candidates:
             print("No tight-band-*.jsonl found in data/kalshi/. Run the observer engine first.")
             return
-        path = candidates[0]
+        path = candidates[-1]
 
     print(f"Loading: {path.name}  ({path.stat().st_size / 1e6:.0f} MB)", flush=True)
     trajs = load_trajectories(path)

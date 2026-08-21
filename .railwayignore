@@ -1,0 +1,61 @@
+# What NOT to upload to Railway.
+#
+# `railway up` tars the working directory. Unfiltered this repo is ~20 GB
+# (models 15 G, data 3.2 G, .claude 1.2 G) and the upload would fail or take
+# forever. The app image only needs source + lockfiles; persistent state lives
+# on the mounted volume at runtime, not in the image.
+
+# The native Windows desktop shell. Its Unisona.Shell.csproj makes Nixpacks
+# detect a .NET app and run `dotnet restore` INSTEAD of installing Node — the
+# 2026-08-21 build failed exactly this way (MSB1003: no project or solution
+# file, because the .csproj is nested, not at the root it cd'd to).
+apps/lantern-garage/desktop/
+
+# Local model weights — never needed by the web server.
+models/
+*.gguf
+*.safetensors
+*.bin
+
+# Persistent state: this is the VOLUME's job. Mount it at /app/data.
+# (Seed it separately; do not bake 3 GB of snapshots into the image.)
+#
+# Runtime state belongs on the volume, not in the image — EXCEPT data/contexts/,
+# which is config rather than state: dream-chat.js reads personas.json from
+# <repoRoot>/data/contexts directly (not via dataRoot()), so it has to be in the
+# image.
+#
+# That works because the volume mounts at /app/state, NOT /app/data, with
+# UNISONA_STATE_DIR=/app/state pointing the writable root at it (app-paths.js:
+# "UNISONA_STATE_DIR, when set, wins outright"). Mounting on /app/data instead
+# would shadow the image's config — which is how the first deploy ended up
+# silently running with fallback personas.
+#
+# Note the `data/*` form, not `data/`: gitignore semantics do not allow
+# re-including a path inside an excluded DIRECTORY, so `data/` + `!data/contexts/`
+# silently ships nothing and the app boots with fallback personas. Excluding the
+# directory's CONTENTS is what makes the negation effective.
+data/*
+!data/contexts/
+
+# Agent/session scratch.
+.claude/
+.git/
+
+# Installed at build time from the lockfiles.
+node_modules/
+apps/*/node_modules/
+
+# Local-only research corpora and heavy artifacts.
+arxiv-corpus/
+experiments/results/
+*.csf
+*.zst
+
+# Test/dev noise.
+playwright-report/
+test-results/
+*.log
+.env
+.env.local
+.env.*.bak*

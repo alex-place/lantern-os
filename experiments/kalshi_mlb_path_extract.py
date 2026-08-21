@@ -26,10 +26,26 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
-SRC = [("2026-07-21", os.path.join("data", "kalshi", "tight-band-2026-07-21.jsonl")),
-       ("2026-07-22", os.path.join("data", "kalshi", "tight-band-2026-07-22.jsonl"))]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from kalshi_snapshot_codec import iter_snapshots, find_snapshot_files  # noqa: E402
+
+# Snapshot files are discovered rather than hardcoded: retention
+# (KALSHI_SNAPSHOT_RETAIN_DAYS, default 14) deletes older days, so the original
+# pinned 2026-07-21/22 paths had already been pruned and this script could not
+# run at all. Override with argv paths. Decoding handles v1, v2 and .gz.
+_KALSHI_DIR = Path(__file__).resolve().parents[1] / "data" / "kalshi"
+
+
+def _sources():
+    if len(sys.argv) > 1:
+        files = [Path(a) for a in sys.argv[1:]]
+    else:
+        files = find_snapshot_files(_KALSHI_DIR)
+    return [(f.name.replace("tight-band-", "")[:10], f) for f in files]
 OUT = os.path.join("experiments", "results", "kalshi_mlb_paths.jsonl")
 
 MAX_SPREAD = 5      # cents — wider than this is not realistically crossable twice
@@ -54,18 +70,16 @@ def fnum(v, d=0.0):
 def main():
     paths = {}          # ticker -> dict(day, rows[], last_status, last_result)
     kept = dropped = snaps = 0
-    for day, src in SRC:
+    sources = _sources()
+    if not sources:
+        print(f"No tight-band snapshot files in {_KALSHI_DIR}")
+        return
+    for day, src in sources:
         if not os.path.exists(src):
             print(f"MISSING {src}")
             continue
-        with open(src, encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
+        print(f"reading {os.path.basename(str(src))}", flush=True)
+        for rec in iter_snapshots(src):
                 snaps += 1
                 snap = rec.get("snapshot") or {}
                 for m in snap.get("markets", []):
