@@ -8289,7 +8289,10 @@ function _dayPnlTip(a){
   if (a && a.pnl_today_source === 'broker_reset') {
     return 'BROKER figure, not the trading session: IBKR day P&L re-baselines at the ~17:15 ET daily reset, so in the evening this measures post-reset drift, not today. ' + (a.pnl_basis || '');
   }
-  const base = 'How much the account made TODAY — today\'s move only, across both closed and open positions. Realized + Unrealized above add up to this.';
+  const decomp = (a && a.realized_today != null && a.unrealized_today != null)
+    ? ` Today = Realized ${(a.realized_today>=0?'+':'-')}$${fmt(Math.abs(a.realized_today),2)} (closed trades) ${(a.unrealized_today>=0?'+ ':'- ')}$${fmt(Math.abs(a.unrealized_today),2)} move on open positions.`
+    : '';
+  const base = "How much the account made TODAY — today’s move only, across both closed and open positions." + decomp;
   const adj = Number(a && a.pnl_carry_adjustment) || 0;
   if (!adj) return base;
   const amt = '$' + fmt(Math.abs(adj), 2);
@@ -8313,17 +8316,23 @@ function renderTpSummary(a){
     // large short open). Labeling cash "Account balance" made a losing account look rich.
     cell('Account value', money(a.equity), '', 'Net liquidation value — what the account is actually worth (cash + positions). Tracks your P&L.') +
     cell('Cash', money(a.cash), '', 'Total cash, including short-sale proceeds. In a margin account with open shorts this is HIGHER than the account is worth — see Account value.') +
-    // EVERY figure in this row means TODAY, so the row can be read straight down:
-    //     Realized + Unrealized = Day P&L
-    // Mixing bases broke that. Realized used to be whole-lot (a position held
-    // three days banked all three days' gain the moment it closed), so on
-    // 2026-08-13 the row read +$2,144.95 and +$5,508.18 summing to +$2,533.54.
-    // Per-position "since entry" P&L still exists — it is the Unrealized column
-    // in the positions table, beside a Day column that sums to this one.
+    // Row contract (#3409): Realized and Day P&L mean TODAY (ledger basis);
+    // Unrealized means SINCE ENTRY and reconciles with the table column below.
+    // Day's tooltip carries the decomposition (Realized + today's open-position
+    // move = Day). The 2026-08-13 whole-lot Realized bug and the 2026-08-22
+    // mislabeled-Unrealized bug were both attempts to force one basis on the
+    // whole row — each broke a different tile.
     cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)) +
-    cell(a.unrealized_today != null ? 'Unrealized P&L' : 'Unrealized (since entry)', signed(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
-      cls(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
-      (a.unrealized_today != null ? 'Move today on the open positions. A carried position counts only from the prior close - its full since-entry P&L is the Unrealized column in the table below.' : 'Since ENTRY, not today: the per-day basis is unavailable on this server, so this equals the sum of the Unrealized column in the table below (lifetime vs avg fill).')) +
+    // #3409: this tile ALWAYS shows since-entry unrealized — the number that
+    // reconciles with the Unrealized column below it. #3380 briefly wired the
+    // day-basis move here so the row summed (Realized+Unrealized=Day); the
+    // operator caught the cost on 08-22: a tile labeled "Unrealized P&L"
+    // reading +$1,658 above a table summing -$679, and mirroring Day P&L
+    // exactly every morning (realized 0 ⇒ day = unrealized-move). The trio
+    // arithmetic lives in the Day P&L tooltip now, labeled as what it is.
+    cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized),
+      'Since entry — the sum of the Unrealized column in the table below (lifetime vs avg fill).' +
+      (a.unrealized_today != null ? ` Today’s move on the open positions alone: ${(a.unrealized_today>=0?'+':'-')}$${fmt(Math.abs(a.unrealized_today),2)} — see Day P&L.` : '')) +
     cell(a.pnl_today_source === 'broker_reset' ? 'Day P&L (broker)' : 'Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) +
     cell('Buying power', money(a.buying_power));
 }
