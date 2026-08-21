@@ -130,9 +130,9 @@
      flyout, a modal and a floating toolbar read as three different materials. These
      are the alert dialog's values -- the newest and best-judged of them -- promoted
      to tokens so the rest inherit rather than re-invent. */
-  :root{--pop-r:12px;--pop-r-sm:10px;--pop-r-item:7px;
+  :root{--pop-r:10px;--pop-r-sm:8px;--pop-r-item:6px;
         --pop-sh:0 24px 60px rgba(0,0,0,.6);--pop-sh-sm:0 12px 32px rgba(0,0,0,.5);
-        --pop-scrim:rgba(4,6,10,.62);--pop-pad:6px;--pop-fs:12.5px;--pop-fs-sm:11.5px}
+        --pop-scrim:rgba(4,6,10,.46);--pop-pad:6px;--pop-fs:12.5px;--pop-fs-sm:11.5px}
   /* The watchlist column is FIXED. It is not draggable, so it does not read a saved
      width -- 340px fits every track with ~40px to spare (measured, not guessed). */
   :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:340px}
@@ -319,8 +319,12 @@
     background:var(--pop-scrim);backdrop-filter:blur(3px)}
   .al-modal-bg[hidden]{display:none}
   .al-modal{--al-h:32px;--al-label:96px;
-    width:min(460px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
-    border:1px solid var(--border);border-radius:var(--pop-r);box-shadow:var(--pop-sh)}
+    /* Sit the surface close to the page and let the BORDER separate it. At --bg1 over a
+       heavy scrim the panel read as a pale slab floating on a blacked-out chart. */
+    width:min(460px,94vw);max-height:88vh;overflow:auto;
+    background:color-mix(in srgb, var(--bg1) 82%, var(--bg0));
+    border:1px solid color-mix(in srgb, var(--border) 70%, var(--text2));
+    border-radius:var(--pop-r);box-shadow:var(--pop-sh)}
   .al-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
   .al-title{font-size:15px;color:var(--text0)}
   /* A pill with a monogram disc. TradingView shows the instrument's logo here; we
@@ -344,8 +348,14 @@
   .al-row > label{flex:0 0 var(--al-label);font-size:var(--pop-fs);color:var(--text2);
     line-height:var(--al-h);align-self:flex-start}
   .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  /* The operator and the value live in this wrapper, which was a bare div: display:block,
+     no gap, so the two boxes sat flush against each other while every other control in
+     the dialog was spaced. It inherits the same rhythm as its parent now. */
+  #alCondFields{display:flex;flex-direction:column;gap:8px}
   .al-fields select,.al-fields input[type=text],.al-fields input[type=number]{
-    width:100%;height:var(--al-h);background:var(--bg3);border:1px solid var(--border);
+    width:100%;height:var(--al-h);
+    background:color-mix(in srgb, var(--bg2) 70%, var(--bg1));
+    border:1px solid color-mix(in srgb, var(--border) 85%, transparent);
     border-radius:var(--pop-r-item);color:var(--text0);padding:0 10px;font:inherit;font-size:13px}
   .al-fields select{appearance:none;-webkit-appearance:none;padding-right:28px;cursor:pointer;
     background-image:url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23828a99' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
