@@ -2117,7 +2117,23 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
         // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
         // the report can split entry outcomes by tape without guessing later.
-        spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null });
+        spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null,
+        // MIRROR JOURNAL (#3390). The redirect counterfactual, priced at the
+        // moment of decision: which same-leverage opposite instrument existed,
+        // and what it cost right now. 2026-08-18 made the case — SOXL fired
+        // BULLISH at 09:30 and lost -$2,433 while its mirror gained ~15%; a
+        // regime-aware redirect is worth building only if rows like this keep
+        // showing that swing, so every leveraged entry records the evidence.
+        // Fail-soft: a missing quote journals null, never blocks the entry.
+        ...(await (async () => {
+          try {
+            const _mir = require('./direction-lock').mirrorOf(sym);
+            if (!_mir) return {};
+            const _q = await yahoo.getQuotes([_mir]).catch(() => null);
+            const _px = _q && _q[0] && Number(_q[0].price) > 0 ? Number(_q[0].price) : null;
+            return { mirror: _mir, mirror_px: _px };
+          } catch (_e) { return {}; }
+        })()) });
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
