@@ -161,3 +161,55 @@ test('SAME-SESSION path unchanged: a feed-visible fill books via the reconciler,
   await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
   assert.strictEqual(readRows().filter((r) => r.event === 'exit').length, 1, 'still one row');
 });
+
+test('SEEDING (#3386): a legacy GTC stop is adopted from the broker book and later classifies the fill', async () => {
+  // The QQQ case: position carried from before the registry existed, its stop
+  // resting at the broker, registry empty. The engine must adopt the stop from
+  // the open-orders feed, then classify the eventual fill as a real stop exit.
+  seedSmh({ stopOrders: null });                       // registry knows nothing
+  const ordersWithLegacyStop = [{ orderId: '318500001', symbol: 'SMH', side: 'SELL',
+    orderType: 'Stop', status: 'Submitted', qty: 203, price: 561.2, filledQty: 0 }];
+  let phase = 'holding';
+  const bridge = {
+    statusCalls: [],
+    getIBKRAccount: async () => ({ equity: 970000, mode: 'paper' }),
+    getIBKRPositions: async () => (phase === 'holding'
+      ? [{ ...ANCHOR }, { symbol: 'SMH', qty: 203, avg_entry_price: 576.40500295, current_price: 563.0, market_value: 114289 }]
+      : [{ ...ANCHOR }]),
+    getIBKROpenOrders: async () => (phase === 'holding' ? ordersWithLegacyStop : []),
+    getIBKRDayPnl: async () => 0,
+    getIBKROrderStatus: async (uid, id) => { bridge.statusCalls.push(id);
+      return id === '318500001' ? { order_id: id, status: 'Filled', avgPrice: 560.7883911, filledQty: 203 } : null; },
+  };
+  await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });   // sees the stop → adopts it
+  assert.ok(at._stopOrders.has('SMH'), 'the legacy stop is adopted');
+  assert.strictEqual(at._stopOrders.get('SMH').id, '318500001');
+  assert.strictEqual(at._stopOrders.get('SMH').seeded, true, 'adoption is labelled, not disguised as placement');
+
+  phase = 'gone';                                       // the stop fills at the broker; feed goes silent
+  await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });   // absence 1 (#3378 streak)
+  await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });   // absence 2 → lookup → book
+  const exits = readRows().filter((r) => r.event === 'exit' && r.symbol === 'SMH');
+  assert.strictEqual(exits.length, 1);
+  assert.match(exits[0].reason, /protective_stop/, 'the seeded id classified the fill');
+  assert.strictEqual(exits[0].order_id, '318500001');
+  assert.strictEqual(exits[0].exit, 560.7883911, 'priced at the fill');
+});
+
+test('seeding is conservative: terminal, non-stop, unheld, and already-registered orders are all ignored', async () => {
+  seedSmh({ stopOrders: { SMH: { id: 'KEEP-ME', px: 561.2, qty: 203, at: Date.now() } } });
+  const bridge = bridgeWith({
+    orderStatus: () => null,
+    orders: [
+      { orderId: 'X1', symbol: 'SMH', side: 'SELL', orderType: 'Stop', status: 'Cancelled', qty: 203, price: 550 },   // terminal
+      { orderId: 'X2', symbol: 'SMH', side: 'SELL', orderType: 'Limit', status: 'Submitted', qty: 203, price: 590 },  // not a stop
+      { orderId: 'X3', symbol: 'ZZZZ', side: 'SELL', orderType: 'Stop', status: 'Submitted', qty: 5, price: 10 },     // not held
+      { orderId: 'X4', symbol: 'SMH', side: 'SELL', orderType: 'Stop', status: 'Submitted', qty: 203, price: 555 },   // held + working, but…
+    ],
+  });
+  // make SMH held so X4's only blocker is the existing registry entry
+  bridge.getIBKRPositions = async () => [{ ...ANCHOR }, { symbol: 'SMH', qty: 203, avg_entry_price: 576.4, current_price: 563.0 }];
+  await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
+  assert.strictEqual(at._stopOrders.get('SMH').id, 'KEEP-ME', 'an existing registry entry is never overwritten by seeding');
+  assert.ok(!at._stopOrders.has('ZZZZ'), 'orders on unheld symbols are not adopted');
+});
