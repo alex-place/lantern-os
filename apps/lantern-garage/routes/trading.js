@@ -123,6 +123,18 @@ async function _autoscanTick() {
       // zero extra market-data calls, fail-soft by construction (the engine
       // swallows its own errors and returns a count).
       const alertsFired = require('../lib/alert-engine').evaluateScan(scan);
+      // REGIME SHADOW (#3389): twice a day, journal-only, no order authority.
+      // Fire-and-forget on the scan clock; the module dedupes via its own
+      // journal (one row per date+read+provider), so restarts cannot double-
+      // fire and a dead provider cannot block the scan. Default OFF.
+      try {
+        const _rs = require('../lib/regime-shadow');
+        if (_rs.enabled()) {
+          const _etm = (() => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
+          if (_etm >= 575 && _etm < 615) _rs.run('open').catch(() => {});
+          if (_etm >= 965 && _etm < 1050) _rs.run('close').catch(() => {});
+        }
+      } catch (_e) { /* the shadow must never touch the scan */ }
       if (alertsFired) console.info(`[Trading] alerts — ${alertsFired} fired`);
       // Act stage: execute on EVERY connected IBKR account, not just one — so when a
       // second person links their account the autopilot trades both. TRADER_AUTO_USER,
