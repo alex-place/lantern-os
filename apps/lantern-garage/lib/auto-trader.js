@@ -1180,6 +1180,24 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // mark-priced row for the same exit.
   const _ordersEarly = await bridge.getIBKROpenOrders(userId).catch(() => []);
   const _filledSyms = _reconcileFills(_ordersEarly);   // authoritative exits, priced at the fill
+  // REGISTRY SEEDING (#3386). The #3379 registry only learns about stops the
+  // engine places AFTER it shipped — QQQ, carried since 08-14 with a GTC stop
+  // from a pre-registry process, stopped out on 2026-08-20 (-$1,718) and still
+  // booked closed_externally with stop_order_id:null. The broker's own open-
+  // orders book names those legacy stops, so adopt them: any WORKING sell-stop
+  // on a symbol we hold, absent from the registry, is one of ours (the #3378
+  // account pin guarantees this feed is our account). Seeded entries carry
+  // seeded:true so a later audit can tell adoption from placement.
+  for (const o of (_ordersEarly || [])) {
+    const _sym = String((o && o.symbol) || '').toUpperCase();
+    if (!_sym || !o || !o.orderId || _stopOrders.has(_sym)) continue;
+    if (String(o.side || '').toUpperCase() !== 'SELL') continue;
+    if (!/st(o)?p/i.test(String(o.orderType || ''))) continue;
+    if (STOP_TERMINAL.test(String(o.status || ''))) continue;   // dead orders teach nothing
+    if (!(Number(heldQty[_sym]) > 0)) continue;                 // only positions we actually hold
+    _stopOrders.set(_sym, { id: String(o.orderId), px: Number(o.price) || null,
+      qty: Number(o.qty) || null, at: now, seeded: true });
+  }
 
   // Only a symbol the autopilot itself decided to exit was ever reconciled below, so
   // a position closed by anything ELSE left no ledger row at all. The dominant such
