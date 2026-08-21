@@ -3317,9 +3317,17 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         };
         for (const d of list) { if (d.hidden) continue; drawOne(d, false); }
         if (pend) {
-          if (pend.pts.length) drawOne({ t: pend.t, pts: pend.pts, text: pend.text }, true);
-          ctx.save(); ctx.fillStyle = DRAW_COLOR;
-          for (const a of pend.pts) { ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 3, 0, Math.PI*2); ctx.fill(); }
+          // The shape follows the cursor while it is being placed, so its size and
+          // angle are visible BEFORE the last click commits it -- TradingView's rubber
+          // band. Without the hover point only the clicked anchors drew, so a two-click
+          // tool showed nothing at all until it was already finished.
+          const _pp = pend.hover ? pend.pts.concat([pend.hover]) : pend.pts;
+          if (_pp.length) drawOne({ t: pend.t, pts: _pp, text: pend.text }, true);
+          ctx.save(); ctx.lineWidth = 1.5;
+          for (const a of pend.pts) {
+            ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 3.5, 0, Math.PI*2);
+            ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = SEL_BLUE; ctx.stroke();
+          }
           ctx.restore();
         }
         // Selection handles: a ring on each anchor of the selected drawing, so what can
@@ -3330,9 +3338,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
           ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([]);
           for (const a of hp) {
-            ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 5, 0, Math.PI * 2);
-            ctx.fillStyle = '#0b0d12'; ctx.fill();
-            ctx.strokeStyle = '#7dd3fc'; ctx.stroke();
+            ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff'; ctx.fill();
+            ctx.strokeStyle = SEL_BLUE; ctx.stroke();
           }
           ctx.restore();
         }
@@ -4370,6 +4378,11 @@ function renderOrderTicket(){
 // through zoom, pan, timeframe and theme changes. Adding a tool = one DRAW_TOOLS
 // entry + one case in the renderer; the click/drag plumbing below is generic.
 const DRAW_COLOR = '#a78bfa';
+/* TradingView paints selection and placement furniture in ONE blue and never in the
+   drawing's own colour -- so a handle stays findable whatever colour the shape is.
+   Ours reused the violet DRAW_COLOR for placement dots and a different sky blue for
+   handles, which read as two unrelated systems. #2962FF is TradingView's. */
+const SEL_BLUE = '#2962ff';
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const FIB_EXT    = [0, 0.618, 1, 1.618, 2.618];
 const CHART_NOTE_BG = () =>
@@ -5487,6 +5500,27 @@ document.addEventListener('pointerdown', (e) => {
   }
 });
 
+/* Rubber band. While a multi-point tool is mid-placement, track the cursor as a
+   PROVISIONAL final point and repaint. _repaintChart touches the canvas only, so this
+   runs at pointer rate without rebuilding the overlay (which would kill the crosshair,
+   the way the ladder rebuild did). The point is provisional: it is never pushed into
+   pts, so a click still decides what commits. */
+document.addEventListener('pointermove', (e) => {
+  if (!_drawPending || !_drawPending.pts.length) return;
+  const spec = DRAW_TOOLS[_drawPending.t];
+  if (!spec || !spec.pts || _drawPending.pts.length >= spec.pts) return;
+  // Find the chart the SAME way the click handler does. A .ladder-overlay div sits
+  // above the canvas, so the cursor never lands on the canvas itself -- resolve
+  // through .zone-ladder, which is the container both paths agree on.
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const lad = el && el.closest ? el.closest('.zone-ladder') : null; if (!lad) return;
+  const cv = lad.querySelector('.chart-canvas'); if (!cv) return;
+  const a2 = _drawAnchor(cv, e.clientX, e.clientY); if (!a2) return;
+  if (_canvasTicker(cv) !== _drawPending.tk) return;
+  _drawPending.hover = { ts: a2.ts, price: a2.price };
+  _repaintChart(_drawPending.tk);
+});
+
 document.addEventListener('pointermove', (e) => {
   if (!_dragDraw) return;
   const g = _selGeom(_dragDraw.tk); if (!g) return;
@@ -5553,6 +5587,7 @@ document.addEventListener('click', e => {
     _drawPending = { tk, t: _drawTool, pts: [] };
   }
   _drawPending.pts.push({ ts: a.ts, price: a.price });
+  _drawPending.hover = null;   // the click supersedes it
 
   if (_drawPending.pts.length >= spec.pts) {
     const obj = { t: _drawTool, pts: _drawPending.pts.slice() };
