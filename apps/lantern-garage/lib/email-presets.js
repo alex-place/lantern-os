@@ -32,6 +32,18 @@ const BRAND = "unisona.ai";
 const SITE = "https://unisona.ai";
 const ACCENT = "#06b6d4";
 
+// Brand palette for the mail shell. Emails can't share the site's CSS variables (mail
+// clients strip <style>/external CSS), so the theme is re-expressed here as inline hex.
+const INK = "#0f172a";       // headings
+const BODY_INK = "#334155";  // paragraph text
+const MUTED = "#64748b";     // secondary / links in footer
+const FAINT = "#94a3b8";     // fine print
+const BORDER = "#e2e8f0";    // card + divider
+const CARD_BG = "#ffffff";
+const PAGE_BG = "#eef2f6";   // page behind the card, so the white card lifts
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
+
 const KINDS = ["code", "button", "message", "info", "ad"];
 
 /** Escape a value for interpolation into HTML. Everything user-supplied goes through this. */
@@ -66,43 +78,70 @@ function greetingText(name) { return `Hi ${String(name || "").trim() || "there"}
  * is precisely the wrong response. The old shared footer said it on every email.
  */
 function footerFor(kind, opts = {}) {
-  const small = "color:#94a3b8;font-size:12px;margin-top:24px";
+  const small = `color:${FAINT};font-size:12px;line-height:1.55;margin:0`;
   if (kind === "code" || kind === "button") {
     return `<p style="${small}">If you didn't request this, you can safely ignore this email — nothing will change.</p>`;
   }
   if (kind === "info") {
-    return `<p style="${small}">You're receiving this because it affects your ${BRAND} account's security. <strong>If this wasn't you, secure your account now.</strong></p>`;
+    return `<p style="${small}">You're receiving this because it affects your ${BRAND} account's security. <strong style="color:${MUTED}">If this wasn't you, secure your account now.</strong></p>`;
   }
   if (kind === "ad") {
     return `<p style="${small}">You're receiving this because you have a ${BRAND} account and haven't opted out of product updates.<br>
-      <a href="${escUrl(opts.unsubscribeUrl)}" style="color:#94a3b8">Unsubscribe from product updates</a></p>`;
+      <a href="${escUrl(opts.unsubscribeUrl)}" style="color:${MUTED}">Unsubscribe from product updates</a></p>`;
   }
   return `<p style="${small}">You're receiving this because you have a ${BRAND} account.</p>`;
 }
 
+/**
+ * The branded email shell. Table-based with inline styles — the only layout mail clients
+ * (Gmail/Outlook/Apple Mail) render reliably; divs + external CSS + CSS variables do not
+ * survive. A light card floats on a tinted page, headed by the wordmark and an accent
+ * rule, so a confirmation email reads like the product rather than a raw console line.
+ */
 function shell(kind, title, bodyHtml, opts = {}) {
-  // The charset meta is belt-and-braces. Resend sends UTF-8 and most clients honour
-  // the MIME header, but these templates contain em-dashes and curly apostrophes, and
-  // a client that guesses latin-1 renders them as "â€" mojibake in the middle of a
-  // security notice. One tag is cheaper than restricting the copy to ASCII.
+  const t = esc(title);
+  // Hidden preheader: the one-line snippet the inbox list shows before the email is
+  // opened. Without it clients scrape the first visible words ("Hi there, …").
+  const preheader = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent">${t} — ${BRAND}</div>`;
   return `<meta charset="utf-8">
-  <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:${ACCENT};margin:0 0 16px">${BRAND}</h2>
-    <h3 style="margin:0 0 12px">${esc(title)}</h3>
-    ${bodyHtml}
-    ${footerFor(kind, opts)}
-  </div>`;
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${preheader}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAGE_BG};margin:0;padding:0;width:100%">
+  <tr><td align="center" style="padding:32px 14px">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="width:520px;max-width:100%;font-family:${FONT}">
+      <tr><td style="padding:0 6px 18px">
+        <span style="font-size:20px;font-weight:800;letter-spacing:-.02em;color:${INK}">unisona<span style="color:${ACCENT}">.ai</span></span>
+      </td></tr>
+      <tr><td style="background:${CARD_BG};border:1px solid ${BORDER};border-radius:16px;padding:36px 36px 30px">
+        <div style="width:44px;height:4px;background:${ACCENT};border-radius:999px;margin:0 0 22px"></div>
+        <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;font-weight:700;color:${INK}">${t}</h1>
+        <div style="font-size:15px;line-height:1.6;color:${BODY_INK}">${bodyHtml}</div>
+      </td></tr>
+      <tr><td style="padding:20px 8px 0">
+        ${footerFor(kind, opts)}
+        <p style="color:${FAINT};font-size:12px;line-height:1.55;margin:12px 0 0">&copy; ${new Date().getFullYear()} ${BRAND} &middot; <a href="${SITE}" style="color:${MUTED};text-decoration:none">unisona.ai</a></p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`;
 }
 
 function ctaButton(href, label) {
   const safe = escUrl(href);
-  return `<p style="margin:20px 0"><a href="${safe}" style="background:${ACCENT};color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;display:inline-block">${esc(label)}</a></p>
-    <p style="color:#64748b;font-size:12px;word-break:break-all">Or paste this link: ${safe}</p>`;
+  // A padded anchor on a table cell — the most portable "button". Outlook renders it as a
+  // styled link (no rounded corners), every other client as the full button; both work.
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 6px">
+      <tr><td style="border-radius:12px;background:${ACCENT}"><a href="${safe}" style="display:inline-block;padding:13px 30px;font-size:15px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;border-radius:12px">${esc(label)}</a></td></tr>
+    </table>
+    <p style="color:${MUTED};font-size:13px;line-height:1.5;margin:14px 0 0">Button not working? Copy and paste this link into your browser:</p>
+    <p style="margin:4px 0 0"><a href="${safe}" style="color:${ACCENT};font-size:13px;word-break:break-all;text-decoration:none">${safe}</a></p>`;
 }
 
 function codeBlock(code) {
   const spaced = esc(String(code).split("").join(" ")); // easier to read/transcribe
-  return `<p style="margin:24px 0"><span style="display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:14px 22px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:6px;color:#0f172a">${spaced}</span></p>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0"><tr>
+      <td align="center" style="background:#f1f5f9;border:1px solid ${BORDER};border-radius:12px;padding:18px 20px;font-family:${MONO};font-size:30px;font-weight:700;letter-spacing:8px;color:${INK}">${spaced}</td>
+    </tr></table>`;
 }
 
 function paragraphs(bodyLines) {
