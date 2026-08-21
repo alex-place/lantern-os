@@ -592,6 +592,12 @@ function _checkFillBasis(sym, brokerEntry) {
 // exactly the case — the per-order status endpoint can answer "did my stop
 // fill?" directly when a position vanishes.
 const _stopOrders = new Map();
+// #3413 BREAKEVEN RATCHET state: sym -> the stop level pinned at entry once the
+// position has been up TRADER_BE_RATCHET. Never lowered while the position
+// lives; cleared when it leaves the book. Persisted — the broker stop it
+// mirrors is a GTC and outlives the process; even if this map is lost, the
+// ratchet pass re-records a working stop it finds at/above entry.
+const _beStopAt = new Map();
 function _registerStop(sym, r, px, qty) {
   if (r && r.order_id && !/error/i.test(String(r.status || ''))) {
     _stopOrders.set(sym, { id: String(r.order_id), px, qty, at: Date.now() });
@@ -640,6 +646,14 @@ function _reconcileFills(orders) {
       return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), ...ex };
     }, _PROCESS_START);
     for (const row of rows) {
+      // Case-insensitive (#3407): IBKR reports 'Stop', Alpaca reports 'stop'.
+      // The exact-case compare cost a cooldown on 2026-08-21 — a real Alpaca
+      // stop fill classified as plain 'broker fill', re-entry the same minute.
+      const _isStopFill = /^stop$/i.test(String(row.order_type || '')) || /(^|\b)stop\b/i.test(String(row.reason || ''));
+      // #3413: a fill of a RATCHETED stop (sitting at entry after the position
+      // was up TRADER_BE_RATCHET) is a round trip, not a thesis failure — mark
+      // the row so review/analytics can tell the two apart.
+      if (_isStopFill && _beStopAt.has(row.symbol)) row.be_ratchet = true;
       logTrade(row);
       done.add(row.symbol);
       // #3379: a fill row for our registered stop consumes the registry entry —
@@ -650,12 +664,18 @@ function _reconcileFills(orders) {
       _excursion.delete(row.symbol);   // consumed by the fill row it was frozen for
       // A STOP fill arms the re-entry cooldown: today + N trading days.
       const _cdDays = cfg().stopCooldownDays;
-      // Case-insensitive (#3407): IBKR reports 'Stop', Alpaca reports 'stop'.
-      // The exact-case compare cost a cooldown on 2026-08-21 — a real Alpaca
-      // stop fill classified as plain 'broker fill', re-entry the same minute.
-      if (/^stop$/i.test(String(row.order_type || '')) || /(^|\b)stop\b/i.test(String(row.reason || ''))) {
-        if (_cdDays > 0) _stopCooldownThrough.set(row.symbol, _nextTradingDates(_etDate(Date.now()), _cdDays));
-        _noteStopFill(Date.now());   // feeds the daily circuit breaker
+      if (_isStopFill) {
+        if (row.be_ratchet) {
+          // #3413 lab rule, validated with exactly this re-entry policy: a
+          // breakeven exit blocks the symbol for the REST OF THE SESSION only,
+          // and does NOT feed the daily breaker — the breaker counts real
+          // failures, and the loss-reduction lab REJECTED broader stand-downs.
+          _stopCooldownThrough.set(row.symbol, _etDate(Date.now()));
+          _beStopAt.delete(row.symbol);
+        } else {
+          if (_cdDays > 0) _stopCooldownThrough.set(row.symbol, _nextTradingDates(_etDate(Date.now()), _cdDays));
+          _noteStopFill(Date.now());   // feeds the daily circuit breaker
+        }
       }
     }
     for (const id of fillLedger.idsToRemember(orders)) _loggedFills.add(String(id));
@@ -691,6 +711,7 @@ function _saveState() {
       stopDistPct: Object.fromEntries(_stopDistPct),
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
       stopOrders: Object.fromEntries(_stopOrders),   // #3379: a GTC stop OUTLIVES the process by design
+      beStopAt: Object.fromEntries(_beStopAt),       // #3413: the ratchet must not un-ratchet on restart
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
       // A restart DURING a dropout must not hand back a clean slate and let the
       // doubling through on the next scan (#3282).
@@ -719,6 +740,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
     for (const [k, v] of Object.entries(o.stopOrders || {})) _stopOrders.set(k, v);   // #3379: GTC stops outlive the process
+    for (const [k, v] of Object.entries(o.beStopAt || {})) _beStopAt.set(k, v);       // #3413
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
     for (const [k, v] of Object.entries(o.lastConfirmedHold || {})) {
       const t = Number(v);
@@ -1354,18 +1376,27 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const _fillPx = Number(_regStatus.avgPrice) > 0 ? Number(_regStatus.avgPrice) : mark;
         const _fillQty = Number(_regStatus.filledQty) > 0 ? Number(_regStatus.filledQty) : qty;
         const _fillPnl = _round2((_fillPx - entry) * _fillQty);
+        const _beHit = _beStopAt.has(sym);   // #3413: ratcheted stop → round trip, not failure
         logTrade({
           event: 'exit', symbol: sym, qty: _fillQty, entry, exit: _fillPx,
           pnl: _fillPnl, pnl_pct: entry > 0 ? +(((_fillPx - entry) / entry) * 100).toFixed(6) : null,
-          reason: `protective_stop (broker GTC stop ${_regStop.px} filled)`,
+          reason: `protective_stop (broker GTC stop ${_regStop.px} filled${_beHit ? '; be_ratchet — stop sat at entry' : ''})`,
+          be_ratchet: _beHit || undefined,
           order_id: _regStop.id, order_type: 'Stop', status: 'filled', source: 'stop-status',
           estimated: !(Number(_regStatus.avgPrice) > 0),
           ...fillLedger.excursionFields(entry, _peak.get(sym), _trough.get(sym), _stopDistPct.get(sym)),
         });
-        // Same arming as a feed-visible stop fill (_reconcileFills): cooldown + breaker.
-        const _cd = cfg().stopCooldownDays;
-        if (_cd > 0) _stopCooldownThrough.set(sym, _nextTradingDates(_etDate(Date.now()), _cd));
-        _noteStopFill(Date.now());
+        // Same arming as a feed-visible stop fill (_reconcileFills): cooldown +
+        // breaker — except a RATCHETED fill (#3413): session block only, breaker
+        // untouched (it counts real failures, not round trips).
+        if (_beHit) {
+          _stopCooldownThrough.set(sym, _etDate(Date.now()));
+          _beStopAt.delete(sym);
+        } else {
+          const _cd = cfg().stopCooldownDays;
+          if (_cd > 0) _stopCooldownThrough.set(sym, _nextTradingDates(_etDate(Date.now()), _cd));
+          _noteStopFill(Date.now());
+        }
         _loggedFills.add(_regStop.id);          // a late feed appearance must not double-book
         _stopOrders.delete(sym);
         _peak.delete(sym); _trough.delete(sym); _entryAt.delete(sym); _excursion.delete(sym);
@@ -1447,6 +1478,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       _unclosableAt.delete(sym); _exitNoOrder.delete(sym);
       _zoneLadder.delete(sym); _stopDistPct.delete(sym);
       _trough.delete(sym); _excursion.delete(sym);
+      _beStopAt.delete(sym);                                 // #3413: ratchet dies with the position
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
       // FREEZE EXPIRY AGAINST BROKER TRUTH (2026-08-08). The in-flight freeze had
       // no expiry and was never re-checked: a parked exit later cancelled/expired
@@ -1606,6 +1638,47 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         if (Array.isArray(_fresh)) _openOrders = _fresh;
       }
     }
+    // ── BREAKEVEN RATCHET (#3413 lab, 2026-08-22). Once a held long has been up
+    // TRADER_BE_RATCHET (fraction, e.g. 0.02), its protective stop rises to the
+    // entry price and never goes back down: the worst path a 2%-up position can
+    // take becomes a round trip instead of a full -3% loser. Validated on all
+    // four lab surfaces (hourly 2y halves + daily 26y two-window) with 5-10bp
+    // stop-fill slippage charged: loss metrics improve everywhere with total
+    // return kept (daily fit worst month -8.7% vs -10.3%, DD -19.2% vs -21.0%,
+    // total 274% vs 215%). The mechanism reuses the resize→re-protect path: we
+    // cancel the low stop here and pin the level; the re-protect pass below
+    // places the new stop AT entry with all its usual guards (attempt caps,
+    // whole-share, below-market clamp). DEFAULT OFF: unset/0 disables.
+    const _bePct = Number(process.env.TRADER_BE_RATCHET) || 0;
+    if (_bePct > 0 && !_ordersUnknown) {
+      let _beCancels = 0;
+      for (const [sym, p] of Object.entries(heldPos)) {
+        if (exclude.has(sym)) continue;
+        const qty = Number(p.qty) || 0;
+        const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;  // genuine basis only — no mark fallback
+        const mark = Number(p.current_price) || 0;
+        if (qty < 1 || !entry || !mark) continue;    // dust cannot carry a stop at all
+        if (_beStopAt.has(sym)) continue;            // already ratcheted — never re-lower
+        if (mark < entry * (1 + _bePct)) continue;
+        const _wk = (_openOrders || []).filter((o) => String(o.symbol || '').toUpperCase() === sym
+          && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')
+          && STOP_WORKING.test(o.status || ''));
+        const _top = _wk.reduce((a, o) => Math.max(a, Number(o.price) || Number(o.stopPrice) || 0), 0);
+        if (_top >= entry) { _beStopAt.set(sym, _top); _saveState(); continue; }  // a trail already sits at/above entry — record it, leave it
+        if (_wk.length) { await cancelRestingStops(bridge, userId, sym); _beCancels++; }
+        _beStopAt.set(sym, entry);
+        logTrade({ event: 'stop_resize', symbol: sym,
+          reason: `be_ratchet: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${(_bePct * 100).toFixed(1)}% — stop rises to entry (#3413)`,
+          entry, mark, stop_was: _top || null, stop_want: entry });
+        _saveState();   // the ratchet must survive a restart between cancel and re-protect
+      }
+      // Re-read orders after any cancel so the re-protect pass below sees the
+      // symbol as unprotected and places the entry-level stop this scan.
+      if (_beCancels) {
+        const _fresh = await bridge.getIBKROpenOrders(userId).catch(() => null);
+        if (Array.isArray(_fresh)) _openOrders = _fresh;
+      }
+    }
     for (const [sym, p] of Object.entries(heldPos)) {
       if (_ordersUnknown) break;                  // orders fetch unreadable this scan — never re-protect blind
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
@@ -1618,6 +1691,11 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
         const curPx = Number(p.current_price) || 0;
         let stop = stopPriceFor(entry, _stopDistPct.get(sym) || c.stopPct);
+        // #3413: a ratcheted symbol re-protects AT entry — never back down to the
+        // stop-distance level. The below-market clamp still applies if price has
+        // since fallen through entry (a sell-stop must sit under the market).
+        const _beLvl = Number(_beStopAt.get(sym)) || 0;
+        if (_beLvl > 0 && _beLvl > stop) stop = Math.round(_beLvl * 100) / 100;
         // A sell-STOP must sit BELOW the market or the broker rejects it. For a position
         // already underwater, the entry-based stop (entry×0.98) is ABOVE the current
         // price — so re-protect would silently fail and the loser stays naked. Clamp the
@@ -2391,6 +2469,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
