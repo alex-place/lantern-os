@@ -317,3 +317,40 @@ def test_main_run_gates_on_regression(monkeypatch):
     monkeypatch.setattr(sb, "TASK_MIN_REPETITION_RATIO", 1.01)  # impossible floor
     rc = sb.main(["--run", "ollama:qwen2.5-coder", "--mode", "fast", "--no-append"])
     assert rc == 1
+
+
+def test_report_is_deterministic_when_data_unchanged(tmp_path, monkeypatch):
+    """#2953: REPORT.md must be a pure function of the leaderboard data.
+
+    The daily job regenerated the report with a wall-clock `datetime.now()` stamp, so the
+    file changed every day even when zero runs were added. The workflow's
+    `git diff --staged --quiet` guard never fired and it committed
+    "0 successful run(s) of 0 total" daily — a dead instrument wearing a live badge. The
+    "as of" stamp now comes from the latest run's timestamp, so an unchanged leaderboard
+    yields byte-identical output and no commit.
+    """
+    monkeypatch.setattr(sb, "LEADERBOARD_PATH", tmp_path / "leaderboard.jsonl")
+    r1, r2 = tmp_path / "R1.md", tmp_path / "R2.md"
+
+    # Empty leaderboard — the exact CI condition (no provider keys → no runs).
+    assert sb.write_report(r1) == 0
+    sb.write_report(r2)
+    assert r1.read_bytes() == r2.read_bytes(), "empty report must not churn between runs"
+    assert "no runs recorded yet" in r1.read_text()
+    assert "0 successful run(s) of 0 total" in r1.read_text()
+
+    # With data, the "as of" is the DATA's latest timestamp, not the wall clock, and the
+    # report is still stable across invocations.
+    row = {
+        "provider": "x", "model": "m", "mode": "fast", "timestamp": "2026-08-01T12:00:00Z",
+        "aggregates": {
+            "avg_latency_ms": 100, "avg_repetition_ratio": 0.9, "success_rate": 1.0,
+            "throughput_tokens_per_sec": 30, "total_cost_estimate_usd": 0,
+        },
+    }
+    (tmp_path / "leaderboard.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    assert sb.write_report(r1) == 1
+    sb.write_report(r2)
+    assert r1.read_bytes() == r2.read_bytes(), "report must be stable across invocations"
+    assert "As of 2026-08-01 12:00:00 UTC" in r1.read_text()
+    assert "1 successful run(s) of 1 total" in r1.read_text()
