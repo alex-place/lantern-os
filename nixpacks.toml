@@ -19,5 +19,5 @@ cmds = [
 ]
 
 [phases.build]
-# Nothing to compile — the server is plain JS and the UI ships as static files.
+# Nothing to compile - the server is plain JS and the UI ships as static files.
 cmds = []

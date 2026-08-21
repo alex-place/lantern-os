@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "sh -c 'cp -rn deploy/railway-seed/. /app/data/ 2>/dev/null; node apps/lantern-garage/server.js'",
+    "startCommand": "node apps/lantern-garage/server.js",
     "healthcheckPath": "/api/status",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

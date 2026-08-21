@@ -20,12 +20,23 @@ models/
 # Persistent state: this is the VOLUME's job. Mount it at /app/data.
 # (Seed it separately; do not bake 3 GB of snapshots into the image.)
 #
-# Shipping config here does NOT work: the volume mounts AT /app/data and
-# shadows whatever the image had at that path. data/contexts/ is config, not
-# state (personas.json is what selectAgent() loads), so it ships instead as
-# deploy/railway-seed/ and the start command copies it onto the volume with
-# `cp -rn` — no-clobber, so real state is never overwritten.
-data/
+# Runtime state belongs on the volume, not in the image — EXCEPT data/contexts/,
+# which is config rather than state: dream-chat.js reads personas.json from
+# <repoRoot>/data/contexts directly (not via dataRoot()), so it has to be in the
+# image.
+#
+# That works because the volume mounts at /app/state, NOT /app/data, with
+# UNISONA_STATE_DIR=/app/state pointing the writable root at it (app-paths.js:
+# "UNISONA_STATE_DIR, when set, wins outright"). Mounting on /app/data instead
+# would shadow the image's config — which is how the first deploy ended up
+# silently running with fallback personas.
+#
+# Note the `data/*` form, not `data/`: gitignore semantics do not allow
+# re-including a path inside an excluded DIRECTORY, so `data/` + `!data/contexts/`
+# silently ships nothing and the app boots with fallback personas. Excluding the
+# directory's CONTENTS is what makes the negation effective.
+data/*
+!data/contexts/
 
 # Agent/session scratch.
 .claude/
