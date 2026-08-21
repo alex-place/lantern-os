@@ -153,6 +153,26 @@ function instrumentSign(sym) {
 // out). The same class of bug was hit before in the lab: regime derived from
 // SQQQ's own SMA-200 inverted the gate and "silently made every inverse-ETF
 // result meaningless" (spy_engine_backtest.js header).
+/**
+ * The opposite-sign instrument in the same family at the SAME leverage — the
+ * symbol a regime-aware redirect would substitute (#3390: the washout trigger
+ * structurally cannot fire an inverse on the day it pays, so the only way to
+ * express "down day" is to flip a LONG fire to its mirror). Derived from
+ * FAMILY + LEVERAGE so a new wrapper added above is mirrored automatically.
+ * null when the family has no same-leverage opposite in the universe.
+ */
+const MIRROR = (() => {
+  const out = {};
+  for (const [sym, [fam, sign]] of Object.entries(FAMILY)) {
+    const lev = LEVERAGE[sym] || 1;
+    for (const [cand, [f2, s2]] of Object.entries(FAMILY)) {
+      if (f2 === fam && s2 === -sign && (LEVERAGE[cand] || 1) === lev) { out[sym] = cand; break; }
+    }
+  }
+  return out;
+})();
+function mirrorOf(sym) { return MIRROR[String(sym || '').toUpperCase()] || null; }
+
 const FAMILY_PROXY = {
   SPY: 'SPY', QQQ: 'QQQ', IWM: 'IWM', SOX: 'SMH', DIA: 'DIA', GLD: 'GLD', TLT: 'TLT',
 };
@@ -199,4 +219,4 @@ function conflicts(sym, positions) {
   return { conflict: true, family, entrySign: sign, existingSign: existing, against };
 }
 
-module.exports = { FAMILY, LEVERAGE, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };
+module.exports = { FAMILY, LEVERAGE, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, mirrorOf, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };

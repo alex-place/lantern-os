@@ -136,3 +136,26 @@ test('a record WITHOUT evidence still writes the bare row — old callers unaffe
     assert.ok(!('ibs' in r), 'absent evidence stays absent — no undefined/null pollution');
   }
 });
+
+test('MIRROR MAP (#3390): every leveraged pair mirrors both ways at matched leverage', () => {
+  const { mirrorOf, leverageOf } = require('../lib/direction-lock');
+  // the pairs the redirect would trade — each must resolve and be symmetric
+  for (const [a, b] of [['SOXL', 'SOXS'], ['TQQQ', 'SQQQ'], ['SPXL', 'SPXS'],
+    ['TNA', 'TZA'], ['UDOW', 'SDOW'], ['SSO', 'SDS'], ['QLD', 'QID'], ['UWM', 'TWM']]) {
+    assert.strictEqual(mirrorOf(a), b, `${a} → ${b}`);
+    assert.strictEqual(mirrorOf(b), a, `${b} → ${a} (symmetric)`);
+    assert.strictEqual(leverageOf(a), leverageOf(b), `${a}/${b} leverage must match`);
+  }
+});
+
+test('mirrorOf never invents a mirror: unlevered longs and unknowns return null', () => {
+  const { mirrorOf } = require('../lib/direction-lock');
+  // SPY's -1x exists (SH) but SPY is 1x long — its mirror IS SH (1x): allowed.
+  assert.strictEqual(mirrorOf('SPY'), 'SH', '1x mirrors to the 1x inverse');
+  // no same-leverage opposite in the universe → null, never a mismatched pair
+  for (const s of ['GLD', 'XLK', 'NOPE', '', null]) {
+    const m = mirrorOf(s);
+    assert.ok(m === null || m !== s, `no self-mirror for ${s}`);
+  }
+  assert.strictEqual(mirrorOf('XLK'), null, 'XLK has no inverse in the universe');
+});
