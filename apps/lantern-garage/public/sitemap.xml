@@ -6,6 +6,11 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://www.unisona.ai/budget.html</loc>
+    <lastmod>2026-08-18</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.unisona.ai/changelog.html</loc>
     <lastmod>2026-07-22</lastmod>
     <priority>0.5</priority>
@@ -26,6 +31,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.unisona.ai/ibkr-setup-guide.html</loc>
+    <lastmod>2026-08-18</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.unisona.ai/kalshi-terminal.html</loc>
     <lastmod>2026-07-22</lastmod>
     <priority>0.6</priority>
@@ -34,6 +44,16 @@
     <loc>https://www.unisona.ai/knowledgecenter.html</loc>
     <lastmod>2026-07-22</lastmod>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.unisona.ai/options.html</loc>
+    <lastmod>2026-08-18</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.unisona.ai/orchestration.html</loc>
+    <lastmod>2026-08-18</lastmod>
+    <priority>0.4</priority>
   </url>
   <url>
     <loc>https://www.unisona.ai/pricing.html</loc>
@@ -49,6 +69,11 @@
     <loc>https://www.unisona.ai/terms.html</loc>
     <lastmod>2026-07-22</lastmod>
     <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.unisona.ai/watch.html</loc>
+    <lastmod>2026-08-18</lastmod>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.unisona.ai/welcome.html</loc>
