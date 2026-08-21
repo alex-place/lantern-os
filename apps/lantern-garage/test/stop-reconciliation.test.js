@@ -213,3 +213,67 @@ test('seeding is conservative: terminal, non-stop, unheld, and already-registere
   assert.strictEqual(at._stopOrders.get('SMH').id, 'KEEP-ME', 'an existing registry entry is never overwritten by seeding');
   assert.ok(!at._stopOrders.has('ZZZZ'), 'orders on unheld symbols are not adopted');
 });
+
+test('BROKER CASING (#3407): a lowercase Alpaca stop fill arms the cooldown like an IBKR one', async () => {
+  // The real 2026-08-21 race row: order_type "stop", reason "broker fill" —
+  // the exact-case compare missed it, no cooldown armed, SOXL re-entered the
+  // same minute. The classification must be case-insensitive.
+  seedSmh({ stopOrders: null });
+  const bridge = bridgeWith({
+    orderStatus: () => null,
+    orders: [{ orderId: 'alp-1', symbol: 'SMH', side: 'SELL', orderType: 'stop', status: 'filled',
+      filledQty: 203, avgPrice: 560.7883911, time: Date.now() }],
+  });
+  await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
+  const st = readState();
+  assert.ok(st.stopCooldownThrough && st.stopCooldownThrough.SMH,
+    'lowercase "stop" must arm the post-stop cooldown');
+  assert.strictEqual(st.stopFills.count, 1, 'and tick the daily breaker');
+});
+
+test('CANCEL SETTLE (#3407): the sell waits for the canceled stop to leave the book', async () => {
+  // Alpaca holds a canceled order in pending_cancel while the shares stay
+  // reserved; selling immediately gets rejected (the eod_decarry double-error
+  // of 08-21, and the operator's champion-flatten bounce of 08-20).
+  let fetches = 0;
+  const phases = [
+    [{ orderId: 'S1', symbol: 'SMH', side: 'SELL', orderType: 'stop', status: 'Submitted', qty: 203 }],       // initial: working
+    [{ orderId: 'S1', symbol: 'SMH', side: 'SELL', orderType: 'stop', status: 'pending_cancel', qty: 203 }],  // check 1: still reserved
+    [],                                                                                                        // check 2: gone
+  ];
+  const bridge = {
+    getIBKROpenOrders: async () => phases[Math.min(fetches++, phases.length - 1)],
+    cancelIBKROrder: async () => ({ ok: true }),
+  };
+  const t0 = Date.now();
+  await at.cancelRestingStops(bridge, 't', 'SMH');
+  assert.ok(fetches >= 3, `must re-check until the order leaves the book (fetched ${fetches})`);
+  assert.ok(Date.now() - t0 >= 600, 'waited for the pending_cancel to settle');
+});
+
+test('cancel settle is BOUNDED: a stop that never dies cannot hang the exit', async () => {
+  const bridge = {
+    getIBKROpenOrders: async () => [{ orderId: 'Z1', symbol: 'SMH', side: 'SELL', orderType: 'stop', status: 'pending_cancel', qty: 203 }],
+    cancelIBKROrder: async () => ({ ok: true }),
+  };
+  const t0 = Date.now();
+  await at.cancelRestingStops(bridge, 't', 'SMH');
+  assert.ok(Date.now() - t0 < 4000, 'bounded retries — the close must never hang');
+});
+
+test('FILL BASIS (#3407): a differing broker basis writes ONE entry_fill correction row', async () => {
+  at._resetCooldowns();
+  if (fs.existsSync(LOG)) fs.unlinkSync(LOG);
+  at._pendingFillBasis.set('SMH', { quote: 119.369, ts: Date.now() });
+  at._checkFillBasis('SMH', 119.185);                       // the real 08-21 SOXL pair
+  at._checkFillBasis('SMH', 119.185);                       // second sighting must be silent
+  const rows = readRows().filter((r) => r.event === 'entry_fill');
+  assert.strictEqual(rows.length, 1, 'exactly one correction row');
+  assert.strictEqual(rows[0].quote_px, 119.369);
+  assert.strictEqual(rows[0].fill_px, 119.185);
+  assert.ok(rows[0].delta_bps > 10, 'the 08-21 gap is ~15bp');
+  // matching basis writes nothing
+  at._pendingFillBasis.set('QQQ', { quote: 700, ts: Date.now() });
+  at._checkFillBasis('QQQ', 700.02);                        // 0.3bp — same price
+  assert.strictEqual(readRows().filter((r) => r.event === 'entry_fill').length, 1);
+});

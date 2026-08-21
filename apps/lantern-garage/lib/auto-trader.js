@@ -345,6 +345,7 @@ const isFailedStop = (status) => {
 async function cancelRestingStops(bridge, userId, sym) {
   try {
     const orders = await bridge.getIBKROpenOrders(userId);
+    const canceled = [];
     for (const o of (orders || [])) {
       // Cancel WORKING and PARKED stops alike: the resize path calls this to clear
       // duplicates, and a parked/unknown-status duplicate it fails to remove is
@@ -352,7 +353,26 @@ async function cancelRestingStops(bridge, userId, sym) {
       // skipped — cancelling those is a no-op that only burns API calls.
       if (String(o.symbol || '').toUpperCase() === sym && o.orderId && !STOP_TERMINAL.test(String(o.status || ''))) {
         await bridge.cancelIBKROrder(userId, o.orderId);
+        canceled.push(String(o.orderId));
       }
+    }
+    // SETTLE BEFORE SELLING (#3407). A cancel is not instantaneous: Alpaca holds
+    // the order in pending_cancel while the shares stay reserved, so a market
+    // sell issued immediately after is rejected for insufficient quantity. That
+    // is exactly how the race book's eod_decarry errored TWICE on 2026-08-21
+    // and carried a 3x position into a weekend (and how the operator's manual
+    // champion flatten bounced on 08-20). Wait — bounded — until the canceled
+    // ids leave the working book; IBKR usually settles on the first check.
+    for (let attempt = 0; canceled.length && attempt < 3; attempt++) {
+      const open = await bridge.getIBKROpenOrders(userId).catch(() => null);
+      if (!Array.isArray(open)) break;                       // unreadable → don't spin
+      // STOP_WORKING, not !STOP_TERMINAL: 'pending_cancel' CONTAINS 'cancel',
+      // so the terminal test reads it as settled — the exact state where the
+      // shares are still reserved. Caught by this fix's own test.
+      const stillWorking = open.some((o) => canceled.includes(String(o.orderId))
+        && STOP_WORKING.test(String(o.status || '')));
+      if (!stillWorking) break;
+      await new Promise((r) => setTimeout(r, 700));
     }
   } catch (_e) { /* fail-soft — a missed cancel is caught by the never-short guard */ }
 }
@@ -547,6 +567,22 @@ const _lastPos = new Map();
 //                   later was booked as our exits, at alien cost bases).
 const _absentStreak = new Map();
 const _seenStreak = new Map();
+// FILL-BASIS CHECK (#3407). The entry row logs the decision-time quote; the
+// broker's avg basis is only knowable later. sym -> { quote, ts }; when the
+// held position first shows a basis differing by >1bp, ONE entry_fill row
+// records both numbers (append-only correction, the ledger never mutates).
+const _pendingFillBasis = new Map();
+function _checkFillBasis(sym, brokerEntry) {
+  const p = _pendingFillBasis.get(sym);
+  if (!p || !(Number(brokerEntry) > 0)) return;
+  _pendingFillBasis.delete(sym);
+  const q = Number(p.quote);
+  if (!(q > 0)) return;
+  const bps = Math.abs(brokerEntry / q - 1) * 1e4;
+  if (bps <= 1) return;                                  // same price — nothing to correct
+  logTrade({ event: 'entry_fill', symbol: sym, quote_px: q, fill_px: Number(brokerEntry),
+    delta_bps: Math.round(bps * 10) / 10 });
+}
 // PROTECTIVE-STOP REGISTRY (#3379). sym -> { id, px, qty, at } for the stop THIS
 // engine last placed. The point: /iserver/account/orders does not reliably show
 // a prior-session GTC stop once it fills (SMH, 2026-08-19 — placed 08-18, filled
@@ -614,7 +650,10 @@ function _reconcileFills(orders) {
       _excursion.delete(row.symbol);   // consumed by the fill row it was frozen for
       // A STOP fill arms the re-entry cooldown: today + N trading days.
       const _cdDays = cfg().stopCooldownDays;
-      if (String(row.order_type || '') === 'Stop' || /(^|\b)stop\b/i.test(String(row.reason || ''))) {
+      // Case-insensitive (#3407): IBKR reports 'Stop', Alpaca reports 'stop'.
+      // The exact-case compare cost a cooldown on 2026-08-21 — a real Alpaca
+      // stop fill classified as plain 'broker fill', re-entry the same minute.
+      if (/^stop$/i.test(String(row.order_type || '')) || /(^|\b)stop\b/i.test(String(row.reason || ''))) {
         if (_cdDays > 0) _stopCooldownThrough.set(row.symbol, _nextTradingDates(_etDate(Date.now()), _cdDays));
         _noteStopFill(Date.now());   // feeds the daily circuit breaker
       }
@@ -810,7 +849,9 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   _entryAt.delete(sym); _peak.delete(sym); _trough.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   _exitIntent.set(sym, reason);
-  logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status });
+  logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status,
+    // #3407: keep the broker's words — status:'error' alone cost a diagnosis round trip on 08-21
+    error: (r && /error/i.test(String(r.status || '')) && (r.reason || r.error)) || null });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
   return r;
 }
@@ -1127,7 +1168,10 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
                              // (2026-08-07): without it, two same-scan entries each compared
                              // against the stale pre-scan gross and stacked past the cap
                              // (probed to 126% of budget; audit 2026-08-08).
-  for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
+  for (const p of (positions || [])) {
+    const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p;
+    _checkFillBasis(k, p.avg_entry_price ?? p.avg_fill_price);   // #3407: one-time basis correction row
+  }
   // Every symbol the broker CONFIRMS we hold refreshes its timestamp (#3282). If
   // one later vanishes with no exit row to explain it, this is what tells the
   // entry gate the flat reading is a feed dropout rather than an opportunity.
@@ -2114,10 +2158,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     }
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
+      _pendingFillBasis.set(sym, { quote: price, ts: now });   // #3407: basis check armed
       logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
         // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
         // the report can split entry outcomes by tape without guessing later.
         spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null,
+        entry_src: 'quote',   // #3407: honest label — the fill basis arrives via entry_fill
         // MIRROR JOURNAL (#3390). The redirect counterfactual, priced at the
         // moment of decision: which same-leverage opposite instrument existed,
         // and what it cost right now. 2026-08-18 made the case — SOXL fired
@@ -2347,4 +2393,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
