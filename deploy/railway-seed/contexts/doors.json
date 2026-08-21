@@ -1,0 +1,30 @@
+{
+  "pcsf_type": "context",
+  "pcsf_version": "2.0.0",
+  "component": "dream-doors",
+  "description": "Dream door canon. Moved from inline blob in lib/dream-chat.js to MCP resource.",
+  "generated_at": "2026-06-07T23:30:00Z",
+  "doors": {
+    "founder": {
+      "name": "Founder's Wish Door",
+      "anchors": ["Love", "Safety", "Truth", "Beauty", "Freedom", "Memory", "Return"],
+      "phrase": "Hold the center. Protect the wish. Return to the anchor."
+    },
+    "xp": {
+      "name": "Gage's Windows XP Door",
+      "phrase": "Never log off. Level up always."
+    },
+    "xenon": {
+      "name": "Xenon Door",
+      "phrase": "Build beyond one world."
+    },
+    "fog": {
+      "name": "Sea of Fog and Clouds Door",
+      "phrase": "Let the powerful images rest before they become stories."
+    },
+    "sigil": {
+      "name": "Sigil / City of Doors",
+      "phrase": "You hold the keys. You protect the doors. You are never alone."
+    }
+  }
+}
