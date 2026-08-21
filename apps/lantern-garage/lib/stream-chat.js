@@ -3293,10 +3293,18 @@ async function handleStreamChat(req, url, res) {
       try {
         let sseDone = false;
         let sseErr = null;
+        // Buffer the connector's output instead of streaming it live. The connector yields its
+        // hardcoded _offline_reply ("no local model is running…") as ordinary tokens when every
+        // provider failed — often just a cold-loading local model whose HTTP is up but whose
+        // weights aren't ready. Those bytes are NOT model output; they must never reach the user
+        // or be credited to ollama (#2982). We flush them only once the done-meta confirms the
+        // connector did not fall back.
+        let connectorText = "";
+        let connectorMeta = {};
         const sseStream = unifiedAgentStreamSSE(message, agent.id, requestedProvider || "ollama", dreamContext);
         sseStream.onData((parsed) => {
-          if (parsed.token) { fullReply += parsed.token; sendToken(parsed.token); }
-          if (parsed.done) { sseDone = true; }
+          if (parsed.token) { connectorText += parsed.token; }
+          if (parsed.done) { if (parsed.meta) connectorMeta = parsed.meta; sseDone = true; }
         });
         sseStream.onError((err) => { sseErr = err; sseDone = true; });
         await new Promise((resolve) => {
@@ -3305,6 +3313,18 @@ async function handleStreamChat(req, url, res) {
           }, 50);
         });
         if (sseErr) throw sseErr;
+        // #2982: only accept the connector's output as a real reply when its done-meta does NOT
+        // say it fell back to the canned offline text. A source/provider of "offline" means all
+        // providers failed; discard the canned bytes, record the failure, and fall through to the
+        // direct-HTTP retry (Attempt 2), which answers once the local model finishes loading.
+        // This keeps the body, the turn footer, and the status bar from ever contradicting.
+        const connectorOffline = !!connectorMeta && (connectorMeta.source === "offline" || connectorMeta.provider === "offline");
+        if (connectorText && !connectorOffline) {
+          fullReply = connectorText;
+          sendToken(connectorText);
+        } else if (connectorOffline) {
+          recordProviderFailure("ollama", "unified_connector_offline_fallback");
+        }
         if (fullReply) {
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({

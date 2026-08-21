@@ -1,0 +1,3 @@
+### Fixed
+
+- chat: the cold-start '_offline_reply' is no longer streamed to the user or credited to the local model. The unified-connector's hardcoded 'no local model is running' fallback (source:offline) was being emitted as ollama tokens and stamped source:ollama/online:true — a turn that said 'down' in the body, 'answered by llama3.1:8b' in the footer, and 'ollama online' in the status bar all at once. stream-chat.js now buffers the connector output, checks the done-meta, and on a source:offline fallback discards it and falls through to the direct-HTTP retry (which answers once a cold-loading model is ready) or the honest offline handler — so the three surfaces always agree (#2982).
