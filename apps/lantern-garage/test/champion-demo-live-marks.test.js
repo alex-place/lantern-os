@@ -35,3 +35,25 @@ test('positionsLive() returns the full book with an account and never throws (ne
   assert.ok(snap.account && Number.isFinite(Number(snap.account.equity)));
   assert.strictEqual(snap.demo, true);
 });
+
+test('positionsLive(seed): watchlist quotes win for shared symbols, no network needed (#2983)', async () => {
+  // A seed covering every champion symbol means positionsLive fetches nothing from Yahoo
+  // (need === []), so this is fully deterministic — it proves the demo book values a shared
+  // ticker at the SAME price the watchlist passed, which is what makes the two surfaces agree.
+  const seed = {};
+  for (const h of demo.HOLDINGS) seed[h.symbol] = { price: h.price + 1, chg_pct: 1.23 };
+  seed.TLT = { price: 83.70, chg_pct: -0.5 }; // the exact watchlist quote from the issue
+  const snap = await demo.positionsLive(seed);
+  const tlt = snap.positions.find((p) => p.symbol === 'TLT');
+  assert.strictEqual(tlt.current_price, 83.70, 'demo TLT marks to the watchlist quote, not baked 88.10');
+  assert.strictEqual(tlt.day_pct, -0.5);
+  assert.strictEqual(snap.account.marked_to_market, true);
+  assert.strictEqual(snap.account.live_quotes, 8, 'every symbol priced from the seed');
+});
+
+test('positionsLive(seed) is case-insensitive on the seed keys', async () => {
+  const seed = {};
+  for (const h of demo.HOLDINGS) seed[h.symbol.toLowerCase()] = { price: 100, chg_pct: 0 };
+  const snap = await demo.positionsLive(seed);
+  assert.strictEqual(snap.positions.find((p) => p.symbol === 'TLT').current_price, 100);
+});
