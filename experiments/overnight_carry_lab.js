@@ -200,5 +200,48 @@ function epStats(eps) {
       console.log(`  ${" ".repeat(8)}       holdout    ${fmt(hold)}`);
     }
   }
+  // ═══ ARM C ═══
+  // (operator refinement 2026-08-20: "about 30% of days will be negative …
+  // [the trader] has the inverse ETFs as a tool — find an optimal way to use
+  // them.") Arm B rejected MULTI-DAY holds. This is the surviving hypothesis:
+  // SAME-DAY only — a signal known AT THE OPEN, inverse held open→close, flat
+  // by the bell. No overnight, so the one-day −3x is just −3× the day's move:
+  // path decay cannot accumulate. Variants are decided on fit alone.
+  console.log("\n════ ARM C — same-day inverse: detect the red day at the open, flat by the close ════");
+  console.log("  entry at the open when the signal is true; exit at that day's close; L∈{1,3}\n");
+  const armC = (bs, variant, L) => {
+    const out = [];
+    for (let i = 1; i < bs.length; i++) {
+      const gap = bs[i].o / bs[i - 1].c - 1;
+      let on = false;
+      if (variant === "gapdown3") on = gap <= -0.003;
+      else if (variant === "gapdown5") on = gap <= -0.005;
+      else if (variant === "breakdown") on = bs[i].o < bs[i - 1].l;
+      else if (variant === "weakgap") on = ibs(bs[i - 1]) <= 0.25 && gap <= -0.002;
+      if (!on) continue;
+      out.push({ d: bs[i].d, oc: bs[i].c / bs[i].o - 1, ret: -L * (bs[i].c / bs[i].o - 1) });
+    }
+    return out;
+  };
+  console.log("  variant    lev  window     days  /yr   winRate   avg/trade   total(compounded)   [avg O→C a long dodges]");
+  const cfmt = (eps) => {
+    if (!eps.length) return "       —";
+    const tot = compound(eps.map((e) => e.ret));
+    const w = eps.filter((e) => e.ret > 0).length / eps.length;
+    const avg = eps.reduce((t, e) => t + e.ret, 0) / eps.length;
+    const avgOc = eps.reduce((t, e) => t + e.oc, 0) / eps.length;
+    const yrs = (Date.parse(eps[eps.length - 1].d) - Date.parse(eps[0].d)) / 3.156e10 || 1;
+    return String(eps.length).padStart(5) + "  " + (eps.length / yrs).toFixed(1).padStart(4)
+      + "   " + (w * 100).toFixed(0).padStart(4) + "%   " + (avg * 1e4).toFixed(1).padStart(7) + " bp   "
+      + pct(tot).padStart(12) + "      [" + (avgOc * 1e4).toFixed(1) + " bp]";
+  };
+  for (const variant of ["gapdown3", "gapdown5", "breakdown", "weakgap"]) {
+    for (const L of [1, 3]) {
+      console.log("  " + variant.padEnd(10) + " -" + L + "x  fit      " + cfmt(armC(fitBars, variant, L)));
+      console.log("  " + " ".repeat(10) + "      holdout  " + cfmt(armC(holdBars, variant, L)));
+    }
+  }
+  console.log("\n  Read the bracketed column twice: it is the SAME table as a LONG-AVOIDANCE filter —");
+  console.log("  a negative avg O→C means a long held through those days bleeds, whether or not an inverse is bought.");
   console.log("\n  VERDICT RULE: an arm ships only if its chosen variant is positive in BOTH windows.");
 })();
