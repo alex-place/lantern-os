@@ -156,17 +156,20 @@ function buildPrompt(ctx) {
 }
 
 function parseReply(text) {
+  // #3407: a degraded parse keeps a snippet of what the model actually said —
+  // the first live close-read failed 'unparseable' and left nothing to debug.
+  const raw = String(text || '').slice(0, 180);
   try {
     const m = String(text || '').match(/\{[\s\S]*\}/);
-    if (!m) return { degraded: true, reason: 'unparseable' };
+    if (!m) return { degraded: true, reason: 'unparseable', raw };
     const j = JSON.parse(m[0]);
     const regime = ['trend_up', 'trend_down', 'chop'].includes(j.regime) ? j.regime : null;
     const posture = ['long', 'flat', 'inverse'].includes(j.posture) ? j.posture : null;
     const conviction = Number.isFinite(Number(j.conviction))
       ? Math.max(0, Math.min(100, Math.round(Number(j.conviction)))) : null;
-    if (!regime || !posture || conviction == null) return { degraded: true, reason: 'missing fields' };
+    if (!regime || !posture || conviction == null) return { degraded: true, reason: 'missing fields', raw };
     return { regime, posture, conviction, why: String(j.reason || '').slice(0, 160), degraded: false };
-  } catch (_e) { return { degraded: true, reason: 'parse error' }; }
+  } catch (_e) { return { degraded: true, reason: 'parse error', raw }; }
 }
 
 // ── providers ────────────────────────────────────────────────────────────────
@@ -180,7 +183,7 @@ async function askClaude(prompt, fetchImpl) {
     const res = await doFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: ac.signal,
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: CLAUDE_MODEL(), max_tokens: 300,
+      body: JSON.stringify({ model: CLAUDE_MODEL(), max_tokens: 500,   // #3407: 300 clipped a reply on day one
         messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res || !res.ok) return { degraded: true, reason: 'http ' + (res && res.status) };
