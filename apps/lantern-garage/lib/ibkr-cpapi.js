@@ -258,6 +258,9 @@ class IbkrCpapi {
   async _ensureLst() {
     if (!this.oauth1) return null;
     if (this._lst && this._lst.expiresAt > Date.now() + 5000) return this._lst.token;
+    // #3394: a failed handshake sets a short cooldown so the maintenance window
+    // is not hammered with one DH exchange per status poll.
+    if (this._lstRetryAfter && Date.now() < this._lstRetryAfter) return null;
     const url = this.baseUrl + '/oauth/live_session_token';
     let req, r, lst;
     this._lstError = null;
@@ -284,6 +287,7 @@ class IbkrCpapi {
         code = r.status ? `http_${r.status}` : 'unreachable';
       }
       this._lstError = { code, status: r.status, detail: msg };
+      this._lstRetryAfter = Date.now() + 120000;   // #3394: back off 2 min after a refused handshake
       return null;
     }
     if (!r.json || !r.json.diffie_hellman_response) { this._lstError = { code: 'no_dh_response' }; return null; }
@@ -303,6 +307,8 @@ class IbkrCpapi {
     const exp = Number(r.json.live_session_token_expiration);
     const expiresAt = exp > now && exp <= now + 24 * 60 * 60 * 1000 ? exp : now + 10 * 60 * 1000;
     this._lst = { token: lst, expiresAt };
+    this._lstMintedAt = Date.now();
+    this._lstRetryAfter = 0;
     // Best-effort brokerage session init (needed for /iserver reads + orders).
     try {
       const initHeaders = this.oauth1.signRequest(
@@ -570,12 +576,34 @@ class IbkrCpapi {
    * connected = the token authenticates AND a brokerage session is up; for reads
    * alone, a successful /portfolio/accounts is also treated as reachable+usable.
    */
+  /**
+   * MORNING-BLINDNESS SELF-HEAL (#3394). IBKR's nightly maintenance kills the
+   * brokerage session, but the cached LST lives ~24h — and ssodh/init only runs
+   * when a NEW LST is minted. The stuck state: every request signs correctly
+   * against a dead session, /tickle answers authenticated:false, and nothing
+   * recovers until a restart happens to re-handshake (2026-08-20: the engine
+   * was blind at 03:48 and only a lucky deploy restart fixed it; tonight the
+   * same state would have held into Friday's open). The cure: when the gateway
+   * is REACHABLE but the session is not authenticated and the LST is old enough
+   * to rule out a mint race, drop the LST — the next request re-mints and
+   * ssodh/init re-seizes the session. Returns true when it invalidated.
+   */
+  _maybeInvalidateStaleSession(probe) {
+    if (!probe || !probe.reachable || probe.authenticated) return false;
+    if (!this._lst) return false;
+    if (Date.now() - (this._lstMintedAt || 0) < 90000) return false;   // fresh mint — not the stuck state
+    this._lst = null;
+    this._statusCache = null;
+    return true;
+  }
+
   async getStatus() {
     const now = Date.now();
     if (this._statusCache && now - this._statusCache.at < this.statusTtlMs) {
       return this._statusCache.value;
     }
     const probe = await this.probe();
+    this._maybeInvalidateStaleSession(probe);   // #3394: next call re-handshakes
     let accountId = null;
     let readsOk = false;
     if (probe.reachable && (probe.authenticated || probe.sessionAlive)) {
