@@ -5509,10 +5509,12 @@ document.addEventListener('pointermove', (e) => {
   if (!_drawPending || !_drawPending.pts.length) return;
   const spec = DRAW_TOOLS[_drawPending.t];
   if (!spec || !spec.pts || _drawPending.pts.length >= spec.pts) return;
+  // Find the chart the SAME way the click handler does. A .ladder-overlay div sits
+  // above the canvas, so the cursor never lands on the canvas itself -- resolve
+  // through .zone-ladder, which is the container both paths agree on.
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  const canvas = el && (el.tagName === 'CANVAS' ? el : (el.closest ? el.closest('.chart-wrap, .pane') : null));
-  const cv = canvas && canvas.tagName === 'CANVAS' ? canvas : (canvas ? canvas.querySelector('canvas') : null);
-  if (!cv) return;
+  const lad = el && el.closest ? el.closest('.zone-ladder') : null; if (!lad) return;
+  const cv = lad.querySelector('.chart-canvas'); if (!cv) return;
   const a2 = _drawAnchor(cv, e.clientX, e.clientY); if (!a2) return;
   if (_canvasTicker(cv) !== _drawPending.tk) return;
   _drawPending.hover = { ts: a2.ts, price: a2.price };
