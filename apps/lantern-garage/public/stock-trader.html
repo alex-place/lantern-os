@@ -2803,7 +2803,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const drawOne = (d, ghost) => {
           // Per-drawing style (colour / width / dash) lives on the object, so it saves with it.
           const _st = (typeof drawStyleOf === 'function') ? drawStyleOf(d) : {};
-          const col = d.color || _st.color || DRAW_COLOR;
+          const col = d.color || _st.color || drawDefaultColor(d.t);
           ctx.save();
           if (ghost) ctx.globalAlpha = 0.55;
           const base = ghost ? 0.55 : 1;
@@ -4580,6 +4580,24 @@ const DRAW_TOOLS = (() => {
         out[id] = Object.assign({ group: cat.name, cat: cat.id, sub: g.name, pts: 1 }, t);
   return out;
 })();
+
+/* One default colour per FAMILY, not one violet for all 51 tools. A fib, a chart
+   pattern and a forecast are different kinds of statement, and drawing them all in the
+   same colour made a chart with several on it unreadable -- which is what 'the patterns
+   are supposed to be multicoloured' meant. An explicit per-drawing colour still wins;
+   this only replaces the fallback. */
+const DRAW_CAT_COLOR = {
+  lines:    '#5b8def',   // structure you draw yourself -- blue, close to the selection blue
+  patterns: '#f5a623',   // chart patterns -- amber, so they read as annotation not price
+  fib:      '#26a69a',   // fib families -- teal, matching the up-candle so levels sit with the tape
+  forecast: '#a78bfa',   // forecasting keeps the old violet; its own levels colour themselves
+  brushes:  '#ec6a5e',   // freehand -- warm, obviously hand-made
+  text:     '#b3b9c5',   // notes are chrome, not signal
+};
+function drawDefaultColor(t) {
+  const spec = DRAW_TOOLS[t];
+  return (spec && DRAW_CAT_COLOR[spec.cat]) || DRAW_COLOR;
+}
 
 const _drawings = (() => { try { return JSON.parse(localStorage.getItem('trader.drawings') || '{}'); } catch (e) { return {}; } })();
 function _saveDrawings() { try { localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); } catch (e) {} }
