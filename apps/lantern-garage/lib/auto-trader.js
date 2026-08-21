@@ -2290,9 +2290,19 @@ function _logSkips(skipped) {
     const key = why.replace(/\d+(\.\d+)?/g, '#');          // ignore churning counters
     if (_lastSkipWhy.get(s.symbol) === key) continue;      // same blocker as last scan → already on record
     _lastSkipWhy.set(s.symbol, key);
+    // EVIDENCE PASS-THROUGH (#3381). #3375 attached decision_context to every
+    // entry-candidate record so a veto could be audited later — and this
+    // whitelist then silently dropped every one of those fields before disk.
+    // Found on the feature's first live day: the ledger rows were still bare.
+    // The whitelist stays (a skip row must not balloon), but the evidence keys
+    // are part of it now.
+    const _ev = {};
+    for (const k of ['ibs', 'spy_tape', 'spy_mom30', 'regime', 'et_min', 'macd_hist', 'in_zone', 'sign', 'knife_hist', 'knife_prev']) {
+      if (s[k] !== undefined) _ev[k] = s[k];
+    }
     logTrade({
       event: 'skip', symbol: s.symbol, direction: s.direction ?? null,
-      p_win: s.p_win ?? null, reason: why.slice(0, 300),
+      p_win: s.p_win ?? null, reason: why.slice(0, 300), ..._ev,
     });
   }
   // A symbol that stops being skipped must forget its reason, so that if the
