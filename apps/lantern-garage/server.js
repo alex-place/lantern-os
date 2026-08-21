@@ -293,9 +293,17 @@ function premiumApiGuard(req, res, url) {
   ) {
     return requireEntitlement(req, res, "pro") ? false : true;
   }
-  // Alpaca broker connect → same trade gate as IBKR ($20 Pro+).
+  // Alpaca broker connect → any signed-in account (Free+), NOT the "trade" gate.
+  // Own-broker trading is a Free-tier capability (hasEntitlement, 2026-07-31), and it's
+  // sold as such (pricing.html: "connect Alpaca and place orders"). Gating the connect
+  // endpoints behind "trade" was a chicken-and-egg deadlock: a Free user only earns
+  // "trade" AFTER brokerConnected(), but couldn't reach connect to get there (#2992/#3008
+  // reconcile). These routes only start the per-user OAuth connect / status / disconnect
+  // (broker-alpaca.js) — a self-service action on the user's OWN credentials, mirroring
+  // the /api/files/* Free+ gate below. Order PLACEMENT stays "trade"-gated via
+  // tradeApiGuard on /api/trading/*.
   if (p.startsWith("/api/broker/alpaca/")) {
-    return requireEntitlement(req, res, "trade") ? false : true;
+    return requireAuth(req, res) ? false : true;
   }
   // File upload/extract → any signed-in account (Free+); blocks anonymous callers.
   if (p.startsWith("/api/files/")) {

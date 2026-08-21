@@ -34,6 +34,8 @@ const CAPS = {
   guest:        Number(process.env.CHAT_CAP_FREE   || 50),
   supporter:    Number(process.env.CHAT_CAP_MEMBER || 100), // $5 Member
   deep_dreamer: Number(process.env.CHAT_CAP_PRO    || 250), // $20 Pro
+  founder:      Number(process.env.CHAT_CAP_PRO    || 250), // legacy alias for deep_dreamer (level 2) — same Pro cap.
+                                                            // Omitting it dropped $20 patrons persisted as "founder" to the Free cap (#2992).
   // pilot ($200) / admin → unlimited
 };
 
