@@ -322,11 +322,16 @@
   .ui-sel-native{position:absolute!important;width:1px!important;height:1px!important;
     margin:-1px!important;padding:0!important;border:0!important;opacity:0!important;
     clip-path:inset(50%);overflow:hidden;white-space:nowrap;pointer-events:none}
-  .ui-sel{width:100%;height:var(--al-h,32px);display:flex;align-items:center;gap:8px;
+  .ui-sel{display:inline-flex;align-items:center;gap:6px;cursor:pointer;text-align:left;
+    font:inherit;color:inherit;background:none;border:0;padding:0}
+  /* The dialog's controls are boxed and uniform; the toolbar's are not. */
+  .al-fields .ui-sel,.al-sym .ui-sel{width:100%;height:var(--al-h,32px);gap:8px;
     background:color-mix(in srgb, var(--bg2) 70%, var(--bg1));
     border:1px solid color-mix(in srgb, var(--border) 85%, transparent);
-    border-radius:var(--pop-r-item);color:var(--text0);font:inherit;font-size:13px;
-    padding:0 10px;cursor:pointer;text-align:left}
+    border-radius:var(--pop-r-item);color:var(--text0);font-size:13px;padding:0 10px}
+  .al-sym .ui-sel{background:none;border:0;height:auto;padding:0;width:auto}
+  /* A toolbar button keeps .chart-ctrl / .wl-sort, copied from the select it replaces. */
+  .ui-sel.chart-ctrl,.ui-sel.wl-sort{display:inline-flex}
   .ui-sel-val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ui-sel-car{flex:0 0 auto;display:flex;opacity:.75;transition:transform .12s ease}
   .ui-sel[aria-expanded="true"] .ui-sel-car{transform:rotate(180deg)}
@@ -5371,7 +5376,9 @@ function _uiSelect(sel) {
   sel.dataset.uiSel = '1';
   sel.classList.add('ui-sel-native'); sel.setAttribute('tabindex', '-1');
   const btn = document.createElement('button');
-  btn.type = 'button'; btn.className = 'ui-sel';
+  btn.type = 'button';
+  // Carry the select's own classes so a toolbar chip still looks like a toolbar chip.
+  btn.className = ('ui-sel ' + (sel.className || '').replace('ui-sel-native', '')).trim();
   btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
   const lab = sel.getAttribute('aria-label'); if (lab) btn.setAttribute('aria-label', lab);
   const val = document.createElement('span'); val.className = 'ui-sel-val';
@@ -5451,6 +5458,16 @@ document.addEventListener('click', (e) => {
 });
 window.addEventListener('resize', _uiSelClose);
 window.addEventListener('scroll', _uiSelClose, true);
+/* Every native select on the page, not just the dialog's. Runs after first paint so
+   markup built by script is covered too, and again on demand for anything minted
+   later (the fullscreen toolbar clones its controls). */
+function _uiSelectPage() { try { _uiSelectAll(document); } catch (_e) {} }
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(_uiSelectPage, 0));
+} else { setTimeout(_uiSelectPage, 0); }
+// A late sweep catches selects rendered by the first data tick.
+setTimeout(_uiSelectPage, 1500);
+setTimeout(_uiSelectPage, 4000);
 function closeAlertDialog() { if (_alertDlg) _alertDlg.hidden = true; _alertEditId = null; }
 
 /* The value boxes follow the operator: one for a level, two for a channel, and the
