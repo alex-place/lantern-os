@@ -497,14 +497,25 @@ def summarize_leaderboard() -> None:
     print("\n" + "=" * 80)
 
 
-def write_report(path: Path = REPORT_PATH) -> None:
-    """Write a Markdown leaderboard report for monitoring (#730 'Monitor leaderboard')."""
+def write_report(path: Path = REPORT_PATH) -> int:
+    """Write a Markdown leaderboard report for monitoring (#730 'Monitor leaderboard').
+
+    Returns the number of successful runs in the report. The report is a PURE FUNCTION of
+    the leaderboard data: the "as of" stamp is the latest run's timestamp, NOT the wall
+    clock. A `datetime.now()` stamp made REPORT.md churn on every invocation, so the daily
+    job's `git diff --staged --quiet` guard never fired and it committed
+    "0 successful run(s) of 0 total" every day — a dead instrument wearing a live badge
+    (#2953). Deriving the stamp from the data means the file only changes when a run is
+    actually added, so an empty day produces no diff and no commit.
+    """
     runs = load_leaderboard()
     successful = [r for r in runs if r.get("aggregates")]
+    latest_ts = max((str(r.get("timestamp", "")) for r in runs), default="")
+    as_of = (latest_ts[:19].replace("T", " ") + " UTC") if latest_ts else "no runs recorded yet"
     lines = [
         "# Serving Benchmark Leaderboard",
         "",
-        f"_Generated {datetime.now(timezone.utc).isoformat()} · "
+        f"_As of {as_of} · "
         f"{len(successful)} successful run(s) of {len(runs)} total._",
         "",
         "Validation contract (#730): FAST → latency <2s (hard), repetition target 0.85 / "
@@ -536,7 +547,8 @@ def write_report(path: Path = REPORT_PATH) -> None:
         lines += [f"**Distinct days with a successful run:** {len(days)} "
                   f"(Definition of Done target: ≥7)", ""]
     path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[benchmark] Wrote report to {path}")
+    print(f"[benchmark] Wrote report to {path} ({len(successful)} successful of {len(runs)} total)")
+    return len(successful)
 
 
 def _parse_provider_specs(spec: str) -> List[Tuple[str, str]]:
