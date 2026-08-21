@@ -186,7 +186,23 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       // positionsLive marks the fixture to the live quote feed (user report:
       // "the same numbers for days" — the baked snapshot never moved). Fail-soft
       // to the static snapshot inside positionsLive if quotes are down.
-      sendJson(res, await require('../../lib/champion-demo').positionsLive(), 200);
+      //
+      // Seed it with the SAME quotes the watchlist renders (getWatchlistPrices), so a
+      // symbol shown in both the demo book and the watchlist can't display two prices
+      // (#2983). Best-effort: a missing/failed watchlist feed just leaves the seed empty
+      // and positionsLive fetches every champion symbol itself, as before.
+      let seed = null;
+      try {
+        if (traderAgent && typeof traderAgent.getWatchlistPrices === 'function') {
+          const wl = await traderAgent.getWatchlistPrices();
+          seed = {};
+          for (const q of wl || []) {
+            const t = q && (q.ticker || q.symbol);
+            if (t) seed[String(t).toUpperCase()] = q;
+          }
+        }
+      } catch (_e) { seed = null; }
+      sendJson(res, await require('../../lib/champion-demo').positionsLive(seed), 200);
       return true;
     }
     try {

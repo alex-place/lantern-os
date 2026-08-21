@@ -131,16 +131,33 @@ function positions(quotesBySym = null) {
  * positions() marked to the live keyless quote feed. Fail-soft: any feed error
  * returns the baked snapshot (marked_to_market:false) — the demo must render
  * even when quotes are down, it just stops claiming to be live.
+ *
+ * `seedQuotes` (optional) is a { SYMBOL: {price, chg_pct} } map from the SAME feed the
+ * watchlist renders (traderAgent.getWatchlistPrices). It WINS for any overlapping symbol,
+ * so a ticker shown in both the demo book and the watchlist can never display two prices
+ * (#2983 — the demo used its own independent yahoo call, which could miss a symbol and
+ * fall back to a ~5%-stale baked mark next to the live watchlist quote). Champion symbols
+ * the seed doesn't cover are fetched from yahoo as before; a null seed = the old behavior.
  */
-async function positionsLive() {
+async function positionsLive(seedQuotes = null) {
+  const seed = {};
+  if (seedQuotes) {
+    for (const s of Object.keys(seedQuotes)) {
+      const q = seedQuotes[s];
+      if (q && Number(q.price) > 0) seed[String(s).toUpperCase()] = q;
+    }
+  }
   try {
     const yahoo = require('./market-data-yahoo');
-    const quotes = await yahoo.getQuotes(HOLDINGS.map((h) => h.symbol));
+    // Only fetch the champion symbols the watchlist seed doesn't already price.
+    const need = HOLDINGS.map((h) => h.symbol).filter((s) => !seed[s]);
+    const quotes = need.length ? await yahoo.getQuotes(need) : [];
     const bySym = {};
     for (const q of quotes || []) if (q && q.ticker) bySym[q.ticker] = q;
-    return positions(bySym);
+    Object.assign(bySym, seed); // watchlist quotes win over the demo's own fetch
+    return positions(Object.keys(bySym).length ? bySym : null);
   } catch (_e) {
-    return positions(null);
+    return positions(Object.keys(seed).length ? seed : null);
   }
 }
 
