@@ -266,3 +266,56 @@ test('entryKnifeFilter config defaults on, disables via env', () => {
     if (saved === undefined) delete process.env.TRADER_ENTRY_KNIFE_FILTER; else process.env.TRADER_ENTRY_KNIFE_FILTER = saved;
   }
 });
+
+
+test('#3295 1x-only entry gate: a 3x wrapper is leverage-blocked on a flat book, a 1x is not, and a HELD 3x reports "already long"', async () => {
+  const saved = { ...process.env };
+  const buys = [];
+  let positions = [];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => positions,
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => { if (/buy/i.test(o.side || '')) buys.push(o); return { status: 'placed' }; },
+  };
+  const enter = (sym) => ({ symbol: sym, direction: 'BULLISH', entry_price: 100, convergence: { decision: 'ENTER', p_win: 0.9 } });
+  try {
+    process.env.TRADER_AUTO_EXECUTE = '1';            // run the entry loop (the stub broker places nothing real)
+    process.env.TRADER_ENTRY_KNIFE_FILTER = '0';      // don't let the knife filter pre-veto
+    process.env.TRADER_REQUIRE_PERSIST = '0';
+    at._resetCooldowns();
+    const t0 = 1_700_000_000_000;
+
+    // Flat book: a 3x wrapper (SOXS, leverage 3) is blocked; a 1x (SPY) is not blocked FOR LEVERAGE.
+    const r = await at.runAutoTrade({ signals: [enter('SOXS'), enter('SPY')] }, { bridge, userId: 'u', now: t0 });
+    const soxs = r.skipped.find((s) => s.symbol === 'SOXS');
+    assert.ok(soxs && /leveraged|1x-only/i.test(soxs.why), `SOXS (3x) must be leverage-blocked, got: ${soxs && soxs.why}`);
+    const spyLevBlocked = r.skipped.some((s) => s.symbol === 'SPY' && /leveraged|1x-only/i.test(s.why));
+    assert.ok(!spyLevBlocked, 'SPY (1x) must NOT be leverage-blocked');
+
+    // Held 3x: the "already long" guard wins, so a position we carry is never re-entered here
+    // yet is left for manageHeldExits — "gate new entries only", not liquidate.
+    positions = [{ symbol: 'SOXS', qty: 100, avg_entry_price: 10, current_price: 10, unrealized_pl: 0, pnl_pct: 0 }];
+    at._resetCooldowns();
+    const r2 = await at.runAutoTrade({ signals: [enter('SOXS')] }, { bridge, userId: 'u', now: t0 + 60000 });
+    const soxsHeld = r2.skipped.find((s) => s.symbol === 'SOXS');
+    assert.ok(soxsHeld && /already long/i.test(soxsHeld.why), `held SOXS should report "already long", got: ${soxsHeld && soxsHeld.why}`);
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
+test('#3295 maxEntryLeverage defaults to 1 (1x-only) and is env-tunable', () => {
+  const saved = process.env.TRADER_MAX_ENTRY_LEVERAGE;
+  try {
+    delete process.env.TRADER_MAX_ENTRY_LEVERAGE;
+    assert.strictEqual(at.cfg().maxEntryLeverage, 1);
+    process.env.TRADER_MAX_ENTRY_LEVERAGE = '3';
+    assert.strictEqual(at.cfg().maxEntryLeverage, 3, 'operator can widen the cap to allow 3x');
+  } finally {
+    if (saved === undefined) delete process.env.TRADER_MAX_ENTRY_LEVERAGE; else process.env.TRADER_MAX_ENTRY_LEVERAGE = saved;
+  }
+});

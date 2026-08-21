@@ -135,6 +135,10 @@ function cfg() {
     // >=100 disables. Default 80 = always keep 20% cash.
     maxGrossPct: n('TRADER_MAX_GROSS_PCT', 80),
     maxNewPerScan: n('TRADER_MAX_NEW_PER_SCAN', DEFAULTS.maxNewPerScan),
+    // #3295: the IBS entry edge lives in 1x ETFs; 3x wrappers measured -319.5R over
+    // 4,308 trades (0/4 inverse profitable in any regime). Block NEW entries above this
+    // leverage magnitude. 1 = 1x-only (default, per the issue). Set 2 or 3 to allow more.
+    maxEntryLeverage: n('TRADER_MAX_ENTRY_LEVERAGE', 1),
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
     maxLossPct: n('TRADER_MAX_LOSS_PCT', DEFAULTS.maxLossPct),           // hard max-loss backstop exit
@@ -1747,6 +1751,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       || held * (Number(heldPos[sym] && heldPos[sym].current_price) || price || 0));
     const _isDustHolding = held > 0 && c.dustPct > 0 && _heldMv < account.equity * (c.dustPct / 100);
     if (held > 0 && !_isDustHolding) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // #3295: the IBS entry edge is in 1x ETFs (+467.6R, 7/7 profitable, 2010–2026); 3x
+    // wrappers contributed -319.5R over 4,308 trades — 0/4 inverse profitable in ANY
+    // regime, and SOXL (3x LONG) fails as badly, so leverage (not direction) is the
+    // discriminator. Block NEW entries above the leverage cap. This runs AFTER the
+    // 'already long' guard, so a 3x we already hold is never re-entered here yet is still
+    // carried and exited by manageHeldExits — "gate new entries only", not liquidate.
+    const _lev = require('./direction-lock').leverageOf(sym);
+    if (_lev > c.maxEntryLeverage) { out.skipped.push({ ...record, why: `1x-only: ${_lev}x leveraged entry blocked (#3295)` }); continue; }
     // UNEXPLAINED FLAT = FEED DROPOUT, NOT AN OPPORTUNITY (#3282).
     //
     // `already long` above trusts one position snapshot. On 2026-08-13 the feed
