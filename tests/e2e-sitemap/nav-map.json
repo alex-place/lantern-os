@@ -4,9 +4,9 @@
   "root": "index.html",
   "totals": {
     "pages": 31,
-    "reachable": 21,
-    "orphaned": 10,
-    "inSitemap": 12
+    "reachable": 20,
+    "orphaned": 11,
+    "inSitemap": 17
   },
   "graph": {
     "accounts.html": [
@@ -119,13 +119,15 @@
       "work.html"
     ],
     "knowledgecenter.html": [
+      "auth.html",
       "budget.html",
       "changelog.html",
       "chat.html",
       "explore.html",
       "faq.html",
+      "pricing.html",
+      "settings.html",
       "stock-trader.html",
-      "whats-new.html",
       "work.html"
     ],
     "metrics.html": [
@@ -256,16 +258,15 @@
     "kalshi-terminal.html": 2,
     "orchestration.html": 2,
     "settings.html": 2,
+    "auth.html": 2,
     "changelog.html": 2,
     "faq.html": 2,
-    "whats-new.html": 2,
-    "options.html": 2,
     "pricing.html": 2,
+    "options.html": 2,
     "trader-guide.html": 2,
     "watch.html": 2,
     "ibkr-setup-guide.html": 3,
-    "auth.html": 3,
-    "terms.html": 4
+    "terms.html": 3
   },
   "byDepth": {
     "0": [
@@ -280,6 +281,7 @@
       "work.html"
     ],
     "2": [
+      "auth.html",
       "changelog.html",
       "fallout-radio.html",
       "faq.html",
@@ -289,14 +291,10 @@
       "pricing.html",
       "settings.html",
       "trader-guide.html",
-      "watch.html",
-      "whats-new.html"
+      "watch.html"
     ],
     "3": [
-      "auth.html",
-      "ibkr-setup-guide.html"
-    ],
-    "4": [
+      "ibkr-setup-guide.html",
       "terms.html"
     ]
   },
@@ -320,7 +318,6 @@
     "terms.html",
     "trader-guide.html",
     "watch.html",
-    "whats-new.html",
     "work.html"
   ],
   "orphaned": [
@@ -333,36 +330,38 @@
     "reset-password.html",
     "system-health.html",
     "welcome.html",
+    "whats-new.html",
     "wide-search.html"
   ],
   "sitemap": [
     "index.html",
+    "budget.html",
     "changelog.html",
     "chat.html",
     "explore.html",
     "faq.html",
+    "ibkr-setup-guide.html",
     "kalshi-terminal.html",
     "knowledgecenter.html",
+    "options.html",
+    "orchestration.html",
     "pricing.html",
     "stock-trader.html",
     "terms.html",
+    "watch.html",
     "welcome.html",
     "whats-new.html"
   ],
   "reachableNotInSitemap": [
     "auth.html",
-    "budget.html",
     "fallout-radio.html",
-    "ibkr-setup-guide.html",
-    "options.html",
-    "orchestration.html",
     "settings.html",
     "trader-guide.html",
-    "watch.html",
     "work.html"
   ],
   "inSitemapNotReachable": [
-    "welcome.html"
+    "welcome.html",
+    "whats-new.html"
   ],
   "knowledgeCenterPath": [
     "index.html",
@@ -377,10 +376,10 @@
   "sharedNavTargets": [
     "chat.html",
     "stock-trader.html",
-    "budget.html",
     "work.html",
     "knowledgecenter.html",
-    "explore.html"
+    "explore.html",
+    "budget.html"
   ],
   "navConfigHidden": [
     "create.html"
