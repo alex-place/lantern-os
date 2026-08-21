@@ -1251,10 +1251,6 @@
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
-  <span class="hgroup-sep" aria-hidden="true"></span>
-  <button id="patternsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
-    onclick="togglePatternMenu(this)"
-    title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in. Detections are only shown when the deterministic engine actually finds them.">◱ Patterns ▾</button>
   <button id="indicatorsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="toggleIndicatorMenu(this)"
     title="Add technical indicators — moving averages and bands on the price, RSI/MACD/ATR and friends in their own strip below it. Each one's periods and colour are yours and are remembered.">∿ Indicators ▾</button>
@@ -1509,9 +1505,6 @@
         <option value="line">Line</option>
         <option value="candle">Candles</option>
       </select>
-      <button id="fsPatternsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
-        onclick="togglePatternMenu(this)"
-        title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in.">◱ Patterns ▾</button>
       <select id="fsChartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -6939,6 +6932,8 @@ function changeChartType(type){
 // carries the active count (e.g. "◱ Patterns (3) ▾"), and the button reads "active"
 // (accent) whenever anything is on. Legible without colour (the count) — WCAG 1.4.1.
 function _setPatternsBtn(){
+  // The toolbar buttons are gone -- the toggles live in the indicators menu. Kept as a
+  // no-op-safe shim because several callers still poke it on every pref change.
   const on = anyPatternOn();
   const n = PATTERN_PREF_KEYS.filter(k=> patternPrefs[k]).length;
   ['patternsToggle','fsPatternsToggle'].forEach(id=>{
@@ -7049,6 +7044,15 @@ function _buildIndMenu(){
     _closeIndMenu();
   });
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !m.hidden) _closeIndMenu(); });
+  // Pattern toggles now live in this menu, so this menu owns their events.
+  m.addEventListener('change',(e)=>{ const cb=e.target.closest && e.target.closest('input[data-pat]');
+    if(cb){ setPatternPref(cb.dataset.pat, cb.checked); } });
+  m.addEventListener('click',(e)=>{
+    const all=e.target.closest && e.target.closest('[data-pat-all]');
+    const none=e.target.closest && e.target.closest('[data-pat-none]');
+    if(all||none){ PATTERN_PREF_KEYS.forEach(k=> patternPrefs[k]=!!all); persistPatternPrefs();
+      m.innerHTML=_indMenuHtml(); if(typeof _refreshPatterns==='function') _refreshPatterns(); }
+  });
   _indMenuEl = m; return m;
 }
 function _closeIndMenu(){
@@ -7108,6 +7112,19 @@ function _indMenuHtml(){
   if(chartIndicators.length){
     h+='<div class="pat-menu-foot"><button type="button" onclick="indClear()">Remove all</button></div>';
   }
+  /* Patterns used to be their own toolbar button and their own menu. They are chart
+     OVERLAYS -- the same kind of thing as an indicator -- so they live here now, and the
+     chart toolbar loses a button that was asking the user to learn a second vocabulary
+     for the same idea. */
+  h += '<div class="pat-menu-group">Patterns &amp; overlays</div>';
+  for (const row of PATTERN_MENU) {
+    if (row.group) { h += '<div class="pat-menu-group">' + esc(row.group) + '</div>'; continue; }
+    h += '<label class="pat-menu-item"><input type="checkbox" data-pat="' + esc(row.key) + '"'
+       + (patternPrefs[row.key] ? ' checked' : '') + '><span class="pat-lbl">' + esc(row.label || row.key) + '</span></label>';
+  }
+  h += '<div class="pat-menu-foot"><button type="button" data-pat-all="1">Select all</button>'
+     + '<button type="button" data-pat-none="1">Clear all</button></div>';
+
   return h;
 }
 function _indRefresh(){
