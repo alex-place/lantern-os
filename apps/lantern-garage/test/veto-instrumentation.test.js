@@ -19,7 +19,14 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { knifeReading, isFallingKnife } = require('../lib/auto-trader');
+// TRADER_TRADES_LOG must be set BEFORE the module is required — it is read at
+// module load into a constant (the same trap stop-reconciliation.test.js pins).
+const _os = require('os');
+const _path = require('path');
+const _fs = require('fs');
+const SKIP_LOG = _path.join(_fs.mkdtempSync(_path.join(_os.tmpdir(), 'vetoinstr-')), 'trades.jsonl');
+process.env.TRADER_TRADES_LOG = SKIP_LOG;
+const { knifeReading, isFallingKnife, _logSkips } = require('../lib/auto-trader');
 const { macd } = require('../lib/signal-engine/indicators');
 
 /** The predicate exactly as it read before the split, for differential testing. */
@@ -97,5 +104,35 @@ test('a series that fires reports a negative, deepening histogram', () => {
   for (const r of firing) {
     assert.ok(r.hist < 0, `a fire must be negative, got ${r.hist}`);
     assert.ok(r.hist < r.prev, `a fire must be deepening, got ${r.hist} vs ${r.prev}`);
+  }
+});
+
+test('END TO END (#3381): the evidence survives _logSkips to the ledger row', () => {
+  // #3375 shipped the context onto the record; the ledger writer then dropped it,
+  // and nobody noticed until the feature's first live day produced bare rows.
+  // This is the round trip the original tests skipped.
+  {
+    _logSkips([{ symbol: 'TESTX', direction: 'BULLISH', p_win: 0.61, why: 'already long',
+      ibs: 0.043, spy_tape: -0.51, spy_mom30: -0.12, regime: 'BEARISH', et_min: 585,
+      macd_hist: -0.0421, in_zone: true, sign: 1, knife_hist: -0.031, knife_prev: -0.02 }]);
+    const rows = _fs.readFileSync(SKIP_LOG, 'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse);
+    const r = rows.find((x) => x.symbol === 'TESTX');
+    assert.ok(r, 'the skip row must be written');
+    assert.strictEqual(r.ibs, 0.043, 'ibs reaches disk');
+    assert.strictEqual(r.spy_tape, -0.51);
+    assert.strictEqual(r.regime, 'BEARISH');
+    assert.strictEqual(r.macd_hist, -0.0421);
+    assert.strictEqual(r.knife_hist, -0.031, 'the falling-knife pair reaches disk');
+    assert.strictEqual(r.in_zone, true);
+    assert.strictEqual(r.reason, 'already long', 'the original fields are intact');
+  }
+});
+
+test('a record WITHOUT evidence still writes the bare row — old callers unaffected', () => {
+  {
+    _logSkips([{ symbol: 'BARE', direction: 'NEUTRAL', p_win: 0.5, why: 'bearish, no long to exit' }]);
+    const r = _fs.readFileSync(SKIP_LOG, 'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse).find((x) => x.symbol === 'BARE');
+    assert.ok(r);
+    assert.ok(!('ibs' in r), 'absent evidence stays absent — no undefined/null pollution');
   }
 });
