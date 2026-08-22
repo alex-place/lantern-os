@@ -1380,7 +1380,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         logTrade({
           event: 'exit', symbol: sym, qty: _fillQty, entry, exit: _fillPx,
           pnl: _fillPnl, pnl_pct: entry > 0 ? +(((_fillPx - entry) / entry) * 100).toFixed(6) : null,
-          reason: `protective_stop (broker GTC stop ${_regStop.px} filled${_beHit ? '; be_ratchet — stop sat at entry' : ''})`,
+          reason: `protective_stop (broker GTC stop ${_regStop.px} filled${_beHit ? '; be_ratchet — stop sat at the lock level' : ''})`,
           be_ratchet: _beHit || undefined,
           order_id: _regStop.id, order_type: 'Stop', status: 'filled', source: 'stop-status',
           estimated: !(Number(_regStatus.avgPrice) > 0),
@@ -1650,6 +1650,13 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // places the new stop AT entry with all its usual guards (attempt caps,
     // whole-share, below-market clamp). DEFAULT OFF: unset/0 disables.
     const _bePct = Number(process.env.TRADER_BE_RATCHET) || 0;
+    // TRADER_BE_LOCK (#3415 lab): the level the stop rises TO, as a fraction
+    // above entry (0 = breakeven, the #3414 default). The stop/trail lab
+    // validated a +1% PROFIT FLOOR (ratchet 0.01 + lock 0.01) on every surface
+    // with entry+exit slippage charged: daily fit 419% vs 87%, holdout 549% vs
+    // 261%, drawdown roughly halved. With lock == ratchet the stop sits at the
+    // touch level and fills on the next downtick — effectively a take-profit.
+    const _beLock = Math.max(0, Number(process.env.TRADER_BE_LOCK) || 0);
     if (_bePct > 0 && !_ordersUnknown) {
       let _beCancels = 0;
       for (const [sym, p] of Object.entries(heldPos)) {
@@ -1664,12 +1671,13 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')
           && STOP_WORKING.test(o.status || ''));
         const _top = _wk.reduce((a, o) => Math.max(a, Number(o.price) || Number(o.stopPrice) || 0), 0);
-        if (_top >= entry) { _beStopAt.set(sym, _top); _saveState(); continue; }  // a trail already sits at/above entry — record it, leave it
+        const _lockLvl = Math.round(entry * (1 + _beLock) * 100) / 100;
+        if (_top >= _lockLvl) { _beStopAt.set(sym, _top); _saveState(); continue; }  // a stop already sits at/above the lock — record it, leave it
         if (_wk.length) { await cancelRestingStops(bridge, userId, sym); _beCancels++; }
-        _beStopAt.set(sym, entry);
+        _beStopAt.set(sym, _lockLvl);
         logTrade({ event: 'stop_resize', symbol: sym,
-          reason: `be_ratchet: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${(_bePct * 100).toFixed(1)}% — stop rises to entry (#3413)`,
-          entry, mark, stop_was: _top || null, stop_want: entry });
+          reason: `be_ratchet: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${(_bePct * 100).toFixed(1)}% — stop rises to ${_beLock > 0 ? `entry+${(_beLock * 100).toFixed(2)}% (profit lock, #3415)` : 'entry (#3413)'}`,
+          entry, mark, stop_was: _top || null, stop_want: _lockLvl, lock: _beLock || undefined });
         _saveState();   // the ratchet must survive a restart between cancel and re-protect
       }
       // Re-read orders after any cancel so the re-protect pass below sees the
@@ -1703,7 +1711,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         // protective stop that caps further downside. (The max-loss backstop in
         // manageHeldExits is the harder floor if price is already past maxLossPct.)
         if (stop && curPx > 0 && stop >= curPx) {
-          stop = Math.round(curPx * (1 - Math.max(0.1, c.stopPct) / 100) * 100) / 100;
+          // A RATCHETED level at/above the market (lock == ratchet, or price
+          // dipped back between the raise and this placement) must NOT take the
+          // underwater clamp — that would park the stop a full stopPct under the
+          // market and erase the lock. The lock was reached: sit 0.1% under the
+          // market, the broker-order analog of "sell on the next downtick" the
+          // lab validated (#3415).
+          stop = _beLvl > 0
+            ? Math.round(curPx * (1 - 0.001) * 100) / 100
+            : Math.round(curPx * (1 - Math.max(0.1, c.stopPct) / 100) * 100) / 100;
         }
         if (stop) {
           // Whole-share stops: a 300.8-share position (dust remnant + re-entry)

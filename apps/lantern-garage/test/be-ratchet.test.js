@@ -24,6 +24,7 @@ process.env.TRADER_STATE_FILE = STATE;
 process.env.TRADER_MANAGE_EXITS = '1';
 delete process.env.TRADER_AUTO_EXECUTE;
 delete process.env.TRADER_BE_RATCHET;
+delete process.env.TRADER_BE_LOCK;
 
 const at = require('../lib/auto-trader');
 
@@ -169,4 +170,49 @@ test('RESTART SURVIVAL: the ratchet map round-trips through _saveState/_loadStat
   at._beStopAt.clear();
   at._loadState();
   assert.strictEqual(at._beStopAt.get('LNG'), 123.45);
+});
+
+test('PROFIT LOCK (#3415): TRADER_BE_LOCK=0.01 — the stop rises to entry+1%, not entry', async () => {
+  process.env.TRADER_BE_RATCHET = '0.02';
+  process.env.TRADER_BE_LOCK = '0.01';
+  try {
+    const bridge = world({ upPct: 0.025 });
+    await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
+    assert.deepStrictEqual(bridge.cancelled, ['S1'], 'the 97 stop was cancelled');
+    const stops = bridge.placed.filter((o) => o.ticker === 'LNG' && o.type === 'stop');
+    assert.strictEqual(stops.length, 1);
+    assert.strictEqual(stops[0].stopPrice, 101, 'placed at entry+1% (the lock), not at entry');
+    const rz = readRows().filter((r) => r.event === 'stop_resize' && /be_ratchet/.test(r.reason));
+    assert.strictEqual(rz.length, 1);
+    assert.strictEqual(rz[0].stop_want, 101);
+    assert.strictEqual(rz[0].lock, 0.01);
+    assert.match(rz[0].reason, /profit lock/);
+    assert.strictEqual(readState().beStopAt.LNG, 101, 'the LOCK level is what persists');
+  } finally { delete process.env.TRADER_BE_LOCK; }
+});
+
+test('LOCK AT THE MARKET: lock == ratchet puts the stop 0.1% under the market, not 3% under', async () => {
+  // mark is exactly at the touch (+1.0%); the lock level (101) equals the market,
+  // so a sell-stop AT 101 would be rejected. The underwater clamp would park it
+  // at 101 * 0.97 and erase the lock; the ratcheted clamp sits 0.1% under.
+  process.env.TRADER_BE_RATCHET = '0.01';
+  process.env.TRADER_BE_LOCK = '0.01';
+  try {
+    const bridge = world({ upPct: 0.01 });
+    await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
+    const stops = bridge.placed.filter((o) => o.ticker === 'LNG' && o.type === 'stop');
+    assert.strictEqual(stops.length, 1, 'a replacement stop was placed');
+    assert.strictEqual(stops[0].stopPrice, 100.9, '0.1% under the 101 market — the lock survives');
+  } finally { delete process.env.TRADER_BE_LOCK; }
+});
+
+test('LOCK NEVER LOWERS: a stop already above the lock level is left alone', async () => {
+  process.env.TRADER_BE_RATCHET = '0.02';
+  process.env.TRADER_BE_LOCK = '0.01';
+  try {
+    const bridge = world({ upPct: 0.025, stopPx: 101.5 });
+    await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
+    assert.strictEqual(bridge.cancelled.length, 0, 'the 101.5 stop beats the 101 lock — untouched');
+    assert.strictEqual(at._beStopAt.get('LNG'), 101.5);
+  } finally { delete process.env.TRADER_BE_LOCK; }
 });
