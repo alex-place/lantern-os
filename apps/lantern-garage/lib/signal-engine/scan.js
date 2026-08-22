@@ -63,20 +63,42 @@ function gateAllows(gate, opts = {}) {
 // IBS — Internal Bar Strength: where price sits in the session's range,
 // (last - low) / (high - low) over the bars of the most recent session date.
 // Null when the range is degenerate or bars are missing (fail-soft: no signal).
+// THE SESSION IS THE REGULAR SESSION (09:30-16:00 ET) of the ET date of the
+// latest bar. market-data-yahoo fetches every intraday chart with
+// includePrePost=true (added 2026-07-27 for the after-hours price display), so
+// the bars carry pre-market (04:00-09:30) and after-hours prints; taking every
+// bar of the date made the live IBS a 04:00-now reading — not the regular-hours
+// IBS every lab validated. On a gap day the thin pre-market prints sit near
+// yesterday's close and stretch the range in the direction of the gap.
+// experiments/session_range_lab.js measured the contaminated ruler halving the
+// 2y analog return (12.0% vs 22.8%) and flipping the entry read on 11.5% of
+// bars. TRADER_IBS_RTH_ONLY=0 restores the old (contaminated) behaviour.
+function _etParts(ts) {
+  const d = new Date(ts);
+  if (!Number.isFinite(d.getTime())) return null;
+  const day = d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const s = d.toLocaleTimeString("en-GB", { timeZone: "America/New_York", hour12: false });
+  return { day, min: Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5)) };
+}
 function sessionIbs(bars) {
   if (!Array.isArray(bars) || !bars.length) return null;
   const last = bars[bars.length - 1];
-  const day = String(last.timestamp || "").slice(0, 10);
+  const rthOnly = process.env.TRADER_IBS_RTH_ONLY !== "0";
+  const lp = rthOnly ? _etParts(last.timestamp) : null;
+  const day = rthOnly ? (lp && lp.day) : String(last.timestamp || "").slice(0, 10);
   if (!day) return null;
   let hi = -Infinity, lo = Infinity;
   for (const b of bars) {
-    if (String(b.timestamp || "").slice(0, 10) !== day) continue;
+    if (rthOnly) {
+      const p = _etParts(b.timestamp);
+      if (!p || p.day !== day || p.min < 570 || p.min >= 960) continue;
+    } else if (String(b.timestamp || "").slice(0, 10) !== day) continue;
     const h = Number(b.high), l = Number(b.low);
     if (Number.isFinite(h)) hi = Math.max(hi, h);
     if (Number.isFinite(l)) lo = Math.min(lo, l);
   }
   const px = Number(last.close);
-  if (!Number.isFinite(px) || !(hi > lo)) return null;
+  if (!Number.isFinite(px) || !(hi > lo)) return null;   // no regular-hours range yet (pre-market) -> no signal
   return (px - lo) / (hi - lo);
 }
 
