@@ -538,6 +538,27 @@ function _stopAttribFrac() {
   return Number.isFinite(v) ? v : 0.9;
 }
 function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
+// ENTRY-HOUR BLOCK (#3427 overnight-leg lab). The washout edge is concentrated
+// late in the session — last-hour entries earn ~+0.8%/trade, the 13:30-14:30
+// bar's entries are NEGATIVE on both halves of the 2y hourly window; skipping
+// that bar lifted the 2y analog from 22.3% to 30.5% on fewer trades (the full
+// fit-chosen set {09:30-10:30, 12:30-13:30, 13:30-14:30}: 37.4%, confirmed on
+// the second half). Mechanism per the literature (Lou/Polk/Skouras; NY Fed
+// "Overnight Drift"): the return accrues overnight and the intraday leg
+// reverts; an early-afternoon washout sits through the worst of it.
+// TRADER_ENTRY_BLOCK_ET="13:30-14:30[,HH:MM-HH:MM...]" — ET windows, half-open;
+// unset = off. Entries only; exits and stops are untouched.
+function _parseEtWindows(spec) {
+  return String(spec || '').split(',').map((s) => s.trim()).filter(Boolean).map((s) => {
+    const m = s.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    return { from: Number(m[1]) * 60 + Number(m[2]), to: Number(m[3]) * 60 + Number(m[4]), label: s };
+  }).filter((w) => w && w.to > w.from);
+}
+function _entryHourBlocked(etMin, spec) {
+  if (!spec || !(etMin >= 0)) return null;
+  return _parseEtWindows(spec).find((w) => etMin >= w.from && etMin < w.to) || null;
+}
 function _nextTradingDates(dateStr, n) {
   // dateStr + n trading days (weekend-skipping; holidays just widen the block,
   // which errs on the safe side for a cooldown).
@@ -2141,6 +2162,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       out.skipped.push({ ...record, why: `circuit breaker: ${_stopFillsCount} stop-outs today (max ${c.stopBreaker}) — no new entries this session` });
       continue;
     }
+    // ENTRY-HOUR BLOCK (#3427) — see _entryHourBlocked. Entries only.
+    if (process.env.TRADER_ENTRY_BLOCK_ET) {
+      const _ehMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
+      const _ehb = _entryHourBlocked(_ehMin, process.env.TRADER_ENTRY_BLOCK_ET);
+      if (_ehb) {
+        out.skipped.push({ ...record, why: `entry_hour_block: ${String(Math.floor(_ehMin / 60)).padStart(2, '0')}:${String(_ehMin % 60).padStart(2, '0')} ET inside ${_ehb.label} — this bar's entries are negative on both lab halves (#3427)` });
+        continue;
+      }
+    }
     // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
     // falling — re-buying the same knife the same/next session is the churn that
     // built the worst backtest days. Barred through the recorded ET date.
@@ -2549,4 +2579,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
