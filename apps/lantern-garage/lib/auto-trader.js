@@ -558,6 +558,24 @@ function _stressCfg() {
     vix: process.env.TRADER_STRESS_VIX === undefined ? 20 : Number(process.env.TRADER_STRESS_VIX),
     spyIbsLvl: process.env.TRADER_STRESS_SPY_IBS === undefined ? 0.3 : Number(process.env.TRADER_STRESS_SPY_IBS) };
 }
+// SYMBOL TILT (#3434 stack-sweep lab). Per-symbol size weights chosen on the
+// FIT surfaces only (weight = clamp(fit edge / median edge, 0.5, 1.5)) and
+// confirmed on both holdouts: recent half 31.5% vs 19.4% (return/DD 5.7 vs
+// 4.3), 26y holdout 1,494% vs 841% (89 vs 60). The first sizing change that
+// improved the ratio instead of scaling it. Validated weights:
+//   SOXL:1.5,SMH:1.5,QQQ:1.5,XLK:1.0,IWM:1.02,SPY:0.83,DIA:0.71,GLD:0.5,TLT:0.5
+// TRADER_SYMBOL_SIZE_MULT="SYM:w,SYM:w,..." (unset = flat). Scales the risk
+// target and the notional cap together, like the room tier and the stress
+// multiplier; composes with both. Clamped to [0.25, 2].
+function _symbolSizeMult(sym, spec = process.env.TRADER_SYMBOL_SIZE_MULT) {
+  if (!spec || !sym) return 1;
+  const want = String(sym).toUpperCase();
+  for (const part of String(spec).split(',')) {
+    const [s, w] = part.split(':').map((x) => String(x || '').trim());
+    if (s.toUpperCase() === want) { const v = Number(w); return Number.isFinite(v) && v > 0 ? Math.min(2, Math.max(0.25, v)) : 1; }
+  }
+  return 1;
+}
 /** Pure: the multiplier and an auditable reason for one entry. */
 function _stressMultiplier({ vixPrior, spyIbs } = {}, cfg = _stressCfg()) {
   if (!(cfg.mult > 1)) return { mult: 1, why: null };
@@ -2241,7 +2259,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const _tierMult = _tier === 'B' ? c.roomBMult : (_tier === 'A+' ? c.aplusMult : 1);
     // #3428 STRESS MULTIPLIER: scales the cap AND the risk target (see _stressMultiplier).
     const _stress = _stressMultiplier({ vixPrior: _vixPrior, spyIbs: _spyIbsNow }, _stressC);
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult * _stress.mult, riskPct: c.riskPct * _tierMult * _stress.mult, stopDistPct: _stopDistEff });
+    const _symMult = _symbolSizeMult(sym);   // #3434 symbol tilt (1 when unset)
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult * _stress.mult * _symMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
@@ -2440,7 +2459,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       const pl = s.plan || {};
       _pendingFillBasis.set(sym, { quote: price, ts: now });   // #3407: basis check armed
       _limitShadowArm(sym, price, now);                        // #3424: journal the limits we did not place
-      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), stress_mult: _stress.mult > 1 ? _stress.mult : undefined, stress_why: _stress.why || undefined, vix_prior: _vixPrior != null ? _vixPrior : undefined, p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), stress_mult: _stress.mult > 1 ? _stress.mult : undefined, stress_why: _stress.why || undefined, vix_prior: _vixPrior != null ? _vixPrior : undefined, sym_mult: _symMult !== 1 ? _symMult : undefined, p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
         // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
         // the report can split entry outcomes by tape without guessing later.
         spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null,
@@ -2674,4 +2693,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _stressMultiplier, _stressCfg, _vixPriorClose, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
