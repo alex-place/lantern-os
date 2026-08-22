@@ -103,6 +103,9 @@ const DEFAULTS = {
   // ── Anti-churn (added after a 103-fill/-$1k whipsaw day) ──────────────────
   minHoldMin: 20,          // don't signal-EXIT a long within N min of entering
   exitMinPwin: 0.6,        // only exit on a STRONG bearish signal (p_win ≥ this)
+  ibsExit: 0,              // IBS THESIS GATE: in IBS mode a non-bullish read may signal-exit
+                           //    only once the session IBS ≥ this (the lab's bounce, 0.6).
+                           //    0 = off (legacy: NEUTRAL sells the moment IBS > entry threshold)
   persistScans: 2,         // act only after the same direction holds N consecutive scans
   persistWindowMs: 200000, // …seen within this window (≈3 scans) — else it's stale
   // ── Momentum / trailing exits — capture the peak instead of round-tripping it ──
@@ -142,6 +145,7 @@ function cfg() {
     minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
     exitReattemptMs: n('TRADER_EXIT_REATTEMPT_MIN', DEFAULTS.exitReattemptMin) * 60000, // anti-churn: min gap between exit attempts on the SAME symbol
     exitMinPwin: n('TRADER_EXIT_MIN_PWIN', DEFAULTS.exitMinPwin),        // anti-churn: exit only on strong bearish
+    ibsExit: n('TRADER_IBS_EXIT', DEFAULTS.ibsExit),                    // fidelity lab 2026-08-22: hold the washout to its bounce
     persistScans: n('TRADER_PERSIST_SCANS', DEFAULTS.persistScans),      // anti-churn: N consecutive scans
     persistWindowMs: n('TRADER_PERSIST_WINDOW_MS', DEFAULTS.persistWindowMs),
     requirePersist: process.env.TRADER_REQUIRE_PERSIST !== '0',          // on by default
@@ -1837,6 +1841,20 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         // Anti-churn gates on the signal-exit (the broker stop still protects the
         // downside independently): (1) don't dump a long we just opened, (2) only
         // exit on a STRONG bearish read, (3) require it to persist across scans.
+        // ── IBS THESIS GATE (fidelity lab, 2026-08-22). In IBS mode the read flips
+        //    BULLISH→NEUTRAL the moment the session IBS rises above the entry
+        //    threshold — i.e. the instant the washout starts to bounce — and that
+        //    NEUTRAL read was selling winners ~50 minutes in for a median +0.09%
+        //    (57 signal_exits 8/10–8/21, 36 inside ±0.2%; the analog on the same
+        //    symbols/weeks earned ~9x by holding to the bounce). The validated exit
+        //    is the BOUNCE: session IBS ≥ TRADER_IBS_EXIT (0.6). Until then the
+        //    thesis is intact — the profit floor, stop and ladder protect; the
+        //    signal does not sell. Off by default; a missing IBS reading falls
+        //    through to the legacy behaviour.
+        if (c.ibsExit > 0 && Number.isFinite(Number(s.ibs)) && Number(s.ibs) < c.ibsExit) {
+          out.skipped.push({ ...record, why: `washout thesis intact (IBS ${Number(s.ibs).toFixed(2)} < ${c.ibsExit}) — no signal exit; floor/stop/ladder protect` });
+          continue;
+        }
         const entryAt = _entryAt.get(sym) || 0;
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
         if (_isPinned(sym)) { out.skipped.push({ ...record, why: 'pinned — signal_exit suppressed by operator (#3318); stop/ladder still protect' }); continue; }
