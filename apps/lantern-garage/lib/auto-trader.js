@@ -1334,6 +1334,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     ...signals.map((x) => String(x && x.symbol || '').toUpperCase()),
     ..._zoneLadder.keys(), ..._entryAt.keys(),
   ].filter(Boolean));
+  const _driftPending = [];   // #3432 position-drift rows, journaled once the orders feed is in hand
   for (const [k, p] of Object.entries(heldPos)) {
     if (!(Number(heldQty[k]) > 0)) continue;
     if (_ourSyms.size && !_ourSyms.has(k)) continue;   // another engine's position
@@ -1351,6 +1352,23 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       if (_seen < 2) { _seenStreak.set(k, _seen); continue; }
     }
     _seenStreak.delete(k);
+    // POSITION DRIFT (#3432). SPY grew 75 -> 76 -> 77 -> 78 on three consecutive
+    // opens (2026-08-18..20) with no entry row in any ledger: something outside
+    // this engine's order path was buying one share at a time, and nothing
+    // noticed until the stop-size reconciliation complained. A held quantity
+    // that changes between scans with no engine order in the last 10 minutes is
+    // journaled here with both quantities and the broker orders the feed shows
+    // for the symbol — the evidence the investigation was missing. Journal-only.
+    {
+      const _prev = _lastPos.get(k);
+      const _newQ = Number(p.qty) || 0;
+      if (_prev && Number.isFinite(Number(_prev.qty)) && Math.abs(_newQ - Number(_prev.qty)) >= 1e-6
+          && (now - (_lastOrderAt.get(k) || 0)) > 10 * 60 * 1000) {
+        _driftPending.push({ event: 'position_drift', symbol: k, qty_was: Number(_prev.qty), qty_now: _newQ,
+          delta: +(_newQ - Number(_prev.qty)).toFixed(6), entry: p.avg_entry_price ?? null, mark: p.current_price ?? null,
+          reason: _newQ > Number(_prev.qty) ? 'quantity grew with no engine order — external/phantom buy' : 'quantity shrank with no engine order — partial external sell' });
+      }
+    }
     _lastPos.set(k, {
       qty: Number(p.qty) || 0,
       entry: p.avg_entry_price ?? p.avg_fill_price ?? null,
@@ -1368,6 +1386,10 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // the reconstruct loop below must yield to it rather than logging a second,
   // mark-priced row for the same exit.
   const _ordersEarly = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  for (const _dr of _driftPending) {   // #3432: journaled with the broker orders the feed shows for the symbol
+    logTrade({ ..._dr, feed_orders: (_ordersEarly || []).filter((o) => String(o.symbol || '').toUpperCase() === _dr.symbol)
+      .map((o) => ({ id: o.orderId, side: o.side, type: o.orderType || o.type, qty: o.qty, status: o.status, price: o.price })).slice(0, 12) });
+  }
   const _filledSyms = _reconcileFills(_ordersEarly);   // authoritative exits, priced at the fill
   // REGISTRY SEEDING (#3386). The #3379 registry only learns about stops the
   // engine places AFTER it shipped — QQQ, carried since 08-14 with a GTC stop
@@ -1820,6 +1842,21 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         continue;
       }
       if (qty > 0 && !hasStop(sym)) {
+        // STACKING GUARD (#3432). The orders FEED can go blind to a WORKING stop
+        // for hours: on 2026-08-17 this pass saw SPY and QQQ as naked on every
+        // scan and placed a fresh stop each time — fifteen deep (1,125 shares of
+        // stops on a 75-share position) by the 04:00 reconciliation. The per-
+        // order status endpoint answers for any id we can name (#3379), and we
+        // registered this one. A working answer means the feed is lying, not
+        // the position naked — do not stack another.
+        const _regPre = _stopOrders.get(sym);
+        if (_regPre && _regPre.id && typeof bridge.getIBKROrderStatus === 'function') {
+          const _st = await bridge.getIBKROrderStatus(userId, _regPre.id).catch(() => null);
+          if (_st && STOP_WORKING.test(String(_st.status || ''))) {
+            (out.skipped = out.skipped || []).push({ symbol: sym, why: `re-protect skipped: registered stop ${_regPre.id} reports ${_st.status} while the feed shows none — feed blind, not naked (#3432)` });
+            continue;
+          }
+        }
         const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
         const curPx = Number(p.current_price) || 0;
         let stop = stopPriceFor(entry, _stopDistPct.get(sym) || c.stopPct);
