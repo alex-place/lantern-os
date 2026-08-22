@@ -305,6 +305,10 @@ function conditional(trades, thr, label) {
   show("ratchet +0.25% -> entry+0.25% (TP floor +0.25%)", { be: 0.0025, lock: 0.0025 });
   show("ratchet +1.5% -> entry+1.5% (TP floor +1.5%)", { be: 0.015, lock: 0.015 });
   show("ratchet +2.0% -> entry+2.0% (TP floor +2.0%)", { be: 0.02, lock: 0.02 });
+  console.log("TIMEOUT — the live engine has NO max-hold exit; every lab config assumed 5 sessions");
+  show("no timeout (live engine today)", { timeoutS: 9999 });
+  show("timeout 5 + TP floor +1.0%", { be: 0.01, lock: 0.01 });
+  show("no timeout + TP floor +1.0%", { timeoutS: 9999, be: 0.01, lock: 0.01 });
   show("NO trail at all (what #3413 scored against)", { trail: null });
   // ── FACTORIAL over the profit-lock family, chosen on FIT surfaces only ──────
   // trail tightness, ratchet trigger and lock level are one knob family ("how
