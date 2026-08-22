@@ -538,6 +538,57 @@ function _stopAttribFrac() {
   return Number.isFinite(v) ? v : 0.9;
 }
 function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
+// STRESS MULTIPLIER (#3428 gates/caps lab; Nagel 2012 "Evaporating Liquidity":
+// short-term reversal returns rise strongly with VIX). Size UP when the tape is
+// stressed — the other direction from the rejected regime-half sizing. Lab:
+// 12% -> 18% when the prior VIX close >= 20 lifted the 26y holdout from 445%
+// to 841% at an UNCHANGED drawdown (-13.9%); the fit-chosen rule (VIX >= 20 OR
+// SPY session IBS <= 0.3, x2) took holdout return/DD from 32 to 69 and tied
+// the recent hourly half. Absolute drawdown grows with the multiplier — the
+// operator picks the size.
+//   TRADER_STRESS_MULT     multiplier (e.g. 1.5); unset or <= 1 = OFF
+//   TRADER_STRESS_VIX      prior-session VIX close at/above which it applies (default 20)
+//   TRADER_STRESS_SPY_IBS  SPY session IBS at/below which it applies (default 0.3)
+// Either condition arms it (OR). It scales BOTH the risk target and the
+// notional cap, like the room tier — otherwise the 12% cap binds and nothing
+// changes. Conviction sizing (size_mult) is untouched. Entries only.
+function _stressCfg() {
+  const mult = Number(process.env.TRADER_STRESS_MULT);
+  return { mult: mult > 1 ? Math.min(2.5, mult) : 1,
+    vix: process.env.TRADER_STRESS_VIX === undefined ? 20 : Number(process.env.TRADER_STRESS_VIX),
+    spyIbsLvl: process.env.TRADER_STRESS_SPY_IBS === undefined ? 0.3 : Number(process.env.TRADER_STRESS_SPY_IBS) };
+}
+/** Pure: the multiplier and an auditable reason for one entry. */
+function _stressMultiplier({ vixPrior, spyIbs } = {}, cfg = _stressCfg()) {
+  if (!(cfg.mult > 1)) return { mult: 1, why: null };
+  const why = [];
+  if (cfg.vix > 0 && Number.isFinite(Number(vixPrior)) && Number(vixPrior) >= cfg.vix) why.push(`VIX ${Number(vixPrior).toFixed(1)} >= ${cfg.vix}`);
+  if (cfg.spyIbsLvl > 0 && Number.isFinite(Number(spyIbs)) && Number(spyIbs) <= cfg.spyIbsLvl) why.push(`SPY IBS ${Number(spyIbs).toFixed(2)} <= ${cfg.spyIbsLvl}`);
+  return why.length ? { mult: cfg.mult, why: why.join(' & ') } : { mult: 1, why: null };
+}
+// Prior-session VIX close, cached per ET date; a failed fetch is retried no
+// sooner than 10 minutes later and NEVER blocks trading (null = condition unmet).
+const _vixCache = { day: null, value: null, triedAt: 0 };
+async function _vixPriorClose(now = Date.now()) {
+  const day = _etDate(now);
+  if (_vixCache.day === day && (_vixCache.value != null || Date.now() - _vixCache.triedAt < 10 * 60 * 1000)) return _vixCache.value;
+  _vixCache.day = day; _vixCache.triedAt = Date.now();
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 5000);
+    const p2 = Math.floor(Date.now() / 1000), p1 = p2 - 12 * 86400;
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&period1=${p1}&period2=${p2}`,
+      { signal: ctl.signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    clearTimeout(timer);
+    const j = await res.json();
+    const r = j && j.chart && j.chart.result && j.chart.result[0];
+    const ts = (r && r.timestamp) || [], closes = (r && r.indicators && r.indicators.quote[0].close) || [];
+    let v = null;
+    for (let i = ts.length - 1; i >= 0; i--) { if (_etDate(ts[i] * 1000) < day && closes[i] != null) { v = Number(closes[i]); break; } }
+    _vixCache.value = Number.isFinite(v) ? v : null;
+  } catch (_e) { _vixCache.value = null; }
+  return _vixCache.value;
+}
 // ENTRY-HOUR BLOCK (#3427 overnight-leg lab). The washout edge is concentrated
 // late in the session — last-hour entries earn ~+0.8%/trade, the 13:30-14:30
 // bar's entries are NEGATIVE on both halves of the 2y hourly window; skipping
@@ -1232,6 +1283,11 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
 
   const signals = (scan && Array.isArray(scan.signals)) ? scan.signals : [];
   const enters = signals.filter((s) => s && s.convergence && s.convergence.decision === 'ENTER');
+  // #3428 stress inputs, once per scan: prior VIX close (cached per day, fail-soft)
+  // and SPY's session IBS from this very scan (SPY is on the tradelist; absent = unmet).
+  const _stressC = _stressCfg();
+  const _vixPrior = _stressC.mult > 1 && enters.length ? await _vixPriorClose(now) : null;
+  const _spyIbsNow = (() => { const spy = signals.find((x) => x && String(x.symbol).toUpperCase() === 'SPY'); return spy && Number.isFinite(Number(spy.ibs)) ? Number(spy.ibs) : null; })();
 
   // Broker truth: current account + open positions (never trade blind). Fetched
   // BEFORE the no-signals early-return so the stop-reconciliation below runs every
@@ -2146,7 +2202,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // have such tight structural stops that the 5% cap binds before the risk
     // target, and without scaling the cap the tiers would size identically.
     const _tierMult = _tier === 'B' ? c.roomBMult : (_tier === 'A+' ? c.aplusMult : 1);
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDistEff });
+    // #3428 STRESS MULTIPLIER: scales the cap AND the risk target (see _stressMultiplier).
+    const _stress = _stressMultiplier({ vixPrior: _vixPrior, spyIbs: _spyIbsNow }, _stressC);
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult * _stress.mult, riskPct: c.riskPct * _tierMult * _stress.mult, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
@@ -2345,7 +2403,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       const pl = s.plan || {};
       _pendingFillBasis.set(sym, { quote: price, ts: now });   // #3407: basis check armed
       _limitShadowArm(sym, price, now);                        // #3424: journal the limits we did not place
-      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), stress_mult: _stress.mult > 1 ? _stress.mult : undefined, stress_why: _stress.why || undefined, vix_prior: _vixPrior != null ? _vixPrior : undefined, p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
         // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
         // the report can split entry outcomes by tape without guessing later.
         spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null,
@@ -2579,4 +2637,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _stressMultiplier, _stressCfg, _vixPriorClose, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
