@@ -576,6 +576,45 @@ const _seenStreak = new Map();
 // held position first shows a basis differing by >1bp, ONE entry_fill row
 // records both numbers (append-only correction, the ledger never mutates).
 const _pendingFillBasis = new Map();
+// ── LIMIT SHADOW (#3424 lab, journal-only) ────────────────────────────────────
+// The depth sweep showed limit-filled entries earn 3-4x the touch entry per
+// trade while the signals whose limit never fills are the weak ones — but the
+// 26y daily bar cannot express an intraday limit, so the mechanism gets a live
+// SHADOW before any order path changes. On every real entry we record the
+// hypothetical resting limits at LIMIT_SHADOW_DEPTHS under the touch price;
+// each scan marks which ones the mark has touched (a resting limit fills at
+// its level — queue position is not modelled, the same optimism as the lab);
+// the shadow closes with the session or the position. Nothing reads it in the
+// engine; experiments/limit_shadow_score.js joins it to the exit rows.
+// TRADER_LIMIT_SHADOW=0 disables.
+const LIMIT_SHADOW_DEPTHS = [0.0025, 0.005, 0.0075, 0.01];
+const _limitShadow = new Map();   // sym -> { touch, ts, date, fills: { depth: fillPx|null } }
+function _limitShadowArm(sym, price, now) {
+  if (process.env.TRADER_LIMIT_SHADOW === '0' || !(price > 0)) return;
+  _limitShadow.set(sym, { touch: price, ts: now, date: _etDate(now),
+    fills: Object.fromEntries(LIMIT_SHADOW_DEPTHS.map((d) => [String(d), null])) });
+}
+function _limitShadowTick(sym, cur, now) {
+  const sh = _limitShadow.get(sym);
+  if (!sh || !(cur > 0)) return;
+  if (_etDate(now) !== sh.date) { _limitShadowClose(sym, 'session_end'); return; }   // the limit works the touch session only
+  for (const d of LIMIT_SHADOW_DEPTHS) {
+    const k = String(d);
+    if (sh.fills[k] != null) continue;
+    const lvl = +(sh.touch * (1 - d)).toFixed(4);
+    if (cur <= lvl) {
+      sh.fills[k] = lvl;
+      logTrade({ event: 'limit_shadow_fill', symbol: sym, depth: d, touch_px: sh.touch, fill_px: lvl, mark: cur,
+        minutes_after_touch: Math.round((now - sh.ts) / 60000) });
+    }
+  }
+}
+function _limitShadowClose(sym, why) {
+  const sh = _limitShadow.get(sym);
+  if (!sh) return;
+  logTrade({ event: 'limit_shadow_close', symbol: sym, touch_px: sh.touch, fills: sh.fills, why });
+  _limitShadow.delete(sym);
+}
 function _checkFillBasis(sym, brokerEntry) {
   const p = _pendingFillBasis.get(sym);
   if (!p || !(Number(brokerEntry) > 0)) return;
@@ -716,6 +755,7 @@ function _saveState() {
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
       stopOrders: Object.fromEntries(_stopOrders),   // #3379: a GTC stop OUTLIVES the process by design
       beStopAt: Object.fromEntries(_beStopAt),       // #3413: the ratchet must not un-ratchet on restart
+      limitShadow: Object.fromEntries(_limitShadow), // #3424: a restart mid-session must not lose the day's shadow
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
       // A restart DURING a dropout must not hand back a clean slate and let the
       // doubling through on the next scan (#3282).
@@ -745,6 +785,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
     for (const [k, v] of Object.entries(o.stopOrders || {})) _stopOrders.set(k, v);   // #3379: GTC stops outlive the process
     for (const [k, v] of Object.entries(o.beStopAt || {})) _beStopAt.set(k, v);       // #3413
+    for (const [k, v] of Object.entries(o.limitShadow || {})) _limitShadow.set(k, v); // #3424
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
     for (const [k, v] of Object.entries(o.lastConfirmedHold || {})) {
       const t = Number(v);
@@ -922,6 +963,7 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     const cur = Number(p.current_price) || 0;
     const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;
     if (!(qty > 0) || !(cur > 0) || !(entry > 0)) continue;
+    _limitShadowTick(sym, cur, now);               // #3424: journal-only, never affects an exit
 
     // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
     if (workingSells.has(sym)) continue;
@@ -1483,6 +1525,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       _zoneLadder.delete(sym); _stopDistPct.delete(sym);
       _trough.delete(sym); _excursion.delete(sym);
       _beStopAt.delete(sym);                                 // #3413: ratchet dies with the position
+      _limitShadowClose(sym, 'position_closed');             // #3424
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
       // FREEZE EXPIRY AGAINST BROKER TRUTH (2026-08-08). The in-flight freeze had
       // no expiry and was never re-checked: a parked exit later cancelled/expired
@@ -2271,6 +2314,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
       _pendingFillBasis.set(sym, { quote: price, ts: now });   // #3407: basis check armed
+      _limitShadowArm(sym, price, now);                        // #3424: journal the limits we did not place
       logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
         // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
         // the report can split entry outcomes by tape without guessing later.
@@ -2503,6 +2547,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
