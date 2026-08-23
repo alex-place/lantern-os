@@ -2035,7 +2035,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   const _dayRaw = await bridge.getIBKRDayPnl(userId).catch(() => null);
   const dayPnl = typeof _dayRaw === 'number' ? _dayRaw
     : (_dayRaw && typeof _dayRaw.dailyPnl === 'number' ? _dayRaw.dailyPnl : null);
-  const haltEntries = typeof dayPnl === 'number' && dayPnl <= -dailyLimit;
+  // TRADER_MAX_DAILY_LOSS_PCT <= 0 disables the halt (2026-08-23). Before this, 0 made dailyLimit 0 and the halt fired on ANY red day P&L.
+  const haltEntries = c.maxDailyLossPct > 0 && typeof dayPnl === 'number' && dayPnl <= -dailyLimit;
   if (haltEntries) out.circuit_breaker = { dayPnl, limit: -Math.round(dailyLimit) };
 
   let opened = 0;

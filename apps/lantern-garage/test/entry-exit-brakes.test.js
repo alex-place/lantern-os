@@ -166,3 +166,15 @@ test('an in-flight exit whose order died at the broker un-freezes after two orde
   const log = fs.readFileSync(process.env.TRADER_TRADES_LOG, 'utf8');
   assert.ok(/exit_unfrozen/.test(log), 'the release is narrated in the ledger');
 });
+
+test('TRADER_MAX_DAILY_LOSS_PCT=0 disables the daily-loss halt (2026-08-23) — before, 0 made the limit 0 and any red day halted entries', async () => {
+  at._resetCooldowns();
+  const { out, buys } = await run({
+    bridgeOpts: { dayPnl: -5000 },
+    signals: [bull('GLD', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }])],
+    env: { TRADER_MAX_DAILY_LOSS_PCT: '0' },
+  });
+  assert.ok(!out.circuit_breaker, 'halt disabled: no circuit breaker reported');
+  assert.ok(!out.skipped.some((s) => /daily-loss/.test(s.why)), 'no daily-loss skip');
+  assert.strictEqual(buys.length, 1, 'the entry places on a red day when the halt is off');
+});

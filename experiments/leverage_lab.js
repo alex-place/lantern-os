@@ -84,8 +84,10 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
   const open = new Map(), trades = [], curve = [];
   const beBlock = new Map();
   const gapFill = (level, b) => Math.min(level, b.o) * (1 - SLIP);
+  let dayKey = null, dayStops = 0, dayStartEq = 100;
   for (const t of timeline) {
     const d = ET_DAY(t);
+    if (d !== dayKey) { dayKey = d; dayStops = 0; dayStartEq = cash; for (const [sym, pos] of open) { const b = idx[sym].get(t); dayStartEq += pos.qtyVal * ((b ? b.o : pos.entry) / pos.entry); } }
     for (const [sym, pos] of [...open]) {
       const b = idx[sym].get(t);
       if (!b || b.t <= pos.entryT) continue;
@@ -135,12 +137,15 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         cash += pos.qtyVal * (exitPx / pos.entry);
         trades.push({ sym, d, ret: exitPx / pos.entry - 1, pnlEq: pos.qtyVal * (exitPx / pos.entry - 1), reason, sessions: b.si - pos.entrySi });
         if (reason === "be_stop") beBlock.set(sym, b.si + 1);
+        if (reason === "stop") dayStops++;
         open.delete(sym);
       }
     }
     let equity = cash;
     for (const [sym, pos] of open) { const b = idx[sym].get(t); equity += pos.qtyVal * ((b ? b.c : pos.entry) / pos.entry); }
-    if (open.size < o.maxConc) {
+    const breakerOn = o.stopBreaker != null && dayStops >= o.stopBreaker;       // engine: TRADER_STOP_BREAKER (default 2)
+    const haltOn = o.dayLossHalt != null && (equity / dayStartEq - 1) <= -o.dayLossHalt;   // engine: TRADER_MAX_DAILY_LOSS_PCT (default 2)
+    if (open.size < o.maxConc && !breakerOn && !haltOn) {
       const cands = [];
       const spyB = spyIdx ? spyIdx.get(t) : null;
       const spyV = spyB ? (intraday ? rIbs(spyB) : dIbs(spyB)) : null;
@@ -266,7 +271,14 @@ function anatomy(trades, from, to, title) {
   for (const add of [["TNA"], ["SPXL"], ["TQQQ"], ["UPRO"], ["TNA", "SPXL"], ["TNA", "SPXL", "TQQQ"], ["TNA", "UPRO", "TQQQ"], ["TNA", "SPXL", "UPRO"]]) console.log(line("+ " + add.join(" "), run(ARMED, [...SYMS, ...add])));
   console.log("\nSLOT CAP with the family (13 names compete for the slots)");
   for (const cap of [5, 6, 7]) console.log(line(`family 1.0x, cap ${cap}`, run({ ...ARMED, maxConc: cap }, ALL)));
-  console.log("\nGROSS CAP — the engine skips entries past TRADER_MAX_GROSS_PCT (default 80); every lab allowed 100");
-  for (const [label, syms] of [["armed 9", SYMS], ["family 13", ALL]]) for (const cap of [0.8, 0.9, 1.0]) console.log(line(`${label}, gross cap ${Math.round(cap * 100)}%`, run({ ...ARMED, grossCap: cap }, syms)));
+  console.log("\nGROSS CAP + LIVE BRAKES the lab never carried — TRADER_MAX_GROSS_PCT=80, TRADER_STOP_BREAKER=2, TRADER_MAX_DAILY_LOSS_PCT=2");
+  console.log(line("lab (no brakes, gross 100%)", run(ARMED, SYMS)));
+  for (const cap of [0.8, 0.9]) console.log(line(`gross cap ${Math.round(cap * 100)}%`, run({ ...ARMED, grossCap: cap }, SYMS)));
+  console.log(line("stop breaker 2", run({ ...ARMED, stopBreaker: 2 }, SYMS)));
+  console.log(line("daily-loss halt 2%", run({ ...ARMED, dayLossHalt: 0.02 }, SYMS)));
+  console.log(line("both brakes", run({ ...ARMED, stopBreaker: 2, dayLossHalt: 0.02 }, SYMS)));
+  console.log(line("both brakes + gross 80% (= live today)", run({ ...ARMED, stopBreaker: 2, dayLossHalt: 0.02, grossCap: 0.8 }, SYMS)));
+  console.log(line("family 13, lab", run(ARMED, ALL)));
+  console.log(line("family 13, both brakes + gross 80%", run({ ...ARMED, stopBreaker: 2, dayLossHalt: 0.02, grossCap: 0.8 }, ALL)));
   for (const s of LEV) { const tr = run(ARMED, [...SYMS, s]).h.trades.filter((x) => x.sym === s); const w = tr.filter((x) => x.ret > 0); const gw = w.reduce((a, x) => a + x.ret, 0), gl = -tr.filter((x) => x.ret <= 0).reduce((a, x) => a + x.ret, 0); console.log(`    ${s} alone (hourly 2y) n ${String(tr.length).padStart(4)}  WR ${(w.length / tr.length * 100).toFixed(0)}%  mean ${(tr.reduce((a, x) => a + x.ret, 0) / tr.length * 100).toFixed(2)}%/t  PF ${(gw / gl).toFixed(2)}`); }
 })().catch((e) => { console.error("failed:", e.message); process.exit(1); });
