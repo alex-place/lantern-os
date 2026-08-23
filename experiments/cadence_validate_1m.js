@@ -321,4 +321,32 @@ async function chart1m(sym, p1, p2) {
     for (const s of SYMS) for (const b of one[s]) b[flag] = (b.closeMin - off) % k === 0 || b.isLast;
     row(`entry every ${k}m at :${String(off).padStart(2, "0")} / exit 1m`, one, { ...LIVE, entryMode: "close", exitMode: "close", persistBars: 2, entryDecisionFlag: flag });
   }
+  console.log("\n5-MINUTE STREAM, 58 days (double the sessions) — entry on a k-minute close, exit on the 5m stream (persist 1)");
+  const F5 = five.SPY[0].d;
+  const cell5 = (r) => { const s = score(r.curve, F5, to), st = stats(r.trades, F5, to); return `n ${String(st.n).padStart(4)} wr ${(st.wr * 100).toFixed(0)}% aw ${(st.aw * 100).toFixed(2)}% al ${(st.al * 100).toFixed(2)}% b ${st.b.toFixed(2)}  ${pct(s ? s.tot : 0, 6)} dd ${pct(s ? s.dd : 0, 5)}`; };
+  console.log(`  window ${F5}..today`);
+  console.log(`  ${"engine analog (5m closes, persist 1)".padEnd(44)} ${cell5(simulate(five, SYMS, { ...LIVE, entryMode: "close", exitMode: "close" }, true, vix, F5, to))}`);
+  for (const [k, off] of [[60, 0], [60, 15], [60, 30], [60, 45], [30, 0], [30, 15], [90, 0], [120, 0]]) {
+    const flag = `d5_${k}_${off}`;
+    for (const s of SYMS) for (const b of five[s]) b[flag] = (b.closeMin - off) % k === 0 || b.isLast;
+    console.log(`  ${`entry every ${k}m at :${String(off).padStart(2, "0")} / exit 5m`.padEnd(44)} ${cell5(simulate(five, SYMS, { ...LIVE, entryMode: "close", exitMode: "close", entryDecisionFlag: flag }, true, vix, F5, to))}`);
+  }
+  console.log("\nCOMBINATIONS toward 1:1 — confirmed entry x exit cadence x ratchet trail, on both streams");
+  const combos = [
+    ["entry 60/:00, exit stream", { entryDecisionFlag: "E60_0" }],
+    ["entry 60/:00, exit stream, rt 1.0/0.5", { entryDecisionFlag: "E60_0", rt: { arm: 1.0, pct: 0.5 } }],
+    ["entry 60/:00, exit 60/:00", { entryDecisionFlag: "E60_0", exitDecisionFlag: "E60_0" }],
+    ["entry 60/:00, exit 60/:00, rt 1.0/0.5", { entryDecisionFlag: "E60_0", exitDecisionFlag: "E60_0", rt: { arm: 1.0, pct: 0.5 } }],
+    ["entry 60/:15, exit stream", { entryDecisionFlag: "E60_15" }],
+    ["entry 60/:15, exit 60/:15", { entryDecisionFlag: "E60_15", exitDecisionFlag: "E60_15" }],
+    ["entry 30/:00, exit 30/:00", { entryDecisionFlag: "E30_0", exitDecisionFlag: "E30_0" }],
+    ["entry 30/:00, exit 30/:00, rt 1.0/0.5", { entryDecisionFlag: "E30_0", exitDecisionFlag: "E30_0", rt: { arm: 1.0, pct: 0.5 } }],
+  ];
+  for (const [name, bars, from_, persist] of [["1m (20 sessions)", one, from, 2], ["5m (" + (process.env.LAB_5M_FROM ? "from " + process.env.LAB_5M_FROM : "58 days") + ")", five, process.env.LAB_5M_FROM || five.SPY[0].d, 1]]) {
+    console.log(`  ${name}`);
+    for (const s of SYMS) for (const b of bars[s]) { b.E60_0 = b.closeMin % 60 === 0 || b.isLast; b.E60_15 = (b.closeMin - 15) % 60 === 0 || b.isLast; b.E30_0 = b.closeMin % 30 === 0 || b.isLast; }
+    const c = (r) => { const s = score(r.curve, from_, to), st = stats(r.trades, from_, to); return `n ${String(st.n).padStart(4)} wr ${(st.wr * 100).toFixed(0)}% aw ${(st.aw * 100).toFixed(2)}% al ${(st.al * 100).toFixed(2)}% b ${st.b.toFixed(2)}  ${pct(s ? s.tot : 0, 6)} dd ${pct(s ? s.dd : 0, 5)}`; };
+    console.log(`    ${"engine analog".padEnd(42)} ${c(simulate(bars, SYMS, { ...LIVE, entryMode: "close", exitMode: "close", persistBars: persist }, true, vix, from_, to))}`);
+    for (const [label, extra] of combos) console.log(`    ${label.padEnd(42)} ${c(simulate(bars, SYMS, { ...LIVE, entryMode: "close", exitMode: "close", persistBars: persist, ...extra }, true, vix, from_, to))}`);
+  }
 })().catch((e) => { console.error("validate failed:", e.message); process.exit(1); });
