@@ -628,6 +628,31 @@ function _entryHourBlocked(etMin, spec) {
   if (!spec || !(etMin >= 0)) return null;
   return _parseEtWindows(spec).find((w) => etMin >= w.from && etMin < w.to) || null;
 }
+// ENTRY CADENCE (#3435). The engine reads the session IBS every scan (~60s) and
+// buys at the first two scans where it crosses the threshold; every lab that
+// validated this stack read it at BAR CLOSES. On 20 sessions of 1-minute data
+// with identical rules (experiments/cadence_validate_1m.js) the engine analog
+// is payoff 0.57 / -0.2%; the same entries confirmed on an hourly close, exit
+// unchanged, are payoff 0.68-1.64 with 8 of 9 boundary phases beating the
+// engine (mean ~+3.7%) and a lower drawdown in every case. The 2y hourly labs,
+// which sample at :30 closes, make +23% / +25% per half. Mechanism: IBS is a
+// CLOSE phenomenon - a washout still at the session low when an hour closes is
+// the pattern the research measured; a two-minute poke at a level is noise.
+// TRADER_ENTRY_CADENCE_MIN=60 (unset/0 = off). TRADER_ENTRY_CADENCE_PHASE=0 is
+// the boundary's minute offset (0 = :00, 30 = :30 = the labs' phase).
+// TRADER_ENTRY_CADENCE_WINDOW=3: entries are allowed for this many minutes after
+// a boundary, so a busy scan loop still lands one decision scan per bar.
+// Entries only - exits, floors, trails and the broker stop are untouched.
+function _entryCadenceBlocked(etMin, cadence, phase = 0, window = 3) {
+  const k = Math.floor(Number(cadence));
+  if (!(k > 0) || !(etMin >= 0)) return null;
+  const ph = ((Math.floor(Number(phase) || 0) % k) + k) % k;
+  const win = Math.max(1, Math.floor(Number(window)) || 3);
+  const since = (((etMin - ph) % k) + k) % k;   // minutes since the last boundary
+  if (since < win) return null;                  // inside the decision window
+  const next = etMin - since + k;
+  return { next, since, label: `${String(Math.floor(next / 60)).padStart(2, '0')}:${String(next % 60).padStart(2, '0')}` };
+}
 function _nextTradingDates(dateStr, n) {
   // dateStr + n trading days (weekend-skipping; holidays just widen the block,
   // which errs on the safe side for a cooldown).
@@ -2285,6 +2310,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         continue;
       }
     }
+    // ENTRY CADENCE (#3435) — see _entryCadenceBlocked. Entries only.
+    if (Number(process.env.TRADER_ENTRY_CADENCE_MIN) > 0) {
+      const _ecMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
+      const _ecb = _entryCadenceBlocked(_ecMin, process.env.TRADER_ENTRY_CADENCE_MIN, process.env.TRADER_ENTRY_CADENCE_PHASE, process.env.TRADER_ENTRY_CADENCE_WINDOW);
+      if (_ecb) {
+        out.skipped.push({ ...record, why: `entry_cadence: ${String(Math.floor(_ecMin / 60)).padStart(2, '0')}:${String(_ecMin % 60).padStart(2, '0')} ET is between bar closes — next decision ${_ecb.label} (#3435)` });
+        continue;
+      }
+    }
     // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
     // falling — re-buying the same knife the same/next session is the churn that
     // built the worst backtest days. Barred through the recorded ET date.
@@ -2693,4 +2727,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
