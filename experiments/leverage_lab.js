@@ -168,6 +168,7 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         const full = equity * frac;
         const size = o.scaleIn ? full * o.scaleIn.firstFrac : full;
         if (size > cash) continue;
+        if (o.grossCap != null && (equity - cash + size) > equity * o.grossCap) continue;   // engine: TRADER_MAX_GROSS_PCT skips entries past the cap
         cash -= size;
         const entryPx = c.b.c * (1 + ENTRY_SLIP);
         open.set(c.sym, { entry: entryPx, entry0: entryPx, qtyVal: size, qtyVal0: full, stopPx: o.stopPct == null ? null : entryPx * (1 - o.stopPct), entrySi: c.b.si, entryT: c.b.t, peak: entryPx });
@@ -265,5 +266,7 @@ function anatomy(trades, from, to, title) {
   for (const add of [["TNA"], ["SPXL"], ["TQQQ"], ["UPRO"], ["TNA", "SPXL"], ["TNA", "SPXL", "TQQQ"], ["TNA", "UPRO", "TQQQ"], ["TNA", "SPXL", "UPRO"]]) console.log(line("+ " + add.join(" "), run(ARMED, [...SYMS, ...add])));
   console.log("\nSLOT CAP with the family (13 names compete for the slots)");
   for (const cap of [5, 6, 7]) console.log(line(`family 1.0x, cap ${cap}`, run({ ...ARMED, maxConc: cap }, ALL)));
+  console.log("\nGROSS CAP — the engine skips entries past TRADER_MAX_GROSS_PCT (default 80); every lab allowed 100");
+  for (const [label, syms] of [["armed 9", SYMS], ["family 13", ALL]]) for (const cap of [0.8, 0.9, 1.0]) console.log(line(`${label}, gross cap ${Math.round(cap * 100)}%`, run({ ...ARMED, grossCap: cap }, syms)));
   for (const s of LEV) { const tr = run(ARMED, [...SYMS, s]).h.trades.filter((x) => x.sym === s); const w = tr.filter((x) => x.ret > 0); const gw = w.reduce((a, x) => a + x.ret, 0), gl = -tr.filter((x) => x.ret <= 0).reduce((a, x) => a + x.ret, 0); console.log(`    ${s} alone (hourly 2y) n ${String(tr.length).padStart(4)}  WR ${(w.length / tr.length * 100).toFixed(0)}%  mean ${(tr.reduce((a, x) => a + x.ret, 0) / tr.length * 100).toFixed(2)}%/t  PF ${(gw / gl).toFixed(2)}`); }
 })().catch((e) => { console.error("failed:", e.message); process.exit(1); });
