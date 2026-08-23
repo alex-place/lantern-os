@@ -1307,6 +1307,42 @@ async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended =
  * Orders still route as marketable LIMIT + outsideRth (closeLong's `extended`
  * path), never naked market orders into a thin book.
  */
+// EXIT AUTHORITY (round-7 lab, 2026-08-23). The validated exit is the BOUNCE:
+// sell at session IBS >= TRADER_IBS_EXIT (+ floor / trail / stop). Three older
+// exits sit in front of it on this path and pre-empt it whenever they are on:
+//   - the zone ladder (armed for EVERY entry since #3285; "zone ladder owns this
+//     exit" blocked the bounce 305 times on live 8/10-8/21): an R1 target at the
+//     zone or +3% with a give-back floor. round7_lab: ladder-owned exits earn
+//     462% vs 1,494% on the 26y holdout (return/DD 26 vs 89) - ANY +3% target
+//     clips the tail the bounce sells into.
+//   - take_profit_R (default 1R = +3%) - the same clip, one layer down.
+//   - momentum_died - a MACD read no lab has validated.
+//   - exitMinPwin (0.6) - a legacy "bearishness" confidence that has nothing to
+//     say about a bounce ("bearish too weak to exit" blocked 51 times).
+// The validated structure needs all four out of the way:
+//   TRADER_ZONE_EXIT=0 TRADER_TAKE_PROFIT_R=0 TRADER_MOMENTUM_EXIT=0 TRADER_EXIT_MIN_PWIN=0
+// This does not change behaviour; it journals ONE config_warning row per process
+// when the bounce gate is armed while something still pre-empts it, so the
+// ledger shows the exit structure that is actually running.
+let _exitAuthorityWarned = false;
+function _exitAuthorityConflicts(c) {
+  if (!(c.ibsExit > 0)) return [];
+  const out = [];
+  if (c.zoneExit) out.push('TRADER_ZONE_EXIT (ladder owns every entry: R1 target pre-empts the bounce)');
+  if (c.takeProfitR > 0) out.push(`TRADER_TAKE_PROFIT_R=${c.takeProfitR} (+${c.takeProfitR}R target fires before the bounce)`);
+  if (c.momentumExit) out.push('TRADER_MOMENTUM_EXIT (unvalidated MACD exit on winners)');
+  if (c.exitMinPwin > 0) out.push(`TRADER_EXIT_MIN_PWIN=${c.exitMinPwin} (bounce blocked unless the read is "bearish enough")`);
+  return out;
+}
+function _warnExitAuthority(c) {
+  if (_exitAuthorityWarned) return;
+  _exitAuthorityWarned = true;
+  const conflicts = _exitAuthorityConflicts(c);
+  if (!conflicts.length) return;
+  const msg = `IBS bounce exit (TRADER_IBS_EXIT=${c.ibsExit}) is armed but pre-empted by: ${conflicts.join('; ')} - the validated exit is not the one running`;
+  console.warn('[auto-trader] ' + msg);
+  logTrade({ event: 'config_warning', symbol: '*', reason: msg });
+}
 async function runAutoTrade(scan, opts = {}) {
   const prev = _actingUser;
   _actingUser = (opts && opts.userId) || null;
@@ -1320,6 +1356,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   const exclude = new Set([...(excludeSymbols || [])].map((s) => String(s).toUpperCase()));
   const c = cfg();
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
+  _warnExitAuthority(c);
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
   if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
@@ -2727,4 +2764,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _exitAuthorityConflicts, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
