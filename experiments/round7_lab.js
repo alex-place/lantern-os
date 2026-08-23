@@ -113,6 +113,19 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
       if (!b || b.t <= pos.entryT) continue;
       const legs = b.c >= b.o ? ["L", "H", "C"] : ["H", "L", "C"];
       let exitPx = null, reason = null;
+      if (o.scaleIn && !pos.added && b.si <= pos.entrySi + (o.scaleIn.sessions || 0)) {
+        const lim = pos.entry0 * (1 - o.scaleIn.depth);
+        if (b.l <= lim && pos.stopPx != null && lim > pos.stopPx) {
+          const addPx = Math.min(lim, b.o), addVal = pos.qtyVal0 * o.scaleIn.addFrac;
+          if (addVal <= cash) {
+            cash -= addVal;
+            // blended entry: weight by value-at-entry
+            const sh0 = pos.qtyVal / pos.entry, sh1 = addVal / addPx;
+            pos.entry = (pos.qtyVal + addVal) / (sh0 + sh1);
+            pos.qtyVal += addVal; pos.added = true; pos.peak = Math.max(pos.peak, pos.entry);
+          }
+        }
+      }
       for (const leg of legs) {
         if (leg === "H") {
           pos.peak = Math.max(pos.peak, b.h);
@@ -174,11 +187,12 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         let frac = o.sizeFrac * (o.weights ? (o.weights[c.sym] || 1) : 1);
         if (o.vixUp != null && vix && vix.get(c.b.d) >= o.vixUp) frac *= 1.5;
         if (c.idio) frac *= 0.5;
-        const size = equity * frac;
+        const full = equity * frac;
+        const size = o.scaleIn ? full * o.scaleIn.firstFrac : full;
         if (size > cash) continue;
         cash -= size;
         const entryPx = c.b.c * (1 + ENTRY_SLIP);
-        open.set(c.sym, { entry: entryPx, qtyVal: size, stopPx: o.stopPct == null ? null : entryPx * (1 - o.stopPct), entrySi: c.b.si, entryT: c.b.t, peak: entryPx });
+        open.set(c.sym, { entry: entryPx, entry0: entryPx, qtyVal: size, qtyVal0: full, stopPx: o.stopPct == null ? null : entryPx * (1 - o.stopPct), entrySi: c.b.si, entryT: c.b.t, peak: entryPx });
       }
     }
     curve.push({ t, d, equity });
@@ -302,6 +316,14 @@ function anatomy(trades, from, to, title) {
   ]);
   sweep("F. SLOT PRIORITY — when more names fire than slots remain, which gets in? (lab: deepest IBS; engine: legacy confidence score)", [
     ["deepest IBS first (lab)", LIVE], ["highest tilt weight first, then depth", { ...LIVE, slotOrder: "expectancy" }], ["shallowest IBS first (worst case)", { ...LIVE, slotOrder: "shallow" }], ["alphabetical (arbitrary)", { ...LIVE, slotOrder: "alpha" }],
+  ]);
+  sweep("G. SCALE-IN — part at the bar-close signal, the rest only on further weakness (limit, no fallback); adds good this session (+n)", [
+    ["validated (all at the signal)", LIVE],
+    ["half now, half at -0.5%", { ...LIVE, scaleIn: { firstFrac: 0.5, addFrac: 0.5, depth: 0.005, sessions: 0 } }],
+    ["half now, half at -1.0%", { ...LIVE, scaleIn: { firstFrac: 0.5, addFrac: 0.5, depth: 0.01, sessions: 0 } }],
+    ["half now, half at -0.5%, add good 1 more session", { ...LIVE, scaleIn: { firstFrac: 0.5, addFrac: 0.5, depth: 0.005, sessions: 1 } }],
+    ["full now, +50% at -0.5%", { ...LIVE, scaleIn: { firstFrac: 1, addFrac: 0.5, depth: 0.005, sessions: 0 } }],
+    ["full now, +50% at -1.0%", { ...LIVE, scaleIn: { firstFrac: 1, addFrac: 0.5, depth: 0.01, sessions: 0 } }],
   ]);
   console.log("\nEXIT ANATOMY (hourly h2) — how the live ladder exits vs the validated bounce");
   for (const [name, cfg] of [["validated", LIVE], ["live ladder", { ...LIVE, ...LADDER }], ["ladder + bounce", { ...LIVE, tp: 0.03, giveback: { arm: 0.027, frac: 0.4 } }]]) anatomy(run(cfg).h.trades, H_MID, H_END, name);
