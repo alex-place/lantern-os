@@ -1343,6 +1343,28 @@ function _warnExitAuthority(c) {
   console.warn('[auto-trader] ' + msg);
   logTrade({ event: 'config_warning', symbol: '*', reason: msg });
 }
+// SLOT PRIORITY (round-7 lab, 2026-08-23). When more names fire in one scan
+// than slots remain, the ADMISSION ORDER decides which get in - and with the
+// hourly decision windows (#3435) several names routinely fire in the same
+// minute on market-wide washout days, the paydays. round7_lab F, 26y holdout:
+// arbitrary order 643%, shallowest-first 910%, deepest IBS first 1,494%,
+// highest tilt weight then deepest IBS 2,866% (return/DD 129 vs 89; recent
+// year 44.6% vs 31.5%) - fit winner, holdout confirms. The scan's own order is
+// the legacy confidence score, which is arbitrary with respect to expectancy.
+// TRADER_SLOT_ORDER: unset/confidence = the scan's order (current behaviour);
+// depth = deepest session IBS first; expectancy = highest TRADER_SYMBOL_SIZE_MULT
+// weight first, deepest IBS as the tie-break. Pure; never drops a candidate.
+function _orderEntries(enters, mode = process.env.TRADER_SLOT_ORDER) {
+  const m = String(mode || 'confidence').toLowerCase();
+  if (m !== 'depth' && m !== 'expectancy') return enters;
+  const ibsOf = (s) => (Number.isFinite(Number(s && s.ibs)) ? Number(s.ibs) : Infinity);   // no reading sorts last
+  const wOf = (s) => _symbolSizeMult(String(s && s.symbol || '').toUpperCase());
+  return enters.map((s, i) => ({ s, i })).sort((a, b) => {
+    if (m === 'expectancy') { const dw = wOf(b.s) - wOf(a.s); if (dw) return dw; }
+    const di = ibsOf(a.s) - ibsOf(b.s);
+    return di || a.i - b.i;   // stable
+  }).map((x) => x.s);
+}
 async function runAutoTrade(scan, opts = {}) {
   const prev = _actingUser;
   _actingUser = (opts && opts.userId) || null;
@@ -2018,7 +2040,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // protectiveOnly (extended hours): manage what we hold, open nothing new.
   // IBS is position-within-session-range; the extended session has almost no
   // range, so the entry signal is undefined there and unbacked by any lab gate.
-  const _entryCandidates = protectiveOnly ? [] : enters;
+  const _entryCandidates = protectiveOnly ? [] : _orderEntries(enters, process.env.TRADER_SLOT_ORDER);
   if (protectiveOnly && enters.length) {
     out.skipped.push({ symbol: '*', why: `extended hours: protective exits only — ${enters.length} entry signal(s) not taken` });
   }
@@ -2764,4 +2786,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _exitAuthorityConflicts, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
