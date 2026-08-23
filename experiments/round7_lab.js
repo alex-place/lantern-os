@@ -137,6 +137,7 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         const sessOk = o.minSessions == null || b.si >= pos.entrySi + o.minSessions;
         if (!o.noBounce && sessOk && v >= o.exitIbs) { exitPx = b.c * (1 - SLIP); reason = "bounce"; }
         else if (o.nextClose && b.isLast && b.si >= pos.entrySi + 1) { exitPx = b.c * (1 - SLIP); reason = "next_close"; }
+        else if (o.decarry && o.decarry.has(sym) && b.isLast) { exitPx = b.c * (1 - SLIP); reason = "decarry"; }
         else if (b.si >= pos.entrySi + o.timeoutS && b.isLast) { exitPx = b.c; reason = "timeout"; }
       }
       if (exitPx != null) {
@@ -292,6 +293,9 @@ function anatomy(trades, from, to, title) {
   ]);
   sweep("D. MARKET-WIDE GATE — require SPY session IBS <= x at entry, or size idiosyncratic entries x0.5", [
     ["validated (no gate)", LIVE], ["SPY IBS <= 0.3 gate", { ...LIVE, spyGate: 0.3 }], ["SPY IBS <= 0.4 gate", { ...LIVE, spyGate: 0.4 }], ["SPY IBS <= 0.5 gate", { ...LIVE, spyGate: 0.5 }], ["half size if SPY IBS > 0.4", { ...LIVE, spyHalf: 0.4 }], ["half size if SPY IBS > 0.5", { ...LIVE, spyHalf: 0.5 }],
+  ]);
+  sweep("E. LEVERAGED DE-CARRY — live flattens SOXL at 15:50 every day (TRADER_EOD_DECARRY, default on); the tilt now puts 1.5x on SOXL", [
+    ["validated (SOXL carries overnight)", LIVE], ["live: SOXL flat at the close", { ...LIVE, decarry: new Set(["SOXL"]) }], ["flat at close, all names", { ...LIVE, decarry: new Set(SYMS) }],
   ]);
   console.log("\nEXIT ANATOMY (hourly h2) — how the live ladder exits vs the validated bounce");
   for (const [name, cfg] of [["validated", LIVE], ["live ladder", { ...LIVE, ...LADDER }], ["ladder + bounce", { ...LIVE, tp: 0.03, giveback: { arm: 0.027, frac: 0.4 } }]]) anatomy(run(cfg).h.trades, H_MID, H_END, name);
