@@ -55,3 +55,25 @@ test('string env values parse the same way the engine passes them', () => {
   assert.strictEqual(at._entryCadenceBlocked(M(11, 4), '60', '0', '3').label, '12:00');
   assert.strictEqual(at._entryCadenceBlocked(M(11, 31), '60', '30', undefined), null);
 });
+
+test('ONE DECISION PER BAR: a late first scan (10:07, nothing decided yet) still decides; beyond half a bar it does not', () => {
+  assert.strictEqual(at._entryCadenceBlocked(M(10, 7), 60, 0, 3, null), null, 'no decision recorded yet for 10:00 -> 10:07 is its decision scan');
+  assert.strictEqual(at._entryCadenceBlocked(M(10, 29), 60, 0, 3, null), null, '10:29 is still inside half a bar');
+  const b = at._entryCadenceBlocked(M(10, 30), 60, 0, 3, null);
+  assert.ok(b && b.why === 'between', '10:30 is past half the bar -> wait for 11:00');
+  assert.strictEqual(b.label, '11:00');
+});
+
+test('ONE DECISION PER BAR: once 10:00 has decided, every later scan in that bar is blocked as already decided; 11:00 decides again', () => {
+  const b = at._entryCadenceBlocked(M(10, 1), 60, 0, 3, M(10, 0));
+  assert.ok(b && b.why === 'decided', '10:01 after a 10:00 decision is blocked even inside the window');
+  assert.strictEqual(b.label, '11:00');
+  assert.ok(at._entryCadenceBlocked(M(10, 20), 60, 0, 3, M(10, 0)), '10:20 blocked');
+  assert.strictEqual(at._entryCadenceBlocked(M(11, 0), 60, 0, 3, M(10, 0)), null, '11:00 is a new bar');
+  assert.strictEqual(at._entryCadenceBlocked(M(11, 4), 60, 0, 3, M(10, 0)), null, '11:04 late first scan of the 11:00 bar decides');
+});
+
+test('ONE DECISION PER BAR: a decision recorded for an EARLIER bar does not block a late scan of the current bar', () => {
+  assert.strictEqual(at._entryCadenceBlocked(M(12, 9), 60, 0, 3, M(11, 0)), null, '12:09 with 11:00 decided -> the 12:00 bar has not decided yet');
+  assert.ok(at._entryCadenceBlocked(M(12, 9), 60, 0, 3, M(12, 0)), '12:09 with 12:00 decided -> blocked');
+});
