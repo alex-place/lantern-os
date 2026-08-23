@@ -109,3 +109,26 @@ test('judge() never throws, even on a poisoned entry', async () => {
     assert.ok(r.skipped || r.logged != null, 'returns a shape, never throws');
   });
 });
+
+test('newsContext: last-24h items for the family and the market, highest impact first, journaled and in the prompt (2026-08-23)', () => {
+  const fs = require('fs'), os = require('os'), path = require('path');
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'news-')), 'news.jsonl');
+  const now = Date.parse('2026-08-24T14:00:00Z');
+  const row = (h, syms, direction, impact, hoursAgo) => JSON.stringify({ headline: h, symbols: syms, direction, impact, published: new Date(now - hoursAgo * 3600e3).toISOString() });
+  fs.writeFileSync(f, [
+    row('Chipmakers slide as export rules tighten', ['SMH', 'NVDA'], 'bearish', 80, 3),
+    row('Fed holds, signals patience', ['SPY'], 'neutral', 70, 20),
+    row('Semis rally on AI orders', ['SOXL'], 'bullish', 60, 5),
+    row('Old story from last week', ['SOXL'], 'bearish', 95, 90),        // outside the window
+    row('Energy ETF comparison', ['XLE'], 'neutral', 35, 1),             // another family, not market
+    row('Chipmakers slide as export rules tighten', ['SMH'], 'bearish', 80, 4),   // duplicate headline
+  ].join('\n') + '\n');
+  const n = ej.newsContext('SOXL', now, { file: f });
+  assert.deepStrictEqual(n.items.map((x) => x.headline), ['Chipmakers slide as export rules tighten', 'Fed holds, signals patience', 'Semis rally on AI orders']);
+  assert.deepStrictEqual(n.items.map((x) => x.scope), ['symbol', 'market', 'symbol']);
+  assert.strictEqual(n.bearish, 1); assert.strictEqual(n.bullish, 1); assert.strictEqual(n.topImpact, 80);
+  const prompt = ej.buildPrompt({ symbol: 'SOXL', price: 20, stop: 19.4, notional: 10000, news: n });
+  assert.ok(/NEWS IN THE LAST 24H/.test(prompt) && /Chipmakers slide/.test(prompt) && /\[bearish, 80, symbol, 3h\]/.test(prompt), prompt);
+  assert.ok(/none on file/.test(ej.buildPrompt({ symbol: 'SOXL', price: 20, news: { items: [] } })), 'empty feed is stated, not omitted');
+  assert.deepStrictEqual(ej.newsContext('SOXL', now, { file: f + '.missing' }).items, [], 'missing feed -> empty, never throws');
+});

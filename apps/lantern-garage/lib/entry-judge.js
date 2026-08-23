@@ -43,6 +43,45 @@ const LOCAL_URL = () => process.env.TRADER_JUDGE_LOCAL_URL || process.env.TRADER
 const LOCAL_MODEL = () => process.env.TRADER_JUDGE_LOCAL_MODEL || process.env.OURO_MODEL || 'ouro:latest';
 
 function enabled() { return process.env.TRADER_ENTRY_JUDGE === '1'; }
+
+// NEWS CONTEXT (operator 2026-08-23: "account for news more — it still affects
+// SPY, SOXL, SOXS"). The scored news feed the server already keeps
+// (data/lantern-garage/trading/news.jsonl: headline, symbols, direction,
+// impact 0-100, published) is read back for the entry's family and for the
+// market at large, last 24h, highest impact first. It goes into the prompt AS
+// EVIDENCE (headlines, no verdict words) and is journaled with the read, so
+// entry_judge_score.js can test "bearish news at entry -> outcome" forward
+// instead of asserting it. Read-only, capped, fail-soft: no feed = no block.
+const NEWS_FILE = () => process.env.TRADER_NEWS_LOG
+  || path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'news.jsonl');
+const MARKET_TAGS = new Set(['SPY', 'QQQ', 'IWM', 'DIA', 'VIX', '^VIX', 'SPX', 'NDX', 'DJI']);
+function newsContext(symbol, now = Date.now(), { maxItems = 6, hours = 24, file = NEWS_FILE() } = {}) {
+  try {
+    if (!fs.existsSync(file)) return { items: [], bearish: 0, bullish: 0, topImpact: 0 };
+    const fam = (FAMILY[String(symbol || '').toUpperCase()] || [null])[0];
+    const famSyms = new Set(Object.entries(FAMILY).filter(([, v]) => v[0] === fam).map(([k]) => k).concat([String(symbol || '').toUpperCase()]));
+    const since = now - hours * 3600e3;
+    // the feed appends; read the tail only (last ~400 KB is >1 day at ~200 rows/day)
+    const size = fs.statSync(file).size, start = Math.max(0, size - 400 * 1024);
+    const fd = fs.openSync(file, 'r'); const buf = Buffer.alloc(size - start);
+    try { fs.readSync(fd, buf, 0, buf.length, start); } finally { fs.closeSync(fd); }
+    const lines = buf.toString('utf8').split(/\r?\n/); if (start > 0) lines.shift();
+    const seen = new Set(); const items = [];
+    for (const l of lines) {
+      if (!l) continue;
+      let r; try { r = JSON.parse(l); } catch (_e) { continue; }
+      const t = Date.parse(r.published || r.recorded_at || ''); if (!(t >= since)) continue;
+      const syms = (r.symbols || []).map((s) => String(s).toUpperCase());
+      const mine = syms.some((s) => famSyms.has(s)), market = syms.length === 0 || syms.some((s) => MARKET_TAGS.has(s));
+      if (!mine && !market) continue;
+      const key = String(r.headline || '').slice(0, 80); if (!key || seen.has(key)) continue; seen.add(key);
+      items.push({ headline: key, direction: r.direction || 'neutral', impact: Number(r.impact) || 0, scope: mine ? 'symbol' : 'market', age_h: Math.round((now - t) / 3600e3) });
+    }
+    items.sort((a, b) => b.impact - a.impact || a.age_h - b.age_h);
+    const top = items.slice(0, maxItems);
+    return { items: top, bearish: items.filter((x) => x.direction === 'bearish').length, bullish: items.filter((x) => x.direction === 'bullish').length, topImpact: items.length ? items[0].impact : 0 };
+  } catch (_e) { return { items: [], bearish: 0, bullish: 0, topImpact: 0 }; }
+}
 function timeoutMs() { return Number(process.env.TRADER_JUDGE_TIMEOUT_MS) || 30000; }
 function logFile() {
   return process.env.TRADER_JUDGE_LOG
@@ -90,6 +129,11 @@ function buildPrompt(e) {
     `  SPY today ${f(e.spy_tape)}%   SPY last 30 min ${f(e.spy_mom30)}%   regime ${e.regime || 'unknown'}`,
     `  MACD histogram ${f(e.macd_hist, 4)}   at S/R zone: ${e.in_zone == null ? 'n/a' : e.in_zone ? 'yes' : 'no'}   time ${e.et_time || 'n/a'} ET`,
     '',
+    ...(e.news && e.news.items && e.news.items.length
+      ? ['NEWS IN THE LAST 24H (headline, scored direction, impact 0-100, scope, age):',
+        ...e.news.items.map((n) => `  - ${n.headline}  [${n.direction}, ${n.impact}, ${n.scope}, ${n.age_h}h]`),
+        `  (${e.news.bearish} bearish / ${e.news.bullish} bullish items in the window)`, '']
+      : ['NEWS IN THE LAST 24H: none on file for this family or the market.', '']),
     `Your options: ${opts}.`,
     '',
     'Reply with strict JSON, no prose:',
@@ -164,7 +208,8 @@ async function askLocal(prompt, allowRedirect, fetchImpl) {
 async function judge(entry, { fetchImpl, now = Date.now() } = {}) {
   if (!enabled()) return { skipped: 'disabled' };
   try {
-    const e = { ...entry, leverage: leverageOf(entry.symbol), inverse: inverseFor(entry.symbol) };
+    const news = entry.news || newsContext(entry.symbol, now);
+    const e = { ...entry, news, leverage: leverageOf(entry.symbol), inverse: inverseFor(entry.symbol) };
     const prompt = buildPrompt(e);
     const base = {
       ts: new Date(now).toISOString(),
@@ -173,6 +218,8 @@ async function judge(entry, { fetchImpl, now = Date.now() } = {}) {
       notional: e.notional ?? null, inverse: e.inverse,
       p_win: e.p_win ?? null, ibs: e.ibs ?? null, spy_tape: e.spy_tape ?? null,
       regime: e.regime ?? null,
+      news_bearish: news.bearish, news_bullish: news.bullish, news_top_impact: news.topImpact,
+      news_items: news.items.map((n) => ({ h: n.headline.slice(0, 60), d: n.direction, i: n.impact, s: n.scope })),
     };
     for (const [provider, ask] of [['claude', askClaude], ['local', askLocal]]) {
       const t0 = Date.now();
@@ -189,4 +236,4 @@ async function judge(entry, { fetchImpl, now = Date.now() } = {}) {
   }
 }
 
-module.exports = { judge, enabled, buildPrompt, parseReply, inverseFor, logFile };
+module.exports = { judge, enabled, buildPrompt, parseReply, inverseFor, logFile, newsContext };
