@@ -165,7 +165,10 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         if (o.spyGate != null && spyV != null && spyV > o.spyGate) continue;
         cands.push({ sym, b, v, idio: o.spyHalf != null && spyV != null && spyV > o.spyHalf });
       }
-      cands.sort((a, z) => a.v - z.v);
+      if (o.slotOrder === "expectancy") cands.sort((a, z) => ((o.weights || {})[z.sym] || 1) - ((o.weights || {})[a.sym] || 1) || a.v - z.v);
+      else if (o.slotOrder === "shallow") cands.sort((a, z) => z.v - a.v);
+      else if (o.slotOrder === "alpha") cands.sort((a, z) => (a.sym < z.sym ? -1 : 1));
+      else cands.sort((a, z) => a.v - z.v);
       for (const c of cands) {
         if (open.size >= o.maxConc) break;
         let frac = o.sizeFrac * (o.weights ? (o.weights[c.sym] || 1) : 1);
@@ -296,6 +299,9 @@ function anatomy(trades, from, to, title) {
   ]);
   sweep("E. LEVERAGED DE-CARRY — live flattens SOXL at 15:50 every day (TRADER_EOD_DECARRY, default on); the tilt now puts 1.5x on SOXL", [
     ["validated (SOXL carries overnight)", LIVE], ["live: SOXL flat at the close", { ...LIVE, decarry: new Set(["SOXL"]) }], ["flat at close, all names", { ...LIVE, decarry: new Set(SYMS) }],
+  ]);
+  sweep("F. SLOT PRIORITY — when more names fire than slots remain, which gets in? (lab: deepest IBS; engine: legacy confidence score)", [
+    ["deepest IBS first (lab)", LIVE], ["highest tilt weight first, then depth", { ...LIVE, slotOrder: "expectancy" }], ["shallowest IBS first (worst case)", { ...LIVE, slotOrder: "shallow" }], ["alphabetical (arbitrary)", { ...LIVE, slotOrder: "alpha" }],
   ]);
   console.log("\nEXIT ANATOMY (hourly h2) — how the live ladder exits vs the validated bounce");
   for (const [name, cfg] of [["validated", LIVE], ["live ladder", { ...LIVE, ...LADDER }], ["ladder + bounce", { ...LIVE, tp: 0.03, giveback: { arm: 0.027, frac: 0.4 } }]]) anatomy(run(cfg).h.trades, H_MID, H_END, name);
