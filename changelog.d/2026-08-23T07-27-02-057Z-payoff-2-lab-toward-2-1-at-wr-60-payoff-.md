@@ -1,0 +1,3 @@
+### Changed
+
+- Payoff-2 lab (toward 2:1 at WR>=60%): payoff and win rate move in exact opposition along the stop distance — structural stops under the session low give payoff 1.04/1.33/1.67 at WR 58/51/45% for 2,099/1,313/1,193% vs the armed 0.86 at 64% for 2,866% (26y); 2R targets destroy it; the runner adds +0.02–0.04 and fails holdout. Scheduled-news calendar (215 FOMC days scraped, payrolls, OPEX) is not a lever; entries after 3+ SPY down closes win 78% at payoff 1.26 (skipping them costs 27% of the holdout); sizing up on streaks wins fit + recent half but loses the 26y ratio (the VIX multiplier already captures it)
