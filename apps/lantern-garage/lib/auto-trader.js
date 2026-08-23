@@ -2593,6 +2593,17 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
             return { mirror: _mir, mirror_px: _px };
           } catch (_e) { return {}; }
         })()) });
+      // ENTRY JUDGE (#3390): a second opinion on this exact entry, in SHADOW —
+      // journal-only, fire-and-forget, scored later against the real outcome
+      // and the redirect counterfactual. Cannot delay or touch the order.
+      try {
+        const _ej = require('./entry-judge');
+        if (_ej.enabled()) {
+          _ej.judge({ symbol: sym, price, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null,
+            notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win,
+            ...(s.decision_context || {}) }).catch(() => {});
+        }
+      } catch (_e) { /* the judge must never touch an entry */ }
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
