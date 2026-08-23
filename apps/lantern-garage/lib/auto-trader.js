@@ -643,15 +643,30 @@ function _entryHourBlocked(etMin, spec) {
 // TRADER_ENTRY_CADENCE_WINDOW=3: entries are allowed for this many minutes after
 // a boundary, so a busy scan loop still lands one decision scan per bar.
 // Entries only - exits, floors, trails and the broker stop are untouched.
-function _entryCadenceBlocked(etMin, cadence, phase = 0, window = 3) {
+// ONE DECISION PER BAR (follow-up, 2026-08-23). The scan loop is setTimeout(60s)
+// AFTER each scan completes, so scan spacing is 60s + scan time: live 8/18-8/21
+// median 58s, p90 139s, p99 564s. A fixed 3-minute window therefore misses an
+// hourly boundary outright roughly once in 15-20, and that hour's decision is
+// skipped for every symbol. Semantics now: the FIRST scan after a boundary
+// decides even if it is late (up to half a bar - beyond that it is a different
+// bar), and a second scan inside the same bar never decides twice. `decided` is
+// the boundary (ET minute) of the last decision scan; the caller records it.
+let _cadenceDecided = { day: null, boundary: null };   // the last decision scan's ET date + boundary minute (per process)
+const _etDateStr = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+function _entryCadenceBlocked(etMin, cadence, phase = 0, window = 3, decided) {
   const k = Math.floor(Number(cadence));
   if (!(k > 0) || !(etMin >= 0)) return null;
   const ph = ((Math.floor(Number(phase) || 0) % k) + k) % k;
   const win = Math.max(1, Math.floor(Number(window)) || 3);
   const since = (((etMin - ph) % k) + k) % k;   // minutes since the last boundary
-  if (since < win) return null;                  // inside the decision window
-  const next = etMin - since + k;
-  return { next, since, label: `${String(Math.floor(next / 60)).padStart(2, '0')}:${String(next % 60).padStart(2, '0')}` };
+  const boundary = etMin - since;
+  const next = boundary + k;
+  const label = `${String(Math.floor(next / 60)).padStart(2, '0')}:${String(next % 60).padStart(2, '0')}`;
+  // decided === undefined: plain window semantics (no tracking). decided === null: tracking, nothing decided yet.
+  if (decided !== undefined && decided != null && Number(decided) === boundary) return { next, since, boundary, label, why: 'decided' };   // this bar already had its decision scan
+  if (since < win) return null;                                                                                   // inside the window
+  if (decided !== undefined && since < k / 2) return null;                                                        // tracking: a late first scan of this bar is still its decision
+  return { next, since, boundary, label, why: 'between' };
 }
 function _nextTradingDates(dateStr, n) {
   // dateStr + n trading days (weekend-skipping; holidays just widen the block,
@@ -2372,11 +2387,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // ENTRY CADENCE (#3435) — see _entryCadenceBlocked. Entries only.
     if (Number(process.env.TRADER_ENTRY_CADENCE_MIN) > 0) {
       const _ecMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
-      const _ecb = _entryCadenceBlocked(_ecMin, process.env.TRADER_ENTRY_CADENCE_MIN, process.env.TRADER_ENTRY_CADENCE_PHASE, process.env.TRADER_ENTRY_CADENCE_WINDOW);
+      const _ecDay = _etDateStr(now);
+      const _ecDecided = _cadenceDecided.day === _ecDay ? _cadenceDecided.boundary : null;   // decisions never carry across sessions
+      const _ecb = _entryCadenceBlocked(_ecMin, process.env.TRADER_ENTRY_CADENCE_MIN, process.env.TRADER_ENTRY_CADENCE_PHASE, process.env.TRADER_ENTRY_CADENCE_WINDOW, _ecDecided);
       if (_ecb) {
-        out.skipped.push({ ...record, why: `entry_cadence: ${String(Math.floor(_ecMin / 60)).padStart(2, '0')}:${String(_ecMin % 60).padStart(2, '0')} ET is between bar closes — next decision ${_ecb.label} (#3435)` });
+        out.skipped.push({ ...record, why: `entry_cadence: ${String(Math.floor(_ecMin / 60)).padStart(2, '0')}:${String(_ecMin % 60).padStart(2, '0')} ET ${_ecb.why === 'decided' ? 'already decided this bar' : 'is between bar closes'} — next decision ${_ecb.label} (#3435)` });
         continue;
       }
+      // this scan is the bar's decision scan: remember the boundary so a second scan in the same bar does not decide again
+      _cadenceDecided = { day: _ecDay, boundary: _ecMin - ((((_ecMin - (Number(process.env.TRADER_ENTRY_CADENCE_PHASE) || 0)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) + Number(process.env.TRADER_ENTRY_CADENCE_MIN)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) };
     }
     // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
     // falling — re-buying the same knife the same/next session is the churn that
