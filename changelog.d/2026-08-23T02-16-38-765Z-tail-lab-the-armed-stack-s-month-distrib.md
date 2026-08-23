@@ -1,0 +1,3 @@
+### Changed
+
+- Tail lab: the armed stack's month distribution across 26 years (320 months, 92 red, median +1.2%, p5 −4.0%, worst −10.0% in 2020-02, best +26% in 2020-03); every crisis window net positive with drawdowns recovering in days (2008-Q4 +43%, 2020-Mar +38%, 2022 +47%, 2025-Apr +21% with −14.8% on 4/8 recovered 4/9); the stress multiplier deepens the worst month (−7.9% → −10%) but lifts the best more (+20.7% → +26%) at an identical max DD — a tail harvester; half size cuts the worst month to −6.6% at ~45% of the 2y return; full Kelly ≈ 22% per position under the armed stack, so 12% ≈ 0.55 Kelly
