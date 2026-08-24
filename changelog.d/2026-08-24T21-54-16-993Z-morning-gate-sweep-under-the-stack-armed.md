@@ -1,0 +1,3 @@
+### Changed
+
+- Morning-gate sweep under the stack armed 2026-08-24 (tilt, slot order, step floor 0.5%, bounce 0.6, hourly cadence): every relaxation of TRADER_IBS_MAX_MORNING beats the armed 0.08 on the h2 holdout; the h1 fit winner is 0.12 and h2 confirms (return/DD 11.08 vs 9.21, 51.2% vs 46.1%, drawdown -4.6% vs -5.0%), expectancy 0.215%/trade vs 0.200% on 25 more trades. 0.12 is exactly the relaxation that admits Monday's two deepest washouts (SOXL 0.09, SMH 0.10) while still blocking XLK/GLD 0.16 and QQQ/TQQQ 0.22. The fine-bar cross-check did not discriminate (cap full of prior-session positions at the first window) and is labelled not-evidence in the output
