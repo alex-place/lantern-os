@@ -1966,7 +1966,10 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const _top = _wk.reduce((a, o) => Math.max(a, Number(o.price) || Number(o.stopPrice) || 0), 0);
         let _lockLvl = Math.round(entry * (1 + _wantPct) * 100) / 100;
         // A stop must sit below the market or the broker rejects/instantly triggers it.
-        if (mark > 0 && _lockLvl >= mark) _lockLvl = Math.round(mark * 0.999 * 100) / 100;
+        // STEPPED MODE ONLY: in flat mode the lock is the validated entry+lock level
+        // and the trigger guarantees mark >= it, so clamping there would change
+        // long-validated behaviour in the equality case (be-ratchet.test.js).
+        if (_stepPct > 0 && mark > 0 && _lockLvl >= mark) _lockLvl = Math.round(mark * 0.999 * 100) / 100;
         if (_prevLock && _lockLvl <= _prevLock) continue;                  // stepped mode: only ever upward
         if (_top >= _lockLvl) { _beStopAt.set(sym, _top); _saveState(); continue; }  // a stop already sits at/above the lock — record it, leave it
         if (_wk.length) { await cancelRestingStops(bridge, userId, sym); _beCancels++; }
