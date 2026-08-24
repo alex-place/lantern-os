@@ -145,6 +145,7 @@ function cfg() {
     minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
     exitReattemptMs: n('TRADER_EXIT_REATTEMPT_MIN', DEFAULTS.exitReattemptMin) * 60000, // anti-churn: min gap between exit attempts on the SAME symbol
     exitMinPwin: n('TRADER_EXIT_MIN_PWIN', DEFAULTS.exitMinPwin),        // anti-churn: exit only on strong bearish
+    exitMinSessionMin: n('TRADER_EXIT_MIN_SESSION_MIN', 30),             // 2026-08-24: no signal exit until the session range is this old
     ibsExit: n('TRADER_IBS_EXIT', DEFAULTS.ibsExit),                    // fidelity lab 2026-08-22: hold the washout to its bounce
     persistScans: n('TRADER_PERSIST_SCANS', DEFAULTS.persistScans),      // anti-churn: N consecutive scans
     persistWindowMs: n('TRADER_PERSIST_WINDOW_MS', DEFAULTS.persistWindowMs),
@@ -651,8 +652,18 @@ function _entryHourBlocked(etMin, spec) {
 // decides even if it is late (up to half a bar - beyond that it is a different
 // bar), and a second scan inside the same bar never decides twice. `decided` is
 // the boundary (ET minute) of the last decision scan; the caller records it.
-let _cadenceDecided = { day: null, boundary: null };   // the last decision scan's ET date + boundary minute (per process)
+let _cadenceDecided = { day: null, boundary: null };   // the boundary whose decision was SPENT (an entry placed), per process
+let _pendingCadence = { day: null, boundary: null };   // the boundary this scan is deciding for; promoted only when an entry places
+function _markCadenceDecided() { if (_pendingCadence.day) _cadenceDecided = { ..._pendingCadence }; }
 const _etDateStr = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+// Minutes elapsed in the REGULAR session (09:30-16:00 ET); null outside it.
+// The bounce exit reads a session range, so it needs the session to have one.
+function _sessionMinutes(now) {
+  const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const m = d.getHours() * 60 + d.getMinutes();
+  if (m < 570 || m >= 960) return null;    // outside regular hours: the extended-hours guard already owns this path
+  return m - 570;
+}
 function _entryCadenceBlocked(etMin, cadence, phase = 0, window = 3, decided) {
   const k = Math.floor(Number(cadence));
   if (!(k > 0) || !(etMin >= 0)) return null;
@@ -1920,7 +1931,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // 261%, drawdown roughly halved. With lock == ratchet the stop sits at the
     // touch level and fills on the next downtick — effectively a take-profit.
     const _beLock = Math.max(0, Number(process.env.TRADER_BE_LOCK) || 0);
-    if (_bePct > 0 && !_ordersUnknown) {
+    const _stepPct = Math.max(0, Number(process.env.TRADER_STEP_FLOOR) || 0);   // 2026-08-24: stepped floor, % per step (0 = flat lock)
+    if ((_bePct > 0 || _stepPct > 0) && !_ordersUnknown) {
       let _beCancels = 0;
       for (const [sym, p] of Object.entries(heldPos)) {
         if (exclude.has(sym)) continue;
@@ -1928,19 +1940,42 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;  // genuine basis only — no mark fallback
         const mark = Number(p.current_price) || 0;
         if (qty < 1 || !entry || !mark) continue;    // dust cannot carry a stop at all
-        if (_beStopAt.has(sym)) continue;            // already ratcheted — never re-lower
-        if (mark < entry * (1 + _bePct)) continue;
+        // STEPPED FLOOR (#step, 2026-08-24 — operator: "if it's at 1%+ the exit
+        // should be 1%, if 2%+ it should be 2%, if 3%+ it should be 3%").
+        // TRADER_STEP_FLOOR = step size in PERCENT (1 = lock each whole percent);
+        // unset/0 keeps the flat one-shot lock. Measured on the four surfaces:
+        // step 1% beats the flat +1% floor on both holdouts (h2 49.7% ÷8.88 vs
+        // 44.5% ÷7.57, 26y ÷161 vs ÷129) and — unlike the round-6 ratchet trail —
+        // it SURVIVES finer bars (5m: +0.4% vs −0.9%, smaller drawdown at every
+        // bar size), because it only moves at discrete levels rather than
+        // following the peak continuously. It also subsumes the generic trail.
+        const _prevLock = Number(_beStopAt.get(sym)) || 0;
+        let _wantPct = null;
+        if (_stepPct > 0) {
+          const _gain = (mark / entry - 1) * 100;
+          const _steps = Math.floor(_gain / _stepPct);
+          if (_steps >= 1) _wantPct = (_steps * _stepPct) / 100;
+        } else if (mark >= entry * (1 + _bePct)) {
+          _wantPct = _beLock;
+        }
+        if (_wantPct == null) continue;                                    // not yet at a lock level
+        if (_stepPct <= 0 && _beStopAt.has(sym)) continue;                 // flat mode: one-shot, never re-lower
         const _wk = (_openOrders || []).filter((o) => String(o.symbol || '').toUpperCase() === sym
           && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')
           && STOP_WORKING.test(o.status || ''));
         const _top = _wk.reduce((a, o) => Math.max(a, Number(o.price) || Number(o.stopPrice) || 0), 0);
-        const _lockLvl = Math.round(entry * (1 + _beLock) * 100) / 100;
+        let _lockLvl = Math.round(entry * (1 + _wantPct) * 100) / 100;
+        // A stop must sit below the market or the broker rejects/instantly triggers it.
+        if (mark > 0 && _lockLvl >= mark) _lockLvl = Math.round(mark * 0.999 * 100) / 100;
+        if (_prevLock && _lockLvl <= _prevLock) continue;                  // stepped mode: only ever upward
         if (_top >= _lockLvl) { _beStopAt.set(sym, _top); _saveState(); continue; }  // a stop already sits at/above the lock — record it, leave it
         if (_wk.length) { await cancelRestingStops(bridge, userId, sym); _beCancels++; }
         _beStopAt.set(sym, _lockLvl);
         logTrade({ event: 'stop_resize', symbol: sym,
-          reason: `be_ratchet: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${(_bePct * 100).toFixed(1)}% — stop rises to ${_beLock > 0 ? `entry+${(_beLock * 100).toFixed(2)}% (profit lock, #3415)` : 'entry (#3413)'}`,
-          entry, mark, stop_was: _top || null, stop_want: _lockLvl, lock: _beLock || undefined });
+          reason: _stepPct > 0
+            ? `step_floor: mark +${((mark / entry - 1) * 100).toFixed(2)}% — stop steps up to entry+${(_wantPct * 100).toFixed(2)}% (${_stepPct}% steps, 2026-08-24)`
+            : `be_ratchet: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${(_bePct * 100).toFixed(1)}% — stop rises to ${_beLock > 0 ? `entry+${(_beLock * 100).toFixed(2)}% (profit lock, #3415)` : 'entry (#3413)'}`,
+          entry, mark, stop_was: _top || null, stop_want: _lockLvl, lock: _wantPct || undefined, step: _stepPct || undefined });
         _saveState();   // the ratchet must survive a restart between cancel and re-protect
       }
       // Re-read orders after any cancel so the re-protect pass below sees the
@@ -2129,6 +2164,31 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         if (c.ibsExit > 0 && Number.isFinite(Number(s.ibs)) && Number(s.ibs) < c.ibsExit) {
           out.skipped.push({ ...record, why: `washout thesis intact (IBS ${Number(s.ibs).toFixed(2)} < ${c.ibsExit}) — no signal exit; floor/stop/ladder protect` });
           continue;
+        }
+        // ── SESSION-RANGE MATURITY (2026-08-24, the Monday morning liquidation).
+        //    The gate above only holds a position when the IBS reading is FINITE.
+        //    `sessionIbs()` returns null while `!(hi > lo)` — no regular-hours
+        //    range yet — so in the first minutes of a session the gate fell
+        //    through to the legacy exit; and with a range only cents wide the
+        //    reading is hypersensitive (a two-cent uptick reads IBS 1.0). On
+        //    2026-08-24 that dumped the whole overnight book in six signal_exits
+        //    between 09:31 and 09:41, every one a loss, −$2,514 — and the ledger
+        //    recorded ZERO "washout thesis intact" skips all day.
+        //    Two guards, both entry-agnostic (stops, floor and trail untouched):
+        //      a) a missing reading means HOLD, never sell (TRADER_EXIT_NEEDS_IBS=0 restores the old fallthrough)
+        //      b) no signal exit until TRADER_EXIT_MIN_SESSION_MIN minutes into
+        //         the regular session (default 30), by which time the range is
+        //         wide enough for IBS to mean something.
+        if (c.ibsExit > 0) {
+          const _mins = _sessionMinutes(now);
+          if (!Number.isFinite(Number(s.ibs)) && process.env.TRADER_EXIT_NEEDS_IBS !== '0') {
+            out.skipped.push({ ...record, why: 'no session IBS reading yet — holding (a missing ruler is not a bounce, 2026-08-24)' });
+            continue;
+          }
+          if (_mins != null && _mins < c.exitMinSessionMin) {
+            out.skipped.push({ ...record, why: `session ${_mins}min old (<${c.exitMinSessionMin}) — the session range is too young for a bounce read; stop/floor protect (2026-08-24)` });
+            continue;
+          }
         }
         const entryAt = _entryAt.get(sym) || 0;
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
@@ -2395,8 +2455,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         out.skipped.push({ ...record, why: `entry_cadence: ${String(Math.floor(_ecMin / 60)).padStart(2, '0')}:${String(_ecMin % 60).padStart(2, '0')} ET ${_ecb.why === 'decided' ? 'already decided this bar' : 'is between bar closes'} — next decision ${_ecb.label} (#3435)` });
         continue;
       }
-      // this scan is the bar's decision scan: remember the boundary so a second scan in the same bar does not decide again
-      _cadenceDecided = { day: _ecDay, boundary: _ecMin - ((((_ecMin - (Number(process.env.TRADER_ENTRY_CADENCE_PHASE) || 0)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) + Number(process.env.TRADER_ENTRY_CADENCE_MIN)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) };
+      // This scan reached the entry stage for this bar. The boundary is NOT
+      // recorded here (2026-08-24): on 2026-08-24 the 10:00 scan spent the hour
+      // on SMH, and SOXL — whose read turned eligible at 10:04, two minutes
+      // after the 3-minute window closed — was locked out until 11:00 with slots
+      // still free ("entry_cadence: already decided this bar"). The bar's
+      // decision is spent only when an entry actually PLACES (see _markCadenceDecided
+      // at the placement site), so a scan that enters nothing leaves the hour open.
+      _pendingCadence = { day: _ecDay, boundary: _ecMin - ((((_ecMin - (Number(process.env.TRADER_ENTRY_CADENCE_PHASE) || 0)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) + Number(process.env.TRADER_ENTRY_CADENCE_MIN)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) };
     }
     // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
     // falling — re-buying the same knife the same/next session is the churn that
@@ -2569,6 +2635,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       _zoneLadder.set(sym, { r1: _r1, r1top: _r1top, r2: _r2, broke: false });
     }
     if (r && r.status === 'placed') {
+      _markCadenceDecided();   // 2026-08-24: the bar's decision is spent only now, on a real placement
       const pl = s.plan || {};
       _pendingFillBasis.set(sym, { quote: price, ts: now });   // #3407: basis check armed
       _limitShadowArm(sym, price, now);                        // #3424: journal the limits we did not place
@@ -2817,4 +2884,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

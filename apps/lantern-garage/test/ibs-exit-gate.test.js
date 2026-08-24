@@ -22,7 +22,8 @@ const STATE = path.join(DIR, 'state.json');
 process.env.TRADER_TRADES_LOG = LOG;
 process.env.TRADER_STATE_FILE = STATE;
 process.env.TRADER_MANAGE_EXITS = '1';
-process.env.TRADER_PERSIST_SCANS = '1';      // one scan suffices here — persistence is not under test
+process.env.TRADER_PERSIST_SCANS = '1';
+process.env.TRADER_EXIT_MIN_SESSION_MIN = '0';   // the maturity guard has its own tests below; keep the others clock-independent      // one scan suffices here — persistence is not under test
 process.env.TRADER_AUTO_EXECUTE = '1';       // the signal loop (and its exit branch) only runs when entries are armed — as live
 delete process.env.TRADER_IBS_EXIT;
 
@@ -86,12 +87,77 @@ test('GATE ON, bounce reached: IBS 0.72 >= 0.6 — the signal exit proceeds', as
   } finally { delete process.env.TRADER_IBS_EXIT; }
 });
 
-test('GATE ON, no IBS reading on the signal: falls through to legacy behaviour', async () => {
+test('GATE ON, no IBS reading: HOLDS (2026-08-24) — a missing ruler is not a bounce', async () => {
   process.env.TRADER_IBS_EXIT = '0.6';
   try {
     const bridge = world();
     const sig = neutral(null); delete sig.ibs;
-    await at.runAutoTrade({ signals: [sig] }, { bridge, userId: 't' });
-    assert.strictEqual(sells(bridge).length, 1, 'a missing reading never silently freezes exits');
+    const out = await at.runAutoTrade({ signals: [sig] }, { bridge, userId: 't' });
+    assert.strictEqual(sells(bridge).length, 0, 'null IBS must not sell');
+    assert.ok(out.skipped.some((s) => /no session IBS reading yet/.test(s.why)), 'skip row names the missing reading');
   } finally { delete process.env.TRADER_IBS_EXIT; }
+});
+
+test('TRADER_EXIT_NEEDS_IBS=0 restores the legacy fallthrough for a missing reading', async () => {
+  process.env.TRADER_IBS_EXIT = '0.6';
+  process.env.TRADER_EXIT_NEEDS_IBS = '0';
+  try {
+    const bridge = world();
+    const sig = neutral(null); delete sig.ibs;
+    await at.runAutoTrade({ signals: [sig] }, { bridge, userId: 't' });
+    assert.strictEqual(sells(bridge).length, 1, 'the escape hatch still sells');
+  } finally { delete process.env.TRADER_IBS_EXIT; delete process.env.TRADER_EXIT_NEEDS_IBS; }
+});
+
+// SESSION-RANGE MATURITY (2026-08-24). `now` is pinned so the suite does not
+// depend on the wall clock: 09:35 ET is 5 minutes into the session, 11:00 is 90.
+const ET_AT = (hh, mm) => {
+  // hh:mm America/New_York on TOMORROW's date: the time-of-day is what the guard
+  // reads, and a forward instant keeps it after any wall-clock timestamp the
+  // fixtures stamp (entryAt / exitAt), so suite order cannot change the result.
+  const etDate = new Date(Date.now() + 26 * 3600e3).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const probeUtcHour = Number(new Date(etDate + 'T12:00:00Z').toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour12: false }).slice(0, 2));
+  const offsetH = 12 - probeUtcHour;                       // 4 in EDT, 5 in EST
+  return Date.parse(`${etDate}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`) + offsetH * 3600e3;
+};
+test('a bounce read 5 minutes into the session does NOT sell — the range is too young', async () => {
+  process.env.TRADER_IBS_EXIT = '0.6';
+  process.env.TRADER_EXIT_MIN_SESSION_MIN = '30';
+  try {
+    const bridge = world();
+    const out = await at.runAutoTrade({ signals: [neutral(0.72)] }, { bridge, userId: 't', now: ET_AT(9, 35) });
+    assert.strictEqual(sells(bridge).length, 0, 'no signal exit in the first 30 minutes');
+    assert.ok(out.skipped.some((s) => /session 5min old/.test(s.why)), 'skip row names the session age');
+  } finally { delete process.env.TRADER_IBS_EXIT; process.env.TRADER_EXIT_MIN_SESSION_MIN = '0'; }
+});
+
+test('the same bounce read 90 minutes in DOES sell — a mature session is not gated', async () => {
+  process.env.TRADER_IBS_EXIT = '0.6';
+  process.env.TRADER_EXIT_MIN_SESSION_MIN = '30';
+  process.env.TRADER_MIN_HOLD_MIN = '0';   // the fixture's entryAt is wall-clock; the pinned `now` predates it
+  try {
+    const a = world();
+    await at.runAutoTrade({ signals: [neutral(0.72)] }, { bridge: a, userId: 't', now: ET_AT(11, 0) });
+    assert.strictEqual(sells(a).length, 1, 'a mature session sells the bounce');
+  } finally { delete process.env.TRADER_IBS_EXIT; delete process.env.TRADER_MIN_HOLD_MIN; process.env.TRADER_EXIT_MIN_SESSION_MIN = '0'; }
+});
+
+test('TRADER_EXIT_MIN_SESSION_MIN=0 disables the maturity guard', async () => {
+  process.env.TRADER_IBS_EXIT = '0.6';
+  process.env.TRADER_EXIT_MIN_SESSION_MIN = '0';
+  process.env.TRADER_MIN_HOLD_MIN = '0';
+  try {
+    const b = world();
+    await at.runAutoTrade({ signals: [neutral(0.72)] }, { bridge: b, userId: 't', now: ET_AT(9, 35) });
+    assert.strictEqual(sells(b).length, 1, 'guard off: sells at 09:35 again');
+  } finally { delete process.env.TRADER_IBS_EXIT; delete process.env.TRADER_MIN_HOLD_MIN; process.env.TRADER_EXIT_MIN_SESSION_MIN = '0'; }
+});
+
+test('_sessionMinutes: minutes into the regular session, null outside it', () => {
+  assert.strictEqual(at._sessionMinutes(ET_AT(9, 30)), 0);
+  assert.strictEqual(at._sessionMinutes(ET_AT(9, 35)), 5);
+  assert.strictEqual(at._sessionMinutes(ET_AT(11, 0)), 90);
+  assert.strictEqual(at._sessionMinutes(ET_AT(15, 59)), 389);
+  assert.strictEqual(at._sessionMinutes(ET_AT(16, 0)), null, 'after the close');
+  assert.strictEqual(at._sessionMinutes(ET_AT(9, 29)), null, 'pre-market');
 });
