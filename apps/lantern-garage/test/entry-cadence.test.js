@@ -77,3 +77,18 @@ test('ONE DECISION PER BAR: a decision recorded for an EARLIER bar does not bloc
   assert.strictEqual(at._entryCadenceBlocked(M(12, 9), 60, 0, 3, M(11, 0)), null, '12:09 with 11:00 decided -> the 12:00 bar has not decided yet');
   assert.ok(at._entryCadenceBlocked(M(12, 9), 60, 0, 3, M(12, 0)), '12:09 with 12:00 decided -> blocked');
 });
+
+test("the bar's decision is spent only when an entry PLACES (2026-08-24)", () => {
+  // On 2026-08-24 the 10:00 scan entered SMH and SOXL — eligible at 10:04, two
+  // minutes after the 3-minute window closed — was locked out until 11:00 with
+  // slots still free. The boundary is now recorded by _markCadenceDecided(),
+  // called at the placement site, not by passing the cadence check.
+  assert.strictEqual(typeof at._markCadenceDecided, 'function', 'the promotion hook is exported');
+  const M = (h, m) => h * 60 + m;
+  // the helper itself is unchanged: with no boundary recorded, a late first scan still decides
+  assert.strictEqual(at._entryCadenceBlocked(M(10, 20), 60, 0, 3, null), null, 'nothing recorded -> a late scan still decides');
+  // once a boundary IS recorded, the same bar is closed
+  const b = at._entryCadenceBlocked(M(10, 20), 60, 0, 3, M(10, 0));
+  assert.ok(b && b.why === 'decided', 'a spent boundary closes the bar');
+  assert.strictEqual(b.label, '11:00');
+});

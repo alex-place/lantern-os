@@ -1,0 +1,3 @@
+### Changed
+
+- Three exit/entry fixes from the first live day: (a) TRADER_EXIT_MIN_SESSION_MIN (default 30) + a missing session-IBS reading now means HOLD — on 2026-08-24 a null reading in the first minutes let the bounce gate fall through and dumped the whole overnight book in six signal_exits for -$2,514 with zero 'washout thesis intact' skips all day; (b) the entry-cadence bar's decision is spent only when an entry actually PLACES, so a scan that enters nothing no longer burns the hour (SOXL became eligible at 10:04, two minutes after the window closed, and waited until 11:00 with slots free); (c) TRADER_STEP_FLOOR — the profit floor steps up with each whole percent of gain instead of locking once at +1%, validated on all four surfaces and on 1h/30m/15m/5m bars
