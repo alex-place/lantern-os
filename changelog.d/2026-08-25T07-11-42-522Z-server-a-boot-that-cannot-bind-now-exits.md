@@ -1,0 +1,3 @@
+### Changed
+
+- Server: a boot that cannot bind now exits instead of running headless. routes/trading schedules the autoscan and fast-exit loops at module load, before server.listen() is attempted, so the EADDRINUSE handler's process.exitCode = 1 never fired - the event loop was held open by the scan timers and the process stayed alive with no HTTP listener while still scanning and placing orders against the same broker account as the instance owning the port. Two strays found in two days, each born minutes after a crash-restart. The handler now exits(1) after the port-owner log flushes; integration test spawns a real server on a taken port and asserts it dies
