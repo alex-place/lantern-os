@@ -667,7 +667,40 @@ function _entryHourBlocked(etMin, spec) {
 // the boundary (ET minute) of the last decision scan; the caller records it.
 let _cadenceDecided = { day: null, boundary: null };   // the boundary whose decision was SPENT (an entry placed), per process
 let _pendingCadence = { day: null, boundary: null };   // the boundary this scan is deciding for; promoted only when an entry places
-function _markCadenceDecided() { if (_pendingCadence.day) _cadenceDecided = { ..._pendingCadence }; }
+// THE BAR'S DECISION IS SPENT WHEN THE WINDOW CLOSES, NOT ON THE FIRST FILL
+// (2026-08-25). Spending it on the first placement let whichever symbol happened
+// to resolve first take the whole hour: on 8/25 the 11:00 bar went to DIA (tilt
+// 0.71, the lowest-weighted name on the list) at 11:00:35 and then blocked QQQ
+// and SMH (tilt 1.5) at 11:01 with three slots free — bypassing the very ranking
+// #3438 measured at 2,866% vs 1,494%. Inside the window every name that becomes
+// eligible now competes on rank; outside it (the late-first-scan allowance) the
+// first placement still spends the bar, so the cadence itself cannot widen.
+function _markCadenceDecided() {
+  if (!_pendingCadence.day) return;
+  if (_pendingCadence.since != null && _pendingCadence.win != null
+      && _pendingCadence.since < _pendingCadence.win) return;   // still inside the decision window — let the rest compete
+  _cadenceDecided = { day: _pendingCadence.day, boundary: _pendingCadence.boundary };
+}
+
+// THE SESSION IBS OF A SIGNAL (2026-08-25). scan.js builds the signal with the
+// reading on `decision_context.ibs` (#3375/#3381 moved the evidence there); there
+// is NO top-level `s.ibs`. Every consumer that read `s.ibs` was therefore reading
+// undefined, silently and permanently:
+//   - the IBS bounce exit — the validated exit, 1,494% vs 462% on the 26y holdout
+//     (#3437) — never fired once. Every held symbol logged "no session IBS reading
+//     yet" instead: live 8/25, 28 such rows across exactly the three held names,
+//     while sessionIbs() computed fine from the same cache (DIA 0.492, SPXL 0.468,
+//     SOXL 0.249).
+//   - _orderEntries' depth tie-break always scored Infinity, so slot priority
+//     silently degraded to weight-only with ties broken by scan order (#3438).
+// Read both, preferring an explicit top-level value if one ever appears.
+function _signalIbs(s) {
+  if (!s) return null;                                   // Number(null) is 0 — a nullish signal must not read as IBS 0
+  const top = Number(s.ibs);
+  if (Number.isFinite(top)) return top;
+  const ctx = Number(s.decision_context && s.decision_context.ibs);
+  return Number.isFinite(ctx) ? ctx : null;
+}
 const _etDateStr = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 // Minutes elapsed in the REGULAR session (09:30-16:00 ET); null outside it.
 // The bounce exit reads a session range, so it needs the session to have one.
@@ -1419,7 +1452,7 @@ function _warnExitAuthority(c) {
 function _orderEntries(enters, mode = process.env.TRADER_SLOT_ORDER) {
   const m = String(mode || 'confidence').toLowerCase();
   if (m !== 'depth' && m !== 'expectancy') return enters;
-  const ibsOf = (s) => (Number.isFinite(Number(s && s.ibs)) ? Number(s.ibs) : Infinity);   // no reading sorts last
+  const ibsOf = (s) => { const v = _signalIbs(s); return v == null ? Infinity : v; };   // no reading sorts last
   const wOf = (s) => _symbolSizeMult(String(s && s.symbol || '').toUpperCase());
   return enters.map((s, i) => ({ s, i })).sort((a, b) => {
     if (m === 'expectancy') { const dw = wOf(b.s) - wOf(a.s); if (dw) return dw; }
@@ -2200,8 +2233,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         //    thesis is intact — the profit floor, stop and ladder protect; the
         //    signal does not sell. Off by default; a missing IBS reading falls
         //    through to the legacy behaviour.
-        if (c.ibsExit > 0 && Number.isFinite(Number(s.ibs)) && Number(s.ibs) < c.ibsExit) {
-          out.skipped.push({ ...record, why: `washout thesis intact (IBS ${Number(s.ibs).toFixed(2)} < ${c.ibsExit}) — no signal exit; floor/stop/ladder protect` });
+        const _sIbs = _signalIbs(s);
+        if (c.ibsExit > 0 && _sIbs != null && _sIbs < c.ibsExit) {
+          out.skipped.push({ ...record, why: `washout thesis intact (IBS ${_sIbs.toFixed(2)} < ${c.ibsExit}) — no signal exit; floor/stop/ladder protect` });
           continue;
         }
         // ── SESSION-RANGE MATURITY (2026-08-24, the Monday morning liquidation).
@@ -2220,7 +2254,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         //         wide enough for IBS to mean something.
         if (c.ibsExit > 0) {
           const _mins = _sessionMinutes(now);
-          if (!Number.isFinite(Number(s.ibs)) && process.env.TRADER_EXIT_NEEDS_IBS !== '0') {
+          if (_signalIbs(s) == null && process.env.TRADER_EXIT_NEEDS_IBS !== '0') {
             out.skipped.push({ ...record, why: 'no session IBS reading yet — holding (a missing ruler is not a bounce, 2026-08-24)' });
             continue;
           }
@@ -2501,7 +2535,11 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       // still free ("entry_cadence: already decided this bar"). The bar's
       // decision is spent only when an entry actually PLACES (see _markCadenceDecided
       // at the placement site), so a scan that enters nothing leaves the hour open.
-      _pendingCadence = { day: _ecDay, boundary: _ecMin - ((((_ecMin - (Number(process.env.TRADER_ENTRY_CADENCE_PHASE) || 0)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) + Number(process.env.TRADER_ENTRY_CADENCE_MIN)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) };
+      const _ecBoundary = _ecMin - ((((_ecMin - (Number(process.env.TRADER_ENTRY_CADENCE_PHASE) || 0)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN)) + Number(process.env.TRADER_ENTRY_CADENCE_MIN)) % Number(process.env.TRADER_ENTRY_CADENCE_MIN));
+      // `since`/`win` travel with the pending boundary so the placement site can tell an
+      // in-window fill (others still get to compete) from a late-first-scan fill (spends the bar).
+      _pendingCadence = { day: _ecDay, boundary: _ecBoundary, since: _ecMin - _ecBoundary,
+        win: Math.max(1, Math.floor(Number(process.env.TRADER_ENTRY_CADENCE_WINDOW)) || 3) };
     }
     // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
     // falling — re-buying the same knife the same/next session is the churn that
@@ -2923,4 +2961,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
