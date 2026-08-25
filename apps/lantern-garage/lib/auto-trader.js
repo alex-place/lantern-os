@@ -231,6 +231,19 @@ function cfg() {
     // operator ran this policy by hand twice (pre-open trim, weekend flat);
     // this automates it: leveraged holdings are flattened into the close.
     eodDecarry: process.env.TRADER_EOD_DECARRY !== '0',
+    // SESSION-END FLAT (2026-08-24, operator: "never hold over the weekend").
+    // TRADER_EOD_FLAT: 'weekend' = flat EVERY held long into the close of the
+    // last session before a weekend; 'all' = flat every session close; unset/
+    // 'off' = hold (the validated default). TRADER_EOD_FLAT_MIN is the ET minute
+    // it starts (default: the de-carry clock, 15:50). Measured on the four
+    // surfaces (experiments/overnight_policy_lab.js) under the armed stack:
+    //   weekend  h1 36.1% div4.14 | d-fit 8,723% div800 | h2 53.1% div11.47 | 26y 15,405% div857  (+4% vs armed, better on BOTH holdouts)
+    //   all      h1 25.1% div2.80 | d-fit 8,463% div760 | h2 50.2% div10.87 | 26y 14,622% div891  (costs 3 of 4 surfaces)
+    // The live book agrees: weekend holds are 8 trades for -$228, while weekday
+    // overnight holds are profit factor 2.58 and 71% of all profit — so the
+    // weekend leg is the part worth cutting, not the overnight leg.
+    eodFlat: String(process.env.TRADER_EOD_FLAT || 'off').trim().toLowerCase(),
+    eodFlatMin: n('TRADER_EOD_FLAT_MIN', n('TRADER_DECARRY_MIN', 950)),
     decarryMin: n('TRADER_DECARRY_MIN', 950),                       // 15:50 ET
     decarrySyms: new Set(String(process.env.TRADER_DECARRY_SYMBOLS
       || 'TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA')
@@ -1122,6 +1135,29 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
           const _ea = _exitAt.get(sym) || 0;
           if (!(_ea && (now - _ea) < c.exitReattemptMs)) {
             await closeLong(bridge, userId, sym, qty, p, 'eod_decarry (leveraged overnight gap risk #3298) — flat into the close', out, now, { extended, refPrice: cur });
+            delete heldQty[sym]; continue;
+          }
+        }
+      }
+    }
+
+    // SESSION-END FLAT — see cfg.eodFlat. Runs after the leveraged de-carry so a
+    // de-carry name is already handled; regular hours only (an extended-session
+    // mark is not a close), and never against a pinned symbol.
+    if ((c.eodFlat === 'weekend' || c.eodFlat === 'all') && qty >= 1 && !extended) {
+      const _et = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const _fm = _et.getHours() * 60 + _et.getMinutes();
+      const _dow = _et.getDay();                       // 5 = Friday, the last session before a weekend
+      const _due = c.eodFlat === 'all' || _dow === 5;
+      if (_due && _fm >= c.eodFlatMin && _fm < 960) {
+        if (_isPinned(sym)) {
+          out.skipped.push({ symbol: sym, why: 'pinned — eod_flat suppressed by operator (#3318); carrying deliberately' });
+        } else {
+          const _ea2 = _exitAt.get(sym) || 0;
+          if (!(_ea2 && (now - _ea2) < c.exitReattemptMs)) {
+            await closeLong(bridge, userId, sym, qty, p, c.eodFlat === 'all'
+              ? 'eod_flat (no overnight holds) — flat into the close'
+              : 'eod_flat_weekend (no weekend holds, 2026-08-24) — flat into Friday\'s close', out, now, { extended, refPrice: cur });
             delete heldQty[sym]; continue;
           }
         }
