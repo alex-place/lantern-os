@@ -1,0 +1,95 @@
+question,ground_truth,exchange_result,market_probability,market_ticker
+Will Mark Carney leave office next in this set?,no,yes,0.99,KXG7LEADEROUT-36-SI
+Will Recep Tayyip Erdoğan leave office next in this set?,no,yes,0.99,KXASIALEADEROUT-35-YSK
+Will Liberal majority make up the next government of Canada?,no,yes,0.98,KXCANCOALITION-30-LMINOR
+What will Republicans set as the highest income tax rate in their reconciliation bill?,yes,no,0.1,KXINCOMERATE-27-39.6
+How much will Republicans increase spending on a Mexican border wall in their reconcilliation bill?,yes,no,0.1,KXWALLSPEND-27-50
+"Will Scott Bessent be confirmed as U.S. Trade Representative by Dec 31, 2026?",no,yes,0.97,KXUSTR-26DEC31-JG
+"Will David Friedman be confirmed as Ambassador to the United Nations by Dec 31, 2026?",no,yes,0.99,KXUNAMB-26DEC31-MWAL
+"Will Tulsi Gabbard be confirmed as Secretary of Veterans Affairs by Dec 31, 2026?",no,yes,0.99,KXSECVA-26DEC31-DC
+"Will Sam Graves be confirmed as Secretary of Transportation by Dec 31, 2026?",no,yes,0.99,KXSECTRANS-26DEC31-SD
+"Will Brandon WIlliams be confirmed as Secretary of Labor by Dec 31, 2026?",no,yes,0.99,KXSECLABOR-26DEC31-LCD
+"Will Bill Pulte be confirmed as Secretary of Housing and Urban Development by Dec 31, 2026?",no,yes,0.98,KXSECHUD-26DEC31-ST
+"Will Thomas Homan be confirmed as Secretary of Homeland Security by Dec 31, 2026?",no,yes,0.99,KXSECHOMELAND-26DEC31-KN
+"Will Chris Wright be confirmed as Secretary of Energy by Dec 31, 2026?",yes,no,0.01,KXSECENERGY-26DEC31-MD
+"Will Ben Carson be confirmed as Secretary of Education by Dec 31, 2026?",no,yes,0.99,KXSECED-26DEC31-LM
+"Will Robert Lighthizer be confirmed as Secretary of Commerce by Dec 31, 2026?",no,yes,0.99,KXSECCOM-26DEC31-HL
+"Will Kelly Loeffler be confirmed as Secretary of Agriculture by Dec 31, 2026?",no,yes,0.99,KXSECAGRO-26-DEC31-BR
+"Will Jeanine Pirro be confirmed as Attorney General by Dec 31, 2026?",no,yes,0.99,KXSECAG-26DEC31-PB
+What will the qualified business income (QBI) deduction be in the Republican reconciliation bill?,no,yes,0.86,KXQBIDEDUCT-27-5
+"Will Kelvin Droegemeier be confirmed as OSTP Director by Dec 31, 2026?",no,yes,0.99,KXOSTP-26DEC31-MK
+"Will Ron Paul be confirmed as OMB Director by Dec 31, 2026?",no,yes,0.99,KXOMB-26DEC31-RV
+"Will Peter Deutsch be confirmed as  by Dec 31, 2026?",no,yes,0.98,KXISAMB-26DEC31-MH
+"Will Melissa Holyoak be confirmed as FTC commissioner by Dec 31, 2026?",no,yes,0.99,KXFTC-26DEC31-MM
+"Will Robert F. Kennedy Jr. be confirmed as FDA Administrator by Dec 31, 2026?",no,yes,0.99,KXFDA-26DEC31-MM
+"Will Travis Voyles be confirmed as EPA Administrator by Dec 31, 2026?",no,yes,0.95,KXEPA-26DEC31-LZ
+"Will Tulsi Gabbard be confirmed as Director of National Intelligence by Dec 31, 2026?",yes,no,0.01,KXDNI-26DEC31-RO
+How much will Republicans increase defense spending in their reconcilliation bill?,yes,no,0.28,KXDEFENSESPEND-27-150
+Which city will host Eurovision 2026?,yes,no,0.01,KXEUROVISIONHOST-26-INNSBRUCK
+Will People's Party for Freedom and Democracy finish 3rd in the 2025 Dutch general election?,yes,no,0.15,KXNLDTHIRD-25OCT29-3-CDA
+Will Catherine Connolly win by between 30% and 100% of votes in the final round of the 2025 Irish presidential election?,yes,no,0.05,KXELECTIONMOVIRELAND-25OCT24-P7
+Will  win the Australian Prime Ministry?,yes,no,0.01,KXAUSPM-48-LNC
+Will FrP finish 2nd in Norway?,yes,no,0.06,KXNORWAYSECOND-25SEP08-2-HCO
+Will the Democratic party win the Lt. Gov race in Virginia?,yes,no,0.01,KXLTGOVVA-25-R
+Will Jay Jones win the 2025 Virginia attorney general election?,yes,no,0.01,KXATTYGENVA-25-R
+Will Mikie Sherrill win the 2025 New Jersey gubernatorial election?,yes,no,0.01,GOVPARTYNJ-25-R
+Will Abigail Spanberger win the 2025 Virginia gubernatorial election?,yes,no,0.01,GOVPARTYVA-25-R
+Who will be confirmed as Ambassador to Turkey?,no,yes,0.99,KXTURKEYAMB-26JAN01-TB
+Will Native Markets win the Hyperliquid validator vote for the USDH ticker?,yes,no,0.0,KXUSDHVOTE-USDH-26JAN01-MULTIPLE
+How many Constitutional Court justices will vote to remove the South Korean President from office?,yes,no,0.01,KXSKVOTE-26-9
+between 312 to 315 members of the House vote for HALT Fentanyl Act?,yes,no,0.06,KXFENT-26JAN01-315
+"Who will win Arizona's 7th Congressional District special election, 2025?",yes,no,0.01,KXUSELECTIONARIZONA7-25-REP
+Will The Substance win Makeup and Hairstyling at the Oscars?,yes,no,0.01,KXOSCARMAH-25-W
+Will The Only Girl in the Orchestra win Documentary Short Film at the Oscars?,yes,no,0.01,KXOSCARDS-25-T
+What will be Russell Westbrook's next team?,no,yes,0.99,KXNEXTTEAMWESTBROOK-25-SAC
+What continent was the next Pope be born in?,yes,no,0.03,KXNEWPOPECONTINENT-25-SOUTHAM
+Who will be the next New Orleans Saints head coach?,yes,no,0.01,KXNEWCOACHNO-25-MK
+Who will be the next Dallas Cowboys head coach?,no,yes,0.99,KXNEWCOACHDAL-25-BS
+Which division will win the pro men's baseball championship?,no,yes,0.99,KXMLBDIVWINNER-25-NLWEST
+Will John Proctor is the Villain win Best Play at the Tonys?,no,yes,0.99,KXBESTPLAY-25-PUR
+Will Nicole Scherzinger win Best Performance by an Actress in a Leading Role in a Musical at the Tonys?,yes,no,0.01,KXBESTACTRMUS-25-TIE
+Will Sarah Snook win Best Performance by an Actress in a Leading Role in a Play at the Tonys?,yes,no,0.01,KXBESTACRESSTONYS-25-TIE
+between 80 to 84 Labor seats won?,no,yes,0.99,KXAUSSEATSLABOR-25-84
+Who will win Championship MVP?,yes,no,0.02,KXMLBWSMVP-25-TIE
+Will the Democratic party win the mayorship in Charlotte?,yes,no,0.17,KXMAYORCHAR-25-R
+Will Ordinary be the #1 song on the Billboard Hot 100 charts this week?,no,yes,0.98,KXTOPSONG-25NOV15-THE
+Italy vs Norway Winner?,yes,no,0.01,KXFIFAGAME-25NOV16ITANOR-TIE
+Tampa Bay at Buffalo Winner?,yes,no,0.01,KXNFLGAME-25NOV16TBBUF-TB
+Will Heliovaara H / Patten H win the Heliovaara H / Patten H vs Salisbury J / Skupski N match?,yes,no,0.01,KXATPDOUBLES-25NOV16HELPATSALSKU-SALSKU
+"Will Jack Della Maddalena win the Maddalena vs Makhachev professional MMA fight scheduled for Nov 15, 2025?",no,yes,0.99,KXUFCFIGHT-25NOV15DELMAK-MAK
+Boise St. at San Diego St. Winner?,no,yes,0.99,KXNCAAFGAME-25NOV15BSUSDSU-SDSU
+Santos FC SP vs SE Palmeiras SP Winner?,yes,no,0.01,KXBRASILEIROGAME-25NOV15SANPAL-TIE
+Will M80 win the Wildcard Gaming vs. M80 match?,yes,no,0.03,KXR6GAME-25NOV15WILDM80-WILD
+Will Team Falcons win Team Falcons vs. Vitality: Map 2?,yes,no,0.01,KXCSGOMAP-FALVIT25-2-VIT
+Will Team Falcons win the Team Falcons vs. Vitality match?,yes,no,0.01,KXCSGOGAME-25NOV15FALVIT-VIT
+FC Barcelona vs Virtus Bologna Winner?,yes,no,0.01,KXEUROLEAGUEGAME-25NOV14VIBFCB-VIB
+What will Al Michaels and/or Kirk Herbstreit say during New York at New England pro football game commentary?,yes,no,0.01,KXTNFMENTION-25NOV14-ROBE
+"Will there be more than 400 delays and cancellations at O'Hare on November 13, 2025?",yes,no,0.0,KXFLIGHTORD-25NOV13-T800
+What will Anderson Cooper say during Anderson Cooper 360 on November 13th?,no,yes,0.99,KXACOOPERMENTION-25NOV14-TRUM
+"Top Netflix show on Nov 10, 2025?",no,yes,0.9,KXNETFLIXRANKSHOW-25NOV10-LEA
+"Top Netflix movie on Nov 10, 2025?",no,yes,0.89,KXNETFLIXRANKMOVIE-25NOV10-FRA
+Predator: Badlands Rotten Tomatoes score?,yes,no,0.07,KXRTPREDATORBADLANDS-87
+San Diego FC vs Portland Winner?,yes,no,0.01,KXMLSGAME-25NOV09SDPOR-TIE
+Club Santos Laguna vs CF Pachuca Winner?,yes,no,0.01,KXLIGAMXGAME-25NOV09SLAPAC-TIE
+Lyon vs PSG Winner?,yes,no,0.01,KXLIGUE1GAME-25NOV09OLPSG-TIE
+Go Ahead Eagles vs Feyenoord Rotterdam Winner?,yes,no,0.01,KXEREDIVISIEGAME-25NOV09GAEFEY-TIE
+Frankfurt vs Mainz Winner?,yes,no,0.01,KXBUNDESLIGAGAME-25NOV09SGEM05-TIE
+Samsunspor vs Eyupspor Winner?,yes,no,0.01,KXSUPERLIGGAME-25NOV09SAMEYU-TIE
+Manchester City vs Liverpool Winner?,yes,no,0.01,KXEPLGAME-25NOV09MCILFC-TIE
+Ulsan HD FC vs Suwon FC Winner?,no,yes,0.99,KXKLEAGUEGAME-25NOV09ULSSFC-ULS
+Wrexham AFC vs Charlton Athletic Winner?,no,yes,0.99,KXEFLCHAMPIONSHIPGAME-25NOV08WRECHA-WRE
+What will Vladimir Tenev say during TBPN Podcast on November 6th?,no,yes,0.99,KXTBPNMENTION-25NOV07-TOKE
+"Opalite streams by Nov 7, 2025?",yes,no,0.01,KXSPOTIFYSONGSOPALITE-25NOV07-275
+"How many sales will The Life of a Showgirl have on the Hits Daily Double Top 50 Chart for Nov 07, 2025?",yes,no,0.08,KXALBUMSALESSWIFT-25NOV07-50000
+FC Viktoria Plzen vs Fenerbahce Istanbul Winner?,yes,no,0.01,KXUELGAME-25NOV06VIKFEN-VIK
+Shkendija Tetovo vs Jagiellonia Bialystok Winner?,no,yes,0.99,KXUECLGAME-25NOV06SHKJAG-TIE
+What will any Supreme Court Justice say during Supreme Court cases against Donald Trump on November 5th?,yes,no,0.01,KXSCOTUSMENTION-25NOV06-WORK
+Who will win the NYC City Council election in District 39?,yes,no,0.04,KXNYCCOUNCIL39-25-MKOR
+Who will win the NYC City Council election in District 38?,yes,no,0.01,KXNYCCOUNCIL38-25-LYE
+Who will win the NYC City Council election in District 30?,no,yes,0.99,KXNYCCOUNCIL30-25-PWON
+Who will win the NYC City Council election in District 2?,yes,no,0.03,KXNYCCOUNCIL2-25-SBAT
+Who will win the NYC City Council election in District 17?,yes,no,0.04,KXNYCCOUNCIL17-25-JURI
+Who will win the NYC City Council election in District 14?,no,yes,0.95,KXNYCCOUNCIL14-25-PSAN
+Who will win the NYC City Council election in District 13?,yes,no,0.0,KXNYCCOUNCIL13-25-TREE
+"Will Zohran Mamdani concede defeat in the their respective race before Nov 5, 2025?",no,yes,0.98,KXELECTCONCEDE-25NOV05-CSLI
+Will Mark Levine be elected to be NYC Comptroller in 2025?,yes,no,0.01,KXCOMPTROLLER-25-TM

@@ -1,0 +1,48 @@
+{
+  "n_seeds": 200,
+  "arms": {
+    "commit": {
+      "arm": "commit (shipped)",
+      "n": 200,
+      "entered_boundary": 1.0,
+      "expanded": 184,
+      "chose_true": 169,
+      "chose_proxy": 15,
+      "other": 0,
+      "truth_rate_among_two": 0.918,
+      "final_mse_when_true": 0.089,
+      "final_mse_when_proxy": 3.047
+    },
+    "hold": {
+      "arm": "hold (expansion is a hypothesis)",
+      "n": 200,
+      "entered_boundary": 1.0,
+      "expanded": 181,
+      "chose_true": 178,
+      "chose_proxy": 3,
+      "other": 0,
+      "truth_rate_among_two": 0.983,
+      "final_mse_when_true": 0.089,
+      "final_mse_when_proxy": 1.877
+    }
+  },
+  "gates": {
+    "commit": {
+      "H1_enters_and_expands": true,
+      "H2_truth_over_proxy": "PASS",
+      "truth_rate": 0.918,
+      "H3_proxy_is_really_worse": true,
+      "H4_control_P3": 0.93,
+      "H4_pass": true
+    },
+    "hold": {
+      "H1_enters_and_expands": true,
+      "H2_truth_over_proxy": "PASS",
+      "truth_rate": 0.983,
+      "H3_proxy_is_really_worse": true,
+      "H4_control_P3": 0.92,
+      "H4_pass": true
+    }
+  },
+  "verdict": "BOTH PASS \u2014 even one-shot commit separates them (the world is not adversarial enough)"
+}

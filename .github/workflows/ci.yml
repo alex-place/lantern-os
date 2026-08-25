@@ -139,6 +139,7 @@ jobs:
           node tests/test_pdf_route_entitlement.js
           node tests/test_secure_cookie_guard.js
           node apps/lantern-garage/test/user-provider-keys.test.js
+          node apps/lantern-garage/test/robin-llm.test.js
 
       # The whole apps/lantern-garage/test suite, globbed rather than listed.
       # Until 2026-08-18 this job named five files by hand and the other 300 in that

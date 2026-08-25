@@ -1,0 +1,39 @@
+# OpenEvolve pilot config — evolve the controller's experiment-selection policy against our own
+# gated evaluator. Small on purpose: this run answers "does the adopted loop work end to end and
+# does it find the improvement direction our sweep already proved exists", not "what is the best
+# policy".
+max_iterations: 40
+
+llm:
+  primary_model: "gpt-4o-mini"
+  temperature: 0.8
+  max_tokens: 4096
+
+prompt:
+  system_message: |
+    You are evolving the experiment-selection policy of an epistemic controller — the part that
+    decides which observable to probe next, in what order, when to stop probing, when to buy, and
+    how long to hold an expansion under suspicion. The file you edit is the entire policy; the
+    probing machinery around it is fixed.
+
+    Fitness = validated discoveries per PAID experiment, times truth-over-proxy rate. Probes cost
+    money and probing stops at EARLY_ACCEPT, so probe ORDER and stopping bars are where budget is
+    won or lost. Two hard constraints score 0.0 outright: any discovery in the null world (drift,
+    no hidden rule), and truth-over-proxy below 0.70 in a world with a cheaper correlated decoy.
+    Beware: lowering bars usually buys decoys; the current cost-linear utility is known to
+    over-prefer cheap proxies.
+
+    Rules: deterministic pure functions, stdlib math only, no other imports, no randomness, no
+    I/O. Keep the module contract exactly: RETRACT_BELOW, EARLY_ACCEPT, HOLD_STEPS,
+    candidate_utility(explained, cost, spent, budget), probe_order(candidates).
+
+database:
+  population_size: 32
+  num_islands: 2
+
+evaluator:
+  timeout: 180
+  parallel_evaluations: 2
+  cascade_evaluation: false
+
+diff_based_evolution: true

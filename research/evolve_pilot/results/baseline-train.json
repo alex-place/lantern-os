@@ -1,0 +1,12 @@
+{
+  "combined_score": 0.1650485436893204,
+  "per_experiment": 0.1650485436893204,
+  "discoveries": 34.0,
+  "false_discoveries": 0.0,
+  "experiments": 206.0,
+  "null_discoveries": 0.0,
+  "worldh_truth_rate": 1.0,
+  "control_null_clean": 1.0,
+  "control_truth_ok": 1.0,
+  "seed_set": "TRAIN"
+}

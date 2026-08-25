@@ -23,6 +23,7 @@ Then rebuild the retrieval index:
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -76,13 +77,23 @@ def log(msg: str) -> None:
 # OAI-PMH fetch with flow-control + retry
 # ---------------------------------------------------------------------------
 
+# A READ timeout is not a URLError. urlopen() raises URLError when the CONNECTION fails, but a
+# socket timeout during resp.read() surfaces as TimeoutError (an OSError, not a URLError) and so
+# escaped the retry loop entirely -- which is what silently killed the 2026-08-20 harvest: it
+# connected, hung on a large ListRecords page, raised "The read operation timed out", and the run
+# re-indexed the same corpus with zero new papers. Read timeouts are the NORMAL failure for this
+# endpoint, so they belong in the same backoff as everything else.
+_READ_ERRORS = (TimeoutError, http.client.IncompleteRead, http.client.HTTPException, ConnectionError)
+_HTTP_TIMEOUT = int(os.environ.get("ARXIV_HTTP_TIMEOUT") or 180)
+
+
 def _http_get(params: dict, *, max_retries: int = 6) -> bytes:
     url = f"{OAI_ENDPOINT}?{urlencode(params)}"
     attempt = 0
     while True:
         req = Request(url, headers={"User-Agent": USER_AGENT})
         try:
-            with urlopen(req, timeout=60) as resp:
+            with urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
                 return resp.read()
         except HTTPError as e:
             # arXiv uses 503 + Retry-After for flow control; also back off on 5xx.
@@ -98,6 +109,14 @@ def _http_get(params: dict, *, max_retries: int = 6) -> bytes:
             if attempt < max_retries:
                 delay = min(30, 5 * (attempt + 1))
                 log(f"network error {e.reason!r}; retry in {delay}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(delay)
+                attempt += 1
+                continue
+            raise
+        except _READ_ERRORS as e:
+            if attempt < max_retries:
+                delay = min(30, 5 * (attempt + 1))
+                log(f"read failed {type(e).__name__}: {e}; retry in {delay}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(delay)
                 attempt += 1
                 continue

@@ -1,0 +1,406 @@
+{
+  "goal": "detect when a language model is answering beyond what it knows, from its own activations, cheaply enough to run on every token in production",
+  "lit": {
+    "relevant": [
+      {
+        "id": "2608.18597",
+        "title": "Off-Manifold Collapse in Guided Protein Language Models",
+        "published": "2026-08",
+        "snippet": "Protein language models are widely used priors for protein sequence design, and a growing body of work controls them at inference time as an alternative to fine-tuning. Such guidance faces a dilemma: mild enough to preserve natural activation statistics, it barely moves the property; strong enough to move it, the generations become progressively harder to fold. We show the failure has a specific a…",
+        "url": "https://arxiv.org/abs/2608.18597",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2604.22271",
+        "title": "How LLMs Detect and Correct Their Own Errors: The Role of Internal Confidence Signals",
+        "published": "2026-04",
+        "snippet": "Large language models can detect their own errors and sometimes correct them without external feedback, but the underlying mechanisms remain unknown. We investigate this through the lens of second-order models of confidence from decision neuroscience. In a first-order system, confidence derives from the generation signal itself and is therefore maximal for the chosen response, precluding error det…",
+        "url": "https://arxiv.org/abs/2604.22271",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2605.29652",
+        "title": "Think Fast, Talk Smart: Partitioning Deterministic and Neural Computation for Structured Health Text Generation",
+        "published": "2026-05",
+        "snippet": "Large language models (LLMs) are increasingly being used to generate health text from structured records such as wearable time series, biomarkers, vitals, and care-management logs. For recurring health outputs, fluency is not enough: systems must remain faithful to source data, ground explanatory claims in available evidence, follow stated policies, emit machine-readable outputs, and run cheaply e…",
+        "url": "https://arxiv.org/abs/2605.29652",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2607.11414",
+        "title": "Confidently Wrong: Detecting Hallucinations in Financial Question Answering from LLM Internal States",
+        "published": "2026-07",
+        "snippet": "Large language models (LLMs) in financial applications fail most consequentially when they are confidently wrong. Hedged, uncertain answers invite scrutiny, whereas confident errors silently degrade downstream decisions without warning. We ask how reliably such confidently wrong answers, or confident hallucinations, can be detected from a model's internal activations, and whether those activations…",
+        "url": "https://arxiv.org/abs/2607.11414",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2608.19147",
+        "title": "Pre-Compiled Pipeline Shards for Distributed LLM Inference on Intel AI PC Fleets",
+        "published": "2026-08",
+        "snippet": "Modern Intel AI PCs ship capable integrated GPUs and NPUs with 16+ GB of unified memory, and they spend considerable time idle. That is not enough memory to fit a large model such as a 70B-parameter LLM. We show that a handful of AIPCs, working together over an ordinary network, can serve models beyond the capability of any single one. We use pipeline parallelism: a model is split by layer into pe…",
+        "url": "https://arxiv.org/abs/2608.19147",
+        "primary_category": "cs.DC"
+      },
+      {
+        "id": "2608.09643",
+        "title": "Activation Probes Surface Code-Security Signals that the Model's Output Misses",
+        "published": "2026-08",
+        "snippet": "AI coding agents now write a growing share of production code, and human security review does not scale at the rate code is generated. The agents in widest use are closed-weight, so a deploying team cannot read their internals. It can instead run an open-weight model as a reviewer over the agent's output. That reviewer's activations are readable. We ask whether reading those activations recovers a…",
+        "url": "https://arxiv.org/abs/2608.09643",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2509.23510",
+        "title": "Model Consistency as a Cheap yet Predictive Proxy for LLM Elo Scores",
+        "published": "2025-09",
+        "snippet": "New large language models (LLMs) are being released every day. Some perform significantly better or worse than expected given their parameter count. Therefore, there is a need for a method to independently evaluate models. The current best way to evaluate a model is to measure its Elo score by comparing it to other models in a series of contests - an expensive operation since humans are ideally re…",
+        "url": "https://arxiv.org/abs/2509.23510",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.14795",
+        "title": "Individual Disempowerment through an Advice Channel: Control Loss when Influence is Endogenous",
+        "published": "2026-08",
+        "snippet": "An AI that can only give advice seems safe: the human is always free to ignore it. That is the premise of the boxing tradition in AI safety, and its long-suspected weak point is that the human who reads the answers is part of the system. We make the fraction $\\varepsilon_t$ of behavior that follows the advice a state of a Markov decision process, moved by the advisor's own messages, so that use de…",
+        "url": "https://arxiv.org/abs/2608.14795",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2511.13240",
+        "title": "Knowing What You Know Is Not Enough: Large Language Model Confidences Don't Align With Their Actions",
+        "published": "2025-11",
+        "snippet": "Large language models (LLMs) are increasingly deployed in agentic and multi-turn workflows where they are tasked to perform actions of significant consequence. In order to deploy them reliably and manage risky outcomes in these settings, it is helpful to access model uncertainty estimates. However, confidence elicitation methods for LLMs are typically not evaluated directly in agentic settings; in…",
+        "url": "https://arxiv.org/abs/2511.13240",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2603.10781",
+        "title": "Taking Shortcuts for Categorical VQA Using Super Neurons",
+        "published": "2026-03",
+        "snippet": "Sparse Attention Vectors (SAVs) have emerged as an excellent training-free alternative to supervised finetuning or low-rank adaptation to improve the performance of Vision Language Models (VLMs). At their heart, SAVs select a few accurate attention heads for a task of interest and use them as classifiers, rather than relying on the model's prediction. In a similar spirit, we find that directly pro…",
+        "url": "https://arxiv.org/abs/2603.10781",
+        "primary_category": "cs.CV"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2608.10760",
+        "title": "A Gateway Architecture for Enterprise MCP Authentication: Unifying Heterogeneous Auth, Identity Delegation, and the User / Non-User Persona Problem",
+        "published": "2026-08",
+        "snippet": "The Model Context Protocol (MCP) has become the de-facto interface for connecting LLM agents to enterprise tools, and adoption has been explosive: within a year, large organizations went from zero to dozens of internally built MCP servers. That speed created a governance crisis. Each team implemented authentication independently -- some with no auth, some with API keys, some with full OAuth -- pro…",
+        "url": "https://arxiv.org/abs/2608.10760",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2608.10694",
+        "title": "Optimize Cheap, Deploy Strong: Cost-Aware Cross-Tier Transfer for Evolutionary Optimization",
+        "published": "2026-08",
+        "snippet": "Evolutionary optimization of LLM prompts and agentic programs (e.g., GEPA) is dominated by fitness evaluation: scoring each candidate runs an answering LLM over a validation set, so the evaluator's price tier dictates total search cost. We restructure that search by decoupling the three roles an LLM plays, running the high-volume answering role on the cheapest tier, reserving a strong model for th…",
+        "url": "https://arxiv.org/abs/2608.10694",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2608.01033",
+        "title": "CallScreenBench: Benchmarking On-Device Models as Phone Secretaries",
+        "published": "2026-08",
+        "snippet": "Language models small enough to run on a handset, quantized to a few bits, are increasingly capable of acting for their user, making on-device task automation newly plausible. One such task is answering the phone. A phone secretary takes an unknown inbound call on its owner's behalf. Unlike the agents evaluated by most benchmarks, it has no task to complete and no cooperative user: the caller hold…",
+        "url": "https://arxiv.org/abs/2608.01033",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2608.04066",
+        "title": "The LLM Proposes, the Executive Disposes: A Self-Verifying Agent Instrument that Dissociates Commitment Drift from Binding Drift in Long-Horizon Agents",
+        "published": "2026-08",
+        "snippet": "How do you verify a long-horizon agent when its own state and self-reports are exactly what you cannot trust? We present an agent instrument built so that verification is structural rather than post-hoc. A deterministic Executive owns all belief; a language model may only file typed proposals, and a claim is admitted only when a prediction pre-registered before acting is matched against observatio…",
+        "url": "https://arxiv.org/abs/2608.04066",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.11698",
+        "title": "REOPD: Reliability-Adaptive Reward Extrapolation for On-Policy Distillation",
+        "published": "2026-08",
+        "snippet": "On-policy distillation (OPD) trains a student on its own trajectories under dense token-level supervision from a teacher. Reward-extrapolation methods such as ExOPD amplify the teacher-reference log-likelihood ratio to move beyond direct imitation, but apply a single global coefficient $λ$ to every token. This can drive the student to fit extreme peaks in the implicit reward, causing reward hackin…",
+        "url": "https://arxiv.org/abs/2608.11698",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2608.16970",
+        "title": "Probing the Prefill: Detecting Code Vulnerabilities via Latent Activations",
+        "published": "2026-08",
+        "snippet": "LLM-based code generation is now embedded in mission-critical pipelines, but defenses against vulnerable output remain post-hoc -- static analyzers, fine-tuned classifiers, or an LLM judge that screen completed code, ignoring the generating model's own internal state. We test a narrower, directly measurable question: when an LLM reads a piece of C/C++ code as context, do its hidden activations alr…",
+        "url": "https://arxiv.org/abs/2608.16970",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2608.07126",
+        "title": "PHOENIX: Fine-Tuned SLM-Powered Autonomous Satellite Lifetime Extension via Predictive Self-Healing and Multi-Agent AI Recovery",
+        "published": "2026-08",
+        "snippet": "Most CubeSats, small and low-cost satellites roughly the size of a shoebox, do not survive as long as they were designed to: a study of 178 missions found that only 48-65% remain operational after two years, against a designed lifetime of 2-5 years. The deeper issue is that a CubeSat in low Earth orbit (LEO) is physically unreachable from the ground for roughly 85 minutes out of every 96-minute or…",
+        "url": "https://arxiv.org/abs/2608.07126",
+        "primary_category": "cs.HC"
+      },
+      {
+        "id": "2607.06601",
+        "title": "TriRoute: Unified Learned Routing for Joint Adaptive Attention, Experts, and KV-Cache Allocation",
+        "published": "2026-07",
+        "snippet": "Conditional computation can decouple language model quality from per-token inference cost, yet leading techniques act on a single axis in isolation: Mixture-of-Experts (MoE) sparsifies the FFN, Mixture-of-Depths (MoD) skips whole transformer blocks, and KV-cache quantization compresses attention memory. We argue these three decisions (attention resolution, expert selection, and cache bit-width) ar…",
+        "url": "https://arxiv.org/abs/2607.06601",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "axes": [
+    {
+      "axis": "signal source",
+      "occupied": [
+        "internal activations",
+        "output probabilities",
+        "attention patterns",
+        "confidence scores"
+      ]
+    },
+    {
+      "axis": "detection timing",
+      "occupied": [
+        "per-token",
+        "post-hoc",
+        "multi-turn aggregation"
+      ]
+    },
+    {
+      "axis": "supervision type",
+      "occupied": [
+        "self-supervised",
+        "external labels",
+        "no supervision"
+      ]
+    },
+    {
+      "axis": "inference cost",
+      "occupied": [
+        "cheap enough for production",
+        "moderate",
+        "expensive"
+      ]
+    },
+    {
+      "axis": "comparison baseline",
+      "occupied": [
+        "model output",
+        "external verifier",
+        "historical consistency"
+      ]
+    },
+    {
+      "axis": "application domain",
+      "occupied": [
+        "code generation",
+        "financial QA",
+        "health text",
+        "protein design"
+      ]
+    }
+  ],
+  "perRound": [
+    {
+      "round": 1,
+      "proposed": 2,
+      "placed": 2,
+      "kept": 0
+    },
+    {
+      "round": 2,
+      "proposed": 2,
+      "placed": 1,
+      "kept": 1
+    },
+    {
+      "round": 3,
+      "proposed": 2,
+      "placed": 2,
+      "kept": 1
+    },
+    {
+      "round": 4,
+      "proposed": 2,
+      "placed": 0,
+      "kept": 3
+    }
+  ],
+  "malformed": 0,
+  "no_difference": 0,
+  "evasion": 0,
+  "no_effect": 0,
+  "diversity": {
+    "mean_overlap": 0.214,
+    "repeated": [
+      "internal(3/3)",
+      "token(3/3)",
+      "ledger(2/3)",
+      "from(2/3)",
+      "real(2/3)"
+    ]
+  },
+  "proposed": 8,
+  "placed": 5,
+  "placed_rate": 0.625,
+  "collisions": [
+    {
+      "title": "Epistemic Controller Gate Activation Patterns as Per-Token Hallucination Signals",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "experiments\\sigma0_hneurons_probe.py"
+    },
+    {
+      "title": "Longitudinal Convergence Ledger-Based Self-Supervised Hallucination Prediction",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "docs\\research\\2026-07-10-hneurons-probe.md"
+    },
+    {
+      "title": "Token-Level Surprise Signal from Epistemic Controller Null-World Divergence",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "docs\\research\\2026-06-30-surprise-leak-layer1-result.md"
+    },
+    {
+      "title": "Layerwise Gradient Norms as Real-Time Hallucination Indicators",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "docs\\research\\2026-06-30-surprise-leak-layer1-result.md"
+    },
+    {
+      "title": "Cross-Session Consistency Embeddings for Online Hallucination Detection",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "docs\\research\\2026-06-30-surprise-leak-layer1-result.md"
+    }
+  ],
+  "pairs": 10,
+  "sham_rank": 4,
+  "of": 5,
+  "sham_control_held": true,
+  "vague_sham_rank": 5,
+  "vague_control_held": true,
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.5575,
+      "wins": 4,
+      "comparisons": 4,
+      "title": "Ledger-Conditioned Sparse Activation Sampling for On-Token Hallucination Flags",
+      "mechanism": "Use the lab’s longitudinal convergence ledger to condition a sparse sampling mask over internal activations, focusing compute on historically predictive neuron subsets per token",
+      "experiment": "Train a sparse gating function conditioned on ledger-derived neuron importance; evaluate hallucination detection accuracy and compute cost per token against dense baselines",
+      "falsifier": "Sparse sampling yields no improvement or degrades detection accuracy compared to dense activation probes",
+      "needs": "ledger data, retraining time, moderate hardware",
+      "cost": "low",
+      "closest_prior": "experiments\\sigma0_hneurons_probe.py",
+      "difference": "Integrates longitudinal ledger data to dynamically sparsify activation reading per token, reducing compute cost beyond static neuron probes",
+      "technical_problem": "High per-token compute cost of dense activation probes limits production throughput",
+      "technical_means": "Apply ledger-informed sparse masks to select ~20% of neurons for activation reading at each token",
+      "technical_effect": "Cuts per-token activation read FLOPs by ~75% while maintaining hallucination detection AUROC within 2 points of dense baseline",
+      "audit": {
+        "verdict": "INCREMENTAL",
+        "evidence": "experiments/sigma0_hneurons_probe.py",
+        "why": "Prior work probes sparse FFN neurons predicting hallucination, but not ledger-conditioned sparse activation sampling per token.",
+        "web_queries": [
+          "ledger-conditioned sparse activation sampling hallucination detection",
+          "sparse neuron activation sampling hallucination flags"
+        ],
+        "web_searched": false,
+        "web_hits": 0
+      },
+      "review": "MECHANISM:  \nConditioning sparse activation sampling on a longitudinal convergence ledger could focus compute on neuron subsets historically predictive of hallucination, enabling efficient on-token flags. By leveraging past neuron behavior correlations with hallucination, the model might cheaply detect internal signals of uncertainty or error without full dense evaluation, fitting production constraints.\n\nEVIDENCE:  \n[1] shows neuron-level signals correlate with hallucination but questions controllability, suggesting detection is plausible but not straightforwardly actionable. [2] supports sparse neuron dependencies, implying selective sampling could capture meaningful signals. [5] demonstrates activation-based monitoring can detect misalignment during generation, aligning with the idea of internal flags. Other papers focus on pruning or interpretability but do not directly support ledger-conditioned sparse sampling for hallucination detection. Overall, partial support exists but no direct demonstration of ledger-conditioned sparse masks for on-token hallucination flags.\n\nWHAT WOULD FALSIFY IT:  \nIf sparse sampling conditioned on historical neuron subsets fails to reliably flag hallucinations on a per-token basis, or if the flagged neurons do not generalize across contexts, this would falsify the claim. Also, if the overhead of maintaining and applying the ledger outweighs the computational savings or detection accuracy, the approach would be invalidated.\n\nRISK:  \nFocusing on historically predictive neurons might miss novel hallucination modes, causing false negatives. The system could overfit to known hallucination patterns, improving headline detection metrics but failing silently on new errors. Additionally, sparse sampling might degrade overall model performance or introduce latency, undermining production viability despite apparent gains.",
+      "citations": [
+        "2607.00158",
+        "2607.11990",
+        "2608.18597",
+        "2608.14003",
+        "2603.04069",
+        "2512.20605",
+        "2605.27813",
+        "2602.05805"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 2,
+      "strength": 0.2649,
+      "wins": 3,
+      "comparisons": 4,
+      "title": "Ledger-Guided Online Calibration of Internal Confidence Signals via Trading Outcome Feedback",
+      "mechanism": "Use live settled trading outcomes from the lab’s prediction market to continuously recalibrate internal confidence signals in real time, improving per-token epistemic accuracy",
+      "experiment": "Implement online calibration loop feeding settled trade results back into confidence signal scaling, measure reduction in hallucination false positives over 1 month",
+      "falsifier": "No measurable reduction in false positive hallucination flags or confidence miscalibration after 1 month of continuous calibration",
+      "needs": "hardware, live trading data, time",
+      "cost": "medium",
+      "closest_prior": "2511.13240 Large Language Model Confidences Don't Align With Their Actions",
+      "difference": "Leverages live trading outcomes as ground truth for continuous online calibration, not static or offline calibration",
+      "technical_problem": "Improve per-token confidence calibration accuracy under production throughput constraints",
+      "technical_means": "Online recalibration of confidence signals using live settled trading outcomes as ground truth",
+      "technical_effect": "Reduces hallucination false positive rate by 20% with <10% additional compute overhead per token",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed papers or prior work directly describe live recalibration of internal confidence signals via settled trading outcomes.",
+        "web_queries": [
+          "online calibration internal confidence signals prediction markets",
+          "real-time confidence recalibration using trading outcome feedback"
+        ],
+        "web_searched": true,
+        "web_hits": 155
+      },
+      "review": "**MECHANISM:**  \nUsing live settled trading outcomes from a prediction market to recalibrate internal confidence signals could work by providing continuous, objective feedback on the model’s epistemic accuracy. This feedback loop would allow the model to adjust its confidence estimates in real time, aligning them better with actual event outcomes. Since prediction markets aggregate diverse information and reflect collective probabilities, their settled results serve as a reliable ground truth for calibration, potentially improving per-token confidence without expensive external annotation.\n\n**EVIDENCE:**  \nThe literature supports the idea that verifiable outcomes can improve calibration in principle [1], and that prediction markets provide real-world, objective signals for forecasting [6,7]. However, [1] notes practical challenges where reinforcement learning with verifiable rewards can degrade calibration. Also, [4] shows internal confidence signals exist but their recalibration mechanisms are unclear. None directly demonstrate that live trading outcomes can be used online per token to improve epistemic accuracy cheaply.\n\n**WHAT WOULD FALSIFY IT:**  \nIf continuous recalibration using live market outcomes fails to improve or even degrades per-token confidence accuracy—e.g., confidence remains poorly aligned with actual correctness despite feedback—or if the latency and noise in market outcomes prevent timely, meaningful updates, the mechanism would be falsified.\n\n**RISK:**  \nThis approach might improve headline calibration metrics by overfitting to market outcomes, causing the model to become overly conservative or biased toward market consensus. It could suppress genuine uncertainty signals or token-level nuance, reducing the model’s ability to detect novel or out-of-distribution errors, thus worsening real-world reliability despite better aggregate scores.",
+      "citations": [
+        "2607.00164",
+        "2511.13240",
+        "2604.03888",
+        "2604.22271",
+        "2511.15921",
+        "2604.20421",
+        "2604.07355",
+        "2604.16742"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 3,
+      "strength": 0.1167,
+      "wins": 2,
+      "comparisons": 4,
+      "title": "Real-Time Epistemic Divergence via Cross-Modal Activation Alignment",
+      "mechanism": "Align internal activations from language and auxiliary modalities (e.g. vision or symbolic metadata) at each token to detect epistemic divergence indicating hallucination",
+      "experiment": "Measure token-level divergence between language-only and multimodal activations in a model with lightweight auxiliary input; correlate divergence spikes with hallucination labels",
+      "falsifier": "No statistically significant correlation (AUROC ≤ 0.5) between cross-modal divergence and hallucination events",
+      "needs": "multimodal data, moderate compute, weeks",
+      "cost": "medium",
+      "closest_prior": "2608.18597 Off-Manifold Collapse in Guided Protein Language Models",
+      "difference": "Uses cross-modal activation alignment per token in production for hallucination detection, not just protein language model off-manifold detection",
+      "technical_problem": "High-latency hallucination detection limited by unimodal internal signals",
+      "technical_means": "Compute token-level divergence between language and auxiliary modality activations at a mid-layer, feeding a lightweight detector",
+      "technical_effect": "Reduces hallucination detection latency by ~30ms per token with AUROC improvement of 8 points over unimodal baseline",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No prior work or papers explicitly align internal activations cross-modally at each token to detect hallucination.",
+        "web_queries": [
+          "cross-modal activation alignment hallucination detection",
+          "real-time epistemic divergence language vision model"
+        ],
+        "web_searched": true,
+        "web_hits": 134
+      },
+      "review": "**MECHANISM:**  \nAligning internal activations from language and auxiliary modalities (e.g., vision or symbolic metadata) at each token could reveal discrepancies when the language model \"hallucinates\" or answers beyond its knowledge. If the language activations diverge from those in a trusted auxiliary modality, this epistemic divergence might signal uncertainty or error, enabling real-time detection without expensive external checks.\n\n**EVIDENCE:**  \nThe retrieved literature provides partial support but no direct validation. Papers on cross-modal alignment and reasoning [1,4,7] show that multi-modal models can align representations effectively, suggesting feasibility. Work on hallucination detection in vision-language models [3] indicates that internal signals can flag ungrounded answers. However, none explicitly demonstrate real-time token-level epistemic divergence detection purely from activation alignment, nor its cheap deployability.\n\n**WHAT WOULD FALSIFY IT:**  \nIf token-level alignment scores between language and auxiliary modalities fail to correlate with hallucination or epistemic uncertainty—e.g., high alignment during hallucinations or low alignment during correct answers—or if the computational overhead is prohibitive for per-token use, the mechanism would be invalidated.\n\n**RISK:**  \nOptimizing for alignment-based divergence detection might encourage the model to produce superficially consistent but semantically shallow outputs, masking hallucinations. This could improve detection metrics while degrading actual factuality or robustness, creating a false sense of reliability.",
+      "citations": [
+        "2510.20193",
+        "2608.18597",
+        "2601.00269",
+        "2605.10815",
+        "2605.07407",
+        "2512.23447",
+        "2510.21323",
+        "2512.22508"
+      ],
+      "grounded": true
+    }
+  ],
+  "wall_s": 288
+}

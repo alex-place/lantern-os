@@ -1,0 +1,118 @@
+{
+  "date": "2026-07-27",
+  "rho_A_fixed": 0.9,
+  "a_red_fixed": -1.0,
+  "gain_sweep": [
+    {
+      "g": 1.0,
+      "d": -2.0,
+      "a_red": -1.0,
+      "eps_naive": 2.0,
+      "eps_c": 0.9743589743589745,
+      "two_over_g": 2.0,
+      "ratio_to_2_over_g": 0.4871794871794872,
+      "naive_overestimate_factor": 2.052631578947368
+    },
+    {
+      "g": 2.0,
+      "d": -3.0,
+      "a_red": -1.0,
+      "eps_naive": 2.0,
+      "eps_c": 0.6440677966101694,
+      "two_over_g": 1.0,
+      "ratio_to_2_over_g": 0.6440677966101694,
+      "naive_overestimate_factor": 3.105263157894737
+    },
+    {
+      "g": 10.0,
+      "d": -11.0,
+      "a_red": -1.0,
+      "eps_naive": 2.0,
+      "eps_c": 0.1735159817351598,
+      "two_over_g": 0.2,
+      "ratio_to_2_over_g": 0.867579908675799,
+      "naive_overestimate_factor": 11.526315789473685
+    },
+    {
+      "g": 100.0,
+      "d": -101.0,
+      "a_red": -1.0,
+      "eps_naive": 2.0,
+      "eps_c": 0.018821198613174838,
+      "two_over_g": 0.02,
+      "ratio_to_2_over_g": 0.9410599306587419,
+      "naive_overestimate_factor": 106.26315789473685
+    },
+    {
+      "g": 999.9999999999999,
+      "d": -1000.9999999999999,
+      "a_red": -1.0,
+      "eps_naive": 2.0,
+      "eps_c": 0.0018981967131225341,
+      "two_over_g": 0.002,
+      "ratio_to_2_over_g": 0.9490983565612671,
+      "naive_overestimate_factor": 1053.631578947368
+    }
+  ],
+  "nonnormal_control": [
+    {
+      "k": 1.0,
+      "transient": 3.912567078376661,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870407
+    },
+    {
+      "k": 2.0,
+      "transient": 7.767732617523837,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870407
+    },
+    {
+      "k": 5.0,
+      "transient": 19.37876976289311,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870386
+    },
+    {
+      "k": 10.0,
+      "transient": 38.745922717546996,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870386
+    },
+    {
+      "k": 20.0,
+      "transient": 77.48603485401989,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870396
+    },
+    {
+      "k": 50.0,
+      "transient": 193.71101933787872,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870393
+    },
+    {
+      "k": 100.0,
+      "transient": 387.42087642010176,
+      "dc_gain": 100.00000000000004,
+      "eps_c": 0.019856439591870393
+    }
+  ],
+  "gates": {
+    "D1_threshold_tracks_open_loop_gain": {
+      "PASS": true,
+      "eps_c_over_2_over_g_at_top": 0.9491
+    },
+    "D2_naive_threshold_unsafe": {
+      "PASS": true,
+      "overestimate_factor_at_top": 1053.6
+    },
+    "D3_nonnormality_is_NOT_the_driver": {
+      "PASS": true,
+      "eps_c_spread_with_transient_varying_100x": 0.0,
+      "note": "refutes this file's first hypothesis (eps* ~ 1/Kreiss)"
+    },
+    "KILL_naive_was_right": false,
+    "VERDICT": "CONFIRMED - (c)'s threshold is 2/|open-loop DC gain|, which neither Part I nor Part II measures; cancellation in a_red hides it, and non-normality is NOT the cause"
+  }
+}

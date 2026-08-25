@@ -1,0 +1,355 @@
+{
+  "goal": "raise reasoning capability per parameter in a small in-house language model we can serve on 8GB, using open-weight models and verification we can run ourselves",
+  "malformed": 0,
+  "lit": {
+    "relevant": [
+      {
+        "id": "2605.00334",
+        "title": "AgentFloor: How Far Up the tool use Ladder Can Small Open-Weight Models Go?",
+        "published": "2026-05",
+        "snippet": "Production agentic systems make many model calls per user request, and most of those calls are short, structured, and routine. This raises a practical routing question that existing evaluations do not directly answer: which parts of an agent workflow truly require large frontier intelligence, and which can be handled by smaller models? We introduce AgentFloor, a deterministic 30-task benchmark org…",
+        "url": "https://arxiv.org/abs/2605.00334",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2510.17498",
+        "title": "Deep Self-Evolving Reasoning",
+        "published": "2025-10",
+        "snippet": "Long-form chain-of-thought reasoning has become a cornerstone of advanced reasoning in large language models. While recent verification-refinement frameworks have enabled proprietary models to solve Olympiad-level problems, their effectiveness hinges on strong, reliable verification and correction capabilities, which remain fragile in open-weight, smaller-scale models. This work demonstrates that…",
+        "url": "https://arxiv.org/abs/2510.17498",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2603.00729",
+        "title": "Qwen3-Coder-Next Technical Report",
+        "published": "2026-03",
+        "snippet": "We present Qwen3-Coder-Next, an open-weight language model specialized for coding agents. Qwen3-Coder-Next is an 80-billion-parameter model that activates only 3 billion parameters during inference, enabling strong coding capability with efficient inference. In this work, we explore how far strong training recipes can push the capability limits of models with small parameter footprints. To achieve…",
+        "url": "https://arxiv.org/abs/2603.00729",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.03065",
+        "title": "Spectral Rewiring for Exploration, Purification, and Model Merging",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning has become a standard post-training recipe for large language models, but dense full-parameter updates create two deployment-relevant bottlenecks: suppressed reasoning performance, often reflected by premature saturation of test-time scaling, and interference when consolidating multiple capabilities through multi-domain training or model merging. We show that the reasoning-e…",
+        "url": "https://arxiv.org/abs/2607.03065",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2606.21638",
+        "title": "Toward Open Weight Models Without Risks: Separating Public and Private Capabilities in LLMs",
+        "published": "2026-06",
+        "snippet": "Open-weight Large Language Models (LLMs) enable scientific progress and broad deployment. However, they make it difficult to control access to sensitive capabilities. Current practice either suppresses dangerous capabilities before release or mediates access through closed services that use specialized model variants, input/output monitors, and API permissions. The former is susceptible to jailbre…",
+        "url": "https://arxiv.org/abs/2606.21638",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2507.10182",
+        "title": "Breaking the Myth: Can Small Models Infer Postconditions Too?",
+        "published": "2025-07",
+        "snippet": "Formal specifications are essential for ensuring software correctness, yet manually writing them is tedious and error-prone. Large Language Models (LLMs) have shown promise in generating such specifications from natural language intents, but the giant model size and high computational demands raise a fundamental question: Do we really need large models for this task? In this paper, we show that a…",
+        "url": "https://arxiv.org/abs/2507.10182",
+        "primary_category": "cs.SE"
+      },
+      {
+        "id": "2510.25055",
+        "title": "GAPMAP: Mapping Scientific Knowledge Gaps in Biomedical Literature Using Large Language Models",
+        "published": "2025-10",
+        "snippet": "Scientific progress is driven by the deliberate articulation of what remains unknown. This study investigates the ability of large language models (LLMs) to identify research knowledge gaps in the biomedical literature. We define two categories of knowledge gaps: explicit gaps, clear declarations of missing knowledge; and implicit gaps, context-inferred missing knowledge. While prior work has focu…",
+        "url": "https://arxiv.org/abs/2510.25055",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2603.00842",
+        "title": "MedGPT-oss: Training a General-Purpose Vision-Language Model for Biomedicine",
+        "published": "2026-03",
+        "snippet": "Biomedical multimodal assistants have the potential to unify radiology, pathology, and clinical-text reasoning, yet a critical deployment gap remains: top-performing systems are either closed-source or computationally prohibitive, precluding the on-premises deployment required for patient privacy and PHI compliance. We introduce MEDGPT-OSS, an open-weight, 20B-parameter generalist vision-language…",
+        "url": "https://arxiv.org/abs/2603.00842",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2606.31092",
+        "title": "Fora: From Weight-Space to Function-Space Protection in Capability-Preserving Fine-Tuning",
+        "published": "2026-06",
+        "snippet": "Full fine-tuning adapts large language models to new tasks but can erode capabilities they already possess. Existing remedies protect through proxies such as parameter distances, importance penalties, output matching, or dominant singular directions of the weights, but none directly asks which activation directions the preserved capability relies on. We argue that a capability is characterized mor…",
+        "url": "https://arxiv.org/abs/2606.31092",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2606.22189",
+        "title": "L20-Edu-135M: An Auditable Single-GPU Study of Data-Efficient Small Language Modeling",
+        "published": "2026-06",
+        "snippet": "Small language models are cheap to serve and feasible on local hardware, but strong public 135M-class systems are commonly trained with hundreds of billions to trillions of tokens on large clusters. We study a sharply resource-constrained regime: a complete 134.5M-parameter language-model pipeline executed on one NVIDIA L20 GPU. The released checkpoint, L20-Edu-135M, receives approximately 13B pre…",
+        "url": "https://arxiv.org/abs/2606.22189",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2607.13332",
+        "title": "Agora: Collective and Permissionless Internet-Scale Pretraining of Large Language Models",
+        "published": "2026-07",
+        "snippet": "Training large language models at the multi-billion to trillion parameter scale is confined to datacenters, where data-parallel (DP) and model-parallel (MP) techniques presume homogeneous accelerators, high-speed interconnects, and a single orchestrating entity. Frontier model development is thereby concentrated among the few groups able to assemble such clusters. Meanwhile, an enormous pool of co…",
+        "url": "https://arxiv.org/abs/2607.13332",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2607.20062",
+        "title": "Solar Open 2 Technical Report",
+        "published": "2026-07",
+        "snippet": "We present Solar Open 2, a 250B-A15B Mixture-of-Experts language model built for long-horizon agentic tasks, scaled up from Solar Open 1 (Solar Open 100B). To hold entire agent trajectories in a single context, Solar Open 2 reaches a 1M-token window through a hybrid attention stack that interleaves one softmax layer among every three linear-attention layers, using no positional encoding and a gate…",
+        "url": "https://arxiv.org/abs/2607.20062",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.09693",
+        "title": "Depth-Entropy Guided Sampling for Training-Free LLM Reasoning",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning (RL) has become the dominant paradigm for improving the reasoning capabilities of large language models, but it requires expensive training, curated data, and reward signals. Recent work shows that sampling from sharpened base-model distributions at test time recovers much of the RL gain, yet existing methods rely solely on output-layer likelihoods and ignore the transformer…",
+        "url": "https://arxiv.org/abs/2607.09693",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2607.20216",
+        "title": "Small, Free, and Effective: Orchestrating Open-Weight Small Language Models to Outperform Single LLM for Malware Analysis",
+        "published": "2026-07",
+        "snippet": "Malware analysis demands rapid interpretation of complex detonation reports spanning filesystem, network, and process behaviours. While large language models (LLMs) demonstrate impressive capabilities for technical artifact interpretation, the opacity and escalating API costs of closed-weight frontier models motivate exploration of open-weight alternatives. However, many open-weight models are lar…",
+        "url": "https://arxiv.org/abs/2607.20216",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2607.02873",
+        "title": "Determinants and Limits of LLM Security-Tool Orchestration: A Study with HexStrike-AI",
+        "published": "2026-07",
+        "snippet": "Large language model agents driving security tool suites over the Model Context Protocol are increasingly common. Yet the factors that bound their capability remain poorly characterized: how much depends on the model versus the client that drives it, whether constraining the agent to the orchestrator's own tools helps, and where capability is limited by reasoning rather than by missing tools. Usin…",
+        "url": "https://arxiv.org/abs/2607.02873",
+        "primary_category": "cs.SE"
+      },
+      {
+        "id": "2606.15079",
+        "title": "Ling and Ring 2.6 Technical Report: Efficient and Instant Agentic Intelligence at Trillion-Parameter Scale",
+        "published": "2026-06",
+        "snippet": "Efficient and scalable agentic intelligence requires models that can deliver both low-latency responses and strong reasoning capabilities while remaining practical to train, serve, and deploy. In this report, we present Ling-2.6 and Ring-2.6, a family of models designed to address this challenge at scale. Ling-2.6 is optimized for instant response generation and high capability per output token, w…",
+        "url": "https://arxiv.org/abs/2606.15079",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2606.07998",
+        "title": "Enhancing AI Interpretability and Safety through Localised Architectures",
+        "published": "2026-06",
+        "snippet": "Recent advances in generative AI, especially powerful Large Language Models (LLMs) and Large Reasoning Models (LRMs), raise concerns over the interpretability, safety and sustainability of these large and opaque AI models. The power of such architectures is derived not only from the scalability of deep neural networks, but also massively parallel hardware such as GPU clusters. The diffuse nature o…",
+        "url": "https://arxiv.org/abs/2606.07998",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2606.29689",
+        "title": "Can MLLMs Critique Like Humans? Evaluating Open-Ended Aesthetic Reasoning in Multimodal Large Language Models",
+        "published": "2026-06",
+        "snippet": "Open-ended aesthetic critique is a challenge for multimodal large language models (MLLMs): unlike multiple-choice aesthetic benchmarks, it has no single correct answer, and most aesthetic evaluation has measured models against numeric scores rather than the written critiques people actually give. We evaluate MLLM critiques against ranked human references and ask whether they are close to human one…",
+        "url": "https://arxiv.org/abs/2606.29689",
+        "primary_category": "cs.CL"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "pairs": 36,
+  "sham_rank": 9,
+  "of": 9,
+  "sham_control_held": true,
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.5071,
+      "wins": 8,
+      "comparisons": 8,
+      "title": "Test-Time Sampling with Depth-Entropy Guided Decoding",
+      "mechanism": "Apply depth-entropy guided sampling at inference to improve reasoning output quality without retraining",
+      "experiment": "Run depth-entropy guided decoding on small open-weight model for multi-step reasoning tasks, measure accuracy vs baseline sampling",
+      "falsifier": "No accuracy improvement or degraded output coherence compared to standard sampling",
+      "needs": "Access to model logits, implementation of guided sampling, inference time",
+      "cost": "low",
+      "review": "MECHANISM:  \nDepth-entropy guided sampling aims to improve reasoning by dynamically adjusting token sampling based on uncertainty (entropy) at different transformer depths during inference. By focusing sampling on tokens or layers with higher entropy, the method can prioritize exploring uncertain reasoning paths without retraining, potentially recovering reasoning gains similar to RL fine-tuning but at test time. This leverages internal model signals beyond output logits, guiding generation toward more coherent or logically consistent outputs.\n\nEVIDENCE:  \n[1] directly supports this approach, showing that depth-entropy guided sampling at test time can recover much of the reasoning improvement from RL without retraining. [5] and [7] also discuss entropy-based test-time refinement and verification loops that improve reasoning by targeting uncertain tokens. Other papers focus on related verification or steering but not this exact mechanism. Thus, the literature provides moderate support for the core idea.\n\nWHAT WOULD FALSIFY IT:  \nIf applying depth-entropy guided sampling at inference yields no measurable improvement in reasoning benchmarks compared to standard sampling, or if it consistently degrades output quality or coherence, that would falsify the claim. Also, if the entropy signals at intermediate depths do not correlate with reasoning errors or uncertainty, the mechanism would be invalidated.\n\nRISK:  \nThis method could increase computational overhead and latency, hurting throughput. It might also bias sampling toward less probable tokens, increasing hallucinations or incoherence, thus inflating reasoning scores on some benchmarks while reducing real-world reliability. Overfitting to entropy heuristics could degrade generalization or produce brittle outputs under distribution shifts.",
+      "citations": [
+        "2607.09693",
+        "2601.03093",
+        "2606.20244",
+        "2508.03726",
+        "2509.00079",
+        "2606.27550",
+        "2508.16665",
+        "2507.17307"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 2,
+      "strength": 0.2515,
+      "wins": 7,
+      "comparisons": 8,
+      "title": "Verification-Refinement Loop on 135M Model",
+      "mechanism": "Iteratively generate chain-of-thought with self-verification and correction to boost reasoning per parameter",
+      "experiment": "Fine-tune L20-Edu-135M with verification-refinement on math reasoning tasks, measure accuracy gains",
+      "falsifier": "No significant accuracy improvement after 3 refinement iterations",
+      "needs": "135M model checkpoint, math datasets, few days GPU fine-tuning",
+      "cost": "medium",
+      "review": "MECHANISM:  \nThe Verification-Refinement Loop aims to improve reasoning per parameter by having the 135M model generate chain-of-thought (CoT) reasoning, then verify and correct its own outputs iteratively. This could work because self-verification helps localize and fix errors in intermediate reasoning steps, potentially amplifying the model’s effective reasoning capacity without increasing parameters. Iterative refinement can reduce compounding errors in multi-step problems, effectively simulating a deeper reasoning process within a small model’s limited capacity.\n\nEVIDENCE:  \nThe literature shows mixed support. [1] demonstrates verification-refinement in large proprietary models but notes fragility in smaller open-weight models. [2] supports error localization via structured reasoning steps, which is foundational for effective self-correction. [7] introduces a denoising iterative self-correction method that improves reasoning reliability, but primarily on larger models. [3] confirms feasibility of training 135M models but does not address verification loops. None conclusively prove robust verification-refinement loops improve reasoning in 135M open models.\n\nWHAT WOULD FALSIFY IT:  \nIf iterative self-verification on the 135M model fails to improve or even degrades reasoning accuracy on benchmark tasks compared to single-pass CoT, especially when verified by human or automated checks, this would falsify the claim. Also, if error localization is unreliable or corrections introduce new errors, the mechanism fails.\n\nRISK:  \nThe loop might inflate confidence and produce superficially coherent but incorrect reasoning, boosting benchmark scores via repeated token generation without genuine understanding. This could mask brittleness, increase latency, and reduce robustness, ultimately degrading real-world reasoning despite improved headline metrics.",
+      "citations": [
+        "2510.17498",
+        "2602.02416",
+        "2606.22189",
+        "2606.13156",
+        "2602.08948",
+        "2602.00871",
+        "2606.21724",
+        "2510.16657"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 3,
+      "strength": 0.1243,
+      "wins": 6,
+      "comparisons": 8,
+      "title": "Activation Subspace Fine-Tuning for Reasoning Preservation",
+      "mechanism": "Fine-tune only top singular vectors of activations linked to reasoning, preserving core capabilities while improving reasoning per parameter",
+      "experiment": "Identify reasoning-critical activation directions, fine-tune a 135M open-weight model on reasoning tasks, measure reasoning gains vs baseline",
+      "falsifier": "No reasoning improvement or degradation in general language ability",
+      "needs": "One GPU, curated reasoning dataset, 1-2 weeks fine-tuning",
+      "cost": "medium",
+      "review": "MECHANISM:  \nActivation Subspace Fine-Tuning targets the top singular vectors of activations linked to reasoning, aiming to update only the most relevant functional directions. By focusing on these subspaces, it intends to preserve the bulk of the model’s pre-trained capabilities while improving reasoning efficiency per parameter. This selective fine-tuning could reduce catastrophic forgetting and maintain core knowledge, leveraging the idea that reasoning is encoded in a low-dimensional activation subspace.\n\nEVIDENCE:  \nRelated work supports aspects of this approach. Fora [1] argues for preserving capabilities by protecting dominant singular directions, though it focuses on weights rather than activations. PALoRA [5] and OPLoRA [2] show that constraining updates in low-rank or orthogonal subspaces can prevent forgetting, but again primarily in weight space. FRISM [4] and DC-Merge [7] highlight benefits of subspace-level merging and directional consistency for capability preservation. None explicitly fine-tune activation singular vectors for reasoning preservation, so direct evidence is limited.\n\nWHAT WOULD FALSIFY IT:  \nIf fine-tuning only top activation singular vectors fails to improve reasoning metrics or causes degradation in other core tasks, it would falsify the claim. Also, if reasoning improvements come at the cost of overall model robustness or if reasoning-related activations are not stable or identifiable, the mechanism would be invalidated.\n\nRISK:  \nFocusing on a narrow activation subspace might improve benchmark reasoning scores superficially while neglecting broader generalization or robustness. It could also cause overfitting to reasoning tasks, reducing performance on other capabilities or increasing brittleness, thus worsening real-world utility despite headline gains.",
+      "citations": [
+        "2606.31092",
+        "2510.13003",
+        "2509.03740",
+        "2601.21187",
+        "2605.24549",
+        "2601.08169",
+        "2603.06242",
+        "2604.12384"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 4,
+      "strength": 0.0618,
+      "wins": 5,
+      "comparisons": 8,
+      "title": "Hybrid Agentic Workflow Using Frontier API for Verification",
+      "mechanism": "Combine small local model for generation with frontier API calls for verification steps, reducing API calls but boosting reasoning",
+      "experiment": "Build agent pipeline where local 134M model generates steps, frontier API verifies/corrects, measure cost vs accuracy tradeoff",
+      "falsifier": "Hybrid pipeline accuracy not better than frontier API alone or too costly to run",
+      "needs": "API budget, local GPUs, integration code, reasoning datasets",
+      "cost": "medium",
+      "review": "MECHANISM:  \nUsing a small local model for initial generation leverages its low latency and low resource use, while selectively invoking a stronger frontier API only for verification steps could improve overall reasoning accuracy per parameter. This hybrid approach aims to reduce expensive API calls by filtering out easy or routine reasoning locally, reserving costly calls for critical verification, thus boosting effective reasoning without exceeding 8GB constraints.\n\nEVIDENCE:  \n[1] AgentFloor directly studies which agent workflow parts require large models versus small ones, supporting selective delegation. [3] discusses compiling deterministic workflows to mitigate small model epistemic limits, aligning with verification steps. [8] shows verification can be efficiently allocated in decoding, analogous to verification calls here. Other papers focus on scale or security but do not directly support this hybrid verification approach. Overall, partial support exists but no direct end-to-end demonstration.\n\nWHAT WOULD FALSIFY IT:  \nIf the hybrid system’s verification calls do not measurably improve reasoning accuracy beyond the small model alone, or if verification overhead negates latency and cost savings, the approach fails. Also, if the small model’s errors are too frequent or subtle for the frontier API to catch reliably, the hybrid workflow would not improve reasoning per parameter.\n\nRISK:  \nThe system might appear better by reporting improved verification pass rates or fewer API calls, but actual end-to-end reasoning or user-facing correctness could degrade if the small model’s flawed generations mislead verification or if verification is shallow. This could inflate headline metrics while reducing robustness or increasing complexity and maintenance burden.",
+      "citations": [
+        "2605.00334",
+        "2606.15079",
+        "2604.17450",
+        "2606.12821",
+        "2509.13597",
+        "2607.20216",
+        "2512.07785",
+        "2606.01019"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 5,
+      "strength": 0.0305,
+      "wins": 4,
+      "comparisons": 8,
+      "title": "Parameter-Efficient Multi-Task Merging via Spectral Rewiring",
+      "mechanism": "Merge multiple small-task-specialist models into one via spectral rewiring to reduce interference and boost reasoning per parameter",
+      "experiment": "Train small models on distinct reasoning subtasks, merge with spectral rewiring, evaluate merged model on composite reasoning benchmark",
+      "falsifier": "Merged model performs worse than individual specialists or baseline",
+      "needs": "Multiple GPUs or cloud hours for specialist training, 2-3 weeks",
+      "cost": "high",
+      "review": "MECHANISM:  \nSpectral rewiring aims to merge multiple task-specialist models by aligning their principal parameter subspaces, reducing destructive interference when combining weights. By focusing on dominant spectral components, it preserves task-specific knowledge while enabling parameter sharing, potentially increasing reasoning capability per parameter in a merged model without retraining. This could be especially useful for small models on limited hardware (8GB), as it avoids full fine-tuning and large memory overhead.\n\nEVIDENCE:  \nThe literature supports spectral methods for model merging and interference reduction [1,4,8]. For example, [4] shows closed-form spectral regularization can minimize interference in multi-task merging, and [8] highlights that task updates concentrate in low-dimensional subspaces, justifying spectral alignment. However, none demonstrate clear reasoning improvements per parameter in small, resource-constrained language models or verify gains on reasoning benchmarks relevant to your goal.\n\nWHAT WOULD FALSIFY IT:  \nIf merging multiple task experts via spectral rewiring yields no improvement or degrades reasoning benchmark performance per parameter compared to a single-task or naïvely merged model, especially under 8GB constraints, this would falsify the claim. Also, if interference or catastrophic forgetting persists despite spectral alignment, the mechanism fails.\n\nRISK:  \nSpectral merging might improve headline metrics by averaging or smoothing weights, superficially boosting some tasks but diluting specialized reasoning capabilities. This could mask reduced robustness or generalization, leading to a model that appears better on benchmarks but performs worse in real-world reasoning or verification tasks.",
+      "citations": [
+        "2607.03065",
+        "2603.21584",
+        "2605.01580",
+        "2606.07289",
+        "2509.11167",
+        "2602.12566",
+        "2606.22589",
+        "2606.19164"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 6,
+      "strength": 0.0147,
+      "wins": 3,
+      "comparisons": 8,
+      "title": "Test-Time Depth-Entropy Sampling on Small Models",
+      "mechanism": "Apply depth-entropy guided sampling at inference to sharpen reasoning outputs without retraining",
+      "experiment": "Implement depth-entropy sampling on 135M model, compare reasoning benchmark scores vs standard sampling",
+      "falsifier": "No improvement or degradation in reasoning accuracy or coherence",
+      "needs": "No training, only inference code changes, multiple GPU hours for evaluation",
+      "cost": "low",
+      "review": "MECHANISM:  \nDepth-entropy guided sampling at test time aims to sharpen reasoning outputs by dynamically adjusting token sampling based on internal model uncertainty (entropy) across transformer layers (\"depth\"). This could focus generation on more confident latent states, reducing hallucinations and improving logical coherence without retraining. It leverages the model’s own internal signals to guide output refinement, potentially boosting reasoning per parameter in small models constrained by 8GB memory.\n\nEVIDENCE:  \n[1] directly proposes depth-entropy guided sampling for training-free reasoning improvements, showing gains in large LLMs without retraining. However, it focuses on large models, and the method’s efficacy on small, open-weight models is not established. Other papers ([3], [4], [5]) discuss verification and latent steering but require more compute or retraining. None demonstrate clear success of this method on small, memory-limited models or verify reasoning improvements without retraining.\n\nWHAT WOULD FALSIFY IT:  \nIf applying depth-entropy guided sampling at inference on small models yields no statistically significant improvement in reasoning benchmarks compared to standard sampling, or if it degrades output quality or consistency, this would falsify the claim. Also, if entropy signals do not correlate with reasoning correctness in small models, the mechanism fails.\n\nRISK:  \nSharpening sampling distributions might reduce output diversity, causing overconfident but brittle reasoning that appears better on some metrics but fails on edge cases. It could also increase inference latency or complexity without commensurate gains, or amplify model biases by focusing on confident but incorrect latent states, misleading evaluation.",
+      "citations": [
+        "2607.09693",
+        "2606.20244",
+        "2603.20441",
+        "2601.03093",
+        "2510.17498",
+        "2603.27665",
+        "2602.02443",
+        "2603.15641"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 7,
+      "strength": 0.0067,
+      "wins": 2,
+      "comparisons": 8,
+      "title": "Modular Verification Head Addition",
+      "mechanism": "Add a small verification head module to a base model to verify chain-of-thought steps, offloading verification from large APIs",
+      "experiment": "Train a 135M model with a verification head on synthetic CoT verification data, test end-to-end reasoning accuracy without API calls",
+      "falsifier": "Verification head fails to improve or worsens reasoning accuracy",
+      "needs": "One GPU, synthetic verification data generation, 1 week training",
+      "cost": "medium",
+      "review": "**MECHANISM:**  \nAdding a modular verification head aims to explicitly check chain-of-thought (CoT) reasoning steps, potentially catching errors early and improving overall reasoning accuracy. By offloading verification from large APIs to a small, specialized module, the base model can focus on generation while the verification head enforces logical consistency and correctness, increasing reasoning capability per parameter within tight memory constraints.\n\n**EVIDENCE:**  \n[3] discusses verification-refinement frameworks but notes their fragility in small open-weight models, suggesting verification is challenging at this scale. [5] highlights the complexity of multi-step deductive reasoning in small models, implying verification is non-trivial. [1] and [4] show small models can handle structured tasks but do not directly validate modular verification heads. Overall, no retrieved paper directly demonstrates that adding a modular verification head improves reasoning in small models; evidence is indirect or negative.\n\n**WHAT WOULD FALSIFY IT:**  \nIf adding the verification head fails to improve or even degrades reasoning accuracy on multi-step CoT benchmarks—especially when compared to baseline small models without verification—or if verification outputs are unreliable or inconsistent, this would falsify the claim.\n\n**RISK:**  \nThe verification head might increase computational overhead and complexity, causing slower inference or overfitting to verification heuristics that do not generalize. This could inflate benchmark scores by catching trivial errors while missing deeper reasoning flaws, giving a false sense of improved capability despite no real reasoning gain.",
+      "citations": [
+        "2603.25944",
+        "2512.00003",
+        "2510.17498",
+        "2605.00334",
+        "2510.09340",
+        "2603.03332",
+        "2606.15079",
+        "2510.18817"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 8,
+      "strength": 0.0027,
+      "wins": 1,
+      "comparisons": 8,
+      "title": "Sparse Activation Routing with Small MoE",
+      "mechanism": "Use a small mixture-of-experts layer to route reasoning subtasks, increasing effective capacity without full parameter growth",
+      "experiment": "Add 4-expert MoE layer to 134M model, train on reasoning benchmarks, compare reasoning accuracy and latency",
+      "falsifier": "MoE routing yields no reasoning accuracy gain or increases latency beyond serving budget",
+      "needs": "Codebase for MoE, GPUs for training, reasoning datasets",
+      "cost": "medium",
+      "review": "**MECHANISM:**  \nSparse Activation Routing with Small MoE could increase reasoning capability per parameter by selectively routing subtasks to specialized expert modules. This allows the model to leverage a larger effective capacity without increasing the full parameter count or compute per token, fitting within an 8GB memory constraint. By activating only a few experts per input, the model can focus capacity where needed, potentially improving reasoning without a proportional increase in FLOPs or memory.\n\n**EVIDENCE:**  \nThe literature shows mixed support. [2] questions whether MoE actually improves inference speed or cost on edge hardware, highlighting practical overheads. [3] and [7] emphasize memory and storage bottlenecks from large expert pools, which could challenge in-house deployment on limited hardware. [8] proposes soft routing to improve efficiency but does not guarantee better reasoning per parameter. None conclusively demonstrate improved reasoning capability in small, memory-constrained models, so direct evidence is limited.\n\n**WHAT WOULD FALSIFY IT:**  \nIf a small MoE model with sparse routing fails to outperform a dense baseline of similar parameter count on reasoning benchmarks, or if the overhead of routing and expert management negates any capacity gains, this would falsify the claim. Also, if memory or latency constraints prevent practical deployment on 8GB hardware, the approach would be invalidated.\n\n**RISK:**  \nThe headline reasoning improvement might come from increased model complexity or overfitting in experts, while routing overheads degrade latency or increase memory fragmentation. This could yield a model that scores better on benchmarks but is slower, less stable, or harder to verify and maintain in-house, undermining practical utility.",
+      "citations": [
+        "2605.02960",
+        "2606.21428",
+        "2605.10933",
+        "2605.06665",
+        "2603.01697",
+        "2606.04438",
+        "2510.10962",
+        "2606.17952"
+      ],
+      "grounded": true
+    }
+  ],
+  "wall_s": 125
+}

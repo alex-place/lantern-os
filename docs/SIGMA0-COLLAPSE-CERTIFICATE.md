@@ -6,6 +6,11 @@ updated: 2026-07-22
 
 # Σ — The Convergence Certificate
 
+> **Start with the plain-English version: [CONVERGENCE-CERTIFICATE-PLAIN.md](CONVERGENCE-CERTIFICATE-PLAIN.md).**
+> This file is the full technical record — 28,000 words, evidence-classed, not written to be read
+> top-to-bottom. The plain version says what it is for, what is actually proven (one result of
+> eleven), and what is not, in a fifth of the space.
+
 *A computable stability certificate for convergence dynamics, and an honest
 account of why an ungrounded self-improving system tends to collapse or diverge.*
 

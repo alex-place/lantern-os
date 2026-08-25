@@ -1,0 +1,199 @@
+{
+  "goal": "raise the rate at which the controller picks the true cause over a cheaper proxy, without breaking its control world",
+  "stages": [
+    {
+      "stage": "literature",
+      "citations": [
+        "2602.16246",
+        "2510.03696",
+        "2604.12513",
+        "2606.09449",
+        "2604.17111",
+        "2605.00963"
+      ],
+      "note": "",
+      "text": "The goal of raising the rate at which a controller picks the true cause over a cheaper proxy, without breaking its control world, relates to measurable properties such as agentic control grounded in internal evidence and calibrated uncertainty-aware decision-making. Paper [3] discusses a variational language model with a calibrated uncertainty-aware controller that supports measurable agentic control based on internal evidence, which aligns with improving true cause selection over proxies. Paper [4] addresses reasoning without gold standards by using proxy-judges, highlighting challenges in correctness evaluation when exact references are unavailable, relevant to distinguishing true causes from proxies. Paper [1] emphasizes scalable, proxy state-based evaluation for multi-turn LLM agents, supporting the use of proxies in evaluation but aiming for reliable comparison and on-policy training data. Paper [6] shows the impact of language grounding and control modules on system performance, implying measurable effects on controller decisions. However, none explicitly quantify the rate of true cause selection over proxies or address maintaining the integrity of the control world during this process.\n\nUNSUPPORTED: Quantitative metrics for increasing true cause selection rate; maintaining control world integrity while shifting from proxies."
+    },
+    {
+      "stage": "baseline",
+      "assay": "controller-two-explanations",
+      "ok": true,
+      "metric": 0.983,
+      "control": true,
+      "noise": 0.019217280437234485,
+      "control_what": "H4: the original hidden-variable world does not regress",
+      "wall_s": 40,
+      "cmd": "python research\\epistemic_controller\\run_world_h.py 200",
+      "env": {}
+    },
+    {
+      "stage": "candidates",
+      "generated": 6,
+      "malformed": 0,
+      "admitted": 6,
+      "unrunnable": []
+    },
+    {
+      "stage": "ranked",
+      "pairs": 21,
+      "sham_rank": 5,
+      "of": 7,
+      "order": [
+        {
+          "title": "Increase hold to require more consistent evidence before boundary",
+          "strength": 0.5246,
+          "wins": 6,
+          "comparisons": 6,
+          "sham": false
+        },
+        {
+          "title": "Increase seeds to reduce noise in selection",
+          "strength": 0.2567,
+          "wins": 5,
+          "comparisons": 6,
+          "sham": false
+        },
+        {
+          "title": "Decrease cost_exponent to reduce penalty on cost and favor accuracy",
+          "strength": 0.1225,
+          "wins": 4,
+          "comparisons": 6,
+          "sham": false
+        },
+        {
+          "title": "Lower mse_k threshold to flag suspect models earlier",
+          "strength": 0.0572,
+          "wins": 3,
+          "comparisons": 6,
+          "sham": false
+        },
+        {
+          "title": "Re-order the candidate list alphabetically before scoring",
+          "strength": 0.0255,
+          "wins": 2,
+          "comparisons": 6,
+          "sham": true
+        },
+        {
+          "title": "Increase alpha to allow more structure-test rejections",
+          "strength": 0.0103,
+          "wins": 1,
+          "comparisons": 6,
+          "sham": false
+        },
+        {
+          "title": "Increase window length to capture longer residual patterns",
+          "strength": 0.0032,
+          "wins": 0,
+          "comparisons": 6,
+          "sham": false
+        }
+      ]
+    }
+  ],
+  "started": null,
+  "baseline": {
+    "ok": true,
+    "metric": 0.983,
+    "control": true,
+    "noise": 0.019217280437234485,
+    "control_what": "H4: the original hidden-variable world does not regress",
+    "wall_s": 40,
+    "result": {
+      "n_seeds": 200,
+      "arms": {
+        "commit": {
+          "arm": "commit (shipped)",
+          "n": 200,
+          "entered_boundary": 1,
+          "expanded": 184,
+          "chose_true": 169,
+          "chose_proxy": 15,
+          "other": 0,
+          "truth_rate_among_two": 0.918,
+          "final_mse_when_true": 0.089,
+          "final_mse_when_proxy": 3.047
+        },
+        "hold": {
+          "arm": "hold (expansion is a hypothesis)",
+          "n": 200,
+          "entered_boundary": 1,
+          "expanded": 181,
+          "chose_true": 178,
+          "chose_proxy": 3,
+          "other": 0,
+          "truth_rate_among_two": 0.983,
+          "final_mse_when_true": 0.089,
+          "final_mse_when_proxy": 1.877
+        }
+      },
+      "gates": {
+        "commit": {
+          "H1_enters_and_expands": true,
+          "H2_truth_over_proxy": "PASS",
+          "truth_rate": 0.918,
+          "H3_proxy_is_really_worse": true,
+          "H4_control_P3": 0.93,
+          "H4_pass": true
+        },
+        "hold": {
+          "H1_enters_and_expands": true,
+          "H2_truth_over_proxy": "PASS",
+          "truth_rate": 0.983,
+          "H3_proxy_is_really_worse": true,
+          "H4_control_P3": 0.92,
+          "H4_pass": true
+        }
+      },
+      "verdict": "BOTH PASS — even one-shot commit separates them (the world is not adversarial enough)"
+    },
+    "cmd": "python research\\epistemic_controller\\run_world_h.py 200",
+    "env": {}
+  },
+  "results": [
+    {
+      "title": "Increase hold to require more consistent evidence before boundary",
+      "params": {
+        "hold": 5
+      },
+      "strength": 0.5245962737711948,
+      "grounded": false,
+      "ok": true,
+      "metric": 0.989,
+      "baseline": 0.983,
+      "delta": 0.006000000000000005,
+      "noise_band": 0.019217280437234485,
+      "control": true,
+      "control_what": "H4: the original hidden-variable world does not regress",
+      "wall_s": 35,
+      "verdict": "WITHIN NOISE"
+    },
+    {
+      "title": "Increase seeds to reduce noise in selection",
+      "params": {
+        "seeds": 350
+      },
+      "strength": 0.2567116235768331,
+      "grounded": false,
+      "ok": true,
+      "metric": 0.991,
+      "baseline": 0.983,
+      "delta": 0.008000000000000007,
+      "noise_band": 0.019217280437234485,
+      "control": true,
+      "control_what": "H4: the original hidden-variable world does not regress",
+      "wall_s": 58,
+      "verdict": "WITHIN NOISE"
+    }
+  ],
+  "interpretation": "This round shows that increasing the hold parameter to demand more consistent evidence and increasing seeds to reduce noise both yield slight improvements in true cause selection, but these changes remain within the noise band and are thus inconclusive. This rules out that simply requiring more consistent evidence or more sampling alone significantly boosts true cause preference without breaking the control world. It suggests the controller is already near optimal under these conditions, and minor parameter tweaks have limited impact. The most informative next change is to test a structural modification—such as adjusting the proxy cost or introducing a penalty for proxy reliance—to more directly shift preference toward the true cause, rather than tuning evidence thresholds or sampling size.",
+  "controls": {
+    "sham_rank": 5,
+    "of": 7,
+    "sham_control_held": true,
+    "assay_control_held": true,
+    "ungrounded_finalists": 2
+  },
+  "verdict": "no candidate beat the measured baseline by more than its noise band (+/-0.019217280437234485)",
+  "wall_s": 185
+}

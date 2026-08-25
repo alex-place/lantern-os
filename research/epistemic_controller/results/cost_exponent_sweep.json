@@ -1,0 +1,30 @@
+{
+  "n_seeds": 200,
+  "rows": [
+    {
+      "cost_exponent": 1.0,
+      "n": 200,
+      "truth_rate": 0.89,
+      "proxy_bought_rate": 0.195,
+      "experiments": 1309,
+      "experiments_per_seed": 6.545
+    },
+    {
+      "cost_exponent": 0.5,
+      "n": 200,
+      "truth_rate": 0.905,
+      "proxy_bought_rate": 0.11,
+      "experiments": 1294,
+      "experiments_per_seed": 6.47
+    },
+    {
+      "cost_exponent": 0.0,
+      "n": 200,
+      "truth_rate": 0.915,
+      "proxy_bought_rate": 0.05,
+      "experiments": 1258,
+      "experiments_per_seed": 6.29
+    }
+  ],
+  "verdict": "the repair is worth making: moving e from 1.0 to 0.0 cuts wasted proxy purchases by 74% (20% -> 5% of seeds)"
+}

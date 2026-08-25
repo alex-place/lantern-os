@@ -264,7 +264,8 @@ jobs:
           # Exempt code where console.* is the intended interface, not a debug leak:
           #   - test files anywhere (top-level tests/, colocated apps/**/test/, *.test.*,
           #     *.spec.*, test_*) — console.log is the test reporter
-          #   - scripts/ and experiments/ — CLI / research tools whose stdout IS console.log
+          #   - scripts/, experiments/ and research/ — CLI / research tools whose stdout IS
+          #     console.log (research/ was missing, so a research CLI tripped the gate, 2026-08-19)
           # The old list only matched top-level tests/ + test_*, so colocated
           # apps/**/test/*.test.js and scripts/*.mjs CLIs tripped the gate falsely (#1561).
           # Real leaks in shipped lib/ routes/ public/ code are still caught.
@@ -274,7 +275,7 @@ jobs:
             ':(exclude,glob)**/tests/**' ':(exclude,glob)**/test/**' \
             ':(exclude,glob)**/*.test.*' ':(exclude,glob)**/*.spec.*' \
             ':(exclude,glob)**/test_*.py' ':(exclude,glob)**/test_*.js' ':(exclude,glob)**/test_*.ts' \
-            ':(exclude,glob)scripts/**' ':(exclude,glob)experiments/**')
+            ':(exclude,glob)scripts/**' ':(exclude,glob)experiments/**' \n            ':(exclude,glob)research/**')
           hits=$(echo "$diff" | grep -E \
             '^\+(.*)(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\))' \
             | grep -v '^+++')

@@ -1,0 +1,51 @@
+{
+  "seeds": [
+    200,
+    400
+  ],
+  "arms": {
+    "repeat/one-shot": {
+      "discoveries": 551,
+      "false": 0,
+      "experiments": 3699,
+      "chains_ok": 551,
+      "per_experiment": 0.14895917815625845,
+      "false_rate": 0.0,
+      "mean_mse": 0.4557561965129875,
+      "possible": 600
+    },
+    "repeat/relmem": {
+      "discoveries": 554,
+      "false": 0,
+      "experiments": 3140,
+      "chains_ok": 554,
+      "per_experiment": 0.17643312101910827,
+      "false_rate": 0.0,
+      "mean_mse": 0.45481095800648463,
+      "possible": 600
+    },
+    "nonrepeat/one-shot": {
+      "discoveries": 554,
+      "false": 0,
+      "experiments": 3670,
+      "chains_ok": 554,
+      "per_experiment": 0.15095367847411445,
+      "false_rate": 0.0,
+      "mean_mse": 0.4454912272995951,
+      "possible": 600
+    },
+    "nonrepeat/relmem": {
+      "discoveries": 550,
+      "false": 0,
+      "experiments": 3677,
+      "chains_ok": 550,
+      "per_experiment": 0.14957846070165895,
+      "false_rate": 0.0,
+      "mean_mse": 0.4766470304406458,
+      "possible": 600
+    }
+  },
+  "repeat_gain_pct": 18.443940952755256,
+  "nonrepeat_ratio": 0.9908898028431197,
+  "pass": false
+}

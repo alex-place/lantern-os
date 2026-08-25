@@ -1,0 +1,381 @@
+{
+  "goal": "raise reasoning capability per parameter in a small in-house language model we can serve on 8GB, using open-weight models and verification we can run ourselves",
+  "lit": {
+    "relevant": [
+      {
+        "id": "2605.00334",
+        "title": "AgentFloor: How Far Up the tool use Ladder Can Small Open-Weight Models Go?",
+        "published": "2026-05",
+        "snippet": "Production agentic systems make many model calls per user request, and most of those calls are short, structured, and routine. This raises a practical routing question that existing evaluations do not directly answer: which parts of an agent workflow truly require large frontier intelligence, and which can be handled by smaller models? We introduce AgentFloor, a deterministic 30-task benchmark org…",
+        "url": "https://arxiv.org/abs/2605.00334",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.04719",
+        "title": "Diagnosing Tool-Selection Reasoning in LLM Agents with Canary Tools",
+        "published": "2026-08",
+        "snippet": "Agent evaluations tell us that a model picked the wrong tool, but rarely why. We introduce canary tools: diagnostic probe tools planted in an agent's Model Context Protocol (MCP) tool set, each engineered to probe one specific tool-selection weakness. A six-type taxonomy (semantic decoys, parameter traps, capability mirages, prerequisite blindness, temporal decoys, and granularity traps) turns a s…",
+        "url": "https://arxiv.org/abs/2608.04719",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2510.17498",
+        "title": "Deep Self-Evolving Reasoning",
+        "published": "2025-10",
+        "snippet": "Long-form chain-of-thought reasoning has become a cornerstone of advanced reasoning in large language models. While recent verification-refinement frameworks have enabled proprietary models to solve Olympiad-level problems, their effectiveness hinges on strong, reliable verification and correction capabilities, which remain fragile in open-weight, smaller-scale models. This work demonstrates that…",
+        "url": "https://arxiv.org/abs/2510.17498",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.03065",
+        "title": "Spectral Rewiring for Exploration, Purification, and Model Merging",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning has become a standard post-training recipe for large language models, but dense full-parameter updates create two deployment-relevant bottlenecks: suppressed reasoning performance, often reflected by premature saturation of test-time scaling, and interference when consolidating multiple capabilities through multi-domain training or model merging. We show that the reasoning-e…",
+        "url": "https://arxiv.org/abs/2607.03065",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2603.00729",
+        "title": "Qwen3-Coder-Next Technical Report",
+        "published": "2026-03",
+        "snippet": "We present Qwen3-Coder-Next, an open-weight language model specialized for coding agents. Qwen3-Coder-Next is an 80-billion-parameter model that activates only 3 billion parameters during inference, enabling strong coding capability with efficient inference. In this work, we explore how far strong training recipes can push the capability limits of models with small parameter footprints. To achieve…",
+        "url": "https://arxiv.org/abs/2603.00729",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2606.21638",
+        "title": "Toward Open Weight Models Without Risks: Separating Public and Private Capabilities in LLMs",
+        "published": "2026-06",
+        "snippet": "Open-weight Large Language Models (LLMs) enable scientific progress and broad deployment. However, they make it difficult to control access to sensitive capabilities. Current practice either suppresses dangerous capabilities before release or mediates access through closed services that use specialized model variants, input/output monitors, and API permissions. The former is susceptible to jailbre…",
+        "url": "https://arxiv.org/abs/2606.21638",
+        "primary_category": "cs.CR"
+      },
+      {
+        "id": "2507.10182",
+        "title": "Breaking the Myth: Can Small Models Infer Postconditions Too?",
+        "published": "2025-07",
+        "snippet": "Formal specifications are essential for ensuring software correctness, yet manually writing them is tedious and error-prone. Large Language Models (LLMs) have shown promise in generating such specifications from natural language intents, but the giant model size and high computational demands raise a fundamental question: Do we really need large models for this task? In this paper, we show that a…",
+        "url": "https://arxiv.org/abs/2507.10182",
+        "primary_category": "cs.SE"
+      },
+      {
+        "id": "2607.20448",
+        "title": "Domyn-Small: A European 10B Reasoning Language Model",
+        "published": "2026-07",
+        "snippet": "We introduce Domyn-Small, a 10-billion-parameter open-weight reasoning language model released under the MIT license. Domyn-Small is the product of an initial pre-training phase on 9 trillion tokens multilingual data, followed by a post-training pipeline for reasoning, instruction following, and context extension. For the latter, we performed a Continued Pre-Training (CPT) phase that doubles the n…",
+        "url": "https://arxiv.org/abs/2607.20448",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2510.25055",
+        "title": "GAPMAP: Mapping Scientific Knowledge Gaps in Biomedical Literature Using Large Language Models",
+        "published": "2025-10",
+        "snippet": "Scientific progress is driven by the deliberate articulation of what remains unknown. This study investigates the ability of large language models (LLMs) to identify research knowledge gaps in the biomedical literature. We define two categories of knowledge gaps: explicit gaps, clear declarations of missing knowledge; and implicit gaps, context-inferred missing knowledge. While prior work has focu…",
+        "url": "https://arxiv.org/abs/2510.25055",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2603.00842",
+        "title": "MedGPT-oss: Training a General-Purpose Vision-Language Model for Biomedicine",
+        "published": "2026-03",
+        "snippet": "Biomedical multimodal assistants have the potential to unify radiology, pathology, and clinical-text reasoning, yet a critical deployment gap remains: top-performing systems are either closed-source or computationally prohibitive, precluding the on-premises deployment required for patient privacy and PHI compliance. We introduce MEDGPT-OSS, an open-weight, 20B-parameter generalist vision-language…",
+        "url": "https://arxiv.org/abs/2603.00842",
+        "primary_category": "cs.CL"
+      }
+    ],
+    "recent": [
+      {
+        "id": "2608.06756",
+        "title": "Capek 0.5: An Execution-Centric Vision-Language Model for Embodied Intelligence",
+        "published": "2026-08",
+        "snippet": "Vision-language models are increasingly serving as the reasoning core of embodied agents. Robot execution is inherently iterative: each action reshapes the scene and physical state, continually renewing what must be perceived, reasoned about, and verified. Meeting these demands requires complementary capabilities that differ in supervision signals, prediction formats, and verification criteria. Ex…",
+        "url": "https://arxiv.org/abs/2608.06756",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.08654",
+        "title": "The Scaffolding Matters More Than the Interface: A Controlled Comparison of MCP and CLI Tool Use Across Seven Agent Scaffoldings, Five Language Models, and One Software Task",
+        "published": "2026-08",
+        "snippet": "How much an AI coding agent costs to run can depend more on the agent scaffolding that drives it than on the interface through which it reaches its tools. We set out to measure the cost of tool use over the Model Context Protocol (MCP) against tool use over an ordinary command-line interface (CLI), a difference on which published estimates disagree by more than an order of magnitude while resting…",
+        "url": "https://arxiv.org/abs/2608.08654",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.13272",
+        "title": "Sovereign by necessity? Frontier AI export controls, cyber security, and the limits of national AI capability",
+        "published": "2026-08",
+        "snippet": "A small number of firms based in two states produce the most capable frontier AI models. The governments of those states have shown both the legal power and the political will to decide which other countries may use these systems. In June 2026 the United States required a leading developer to obtain licences before releasing its most advanced models to any foreign person, including foreign nationa…",
+        "url": "https://arxiv.org/abs/2608.13272",
+        "primary_category": "cs.AI"
+      },
+      {
+        "id": "2608.01017",
+        "title": "Why LLMs Give In: Conversational Factors and Reasoning Behind Medical Sycophancy",
+        "published": "2026-08",
+        "snippet": "A language model that abandons a correct medical answer under user pushback is more dangerous than one that was simply wrong, because it lends the credibility of a correct answer to the user's misinformation. Such model behavior, described as medical sycophancy, is usually reported as a single rate per model, but we find it is a property of the conversation, not the model. We study medical sycopha…",
+        "url": "https://arxiv.org/abs/2608.01017",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2608.00004",
+        "title": "Cost-Effective Automated Judging of Natural-Language Mathematical Proofs",
+        "published": "2026-08",
+        "snippet": "Grading natural-language mathematical proofs is a recurring cost in evaluating math-reasoning systems, and frontier LLM judges are expensive. We ask whether cheap open-weight models can serve as reliable judges given a candidate proof, a ground-truth proof, and a human-grading rubric. On a 200-instance validation sample of IMO-GradingBench, three cheap judges (GPT-OSS 120B, DeepSeek-V4 Flash, Gemm…",
+        "url": "https://arxiv.org/abs/2608.00004",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.13332",
+        "title": "Agora: Collective and Permissionless Internet-Scale Pretraining of Large Language Models",
+        "published": "2026-07",
+        "snippet": "Training large language models at the multi-billion to trillion parameter scale is confined to datacenters, where data-parallel (DP) and model-parallel (MP) techniques presume homogeneous accelerators, high-speed interconnects, and a single orchestrating entity. Frontier model development is thereby concentrated among the few groups able to assemble such clusters. Meanwhile, an enormous pool of co…",
+        "url": "https://arxiv.org/abs/2607.13332",
+        "primary_category": "cs.LG"
+      },
+      {
+        "id": "2607.20062",
+        "title": "Solar Open 2 Technical Report",
+        "published": "2026-07",
+        "snippet": "We present Solar Open 2, a 250B-A15B Mixture-of-Experts language model built for long-horizon agentic tasks, scaled up from Solar Open 1 (Solar Open 100B). To hold entire agent trajectories in a single context, Solar Open 2 reaches a 1M-token window through a hybrid attention stack that interleaves one softmax layer among every three linear-attention layers, using no positional encoding and a gate…",
+        "url": "https://arxiv.org/abs/2607.20062",
+        "primary_category": "cs.CL"
+      },
+      {
+        "id": "2607.09693",
+        "title": "Depth-Entropy Guided Sampling for Training-Free LLM Reasoning",
+        "published": "2026-07",
+        "snippet": "Reinforcement learning (RL) has become the dominant paradigm for improving the reasoning capabilities of large language models, but it requires expensive training, curated data, and reward signals. Recent work shows that sampling from sharpened base-model distributions at test time recovers much of the RL gain, yet existing methods rely solely on output-layer likelihoods and ignore the transformer…",
+        "url": "https://arxiv.org/abs/2607.09693",
+        "primary_category": "cs.LG"
+      }
+    ],
+    "available": true,
+    "pool": 40
+  },
+  "axes": [
+    {
+      "axis": "model size",
+      "occupied": [
+        "small (<=10B)",
+        "medium (10B-80B)",
+        "large (80B+)"
+      ]
+    },
+    {
+      "axis": "reasoning enhancement method",
+      "occupied": [
+        "chain-of-thought",
+        "verification-refinement",
+        "reinforcement learning",
+        "sampling strategies",
+        "tool use diagnostics"
+      ]
+    },
+    {
+      "axis": "supervision type",
+      "occupied": [
+        "self-supervised",
+        "supervised",
+        "reward-based",
+        "unsupervised"
+      ]
+    },
+    {
+      "axis": "inference cost",
+      "occupied": [
+        "low (few parameters active)",
+        "medium",
+        "high (full model)"
+      ]
+    },
+    {
+      "axis": "tool integration",
+      "occupied": [
+        "none",
+        "canary tools",
+        "MCP tool sets",
+        "agent scaffolding"
+      ]
+    },
+    {
+      "axis": "deployment constraint",
+      "occupied": [
+        "8GB memory",
+        "on-premises verification",
+        "open-weight availability"
+      ]
+    }
+  ],
+  "perRound": [
+    {
+      "round": 1,
+      "proposed": 4,
+      "placed": 4,
+      "kept": 0
+    },
+    {
+      "round": 2,
+      "proposed": 4,
+      "placed": 1,
+      "kept": 3
+    },
+    {
+      "round": 3,
+      "proposed": 0,
+      "placed": 0,
+      "kept": 3
+    }
+  ],
+  "malformed": 1,
+  "no_difference": 0,
+  "proposed": 8,
+  "placed": 5,
+  "placed_rate": 0.625,
+  "collisions": [
+    {
+      "title": "Epistemic-Controller-Gated Curriculum for Small Models",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "research/epistemic_controller/run_mvp.py"
+    },
+    {
+      "title": "Verified-Cascade-Guided Parameter Pruning for Reasoning Efficiency",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "experiments/verified_cascade_offline.py"
+    },
+    {
+      "title": "Longitudinal Hypothesis Ledger-Driven Meta-Reasoning Fine-Tuning",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "experiments\\v1_10_toy\\m1_ledger_check.py"
+    },
+    {
+      "title": "Prediction-Market-Informed Reinforcement for Small Model Reasoning",
+      "verdict": "ANSWERED-HERE",
+      "evidence": "docs\\research\\PREDICTION-MARKET-GROUNDING-SURVEY.md"
+    },
+    {
+      "title": "Verified-Cascade-Triggered Auxiliary Task Injection",
+      "verdict": "PORT",
+      "evidence": "docs\\adr\\0030-spiral-verified-cascade-harness.md"
+    }
+  ],
+  "pairs": 10,
+  "sham_rank": 3,
+  "of": 5,
+  "sham_control_held": false,
+  "vague_sham_rank": 5,
+  "vague_control_held": true,
+  "ideas": [
+    {
+      "rank": 1,
+      "strength": 0.5575,
+      "wins": 4,
+      "comparisons": 4,
+      "title": "Epistemic-Controller-Gated Dynamic Parameter Allocation",
+      "mechanism": "Use epistemic controller gates to dynamically activate sparse subnetworks per reasoning step, reducing active parameters while preserving reasoning depth",
+      "experiment": "Measure reasoning accuracy and parameter efficiency by gating subnetworks on 8GB model during multi-step reasoning tasks with recorded refutations",
+      "falsifier": "No accuracy gain or parameter reduction compared to static full-parameter inference",
+      "needs": "8GB GPU, existing epistemic controller logs, weeks",
+      "cost": "medium",
+      "closest_prior": "Epistemic-Controller-Gated Curriculum for Small Models",
+      "difference": "Dynamically gates parameters per step rather than curriculum-level gating, enabling fine-grained parameter use control during inference",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No prior work or papers explicitly describe epistemic-controller-gated dynamic sparse subnetworks per reasoning step.",
+        "web_queries": [
+          "epistemic controller gated dynamic parameter allocation",
+          "dynamic sparse subnetworks reasoning step epistemic control"
+        ],
+        "web_searched": true,
+        "web_hits": 82
+      },
+      "review": "MECHANISM:  \nEpistemic-Controller-Gated Dynamic Parameter Allocation aims to activate only relevant sparse subnetworks per reasoning step, guided by an epistemic controller that estimates uncertainty or knowledge gaps. This could reduce active parameters while maintaining or increasing reasoning depth by focusing compute on needed transformations dynamically, avoiding redundant or uniform processing across steps.\n\nEVIDENCE:  \n[1] Ouroboros shows input-conditioned controllers modulating recursive transformer weights, supporting dynamic adaptation per step. [3] GRADE uses gating to route queries adaptively, improving multi-agent reasoning efficiency. [4] The Multiple Ticket Hypothesis supports sparse subnetworks sufficing for performance, implying dynamic sparsity could work. [6] Sparse Growing Transformer explores sparse depth allocation, related to dynamic parameter use. None directly validate epistemic gating for reasoning depth in small models on 8GB, but these works collectively suggest feasibility.\n\nWHAT WOULD FALSIFY IT:  \nIf dynamic gating fails to preserve or improve reasoning accuracy compared to static dense or fixed sparse models at similar parameter budgets, or if gating overhead negates parameter savings, the mechanism would be falsified. Also, if epistemic signals do not correlate with useful gating decisions, the approach would fail.\n\nRISK:  \nDynamic gating might improve headline metrics by selectively activating parameters but could degrade robustness or generalization if gating misfires. Overhead from the controller or gating logic might increase latency or complexity, and sparse subnetworks might miss synergistic parameter interactions, reducing reasoning quality despite fewer active parameters.",
+      "citations": [
+        "2604.02051",
+        "2608.09250",
+        "2607.10836",
+        "2602.01599",
+        "2606.19808",
+        "2603.23998",
+        "2603.00729",
+        "2608.11233"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 2,
+      "strength": 0.2649,
+      "wins": 3,
+      "comparisons": 4,
+      "title": "Prediction-Market-Weighted Ensemble Distillation for Small Models",
+      "mechanism": "Use settled prediction market confidence as weights to distill an ensemble of reasoning trajectories into a single small model, biasing learning towards high-confidence correct paths",
+      "experiment": "Distill ensemble outputs weighted by market confidence into 8GB model, evaluate reasoning accuracy and calibration against unweighted distillation",
+      "falsifier": "No improvement or degradation in reasoning accuracy or calibration compared to unweighted distillation",
+      "needs": "8GB GPU, prediction market data, weeks",
+      "cost": "medium",
+      "closest_prior": "Prediction-Market-Informed Reinforcement for Small Model Reasoning",
+      "difference": "Uses prediction market data to weight ensemble distillation rather than reinforcement learning, focusing on supervised distillation with confidence weighting",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No prior work or papers explicitly use prediction-market confidence as weights for ensemble distillation into small models.",
+        "web_queries": [
+          "prediction market weighted ensemble distillation",
+          "using prediction market confidence for model distillation"
+        ],
+        "web_searched": true,
+        "web_hits": 70
+      },
+      "review": "**MECHANISM:**  \nUsing prediction-market confidence to weight reasoning trajectories during distillation could focus the small model’s learning on the most reliable, high-quality reasoning paths. This selective emphasis might improve token-level credit assignment and reduce noise from weaker or incorrect trajectories, potentially raising reasoning capability per parameter by biasing the student model toward verified, consensus-backed outputs.\n\n**EVIDENCE:**  \nNone of the retrieved papers directly validate prediction-market-weighted ensemble distillation. Related works [1,7] discuss on-policy distillation and weighting trajectories by informativeness or correctness, showing benefits from selective training signals. Paper [6] supports confidence-weighted ensembles improving performance in emotion detection but not distillation. Paper [2] highlights challenges in capturing diverse reasoning paths, suggesting naive distillation is insufficient. Overall, no direct empirical support for prediction-market weighting in distillation for small LMs.\n\n**WHAT WOULD FALSIFY IT:**  \nIf distilling with prediction-market-weighted trajectories yields no improvement or degrades reasoning accuracy compared to uniform or heuristic weighting, especially when controlling for ensemble quality and student capacity, this would falsify the claim. Also, if the small model overfits to high-confidence but narrow reasoning paths, losing generalization, that would disprove the mechanism’s benefit.\n\n**RISK:**  \nFocusing distillation on high-confidence trajectories might reduce reasoning diversity, causing the small model to miss alternative valid reasoning strategies. This could inflate benchmark scores on familiar tasks (headline number) while reducing robustness and adaptability in real-world or out-of-distribution reasoning, ultimately making the system brittle despite apparent gains.",
+      "citations": [
+        "2604.10688",
+        "2508.16861",
+        "2512.02092",
+        "2512.19093",
+        "2605.14876",
+        "2512.17630",
+        "2606.23104",
+        "2606.23897"
+      ],
+      "grounded": true
+    },
+    {
+      "rank": 3,
+      "strength": 0.0465,
+      "wins": 1,
+      "comparisons": 4,
+      "title": "Ledger-Guided Contrastive Fine-Tuning for Error Pattern Disentanglement",
+      "mechanism": "Leverage the longitudinal hypothesis ledger to identify and contrast error clusters, fine-tuning model to disentangle confusable reasoning patterns",
+      "experiment": "Fine-tune on paired positive/negative hypothesis-evidence sets from ledger, measure reduction in specific error clusters on held-out reasoning tasks",
+      "falsifier": "No statistically significant reduction in targeted error clusters or overall reasoning accuracy",
+      "needs": "8GB GPU, ledger data, 2-3 weeks",
+      "cost": "medium",
+      "closest_prior": "Longitudinal Hypothesis Ledger-Driven Meta-Reasoning Fine-Tuning",
+      "difference": "Applies contrastive learning on error clusters rather than generic ledger-driven fine-tuning, explicitly disentangling confusable reasoning failures",
+      "audit": {
+        "verdict": "UNVERIFIED",
+        "evidence": "",
+        "why": "No listed papers or prior work measure or fine-tune using ledger-guided contrastive disentanglement of error patterns.",
+        "web_queries": [
+          "ledger-guided contrastive fine-tuning error pattern disentanglement",
+          "longitudinal hypothesis ledger contrastive learning fine-tuning"
+        ],
+        "web_searched": true,
+        "web_hits": 107
+      },
+      "review": "**MECHANISM:**  \nLedger-Guided Contrastive Fine-Tuning aims to improve reasoning by explicitly identifying clusters of similar errors (confusable reasoning patterns) from a longitudinal error ledger, then fine-tuning the model to separate these patterns via contrastive learning. This could help the model disentangle subtle reasoning failures that standard fine-tuning misses, effectively sharpening its internal representations to reduce systematic confusions and improve per-parameter reasoning efficiency.\n\n**EVIDENCE:**  \nNone of the retrieved papers directly validate this approach. [6] discusses pattern selection in reasoning models but does not address ledger-guided contrastive fine-tuning. [1] relates to disentanglement in time series but not language model reasoning. [3] and [4] focus on small model training and fine-tuning but do not explore error pattern disentanglement. Overall, no direct empirical or theoretical support for ledger-guided contrastive fine-tuning in small LMs is found.\n\n**WHAT WOULD FALSIFY IT:**  \nIf fine-tuning on error clusters identified from a ledger fails to reduce error correlation within clusters or does not improve reasoning accuracy beyond standard fine-tuning baselines, this would falsify the claim. Additionally, if the model’s representations do not show improved separability of confusable reasoning patterns post-training, the mechanism would be invalidated.\n\n**RISK:**  \nFocusing on disentangling error clusters might overfit the model to specific error patterns in the ledger, improving benchmark scores superficially while reducing generalization to unseen reasoning tasks. This could inflate headline reasoning metrics but degrade robustness and real-world performance, especially given limited data and compute in a small 8GB-serving model.",
+      "citations": [
+        "2601.16632",
+        "2507.10182",
+        "2606.22189",
+        "2508.04063",
+        "2507.16530",
+        "2601.07238",
+        "2608.18033",
+        "2511.14435"
+      ],
+      "grounded": true
+    }
+  ],
+  "wall_s": 249
+}

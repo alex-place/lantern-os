@@ -1,0 +1,103 @@
+{
+  "n_seeds": 60,
+  "episodes": 20,
+  "H": {
+    "hold": {
+      "proxy_early": 0.21833333333333332,
+      "proxy_late": 0.19,
+      "drops_early": 0.3466666666666667,
+      "drops_late": 0.32166666666666666,
+      "exp_per_disc_early": 7.94368932038835,
+      "exp_per_disc_late": 7.509578544061303,
+      "validated_late": 0.87
+    },
+    "self": {
+      "proxy_early": 0.20666666666666667,
+      "proxy_late": 0.16833333333333333,
+      "drops_early": 0.3383333333333333,
+      "drops_late": 0.30833333333333335,
+      "exp_per_disc_early": 7.855491329479769,
+      "exp_per_disc_late": 7.432380952380952,
+      "validated_late": 0.875
+    },
+    "self-loose": {
+      "proxy_early": 0.19833333333333333,
+      "proxy_late": 0.14666666666666667,
+      "drops_early": 0.3333333333333333,
+      "drops_late": 0.28833333333333333,
+      "exp_per_disc_early": 7.81573896353167,
+      "exp_per_disc_late": 7.365714285714286,
+      "validated_late": 0.875
+    },
+    "self-cf": {
+      "proxy_early": 0.20166666666666666,
+      "proxy_late": 0.12166666666666667,
+      "drops_early": 0.3333333333333333,
+      "drops_late": 0.2633333333333333,
+      "exp_per_disc_early": 7.823416506717851,
+      "exp_per_disc_late": 7.2320754716981135,
+      "validated_late": 0.8833333333333333
+    }
+  },
+  "controls": {
+    "C1_fired": 0.0,
+    "C2_fired": 0.0,
+    "C1_drops": 0.15583333333333332,
+    "C2_drops": 0.24083333333333334,
+    "C1_fired_counterfactual": 0.0,
+    "C2_fired_counterfactual": 0.0
+  },
+  "gates": {
+    "S1_baseline_does_not_learn": {
+      "PASS": true,
+      "hold_early": 0.21833333333333332,
+      "hold_late": 0.19
+    },
+    "S2_self_learns": {
+      "PASS": false,
+      "self_early": 0.20666666666666667,
+      "self_late": 0.16833333333333333,
+      "kept": 14,
+      "reverted": 5
+    },
+    "S3_diagnosis_specific": {
+      "PASS": true,
+      "C1_fired": 0.0,
+      "C2_fired": 0.0,
+      "C2_drops_per_episode": 0.24083333333333334,
+      "C2_null_diagnoses": 704
+    },
+    "S2_S3_S4_counterfactual": {
+      "S2_PASS": false,
+      "S3_PASS": true,
+      "S4_PASS": false,
+      "kept": 28,
+      "reverted": 18,
+      "self_early": 0.20166666666666666,
+      "self_late": 0.12166666666666667,
+      "C1_fired": 0.0,
+      "C2_fired": 0.0,
+      "rounds_usable": 1385,
+      "rounds_seen": 2108,
+      "discordant_pairs": 182,
+      "exp_per_disc_late": 7.2320754716981135,
+      "hold_exp_per_disc_late": 7.509578544061303
+    },
+    "S2_S3_loose_variant": {
+      "S2_PASS": false,
+      "S3_PASS": false,
+      "kept": 34,
+      "reverted": 14,
+      "C1_fired": 0.2,
+      "C2_fired": 0.3333333333333333,
+      "note": "cost reference = median: fires 2x more often and fires on BOTH controls"
+    },
+    "S4_it_pays": {
+      "PASS": false,
+      "hold_late": 7.509578544061303,
+      "self_late": 7.432380952380952,
+      "saving_pct": 1.0
+    }
+  },
+  "verdict": "KILLED: the mistake ledger does not let the scientist repair its own policy"
+}
