@@ -17,7 +17,7 @@ function check(name, fn) {
 function local() { delete process.env.LANTERN_TENANCY; }
 function cloud() { process.env.LANTERN_TENANCY = "cloud"; }
 
-const HOSTED = ["index.html", "dream-chat.html", "explore.html", "faq.html"];
+const HOSTED = ["index.html", "chat.html", "explore.html", "faq.html"];
 const LOCAL_ONLY = ["kalshi-terminal.html", "trading.html", "work.html", "admin-flags.html",
   "create.html", "orchestration.html", "knowledgecenter.html"];
 
@@ -46,7 +46,7 @@ check("cloud profile BLOCKS every local-only surface", () => {
 
 check("hosted subset is chat + explore + help + a minimal account/landing shell", () => {
   // Guard against silent subset creep: the product surfaces + the login/landing shell.
-  for (const s of ["dream-chat.html", "explore.html", "faq.html"]) {
+  for (const s of ["chat.html", "explore.html", "faq.html"]) {
     assert.ok(HOSTED_SURFACES.has(s), `${s} must be hosted`);
   }
   // Local-only clusters must NOT leak into the hosted subset.
