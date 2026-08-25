@@ -1,0 +1,3 @@
+### Changed
+
+- Two live defects: the signal's session IBS lives on decision_context.ibs and never at the top level, so the exit gate's s.ibs and the slot-order depth tie-break both read undefined permanently — the validated IBS bounce exit had never fired in production and slot priority had degraded to weight-only; and the cadence bar was spent on the first placement, so the first symbol to resolve took the whole hour (8/25 11:00 went to DIA at tilt 0.71 and blocked QQQ and SMH at tilt 1.5 with three slots free). _signalIbs reads both; the bar is now spent when the window closes, not on the first fill
