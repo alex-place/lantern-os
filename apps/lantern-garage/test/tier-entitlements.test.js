@@ -43,6 +43,12 @@ check("deep_dreamer ($20 Pro): pro + trade YES, ai_trader NO", () => {
   assert.strictEqual(hasEntitlement(r, "trade"), true);
   assert.strictEqual(hasEntitlement(r, "ai_trader"), false); // AI trader is Pilot-only
 });
+check("founder (legacy alias for deep_dreamer, level 2): same Pro entitlements", () => {
+  const r = reqFor("founder");
+  assert.strictEqual(hasEntitlement(r, "pro"), true);
+  assert.strictEqual(hasEntitlement(r, "trade"), true);
+  assert.strictEqual(hasEntitlement(r, "ai_trader"), false);
+});
 check("pilot ($200 Pilot): pro + trade + ai_trader ALL yes", () => {
   const r = reqFor("pilot");
   assert.strictEqual(hasEntitlement(r, "pro"), true);
@@ -70,6 +76,7 @@ check("caps: anon 10 / Free 50 / Member 100 / Pro 250 / Pilot ∞", () => {
   assert.strictEqual(quota.capFor(reqFor("guest")).cap, 50);                  // signed-in Free
   assert.strictEqual(quota.capFor(reqFor("supporter")).cap, 100);            // $5 Member
   assert.strictEqual(quota.capFor(reqFor("deep_dreamer")).cap, 250);         // $20 Pro
+  assert.strictEqual(quota.capFor(reqFor("founder")).cap, 250);              // legacy Pro alias — NOT the Free 50 (#2992)
   assert.strictEqual(quota.capFor(reqFor("pilot")).cap, Infinity);           // $200 Pilot
   assert.strictEqual(quota.capFor(reqFor("admin")).cap, Infinity);           // staff
 });
