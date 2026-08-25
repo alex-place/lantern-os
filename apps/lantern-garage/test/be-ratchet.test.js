@@ -26,6 +26,21 @@ delete process.env.TRADER_AUTO_EXECUTE;
 delete process.env.TRADER_BE_RATCHET;
 delete process.env.TRADER_BE_LOCK;
 
+// HERMETIC EXITS (2026-08-25). These fixtures hold a position in "LNG" — a REAL
+// ticker — and the engine's market-data-driven exits fetch live bars for whatever
+// symbol it is holding. So with those exits at their defaults the suite's verdict
+// depends on Cheniere Energy's intraday MACD/RSI: CI was green at 14:49 ET and red
+// at 15:58 ET the same afternoon, with be-ratchet losing 6 tests and eod-flat 4 to
+// a `momentum_died (MACD hist<0, <EMA9, RSI 40)` exit that closed the position out
+// from under the behaviour being tested. Pinning the five exit-authority switches
+// to their ARMED production values (#3437/#3438) makes the fixture deterministic
+// AND more faithful to the engine that actually runs. A test about the break-even ratchet must
+// not be able to fail because a real stock moved.
+process.env.TRADER_MOMENTUM_EXIT = '0';
+process.env.TRADER_ZONE_EXIT = '0';
+process.env.TRADER_TAKE_PROFIT_R = '0';
+process.env.TRADER_EXIT_MIN_PWIN = '0';
+process.env.TRADER_EOD_DECARRY = '0';
 const at = require('../lib/auto-trader');
 
 const readRows = () => (fs.existsSync(LOG)
