@@ -79,6 +79,14 @@ const TIER_NAME = { supporter: "Member", deep_dreamer: "Pro", pilot: "Pilot" };
 function lineItemForRole(role) {
   const price = priceIdForRole(role);
   if (price) return { price, quantity: 1 };
+  // No Price id for this tier. An inline ad-hoc price is a DEV/amount-only convenience —
+  // safe ONLY when NO tier has a Price id. If SOME tiers are configured but this one isn't,
+  // the webhook's roleForPrice() refuses the USD-amount fallback (anyConfigured), so an
+  // inline price here would CHARGE the customer and grant NOTHING (#4). Refuse symmetrically:
+  // this tier isn't purchasable on this deploy until its STRIPE_PRICE_* id is set, so
+  // canCheckout() is false and no buy button / checkout can charge for an ungrantable tier.
+  const anyConfigured = Object.values(tierPrices()).some(Boolean);
+  if (anyConfigured) return null;
   const unit_amount = AMOUNT_CENTS[role];
   if (!Number.isFinite(unit_amount)) return null;
   return {

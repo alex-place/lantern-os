@@ -352,6 +352,12 @@ module.exports = async function billingRoutes(req, res, url, deps) {
       },
       subscribed,                                  // has a live Stripe subscription
       stripeStatus: (prof && prof.stripeStatus) || null,
+      // Is the SOURCE-OF-TRUTH grant path armed? With the secret key set but
+      // STRIPE_WEBHOOK_SECRET unset, checkout still charges but the webhook 503s, leaving
+      // only the fragile client-side /api/billing/sync to grant — if that POST is lost
+      // (tab closed, network blip) the customer pays and is never granted (#6). Surface it
+      // so pricing.html can warn / an operator can see the gap.
+      webhook: !!process.env.STRIPE_WEBHOOK_SECRET,
     });
     return true;
   }

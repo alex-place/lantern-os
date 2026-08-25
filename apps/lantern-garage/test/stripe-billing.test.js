@@ -58,6 +58,18 @@ check("roleForPrice: #2620 — with a Price configured, an UNMATCHED USD price g
   assert.equal(B.roleForPrice({ id: "price_unrelated", currency: "usd", unit_amount: 500000 }), null);
   delete process.env.STRIPE_PRICE_DEEP_DREAMER;
 });
+check("#4 — a tier with no Price id is NOT purchasable once ANOTHER tier is configured (no silent charge)", () => {
+  // Dev/amount-only mode (no Price ids) → an inline ad-hoc price is fine, tier IS buyable.
+  delete process.env.STRIPE_PRICE_PILOT; delete process.env.STRIPE_PRICE_DEEP_DREAMER;
+  assert.equal(B.canCheckout("deep_dreamer"), true, "no ids configured → dev inline price allowed");
+  // Configure ONLY Pilot. Pro now has no Price id, and the webhook's roleForPrice() would
+  // refuse the amount fallback (anyConfigured) → an inline Pro price would charge and grant
+  // nothing. So Pro must be un-buyable, mirroring the grant side.
+  process.env.STRIPE_PRICE_PILOT = "price_pilot_live";
+  assert.equal(B.canCheckout("pilot"), true, "Pilot has a Price id → buyable");
+  assert.equal(B.canCheckout("deep_dreamer"), false, "Pro has no id while Pilot does → NOT buyable (would charge, grant nothing)");
+  delete process.env.STRIPE_PRICE_PILOT;
+});
 check("roleForPrice: FAIL CLOSED on sub-floor, non-USD, or missing price", () => {
   assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 499 }), null); // below $5
   assert.equal(B.roleForPrice({ id: "x", currency: "eur", unit_amount: 20000 }), null); // €200 ≠ $200
