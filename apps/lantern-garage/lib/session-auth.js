@@ -9,10 +9,8 @@
  */
 
 const { signOauth, verifyOauth, readCookie } = require("./oauth-core");
-const { getProfile } = require("./user-profiles");
 const { getSessionUser } = require("./session-identity");
-const { roleLevel } = require("./role-hierarchy");
-const { SIGNOUT_COOKIE } = require("./auth-middleware");
+const { SIGNOUT_COOKIE, effectiveRole, hasEntitlement } = require("./auth-middleware");
 
 /**
  * Current session info for /api/auth/session — provider-agnostic. Reports the
@@ -21,17 +19,16 @@ const { SIGNOUT_COOKIE } = require("./auth-middleware");
 function getSessionInfo(req) {
   const user = getSessionUser(req);
   if (user && user.id) {
-    const role = user.role || "guest";
-    const profile = getProfile(user.id);
-    // Keep this IN LOCK-STEP with auth-middleware.hasEntitlement("trade"): trading
-    // is unlocked by the $20 Deep Dreamer tier and up (roleLevel), by admin, or by
-    // an explicit per-account entitlement override. If this drifts from the server
-    // gate, a paid trader gets the read-only UI while the API lets them trade (or
-    // vice-versa). #trade-entitlement-consistency
-    const trade =
-      role === "admin" ||
-      roleLevel(role) >= roleLevel("deep_dreamer") ||
-      !!(profile && profile.entitlements && profile.entitlements.trade === true);
+    // Resolve role + trade from the PERSISTED profile through the SAME functions the server
+    // gates use (effectiveRole / hasEntitlement), not the login-time session snapshot.
+    // Reading user.role let /api/auth/session drift for up to the cookie lifetime: a Stripe
+    // cancel/refund or an admin demote that does NOT destroy the session left the UI showing
+    // the old tier + trade:true while the gates (which read the live profile) had already
+    // revoked it. Going through the gates keeps the reported state in lock-step in BOTH
+    // directions — and picks up the brokerConnected grant a Free user earns by connecting
+    // their own broker, which the snapshot-based trade calc missed entirely.
+    const role = effectiveRole(req) || "guest";
+    const trade = hasEntitlement(req, "trade");
     return {
       authenticated: true,
       role,
