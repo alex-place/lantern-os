@@ -1,0 +1,3 @@
+### Fixed
+
+- Trader guest showroom is no longer defeated by a redundant Pro modal (#3008). detectGuestMode() builds a read-only demo showroom (charts/watchlist/signals + a demo portfolio, all money surfaces hidden), but applyTierGate() then threw a full-viewport Pro modal over it on a deliberate arrival, hard-walling the very view that was built (a MutationObserver hack already fought this for the #journal deep link). Now a deliberate arrival (Trade tab, pricing/upgrade link, direct URL) sees the read-only showroom + its DEMO banner + upgrade CTA instead of the paywall overlay; casual global-nav arrivals still funnel to Watch (operator 2026-07-30). Verified live: tradeLock display none, body.guest+body.demo active.

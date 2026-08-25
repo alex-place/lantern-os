@@ -8879,9 +8879,17 @@ async function applyTierGate(){
     const deliberate = params.get('stay') === '1' ||
       (document.referrer && /\/(watch|options|pricing)\.html/.test(document.referrer));
     if (deliberate) {
-      const el = document.getElementById('tradeLock'); if (el) el.style.display='flex';
+      // #3008: a DELIBERATE arrival (the in-page Trade tab ?stay=1, a pricing/upgrade
+      // link, a direct URL from this app) now sees the READ-ONLY showroom that
+      // detectGuestMode() already built — its unmissable DEMO banner + sign-in/upgrade
+      // CTA + demo portfolio — instead of a full-viewport Pro modal hard-walling it over
+      // the top. Every money surface stays closed (server guards + body.guest CSS +
+      // window.GUEST), so nothing here can place an order; only the redundant paywall
+      // overlay is gone. (The #journal deep-link MutationObserver hack above becomes moot.)
+      const el = document.getElementById('tradeLock'); if (el) el.style.display='none';
       return;
     }
+    // Casual global-nav arrival → the free product (Watch), with a banner (operator 2026-07-30).
     location.replace('/watch.html?from=trader');
   }catch(_e){ /* session unreachable → leave the page usable */ }
 }
