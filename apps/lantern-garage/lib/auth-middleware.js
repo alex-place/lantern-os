@@ -401,6 +401,7 @@ module.exports = {
   requireRole,
   requireStaff,
   isStaff,
+  effectiveRole,
   hasEntitlement,
   requireEntitlement,
   isAdmin,

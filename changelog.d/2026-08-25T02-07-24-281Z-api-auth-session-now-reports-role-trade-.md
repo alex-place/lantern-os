@@ -1,0 +1,3 @@
+### Fixed
+
+- /api/auth/session now reports role + trade entitlement from the PERSISTED profile (effectiveRole/hasEntitlement) instead of the login-time session snapshot. Reading user.role let the reported tier drift for up to the cookie lifetime: a Stripe cancel/refund or an admin demote that didn't destroy the session left the UI showing the old tier + trade:true while the server gates (which read the live profile) had already revoked it; the snapshot trade calc also missed the brokerConnected grant a Free user earns by connecting their own broker. Now the reported state is in lock-step with the enforcing gates in both directions.
