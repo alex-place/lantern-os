@@ -526,7 +526,16 @@ server.on("error", (error) => {
     findPortOwner(port)
       .then((owner) => console.error(`[lantern-garage] ${eaddrinuseHelp(port, owner)}`))
       .catch(() => console.error(`[lantern-garage] Port ${port} is already in use.`))
-      .finally(() => { process.exitCode = 1; });
+      // EXIT, don't merely set exitCode (2026-08-25). routes/trading.js schedules the
+      // autoscan + fast-exit loops at MODULE LOAD — server.js requires it above, before
+      // listen() is ever attempted — so the event loop never drains and a bare
+      // `process.exitCode = 1` never fires. The process stayed alive HEADLESS: no HTTP
+      // listener, but still scanning and placing orders against the same broker account
+      // as the instance that owns the port. Two were found in two days (8/24 pid 26188,
+      // 8/25 pid 20776), each born minutes after a crash-restart while the old process
+      // still held the port. The 250ms delay lets the port-owner log flush first, the
+      // same shape the uncaughtException handler below uses.
+      .finally(() => setTimeout(() => process.exit(1), 250));
     return;
   }
   throw error;
