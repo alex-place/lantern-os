@@ -1,41 +1,8 @@
-/**
- * direction_lock_lab.js — fix 2 (operator, 2026-08-25): should an opposing
- * family signal be discarded, or should it close the position blocking it?
- *
- * On 8/25 SPXS fired a valid signal at 13:00 and was blocked by a LOSING SPXL
- * long ("direction_conflict: opposite SPY exposure via SPXL"). Live evidence is
- * suggestive but thin: over 24 distinct blocked signals (both boxes, 7/09-8/25)
- * the blocked side returned +0.100%/trade to the session close while the holding
- * that blocked it returned -0.038% — but that is dominated by one cluster (8/24
- * SQQQ vs QQQ, six instances on a single trending day) and one case cuts hard the
- * other way (8/13 SQQQ -2.59% vs QQQ +0.84%). 24 samples is not the bar.
- *
- * The lock itself is sound where it started: long SPXL + long SPXS is a hedge
- * with double fees and double 3x decay, so "allow both" is wrong on first
- * principles. The open question is narrower - whether an opposing signal should
- * FLIP the position rather than be thrown away, and whether that should depend on
- * the blocked position being underwater.
- *
- * Universe: the 9 longs plus the three inverses the live tradelist carries, with
- * the live polarity rule modelled (an inverse only fires when its underlying sits
- * at its own session top - scan.js "a wrapper washout is not a market washout").
- * The inverses list from 2010, so the daily windows start there.
- * Usage: node experiments/direction_lock_lab.js
- */
 "use strict";
 
 const https = require("https");
 
 const SYMS = ["SPY", "QQQ", "IWM", "DIA", "GLD", "TLT", "SMH", "XLK", "SOXL"];
-// the live tradelist also carries these economic shorts; FAM mirrors direction-lock.js
-const INV = ["SQQQ", "SOXS", "SPXS"];
-const FAM = { SPY: ["SPY", 1], SPXL: ["SPY", 1], UPRO: ["SPY", 1], SPXS: ["SPY", -1],
-  QQQ: ["QQQ", 1], TQQQ: ["QQQ", 1], SQQQ: ["QQQ", -1],
-  IWM: ["IWM", 1], TNA: ["IWM", 1], SMH: ["SOX", 1], SOXL: ["SOX", 1], SOXS: ["SOX", -1],
-  DIA: ["DIA", 1], GLD: ["GLD", 1], TLT: ["TLT", 1], XLK: ["QQQ", 1] };
-const famOf = (s) => (FAM[s] ? FAM[s][0] : s);
-const signOf = (s) => (FAM[s] ? FAM[s][1] : 1);
-const UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY" };
 const SLIP = Number(process.env.LAB_SLIP_BP || 5) / 10000;
 const ENTRY_SLIP = Number(process.env.LAB_ENTRY_SLIP_BP || 5) / 10000;
 const LIVE_TRAIL = { arm: 1.5, pct: 2.5 };
@@ -190,14 +157,6 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         if (!b || b.si === 0) continue;
         if (beBlock.has(sym) && b.si < beBlock.get(sym)) continue;
         if (intraday && o.skipHours && o.skipHours.has(b.hour)) continue;
-        // POLARITY (live rule, scan.js): an inverse is only a washout when its UNDERLYING
-        // sits at the top of its own session range — a wrapper washout is not a market washout.
-        if (UNDERLYING[sym]) {
-          const ub = idx[UNDERLYING[sym]] && idx[UNDERLYING[sym]].get(t);
-          if (!ub) continue;
-          const uIbs = intraday ? rIbs(ub) : dIbs(ub);
-          if (!(uIbs >= 1 - o.thr)) continue;
-        }
         const v = intraday ? rIbs(b) : dIbs(b);
         const thr = intraday && b.closeMin < 660 && o.morningThr != null ? o.morningThr : o.thr;
         if (v > thr) continue;
@@ -213,25 +172,6 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
         let frac = o.sizeFrac * (o.weights ? (o.weights[c.sym] || 1) : 1);
         if (o.vixUp != null && vix && vix.get(c.b.d) >= o.vixUp) frac *= 1.5;
         if (c.idio) frac *= 0.5;
-        // DIRECTION LOCK (direction-lock.js): refuse an entry whose sign opposes live family exposure.
-        //   o.lock 'block' = today's engine | 'flip' = close the opposing holding, then enter |
-        //   'flipLoser' = flip only when the opposing holding is underwater | 'off' = allow both (the hedge)
-        const _fam = famOf(c.sym), _sgn = signOf(c.sym);
-        const _opp = [...open].filter(([k]) => famOf(k) === _fam && signOf(k) !== _sgn);
-        if (_opp.length && o.lock !== "off") {
-          if (o.lock === "block" || o.lock == null) continue;
-          const _flipAll = o.lock === "flip";
-          let _did = false;
-          for (const [k, pos] of _opp) {
-            const kb = idx[k].get(t); if (!kb) continue;
-            const g = kb.c / pos.entry - 1;
-            if (!_flipAll && g >= 0) continue;                 // flipLoser: only a losing holding is flipped out
-            cash += pos.qtyVal * ((kb.c * (1 - SLIP)) / pos.entry);
-            trades.push({ sym: k, d, ret: (kb.c * (1 - SLIP)) / pos.entry - 1, pnlEq: pos.qtyVal * ((kb.c * (1 - SLIP)) / pos.entry - 1), reason: "flip", sessions: kb.si - pos.entrySi });
-            open.delete(k); _did = true;
-          }
-          if (!_did) continue;                                  // nothing flipped -> the lock still blocks
-        }
         const full = equity * frac;
         const size = o.scaleIn ? full * o.scaleIn.firstFrac : full;
         if (size > cash) continue;
@@ -306,61 +246,38 @@ function anatomy(trades, from, to, title) {
 
 (async () => {
   const nowSec = Math.floor(Date.now() / 1000);
-  const ALL = [...SYMS, ...INV];
-  const hourly = {}, daily = {};
-  for (const s of ALL) { hourly[s] = annotate(await chart(s, "1h", nowSec - 720 * 86400), true); daily[s] = annotate(await chart(s, "1d", Math.floor(Date.UTC(1999, 0, 1) / 1000)), false); }
-  const vix = priorCloseMap(annotate(await chart("^VIX", "1d", Math.floor(Date.UTC(1999, 0, 1) / 1000)), false));
-  const H_START = hourly.SPY[0].d, H_MID = hourly.SPY[Math.floor(hourly.SPY.length / 2)].d, END = "2099-01-01";
-  // the inverses are young: SQQQ/SOXS/SPXS all list 2010+, so the daily fit window starts there
-  const dStart = INV.map((s) => daily[s][0].d).sort().slice(-1)[0];
-  const FIT = [dStart, "2019-01-01"], HOLD = ["2019-01-01", END];
-  const W = { SOXL: 1.5, SMH: 1.5, QQQ: 1.5, IWM: 1.02, XLK: 1.0, SPY: 0.83, DIA: 0.71, GLD: 0.5, TLT: 0.5 };
-  const ARMED = { ...MONDAY, morningThr: 0.12, weights: W, slotOrder: "expectancy", stepFloor: 0.5 };
-  const SURF = [["h1", H_START, H_MID, "h"], ["d-fit " + FIT[0].slice(0, 4) + "-18", FIT[0], FIT[1], "d"], ["h2", H_MID, END, "h"], ["d-hold 2019-", HOLD[0], HOLD[1], "d"]];
-  const run = (cfg) => { const h = simulate(hourly, ALL, cfg, true, vix), d = simulate(daily, ALL, cfg, false, vix); const r = { h, d, s: [], st: [] }; for (const [, a, z, k] of SURF) { const x = k === "h" ? h : d; r.s.push(score(x.curve, a, z)); r.st.push(stats(x.trades, a, z)); } return r; };
-  const cell = (r, i) => `${pct(r.s[i].tot, 8)} ÷${ratio(r.s[i])} dd ${pct(r.s[i].dd, 6)} wr ${(r.st[i].wr * 100).toFixed(0)}% n ${String(r.st[i].n).padStart(4)}`;
-  const line = (n, r) => `  ${n.padEnd(34)} h1 ${cell(r, 0)} | d-fit ${cell(r, 1)} | h2 ${cell(r, 2)} | d-hold ${cell(r, 3)}`;
-  console.log("DIRECTION LOCK — should an opposing family signal be discarded, or should it close the position blocking it?");
-  console.log(`Universe: the 9 longs + SQQQ/SOXS/SPXS, with the live polarity rule (an inverse fires only when its underlying sits at its session top).`);
-  console.log(`Surfaces: hourly 2y halves + daily ${FIT[0]}..2018 (fit) / 2019- (holdout) — the inverses only list from ${dStart}.\n`);
-  const rows = [
-    ["block (today's engine)", { ...ARMED, lock: "block" }],
-    ["flip — close the opposing holding", { ...ARMED, lock: "flip" }],
-    ["flipLoser — only if it is underwater", { ...ARMED, lock: "flipLoser" }],
-    ["off — allow both sides (the hedge)", { ...ARMED, lock: "off" }],
-    ["longs only (no inverses at all)", { ...ARMED, lock: "block", longsOnly: true }],
-  ];
-  const out = [];
-  for (const [name, cfg] of rows) {
-    const syms = cfg.longsOnly ? SYMS : ALL;
-    const h = simulate(hourly, syms, cfg, true, vix), d = simulate(daily, syms, cfg, false, vix);
-    const r = { s: [], st: [] };
-    for (const [, a, z, k] of SURF) { const x = k === "h" ? h : d; r.s.push(score(x.curve, a, z)); r.st.push(stats(x.trades, a, z)); }
-    out.push({ name, r, h, d }); console.log(line(name, r));
+  const hourly={}, daily={};
+  for (const s of SYMS) { hourly[s]=annotate(await chart(s,"1h",nowSec-720*86400),true); daily[s]=annotate(await chart(s,"1d",Math.floor(Date.UTC(1999,0,1)/1000)),false); }
+  const vix=priorCloseMap(annotate(await chart("^VIX","1d",Math.floor(Date.UTC(1999,0,1)/1000)),false));
+  const W={SOXL:1.5,SMH:1.5,QQQ:1.5,IWM:1.02,XLK:1.0,SPY:0.83,DIA:0.71,GLD:0.5,TLT:0.5};
+  const ARMED={...MONDAY, morningThr:0.12, weights:W, slotOrder:"expectancy", stepFloor:0.5};
+  // SPY open->close by date, and SPY close-to-close, so "down day" is unambiguous
+  const spyIntra=new Map(), spyC2C=new Map();
+  { const ds=daily.SPY; for(let i=0;i<ds.length;i++){ spyIntra.set(ds[i].d,(ds[i].c/ds[i].o-1)*100); if(i) spyC2C.set(ds[i].d,(ds[i].c/ds[i-1].c-1)*100); } }
+  const split=(trades,from,to,map,label)=>{
+    const up=[],dn=[];
+    for(const t of trades){ if(t.d<from||t.d>=to) continue; const s=map.get(t.d); if(s==null) continue; (s>=0?up:dn).push(t.ret); }
+    const st=a=>({n:a.length, mean:a.length?a.reduce((x,y)=>x+y,0)/a.length*100:0, wr:a.length?a.filter(x=>x>0).length/a.length*100:0, tot:a.reduce((x,y)=>x+y,0)*100});
+    const u=st(up), d=st(dn);
+    console.log('  '+label.padEnd(22)+' UP-day trades n '+String(u.n).padStart(5)+'  WR '+u.wr.toFixed(0)+'%  mean '+u.mean.toFixed(3)+'%  sum '+u.tot.toFixed(0)+'%   |   DOWN-day trades n '+String(d.n).padStart(5)+'  WR '+d.wr.toFixed(0)+'%  mean '+d.mean.toFixed(3)+'%  sum '+d.tot.toFixed(0)+'%');
+  };
+  const h=simulate(hourly,SYMS,ARMED,true,vix), d=simulate(daily,SYMS,ARMED,false,vix);
+  const H_START=hourly.SPY[0].d, H_MID=hourly.SPY[Math.floor(hourly.SPY.length/2)].d, END="2099-01-01";
+  console.log('ARMED STACK — trades grouped by the SESSION they were entered in (SPY open->close)');
+  split(h.trades,H_START,END,spyIntra,'hourly 2y');
+  split(d.trades,"2000-01-01","2015-01-01",spyIntra,'daily fit 2000-14');
+  split(d.trades,"2015-01-01",END,spyIntra,'daily holdout 2015-');
+  console.log('\nSame, grouped by SPY CLOSE-TO-CLOSE (a "down day" in the headline sense)');
+  split(h.trades,H_START,END,spyC2C,'hourly 2y');
+  split(d.trades,"2015-01-01",END,spyC2C,'daily holdout 2015-');
+  // equity change on down days only
+  const dayRet=(curve)=>{ const by=new Map(); for(const p of curve){ const cur=by.get(p.d)||{f:p.equity,l:p.equity}; cur.l=p.equity; by.set(p.d,cur); } const ks=[...by.keys()].sort(); const out=[]; for(let i=1;i<ks.length;i++) out.push({d:ks[i], r:by.get(ks[i]).l/by.get(ks[i-1]).l-1}); return out; };
+  for (const [label,curve,map] of [['daily 26y',d.curve,spyC2C],['hourly 2y',h.curve,spyC2C]]) {
+    const dr=dayRet(curve); const up=[],dn=[];
+    for(const x of dr){ const s=map.get(x.d); if(s==null) continue; (s>=0?up:dn).push(x.r); }
+    const m=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length*100):0;
+    const w=a=>a.length?a.filter(x=>x>0).length/a.length*100:0;
+    console.log('\n  '+label+' ACCOUNT return on SPY-down days: '+m(dn).toFixed(3)+'%/day, green on '+w(dn).toFixed(0)+'% of them (n='+dn.length+')');
+    console.log('  '+label+' ACCOUNT return on SPY-up   days: '+m(up).toFixed(3)+'%/day, green on '+w(up).toFixed(0)+'% of them (n='+up.length+')');
   }
-  const base = out[0];
-  const fitScore = (x) => rat(x.r.s[0]) / rat(base.r.s[0]) + rat(x.r.s[1]) / rat(base.r.s[1]);
-  const win = out.slice(1).sort((a, z) => fitScore(z) - fitScore(a))[0];
-  const ok = rat(win.r.s[2]) >= rat(base.r.s[2]) * 0.98 && rat(win.r.s[3]) >= rat(base.r.s[3]) * 0.98;
-  console.log(`\n  → fit winner among the changes: ${win.name} — holdout ${ok ? "CONFIRMS" : "REJECTS"} (h2 ÷${ratio(win.r.s[2])} vs ${ratio(base.r.s[2])}, d ÷${ratio(win.r.s[3])} vs ${ratio(base.r.s[3])})`);
-  const beats = out.slice(1).filter((x) => rat(x.r.s[2]) >= rat(base.r.s[2]) * 0.98 && rat(x.r.s[3]) >= rat(base.r.s[3]) * 0.98);
-  console.log(`  → holds return/DD on BOTH holdouts vs today's block rule: ${beats.length ? beats.map((x) => x.name).join("; ") : "none"}`);
-  console.log("\nAUDIT — the largest inverse trades on the daily surface (a fabricated return shows up here)");
-  {
-    const d0 = simulate(daily, ALL, { ...ARMED, lock: "block" }, false, vix);
-    const inv = d0.trades.filter((t) => INV.includes(t.sym)).sort((a, z) => Math.abs(z.ret) - Math.abs(a.ret));
-    for (const t of inv.slice(0, 10)) console.log(`    ${t.d} ${t.sym.padEnd(5)} ret ${(t.ret * 100).toFixed(1).padStart(9)}%  reason ${t.reason}`);
-    const huge = inv.filter((t) => Math.abs(t.ret) > 0.5);
-    const sum = (a) => a.reduce((x, y) => x + y.ret, 0) * 100;
-    console.log(`    inverse trades total ${inv.length}; |ret|>50%: ${huge.length} contributing ${sum(huge).toFixed(0)}% of the ${sum(inv).toFixed(0)}% they sum to`);
-    const clean = inv.filter((t) => Math.abs(t.ret) <= 0.5);
-    console.log(`    excluding those: ${clean.length} trades summing ${sum(clean).toFixed(0)}%, mean ${(sum(clean) / clean.length).toFixed(3)}%/trade`);
-  }
-  console.log("\n  flip trades actually taken (hourly 2y), and what the inverses contributed:");
-  for (const x of out) {
-    const fl = x.h.trades.filter((z) => z.reason === "flip");
-    const inv = x.h.trades.filter((z) => INV.includes(z.sym));
-    const m = (a) => (a.length ? (a.reduce((s, z) => s + z.ret, 0) / a.length * 100).toFixed(3) : "  -  ");
-    console.log(`    ${x.name.padEnd(34)} flips ${String(fl.length).padStart(4)} (${m(fl)}%/trade)   inverse trades ${String(inv.length).padStart(4)} (${m(inv)}%/trade)`);
-  }
-})().catch((e) => { console.error("lab failed:", e.message); process.exit(1); });
+})().catch(e=>{console.error('failed:',e.message);process.exit(1);});
