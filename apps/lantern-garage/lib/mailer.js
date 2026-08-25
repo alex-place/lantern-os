@@ -169,29 +169,44 @@ async function sendMail({ to, subject, html, text, link }) {
 async function _sendMailInner({ to, subject, html, text, link }) {
   // Provider chain: Resend (HTTP) → SMTP → dev outbox. On a provider failure the
   // result is reported honestly (ok:false + reason) — never silently swallowed.
+  let providerError = null;
   if (resendConfigured()) {
     const r = await sendViaResend({ to, subject, html, text });
     if (r.ok) return { ok: true, transport: "resend" };
     console.error(`[mailer] resend send failed to ${to}: ${r.error}`);
-    // Fall through to SMTP if that's also configured; otherwise report the failure.
-    if (!smtpConfigured()) return { ok: false, transport: "resend", error: r.error };
+    // If SMTP is also configured, fall through and try it. Otherwise the provider FAILED
+    // and there's no second transport — remember the error and still record to the outbox
+    // below so the action code/link is operator-recoverable (#3021: a configured-but-
+    // failing Resend, e.g. an unverified MAIL_FROM domain, must not swallow the code).
+    if (!smtpConfigured()) providerError = r.error;
   }
   const transport = getTransport();
   if (!transport) {
-    // Dev fallback — make the action link impossible to miss in the logs, and
-    // persist it so a test harness can read it back.
+    // Outbox — the recovery + dev sink. Reached either because NO mailer is configured
+    // (dev box) OR because the only configured provider just FAILED (providerError set).
+    // Always persist so the code/link is recoverable; report ok honestly per which case.
+    const failed = !!providerError;
     console.log(
-      `\n📧 [mailer:dev] no SMTP configured — email NOT sent.\n` +
-      `   to:      ${to}\n   subject: ${subject}\n` +
-      (link ? `   link:    ${link}\n` : "")
+      failed
+        ? `\n📧 [mailer:recovery] provider send FAILED (${providerError}) — email NOT delivered; ` +
+          `code/link written to the outbox for operator recovery.\n   to: ${to}\n   subject: ${subject}\n` +
+          (link ? `   link:    ${link}\n` : "")
+        : `\n📧 [mailer:dev] no SMTP configured — email NOT sent.\n` +
+          `   to:      ${to}\n   subject: ${subject}\n` +
+          (link ? `   link:    ${link}\n` : "")
     );
     try {
       fs.appendFileSync(
         OUTBOX,
-        JSON.stringify({ to, subject, link: link || null, at: new Date().toISOString() }) + "\n"
+        JSON.stringify({ to, subject, link: link || null, failed, error: providerError || null, at: new Date().toISOString() }) + "\n"
       );
     } catch (_) { /* best-effort */ }
-    return { ok: true, transport: "dev", link };
+    // Honesty: a configured provider that failed means the user did NOT get the mail —
+    // report ok:false so the caller surfaces a retry. A genuine no-mailer box is the
+    // intended dev path → ok:true.
+    return failed
+      ? { ok: false, transport: "resend", error: providerError, recoveredToOutbox: true, link }
+      : { ok: true, transport: "dev", link };
   }
   try {
     await transport.sendMail({ from: fromAddress(), to, subject, html, text: text || undefined });
@@ -208,8 +223,15 @@ async function _sendMailInner({ to, subject, html, text, link }) {
 // footer's claim, and the visual shell from drifting apart across 12 send sites.
 const { buildEmail, mayReceiveAd, BRAND, SITE } = require("./email-presets");
 
+// Payload builder split from the sender so the interactive signup path can send it with a
+// BOUNDED wait (sendMailBounded) and read the real delivery result, instead of firing it
+// off and guessing from config (#3021).
+function verificationCodeEmailPayload(to, name, code) {
+  return buildEmail({ kind: "code", to, name, code });
+}
+
 async function sendVerificationCodeEmail(to, name, code) {
-  return sendMail(buildEmail({ kind: "code", to, name, code }));
+  return sendMail(verificationCodeEmailPayload(to, name, code));
 }
 
 // Payload builder split out from the sender so a caller that needs a BOUNDED wait
@@ -302,6 +324,7 @@ module.exports = {
   sendVerificationEmail,
   verificationEmailPayload,
   sendVerificationCodeEmail,
+  verificationCodeEmailPayload,
   sendPasswordResetEmail,
   sendNewSignInEmail,
   sendWelcomeEmail,

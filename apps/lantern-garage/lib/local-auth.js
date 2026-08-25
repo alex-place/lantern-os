@@ -21,7 +21,7 @@ const {
 const { profileHasAdminOverride } = require("./auth-providers");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
-const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
+const { sendVerificationCodeEmail, verificationCodeEmailPayload, sendMailBounded, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
 const { issueCode } = require("./verify-codes");
 const { isLoopback, clientIp } = require("./request-auth");
 const { canonicalOrigin } = require("./base-url");
@@ -40,8 +40,19 @@ const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-aut
 async function sendSignupVerification(req, profile) {
   try {
     const code = await issueCode(profile.id, profile.email || null);
-    sendVerificationCodeEmail(profile.email, profile.name, code).catch(() => {});
-    return { delivery: mailerConfigured() ? "sent" : "logged", code };
+    // AWAIT the send with a bounded wait (so signup never hangs on a slow provider, #3094)
+    // and report the REAL outcome — not merely that a provider is configured. Deriving
+    // delivery from mailerConfigured() reported "sent" even when the send failed (#3021:
+    // Resend key set but MAIL_FROM domain unverified), locking the account out of
+    // verification forever with no honest signal. On failure the mailer now records the
+    // code to the outbox for operator recovery; here we surface delivery:"failed" so the
+    // client can offer a retry/support path instead of a silent dead end.
+    const r = await sendMailBounded(verificationCodeEmailPayload(profile.email, profile.name, code));
+    const delivery = (r && r.ok) ? "sent"
+      : (r && r.pending) ? "sending"      // provider slow; the send is still in flight
+      : mailerConfigured() ? "failed"     // a provider was configured but the send failed
+      : "logged";                         // no mailer at all → code went to the outbox/log (dev)
+    return { delivery, code, error: (r && r.error) || null };
   } catch (_) {
     return { delivery: "logged", code: null }; // best-effort
   }
