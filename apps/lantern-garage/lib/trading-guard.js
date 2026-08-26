@@ -9,7 +9,8 @@
  * Gates (ALL must pass to place a real order):
  *   1. No global halt file: data/kalshi/LIVE-KILL-SWITCH or data/kalshi/TRADING-PAUSED.
  *   2. TRADER_LIVE=1              — master arm switch (default unset/0 = dry run).
- *   3. notional ≤ the per-position cap (TRADER_MAX_POSITION_PCT of equity, default
+ *   3. notional ≤ the per-position cap — BUYS ONLY, because a cap on position size
+ *      must never stop a position being closed (TRADER_MAX_POSITION_PCT of equity, default
  *      5%; falls back to the flat MAX_ORDER_NOTIONAL, $2000, when equity is unknown)
  *      and qty ≤ MAX_ORDER_QTY — a share-count SANITY ceiling (default 100000), not
  *      the real limit. Notional governs; a fractional-share book legitimately places
@@ -46,7 +47,7 @@ function haltFile() {
  *   mode = account mode from IbkrCpapi.inferMode ('paper'|'live'|'unknown').
  * @returns {{allowed:boolean, dry:boolean, reason:string, mode:string, caps:object}}
  */
-function orderGate({ mode = "unknown", qty, price, equity } = {}) {
+function orderGate({ mode = "unknown", qty, price, equity, side } = {}) {
   const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
   // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
   // equity (default 5% → $50k on $1M; must MATCH auto-trader.js maxPositionPct or
@@ -67,7 +68,30 @@ function orderGate({ mode = "unknown", qty, price, equity } = {}) {
   if (halt) return deny(`global halt engaged (data/kalshi/${halt}) — all live trading stopped`);
   if (!q || q <= 0) return deny("qty must be > 0");
   if (q > maxQty) return deny(`qty ${q} exceeds MAX_ORDER_QTY ${maxQty}`);
-  if (px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? maxPositionPct + "% of equity" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
+  // A CAP ON POSITION SIZE MUST NEVER BLOCK A POSITION FROM BEING CLOSED
+  // (2026-08-25). `side` has been in this function's JSDoc since it was written
+  // and ibkr-cpapi.js has always passed it — it was simply never destructured, so
+  // the cap applied to sells exactly as it did to buys. The operator hit it trying
+  // to flatten before an A/B: SOXL 1,517 shares at $115.67 = $175,471 against a cap
+  // of 12% x $966,744 = $116,009. DENIED. The position could be opened and not shut.
+  //
+  // It could be opened because the sizer's cap legitimately SCALES — auto-trader
+  // multiplies maxPositionPct by the room tier, the stress multiplier and the symbol
+  // tilt (SOXL 1.5), so 12% becomes 18% and, at VIX >= 20, 27%. This guard reads the
+  // raw 12%. And because the cap only fires `px > 0`, a MARKET order skips it
+  // entirely; the entry was a market buy. So the cap was inert for the order that
+  // took the risk and binding on the order that would have shed it — the exact
+  // inversion of what it is for. #3326 completes the trap: outside RTH a manual
+  // flatten is converted to a marketable LIMIT so it can execute, which is what gives
+  // it the price that trips the cap. The one moment it fires is the one moment it
+  // must not.
+  //
+  // A sell cannot increase a long position, so the position-size cap has no business
+  // judging it. Every other gate still applies to sells — the halt file, TRADER_LIVE,
+  // the account-mode opt-in, and the MAX_ORDER_QTY sanity ceiling — and the trader is
+  // longs-only, so this does not open a naked-short path. Buys are untouched.
+  const reducing = String(side || "").toLowerCase() === "sell";
+  if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? maxPositionPct + "% of equity" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
   if (process.env.TRADER_LIVE !== "1") return deny("TRADER_LIVE=0 — dry run (no real order placed); set TRADER_LIVE=1 to arm");
   if (mode === "unknown") return deny("account mode unknown — refusing to place a real order");
   if (mode === "live" && process.env.TRADER_ALLOW_LIVE_ACCOUNT !== "1") {
