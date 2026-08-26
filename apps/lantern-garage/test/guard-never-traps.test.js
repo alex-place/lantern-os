@@ -20,6 +20,14 @@
  *
  * Net: the cap was inert for the order that took the risk and binding on the order
  * that would have shed it.
+ *
+ * All three are fixed now. (1) sells are exempt from a POSITION-SIZE cap outright.
+ * (3) a market order is priced against the caller's `refPrice` — the same quote the
+ * entry was sized from — and an unpriceable BUY is refused rather than waved through.
+ * (2) had to be fixed WITH (3): the moment the cap starts binding on market orders, a
+ * guard reading the flat 12% would refuse every tilt-1.5 entry and silently delete
+ * SOXL/SMH/QQQ from the book. The ceiling now derives from the same environment the
+ * sizer reads, so the guard stays independent and stops misreading the policy.
  */
 const { test } = require('node:test');
 const assert = require('node:assert');
@@ -96,8 +104,67 @@ test('a sell that fits under the cap was never the problem, and still passes', (
   assert.strictEqual(armed({}, { qty: 100, price: 115.67, equity: 966744, side: 'sell' }).allowed, true);
 });
 
-test('a market order (no price) is unaffected on both sides — the cap needs a price', () => {
+// ---------------------------------------------------------------------------
+// The cap now binds on MARKET orders (operator, 2026-08-25). It used to compute
+// notional from the LIMIT price, so a market order priced at nothing had a notional
+// of nothing and skipped the cap — and market buys are the engine's normal entry
+// path, so the 12% per-position cap was unenforced on every ordinary entry.
+// ---------------------------------------------------------------------------
+const TILT = 'SOXL:1.5,SMH:1.5,QQQ:1.5,IWM:1.02,XLK:1.0,SPY:0.83,DIA:0.71,GLD:0.5,TLT:0.5';
+
+test('a market BUY is capped against the reference price it was sized from', () => {
+  // 2,600 SOXL = $300,742, past even the tilt+stress ceiling of $261,021
+  const g = armed({ TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' },
+    { qty: 2600, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(g.allowed, false, 'a market order must not slip the cap by having no price');
+  assert.match(g.reason, /exceeds cap/);
+});
+
+test('an unpriced buy stays ALLOWED — a documented limit, not an oversight', () => {
+  // orderGate sits under a general-purpose placeOrder(), not only the engine. Refusing
+  // every priceless buy broke the IBKR warning handshake immediately
+  // (exit-warning-confirm-behavior) and would disable any caller that has no quote.
+  // The engines that size against equity — auto-trader and overnight-trader — all pass
+  // refPrice, so the paths that can build an oversized position ARE covered.
+  const g = armed({}, { qty: 1517, price: 0, equity: 966744, side: 'buy' });
+  assert.strictEqual(g.allowed, true, 'documented residue: no price means no cap check');
+});
+
+test("the engine's own entry carries a price, so it IS capped", () => {
+  // this is the contract the comment in trading-guard.js names: any caller that sizes
+  // by equity must pass refPrice. auto-trader and overnight-trader both do.
+  const capped = armed({ TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' },
+    { qty: 2600, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(capped.allowed, false, 'a market entry over the ceiling is refused');
+  const same = armed({ TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' },
+    { qty: 2600, price: 0, equity: 966744, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(same.allowed, true, 'the identical order WITHOUT refPrice is the uncapped residue');
+});
+
+test('an unpriceable SELL is still allowed — the cap must never trap, priced or not', () => {
   assert.strictEqual(armed({}, { qty: 1517, price: 0, equity: 966744, side: 'sell' }).allowed, true);
-  assert.strictEqual(armed({}, { qty: 1517, price: 0, equity: 966744, side: 'buy' }).allowed, true,
-    'documented behaviour, and the reason the oversized entry was placed at all');
+});
+
+test("the ceiling follows the SIZER's policy, so tilted entries are not deleted", () => {
+  const env = { TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' };
+  // today's real entry: 1,517 SOXL @ $115.67 = $175,471. Sized at 12% x 1.5 tilt;
+  // a flat-12% gate would refuse it and silently delete the highest-weighted name.
+  const soxl = armed(env, { qty: 1517, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(soxl.allowed, true, `the engine's own sizing must clear its own guard: ${soxl.reason}`);
+  assert.strictEqual(soxl.caps.capMult, 1.5 * 1.5, 'tilt x stress headroom');
+  // and a DOWN-tilted name gets a correspondingly smaller ceiling
+  const spy = armed(env, { qty: 1400, price: 0, refPrice: 640, equity: 966744, side: 'buy', symbol: 'SPY' });
+  assert.strictEqual(spy.allowed, false);
+  assert.ok(spy.caps.effectivePct < soxl.caps.effectivePct, 'SPY tilt 0.83 < SOXL tilt 1.5');
+});
+
+test('an unknown symbol gets the base cap, never a silent multiplier', () => {
+  const g = armed({ TRADER_SYMBOL_SIZE_MULT: TILT }, { qty: 1, price: 0, refPrice: 1, equity: 1e6, side: 'buy', symbol: 'ZZZZ' });
+  assert.strictEqual(g.caps.capMult, 1);
+  assert.strictEqual(g.caps.effectivePct, 12);
+});
+
+test('a hostile tilt value cannot widen the ceiling past the sizer clamp', () => {
+  const g = armed({ TRADER_SYMBOL_SIZE_MULT: 'SOXL:99' }, { qty: 1, price: 0, refPrice: 1, equity: 1e6, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(g.caps.capMult, 2, 'clamped to 2, matching auto-trader _symbolSizeMult');
 });

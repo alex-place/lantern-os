@@ -142,7 +142,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -199,6 +199,10 @@ class TradingAPIBridge {
       qty,
       orderType,
       price: orderType === 'STP' ? stopPrice : limitPrice,
+      // A MKT order carries no price, so the guard's per-position cap needs the quote
+      // the caller sized from — without it a market buy's notional reads as zero and
+      // the cap never binds on the engine's normal entry path.
+      refPrice,
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
       equity: eq,
       outsideRth: !!outsideRth,   // pre/post-market fills (LMT + outsideRTH)

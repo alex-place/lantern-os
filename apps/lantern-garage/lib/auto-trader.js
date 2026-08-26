@@ -2645,9 +2645,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // needs_confirmation while its exit would have sailed through. These
     // symbols were deliberately gated INTO the watchlist; the disclosure is
     // acknowledged by design, not per-order.
+    // refPrice: the SAME quote this entry was sized from, so the guard's per-position
+    // cap can price a market buy. Without it a market order's notional reads as zero
+    // and the cap never binds on the engine's normal path (2026-08-25).
     const enOrder = (extended && price > 0)
-      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true }
-      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true };
+      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true, refPrice: price }
+      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true, refPrice: price };
     const r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the

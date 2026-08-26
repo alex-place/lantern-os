@@ -516,7 +516,9 @@ async function tick({ bridge } = {}) {
       const qty = Math.max(1, Math.floor(per / px));
       let status = 'dry_run';
       if (placeReal) {
-        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: execSym, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));
+        // refPrice: the same close this leg was sized from, so the guard's per-position
+        // cap can price a MARKET buy (an unpriced one is not capped at all).
+        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: execSym, side: 'buy', qty, type: 'market', equity, refPrice: px }).catch((e) => ({ status: 'error', reason: e.message }));
         status = (r && r.status) || 'error';
       }
       legs.push({ symbol: execSym, signal: s.symbol, sleeve: s.sleeve, qty, ref_close: px, placed: placeReal && status === 'placed' });
