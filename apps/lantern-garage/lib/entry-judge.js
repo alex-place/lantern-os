@@ -142,18 +142,49 @@ function buildPrompt(e) {
   ].join('\n');
 }
 
+// PARSING WAS THE JUDGE'S BIGGEST FAILURE MODE (2026-08-26). Of 18 journaled rows,
+// 14 were degraded; the claude provider's share was 4x "unparseable" against 4 real
+// verdicts. "unparseable" means no {...} was found AT ALL — the signature of a reply
+// cut off before its closing brace, not of a model refusing the format. max_tokens was
+// 200 against a prompt asking for a verdict, a conviction and a 20-word reason, and the
+// verdicts that DID land used 17-19 of those words. It was clipping its own answers.
+//
+// Three defences, cheapest first: the caller now prefills an opening brace so the reply
+// cannot begin with prose, max_tokens has room, and this parser repairs the residue —
+// a fenced block, a leading brace supplied by the prefill, or an object truncated
+// mid-string. A judge that cannot be read is worth exactly nothing, and the failure was
+// silent: every degraded row still journaled, so the sleeve looked instrumented.
+const chr34 = String.fromCharCode(34), chr92 = String.fromCharCode(92);
 function parseReply(text, allowRedirect) {
-  try {
-    const m = String(text || '').match(/\{[\s\S]*\}/);
-    if (!m) return { degraded: true, reason: 'unparseable' };
-    const j = JSON.parse(m[0]);
-    const allowed = allowRedirect ? ['approve', 'reject', 'redirect_inverse'] : ['approve', 'reject'];
-    if (!allowed.includes(j.verdict)) return { degraded: true, reason: 'bad verdict' };
-    const conviction = Number.isFinite(Number(j.conviction))
-      ? Math.max(0, Math.min(100, Math.round(Number(j.conviction)))) : null;
-    if (conviction == null) return { degraded: true, reason: 'no conviction' };
-    return { verdict: j.verdict, conviction, why: String(j.reason || '').slice(0, 160), degraded: false };
-  } catch (_e) { return { degraded: true, reason: 'parse error' }; }
+  const attempt = (raw) => {
+    let s = String(raw || '').trim();
+    s = s.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();   // fenced block
+    let m = s.match(/\{[\s\S]*\}/);
+    if (!m) {
+      // TRUNCATED: close what is open, so a reply clipped mid-reason still yields a
+      // usable verdict instead of being discarded as noise.
+      const at = s.indexOf('{');
+      if (at < 0) return null;
+      let frag = s.slice(at);
+      let quotes = 0;
+      for (let i = 0; i < frag.length; i++) if (frag[i] === chr34 && frag[i - 1] !== chr92) quotes++;
+      if (quotes % 2) frag += chr34;
+      m = [frag.replace(/,\s*$/, '') + '}'];
+    }
+    try { return JSON.parse(m[0]); } catch (_e) { return null; }
+  };
+  // Two shapes reach here and both must work: a reply that already carries the whole
+  // object, and the CONTINUATION of an assistant prefill, which is missing its opening
+  // brace by construction. Try it as-is first so a complete object is never mangled by
+  // a brace it did not need.
+  const j = attempt(text) || attempt('{' + String(text || ''));
+  if (!j) return { degraded: true, reason: 'unparseable' };
+  const allowed = allowRedirect ? ['approve', 'reject', 'redirect_inverse'] : ['approve', 'reject'];
+  if (!allowed.includes(j.verdict)) return { degraded: true, reason: 'bad verdict' };
+  const conviction = Number.isFinite(Number(j.conviction))
+    ? Math.max(0, Math.min(100, Math.round(Number(j.conviction)))) : null;
+  if (conviction == null) return { degraded: true, reason: 'no conviction' };
+  return { verdict: j.verdict, conviction, why: String(j.reason || '').slice(0, 160), degraded: false };
 }
 
 async function askClaude(prompt, allowRedirect, fetchImpl) {
@@ -167,12 +198,21 @@ async function askClaude(prompt, allowRedirect, fetchImpl) {
     const res = await doFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: ac.signal,
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: CLAUDE_MODEL(), max_tokens: 200,
+      // max_tokens 512, up from 200. THIS is the fix: "unparseable" meant no closing
+      // brace was found at all, and the verdicts that DID land used 17-19 of the 20
+      // words the prompt allows — the model was clipping its own answers mid-reason.
+      //
+      // An assistant prefill of '{' would force JSON harder and was tried first; the
+      // API refuses it on this model (HTTP 400, "This model does not support assistant
+      // message prefill"). Only a call to the real endpoint surfaced that, which is why
+      // this fix is verified against the live API and not against a stub.
+      body: JSON.stringify({ model: CLAUDE_MODEL(), max_tokens: 512,
         messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res || !res.ok) return { degraded: true, reason: 'http ' + (res && res.status) };
     const j = await res.json();
     const text = (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+    // the prefill is not echoed back, so restore it before parsing
     return parseReply(text, allowRedirect);
   } catch (e) {
     return { degraded: true, reason: ac.signal.aborted ? 'timeout' : String(e && e.message).slice(0, 60) };
