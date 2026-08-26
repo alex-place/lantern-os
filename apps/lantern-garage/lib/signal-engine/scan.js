@@ -177,11 +177,45 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
 const _VETO_LOG = process.env.TRADER_TRADES_LOG
   ? require("path").resolve(process.env.TRADER_TRADES_LOG)
   : require("path").join(__dirname, "..", "..", "..", "..", "data", "lantern-garage", "trading", "autopilot-trades.jsonl");
-function _logVeto(rec) {
+// THE COUNTERFACTUAL LEDGER IS EVIDENCE, SO IT HAS TO BE CLEAN (2026-08-25).
+// Auditing it for the first time turned up 6,182 wrapper fires of which only 67
+// were decisions the day-trader could ever have acted on:
+//
+//   -2,112  logged on a Saturday or Sunday
+//   -1,720  logged outside 09:30-16:00 ET (one sample fired at 23:15 ET off a
+//           stale 19:45 extended-hours bar, and re-fired every 60s all night)
+//   -2,283  the same symbol re-logged inside one entry-cadence hour
+//
+// Two of those three are noise this writer can refuse at the source. A fire the
+// engine could not have taken is not a counterfactual - it is a duplicate of a
+// frozen bar, and because it repeats on the 60s scan clock it OUTNUMBERS the
+// real evidence 30:1. Left in, the naive read of this ledger ("the veto blocks
+// 46% of candidates") is wrong by an order of magnitude: in-session, on a
+// decision basis, the selective gate allows 19 of 24.
+//
+// The third defect had no fix at the source: nothing on a row said WHO wrote it.
+// On 2026-08-21 this log flipped between mode "0" and mode "selective" 132 times
+// in one session - the fingerprint of a second engine writing into the same tree
+// under a different environment, which is exactly the headless-boot failure
+// #3454 closed. 43 of the 67 usable decisions came from that ghost, and nothing
+// in the data said so. Every row now carries its writing process, so a second
+// writer is visible in the data instead of silently averaged into it.
+//
+// TRADER_POLARITY_LOG_ALL=1 restores the firehose if extended-hours entries are
+// ever armed and off-session fires become real decisions again.
+function _inRegularSession(now = new Date()) {
+  const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const dow = et.getDay();
+  if (dow === 0 || dow === 6) return false;
+  const min = et.getHours() * 60 + et.getMinutes();
+  return min >= 9 * 60 + 30 && min <= 16 * 60;
+}
+function _logVeto(rec, now = new Date()) {
   try {
+    if (process.env.TRADER_POLARITY_LOG_ALL !== "1" && !_inRegularSession(now)) return;
     const fs = require("fs"), path = require("path");
     fs.mkdirSync(path.dirname(_VETO_LOG), { recursive: true });
-    fs.appendFileSync(_VETO_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + "\n");
+    fs.appendFileSync(_VETO_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec, pid: process.pid }) + "\n");
   } catch (_e) { /* never break the scan */ }
 }
 
@@ -263,7 +297,18 @@ function spyTapeContext(spyBars15) {
  * (tape, mom30, ll, uIbs), so live data accumulates the counterfactual on
  * exactly the conditions the lab is judging.
  */
+// THE LEDGER MUST RECORD THE MODE THAT WAS APPLIED, not a second read of the
+// environment (2026-08-25). The mode resolves as `opts.shortEdge ?? env`, so a
+// caller passing it explicitly produced a row stamped with whatever the env
+// happened to say — a silent lie in the one field that says which rule judged
+// the fire. Wrapped rather than threaded through nine return branches, so a
+// future branch cannot forget it.
 function applyPolarity(sym, direction, opts = {}) {
+  const out = _applyPolarity(sym, direction, opts);
+  if (out.mode === undefined) out.mode = String(opts.shortEdge ?? process.env.TRADER_SHORT_EDGE ?? "0").toLowerCase();
+  return out;
+}
+function _applyPolarity(sym, direction, opts = {}) {
   if (direction !== "BULLISH") return { direction, veto: null };
   const { family, sign } = require("../direction-lock").instrumentSign(sym);
   if (sign >= 0) return { direction, veto: null };
@@ -605,7 +650,7 @@ async function scanAll(watchlist) {
             wrapper_dd: _wDD == null ? null : +_wDD.toFixed(3),
             underlying_tape: _uTape == null ? null : +_uTape.toFixed(3),
             et_min: _etMin,
-            mode: String(process.env.TRADER_SHORT_EDGE || "0"),
+            mode: _pol.mode,
           });
         } catch (_e) { /* instrumentation must never break the scan */ }
       } else if (_pol.allowed) {
@@ -623,7 +668,7 @@ async function scanAll(watchlist) {
             wrapper_dd: _wDD == null ? null : +_wDD.toFixed(3),
             underlying_tape: _uTape == null ? null : +_uTape.toFixed(3),
             et_min: _etMin,
-            mode: String(process.env.TRADER_SHORT_EDGE || "0"),
+            mode: _pol.mode,
           });
         } catch (_e) { /* instrumentation must never break the scan */ }
       }
@@ -889,4 +934,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, sessionIbs, sessionDrawdownPct, barEtMinute, applyPolarity, spyTapeContext, gateAllows, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, sessionIbs, sessionDrawdownPct, barEtMinute, applyPolarity, spyTapeContext, gateAllows, rileyGate, candleGrade, convergenceVerdict, _inRegularSession, _logVeto };
