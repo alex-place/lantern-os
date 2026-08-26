@@ -2493,7 +2493,17 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // #3428 STRESS MULTIPLIER: scales the cap AND the risk target (see _stressMultiplier).
     const _stress = _stressMultiplier({ vixPrior: _vixPrior, spyIbs: _spyIbsNow }, _stressC);
     const _symMult = _symbolSizeMult(sym);   // #3434 symbol tilt (1 when unset)
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult * _stress.mult * _symMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult, stopDistPct: _stopDistEff });
+    // HARD PER-POSITION CAP (operator, 2026-08-25). The tier / stress / tilt multipliers
+    // still scale the RISK TARGET — that is what sizing by expectancy means — but they may
+    // no longer lift the NOTIONAL CEILING above TRADER_MAX_POSITION_PCT. Before this, SOXL
+    // and SMH and QQQ (tilt 1.5) sized to 18% of equity and 27% at VIX >= 20, which is also
+    // why trading-guard refused to transact them: it read the bare 12%. One number now.
+    // Cost, measured before arming (experiments/hard_cap_lab.js): return/DD h1 -15%,
+    // d-fit -40%, h2 -22%, d-hold -44% — on the 26-year holdout 2,866% -> 1,202% of return
+    // against a drawdown of 22.1% -> 16.5%. Down-weights are untouched: SPY 0.83 still
+    // sizes to 9.96%, GLD/TLT 0.5 to 6%.
+    const _capMult = Math.min(1, _tierMult * _stress.mult * _symMult);
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _capMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
@@ -2645,9 +2655,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // needs_confirmation while its exit would have sailed through. These
     // symbols were deliberately gated INTO the watchlist; the disclosure is
     // acknowledged by design, not per-order.
+    // refPrice: the SAME quote this entry was sized from, so the guard's per-position
+    // cap can price a market buy. Without it a market order's notional reads as zero
+    // and the cap never binds on the engine's normal path (2026-08-25).
     const enOrder = (extended && price > 0)
-      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true }
-      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true };
+      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true, refPrice: price }
+      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true, refPrice: price };
     const r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the

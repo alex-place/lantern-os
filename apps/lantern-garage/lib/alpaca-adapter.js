@@ -246,7 +246,9 @@ async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPri
     // Real money: the same double gate as the IBKR path.
     let eq = Number(equity) || 0;
     if (!eq) { const acct = await getAccount(userId).catch(() => null); eq = (acct && acct.equity) || 0; }
-    const gate = orderGate({ mode, qty: Number(qty), price: Number(limitPrice) || 0, equity: eq });
+    // `side` matters: the position-size cap applies to buys only, so a sell can always
+    // close a position the sizer's tilt/stress multipliers grew past the raw cap.
+    const gate = orderGate({ mode, qty: Number(qty), price: Number(limitPrice) || 0, equity: eq, side });
     if (process.env.TRADER_ALLOW_LIVE_ACCOUNT !== '1') {
       return { ...base, status: 'dry_run', dry: true, reason: 'live Alpaca account — set TRADER_ALLOW_LIVE_ACCOUNT=1 to arm real-money orders' };
     }
