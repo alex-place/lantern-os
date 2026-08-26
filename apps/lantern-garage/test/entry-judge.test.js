@@ -132,3 +132,74 @@ test('newsContext: last-24h items for the family and the market, highest impact 
   assert.ok(/none on file/.test(ej.buildPrompt({ symbol: 'SOXL', price: 20, news: { items: [] } })), 'empty feed is stated, not omitted');
   assert.deepStrictEqual(ej.newsContext('SOXL', now, { file: f + '.missing' }).items, [], 'missing feed -> empty, never throws');
 });
+
+// ---------------------------------------------------------------------------
+// THE JUDGE WAS UNREADABLE HALF THE TIME (2026-08-26). 18 journaled rows, 14
+// degraded; the claude provider scored 4x "unparseable" against 4 real verdicts.
+// "unparseable" means no {...} was found AT ALL — a reply cut off before its
+// closing brace, not a model refusing the format. max_tokens was 200 and the
+// verdicts that landed used 17-19 of the prompt's 20 allowed words: it was
+// clipping its own answers. After the fix, a live replay of all 9 real journaled
+// entries returned 9 verdicts for 9 attempts.
+// ---------------------------------------------------------------------------
+const OBJ = String.fromCharCode(123) + '"verdict":"reject","conviction":72,"reason":"tape one-way lower"' + String.fromCharCode(125);
+
+test('a complete object parses — the ordinary case must not regress', () => {
+  const r = ej.parseReply(OBJ, true);
+  assert.strictEqual(r.degraded, false);
+  assert.strictEqual(r.verdict, 'reject');
+  assert.strictEqual(r.conviction, 72);
+});
+
+test('a fenced block parses — models wrap JSON in markdown unprompted', () => {
+  const r = ej.parseReply('```json\n' + OBJ + '\n```', true);
+  assert.strictEqual(r.degraded, false);
+  assert.strictEqual(r.verdict, 'reject');
+});
+
+test('a reply CLIPPED mid-reason still yields its verdict', () => {
+  // the exact shape that produced 4 "unparseable" rows: cut off inside the reason
+  const clipped = OBJ.slice(0, OBJ.indexOf('lower'));
+  const r = ej.parseReply(clipped, true);
+  assert.strictEqual(r.degraded, false, 'a truncated reason must not discard the verdict');
+  assert.strictEqual(r.verdict, 'reject');
+  assert.strictEqual(r.conviction, 72);
+});
+
+test('an object missing its opening brace parses', () => {
+  const r = ej.parseReply(OBJ.slice(1), true);
+  assert.strictEqual(r.degraded, false);
+  assert.strictEqual(r.verdict, 'reject');
+});
+
+test('genuine refusals are still degraded, not invented into a verdict', () => {
+  assert.strictEqual(ej.parseReply('I cannot answer that.', true).degraded, true);
+  assert.strictEqual(ej.parseReply('', true).degraded, true);
+  assert.strictEqual(ej.parseReply(null, true).degraded, true);
+});
+
+test('a bad verdict word is still refused', () => {
+  const bad = String.fromCharCode(123) + '"verdict":"maybe","conviction":50' + String.fromCharCode(125);
+  assert.strictEqual(ej.parseReply(bad, true).reason, 'bad verdict');
+});
+
+test('redirect_inverse is refused when the family has no inverse', () => {
+  assert.strictEqual(ej.parseReply(OBJ.replace('reject', 'redirect_inverse'), false).reason, 'bad verdict');
+});
+
+test('the claude request carries token headroom and NO assistant prefill', async () => {
+  // this model returns HTTP 400 on prefill ("does not support assistant message
+  // prefill"), which only a live call revealed. Pin both facts.
+  let seen = null;
+  const fetchImpl = async (url, opts) => {
+    // BOTH providers are called; capture only the anthropic request or this reads the
+    // local body, which carries no max_tokens and silently passes a weaker assertion.
+    if (String(url).includes('anthropic')) seen = JSON.parse(opts.body);
+    return { ok: true, json: async () => ({ content: [{ type: 'text', text: OBJ }] }) };
+  };
+  await withEnv({ TRADER_ENTRY_JUDGE: '1', ANTHROPIC_API_KEY: 'test-key' }, () => ej.judge(ENTRY, { fetchImpl }));
+  assert.ok(seen, 'the request was built');
+  assert.ok(seen.max_tokens >= 512, `max_tokens ${seen.max_tokens} leaves no room for a 20-word reason`);
+  assert.strictEqual(seen.messages.length, 1, 'no assistant prefill — the API rejects it on this model');
+  assert.strictEqual(seen.messages[0].role, 'user');
+});
