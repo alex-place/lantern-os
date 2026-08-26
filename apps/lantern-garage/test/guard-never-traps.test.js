@@ -145,26 +145,44 @@ test('an unpriceable SELL is still allowed — the cap must never trap, priced o
   assert.strictEqual(armed({}, { qty: 1517, price: 0, equity: 966744, side: 'sell' }).allowed, true);
 });
 
-test("the ceiling follows the SIZER's policy, so tilted entries are not deleted", () => {
+test('the ceiling is HARD — the symbol tilt cannot raise it (operator, 2026-08-25)', () => {
   const env = { TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' };
-  // today's real entry: 1,517 SOXL @ $115.67 = $175,471. Sized at 12% x 1.5 tilt;
-  // a flat-12% gate would refuse it and silently delete the highest-weighted name.
-  const soxl = armed(env, { qty: 1517, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
-  assert.strictEqual(soxl.allowed, true, `the engine's own sizing must clear its own guard: ${soxl.reason}`);
-  assert.strictEqual(soxl.caps.capMult, 1.5 * 1.5, 'tilt x stress headroom');
-  // and a DOWN-tilted name gets a correspondingly smaller ceiling
-  const spy = armed(env, { qty: 1400, price: 0, refPrice: 640, equity: 966744, side: 'buy', symbol: 'SPY' });
-  assert.strictEqual(spy.allowed, false);
-  assert.ok(spy.caps.effectivePct < soxl.caps.effectivePct, 'SPY tilt 0.83 < SOXL tilt 1.5');
+  // 1,517 SOXL = $175,471 = 18% of equity. That is what the sizer used to build, and
+  // what the guard refused. Now neither will: TRADER_MAX_POSITION_PCT is the ceiling
+  // for every symbol regardless of tilt or stress.
+  const over = armed(env, { qty: 1517, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(over.allowed, false, 'tilt 1.5 must not lift the ceiling');
+  assert.match(over.reason, /HARD ceiling/);
+  assert.strictEqual(over.caps.maxPositionPct, 12);
+  // and the size the clamped sizer now produces clears it
+  assert.strictEqual(armed(env, { qty: 1002, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' }).allowed, true);
 });
 
-test('an unknown symbol gets the base cap, never a silent multiplier', () => {
-  const g = armed({ TRADER_SYMBOL_SIZE_MULT: TILT }, { qty: 1, price: 0, refPrice: 1, equity: 1e6, side: 'buy', symbol: 'ZZZZ' });
-  assert.strictEqual(g.caps.capMult, 1);
-  assert.strictEqual(g.caps.effectivePct, 12);
+test('the sizer and the guard agree on one number', () => {
+  const at = require('../lib/auto-trader');
+  const equity = 966744, price = 115.67;
+  // the sizer's own clamp: tier x stress x tilt may scale DOWN, never above the cap
+  const capMult = Math.min(1, 1 * 1.5 * 1.5);
+  const qty = at.sizePosition({ equity, price, positionPct: 12, maxPositionPct: 12 * capMult, riskPct: 0.36 * 1.5 * 1.5, stopDistPct: 3 });
+  assert.ok(qty * price <= equity * 0.12, `sizer produced ${qty} sh = $${Math.round(qty * price)}, over a 12% ceiling`);
+  const g = armed({ TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' },
+    { qty, price: 0, refPrice: price, equity, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(g.allowed, true, `the guard must accept what the sizer built: ${g.reason}`);
 });
 
-test('a hostile tilt value cannot widen the ceiling past the sizer clamp', () => {
-  const g = armed({ TRADER_SYMBOL_SIZE_MULT: 'SOXL:99' }, { qty: 1, price: 0, refPrice: 1, equity: 1e6, side: 'buy', symbol: 'SOXL' });
-  assert.strictEqual(g.caps.capMult, 2, 'clamped to 2, matching auto-trader _symbolSizeMult');
+test('a DOWN-tilted name still sizes below the cap — only the up-weights are clamped', () => {
+  const at = require('../lib/auto-trader');
+  const equity = 1e6, price = 100;
+  const spy = at.sizePosition({ equity, price, positionPct: 12, maxPositionPct: 12 * Math.min(1, 0.83), riskPct: 0.36 * 0.83, stopDistPct: 3 });
+  assert.ok(spy * price <= equity * 0.0996 + price, 'SPY tilt 0.83 -> ~9.96%, not 12%');
 });
+
+test('the extended-hours marketable limit does not deny its own sized order', () => {
+  // #3326 prices an out-of-RTH entry 0.2% through the spread so it can fill. Capping on
+  // that uplift would refuse an order the sizer built to fit, so refPrice governs.
+  const sized = armed({}, { qty: 1002, price: 0, refPrice: 115.67, equity: 966744, side: 'buy' });
+  assert.strictEqual(sized.allowed, true);
+  const ext = armed({}, { qty: 1002, price: 115.90, refPrice: 115.67, equity: 966744, side: 'buy' });
+  assert.strictEqual(ext.allowed, true, 'the 0.2% marketable uplift must not trip the cap');
+});
+

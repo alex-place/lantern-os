@@ -2493,7 +2493,17 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // #3428 STRESS MULTIPLIER: scales the cap AND the risk target (see _stressMultiplier).
     const _stress = _stressMultiplier({ vixPrior: _vixPrior, spyIbs: _spyIbsNow }, _stressC);
     const _symMult = _symbolSizeMult(sym);   // #3434 symbol tilt (1 when unset)
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult * _stress.mult * _symMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult, stopDistPct: _stopDistEff });
+    // HARD PER-POSITION CAP (operator, 2026-08-25). The tier / stress / tilt multipliers
+    // still scale the RISK TARGET — that is what sizing by expectancy means — but they may
+    // no longer lift the NOTIONAL CEILING above TRADER_MAX_POSITION_PCT. Before this, SOXL
+    // and SMH and QQQ (tilt 1.5) sized to 18% of equity and 27% at VIX >= 20, which is also
+    // why trading-guard refused to transact them: it read the bare 12%. One number now.
+    // Cost, measured before arming (experiments/hard_cap_lab.js): return/DD h1 -15%,
+    // d-fit -40%, h2 -22%, d-hold -44% — on the 26-year holdout 2,866% -> 1,202% of return
+    // against a drawdown of 22.1% -> 16.5%. Down-weights are untouched: SPY 0.83 still
+    // sizes to 9.96%, GLD/TLT 0.5 to 6%.
+    const _capMult = Math.min(1, _tierMult * _stress.mult * _symMult);
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _capMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in

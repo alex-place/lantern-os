@@ -49,42 +49,24 @@ function haltFile() {
  *   mode = account mode from IbkrCpapi.inferMode ('paper'|'live'|'unknown').
  * @returns {{allowed:boolean, dry:boolean, reason:string, mode:string, caps:object}}
  */
-// THE GUARD HAS TO READ THE SAME POLICY THE SIZER DOES (2026-08-25). auto-trader
-// sizes against `maxPositionPct * roomTier * stress * symbolTilt`; this file read the
-// bare TRADER_MAX_POSITION_PCT. While the cap was inert on market orders that mismatch
-// was invisible. The moment the cap starts binding on market orders (below) it would
-// have DENIED every tilted entry outright — SOXL/SMH/QQQ at tilt 1.5 size to 18% of
-// equity against a 12% gate — silently deleting the three highest-weighted names in the
-// book, which is the opposite of what a safety gate is for.
+// A HARD PER-POSITION CAP (operator, 2026-08-25). TRADER_MAX_POSITION_PCT is the
+// ceiling for every symbol, full stop — the symbol tilt may size a position DOWN but
+// never above it.
 //
-// So the ceiling is derived from the SAME environment the sizer reads, not from
-// anything the caller asserts: the guard stays an independent check, it just stops
-// misreading the configured policy as a flat number. Stress is applied as constant
-// HEADROOM rather than tracked live — the guard cannot see VIX, and a ceiling that is
-// occasionally looser than the sizer is a sane ceiling, whereas one that is
-// occasionally tighter is a trading outage.
-// Room tier is deliberately NOT included: it is off (TRADER_ROOM_TIER=0) and, unlike
-// tilt and stress, it is per-signal rather than per-symbol, so the guard cannot derive
-// it. If it is ever re-armed this ceiling must be revisited.
-function _capMultiplier(symbol) {
-  const spec = process.env.TRADER_SYMBOL_SIZE_MULT;
-  let tilt = 1;
-  if (spec && symbol) {
-    const want = String(symbol).toUpperCase();
-    for (const part of String(spec).split(",")) {
-      const [s, w] = part.split(":").map((x) => String(x || "").trim());
-      if (s.toUpperCase() === want) {
-        const v = Number(w);
-        tilt = Number.isFinite(v) && v > 0 ? Math.min(2, Math.max(0.25, v)) : 1;   // same clamp as auto-trader
-        break;
-      }
-    }
-  }
-  const stress = Number(process.env.TRADER_STRESS_MULT);
-  return tilt * (Number.isFinite(stress) && stress > 1 ? stress : 1);
-}
-
-function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, symbol } = {}) {
+// This is a change of policy, not a reading of one. Until now auto-trader multiplied
+// the cap by the room tier, the stress multiplier and the symbol tilt, so SOXL/SMH/QQQ
+// sized to 18% of equity and 27% at VIX >= 20 while this file read the bare 12%. That
+// mismatch was invisible only because the cap did not bind on market orders (below);
+// the moment it binds, guard and sizer have to agree on one number. They now agree on
+// the hard one: auto-trader clamps its effective cap to c.maxPositionPct.
+//
+// Measured cost, before arming (experiments/hard_cap_lab.js, four surfaces, live env):
+// return/DD h1 -15%, d-fit -40%, h2 -22%, d-hold -44%. On the 26-year holdout that is
+// 2,866% -> 1,202% of return against a drawdown of 22.1% -> 16.5% — 58% of the return
+// given up to remove 25% of the drawdown. Win rate is unchanged at 64%: sizing does not
+// change WHICH trades are taken, only how big. The operator chose this knowing the
+// number; TRADER_MAX_POSITION_PCT is the single knob that reverses it.
+function orderGate({ mode = "unknown", qty, price, equity, side, refPrice } = {}) {
   const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
   // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
   // equity (default 5% → $50k on $1M; must MATCH auto-trader.js maxPositionPct or
@@ -94,10 +76,8 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, symbo
   const maxPositionPct = Number(process.env.TRADER_MAX_POSITION_PCT) || 5;
   const eq = Number(equity) || 0;
   const flatNotional = envInt("MAX_ORDER_NOTIONAL", 2000);
-  const capMult = _capMultiplier(symbol);
-  const effectivePct = maxPositionPct * capMult;
-  const maxNotional = eq > 0 ? eq * (effectivePct / 100) : flatNotional;
-  const caps = { maxQty, maxNotional: Math.round(maxNotional), maxPositionPct, effectivePct, capMult, equity: eq || null };
+  const maxNotional = eq > 0 ? eq * (maxPositionPct / 100) : flatNotional;
+  const caps = { maxQty, maxNotional: Math.round(maxNotional), maxPositionPct, equity: eq || null };
   const q = Number(qty) || 0;
   // THE CAP HAS TO BIND ON MARKET ORDERS, WHICH IS WHERE THE RISK ACTUALLY GOES IN
   // (operator, 2026-08-25). Until now `notional` was computed from the order's LIMIT
@@ -123,7 +103,16 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, symbo
   // callers that do not size against equity; it is not a new hole. If a caller that
   // sizes by equity is ever added, it must pass refPrice — that is the contract, and
   // the reason this comment names the two that do.
-  const px = Number(price) > 0 ? Number(price) : (Number(refPrice) > 0 ? Number(refPrice) : 0);
+  // refPrice WINS over the order's own limit price when the caller supplies one, because
+  // it is the price the position was SIZED from and the cap governs position size. The
+  // two differ by design on the extended-hours path: #3326 makes an out-of-RTH entry a
+  // marketable limit 0.2% through the spread so it can actually fill. Capping on that
+  // uplift denies an order the sizer built to fit — 1,002 SOXL sized at $115.67 is
+  // $115,901 against a $116,009 ceiling, and the same order priced at $115.90 is
+  // $116,132, refused. Slippage headroom is not a risk-policy question; the intended
+  // position size is. Callers here are all our own code, and the manual order route
+  // supplies no refPrice, so its limit price still governs.
+  const px = Number(refPrice) > 0 ? Number(refPrice) : (Number(price) > 0 ? Number(price) : 0);
   const notional = q * px;
   const deny = (reason) => ({ allowed: false, dry: true, reason, mode, caps });
 
@@ -154,7 +143,7 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, symbo
   // the account-mode opt-in, and the MAX_ORDER_QTY sanity ceiling — and the trader is
   // longs-only, so this does not open a naked-short path. Buys are untouched.
   const reducing = String(side || "").toLowerCase() === "sell";
-  if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? effectivePct.toFixed(1) + "% of equity" + (capMult !== 1 ? ` = ${maxPositionPct}% x ${capMult.toFixed(2)} tilt/stress` : "") : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
+  if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? maxPositionPct + "% of equity — a HARD ceiling, the symbol tilt cannot raise it" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
   if (process.env.TRADER_LIVE !== "1") return deny("TRADER_LIVE=0 — dry run (no real order placed); set TRADER_LIVE=1 to arm");
   if (mode === "unknown") return deny("account mode unknown — refusing to place a real order");
   if (mode === "live" && process.env.TRADER_ALLOW_LIVE_ACCOUNT !== "1") {

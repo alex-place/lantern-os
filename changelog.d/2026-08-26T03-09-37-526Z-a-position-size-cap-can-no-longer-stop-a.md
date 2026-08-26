@@ -20,14 +20,22 @@
   immediately. Every engine that sizes against equity (`auto-trader`,
   `overnight-trader`) now passes `refPrice`, so the paths that can build an oversized
   position are covered.
-- **The guard now reads the same sizing policy the sizer does.** `auto-trader` sizes
-  against `maxPositionPct × roomTier × stress × symbolTilt`; the guard read the bare
-  `TRADER_MAX_POSITION_PCT`. While the cap was inert on market orders that mismatch was
-  invisible — the moment it starts binding it would have refused **every tilt-1.5 entry**
-  (SOXL/SMH/QQQ size to 18% against a 12% gate), silently deleting the three
-  highest-weighted names. The ceiling is now derived from the same environment the sizer
-  reads, so the guard stays an independent check instead of contradicting the configured
-  policy. Room tier is excluded (it is off, and is per-signal rather than per-symbol).
+- **`TRADER_MAX_POSITION_PCT` is now a HARD ceiling — the symbol tilt cannot raise it**
+  (operator's call). Until now `auto-trader` multiplied the per-position cap by room
+  tier × stress × symbol tilt, so SOXL/SMH/QQQ sized to **18%** of equity and **27%** at
+  VIX ≥ 20, while `trading-guard` read the bare 12% — which is why the guard refused to
+  transact positions the engine had legitimately built. Guard and sizer now agree on one
+  number: the multipliers still scale the *risk target*, but the notional ceiling is
+  clamped at `TRADER_MAX_POSITION_PCT`. Down-weights are untouched — SPY 0.83 still sizes
+  to 9.96%, GLD/TLT 0.5 to 6%.
 
-  **Effective ceilings at the armed config** (12% base, stress 1.5 as constant headroom):
-  SOXL/SMH/QQQ 27%, XLK 18%, SPY 14.9%, DIA 12.8%, GLD/TLT 9%.
+  **Measured before arming** (`experiments/hard_cap_lab.js`, four surfaces, live env) —
+  return/DD **h1 −15%, d-fit −40%, h2 −22%, d-hold −44%**. On the 26-year holdout that is
+  **2,866% → 1,202%** of return against a drawdown of **22.1% → 16.5%**: 58% of the return
+  given up to remove 25% of the drawdown. Win rate is unchanged at 64% — sizing does not
+  change which trades are taken, only how big. `TRADER_MAX_POSITION_PCT` is the single
+  knob that reverses it.
+- The cap is measured against `refPrice` in preference to the order's own limit price.
+  The two differ by design on the extended-hours path: `#3326` prices an out-of-RTH entry
+  0.2% through the spread so it can fill, and capping on that uplift would refuse an
+  order the sizer built to fit.
