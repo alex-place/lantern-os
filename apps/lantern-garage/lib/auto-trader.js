@@ -737,6 +737,35 @@ function _nextTradingDates(dateStr, n) {
   }
   return d.toISOString().slice(0, 10);
 }
+// DEFERRED EXTENDED-HOURS FILLS (operator, 2026-08-26). A price-threshold exit that
+// triggers outside RTH still DECIDES outside RTH — but it must not FILL there.
+//
+// Measured over 59 days, 10 names, 580 symbol-days: after a pre-market drawdown of
+// -1.5% or worse the regular-session open was ABOVE the pre-market low 79% of the time
+// (the -2.0/-1.5% band opened +1.77% up, +2.33% an hour in). After-hours is the same
+// story at 88%. Every credible band, both windows, reverts at the open. Selling into an
+// extended-hours low is systematically selling the low.
+//
+// It cost SOXL on 2026-08-26: trailing_stop fired 08:36 at 113.52 on a real, sustained
+// pre-market fall; the session opened at 115.54 and ran to 117.19. -$2,647 realised
+// where the same decision filled at the open would have been roughly +$418.
+//
+// The DECISION stands and the position still leaves the book, so #3378's reason for
+// managing the extended session at all is untouched. Only the fill moves to 09:30.
+//
+// NOT DEFERRED: max_loss. That is the disaster brake, not gain protection, and a
+// position already at its loss cap should not be asked to wait. The broker's resting
+// stop stays underneath throughout, so a genuine overnight collapse is caught by the
+// venue rather than by us.
+//
+// The risk this accepts, plainly: on the minority of days that do NOT revert, the
+// deferred fill is worse. The measurement says that is the smaller half by a wide
+// margin. TRADER_EXT_DEFER_EXITS=0 reverts it.
+const _deferredExit = new Map();   // sym -> { reason, decidedAt, decidedPx }
+const DEFERRABLE = /^(trailing_stop|take_profit|peak_giveback|r2_trail|zone_)/i;
+function _extDeferEnabled() { return process.env.TRADER_EXT_DEFER_EXITS !== '0'; }
+function _isDeferrableExit(reason) { return DEFERRABLE.test(String(reason || '').trim()); }
+
 const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
 // sym -> last observed broker snapshot { qty, entry, mark, ts } while we held it.
@@ -918,6 +947,7 @@ function _saveState() {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
     fs.writeFileSync(STATE_FILE, JSON.stringify({
       peak: Object.fromEntries(_peak),
+      deferredExit: Object.fromEntries(_deferredExit),   // an overnight decision must survive a restart
       trough: Object.fromEntries(_trough),
       excursion: Object.fromEntries(_excursion),   // placement→fill handoff must survive a restart
 
@@ -955,6 +985,7 @@ function _loadState() {
   try {
     const o = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     for (const [k, v] of Object.entries(o.peak || {})) _peak.set(k, v);
+    for (const [k, v] of Object.entries(o.deferredExit || {})) _deferredExit.set(k, v);
     for (const [k, v] of Object.entries(o.trough || {})) _trough.set(k, v);
     for (const [k, v] of Object.entries(o.excursion || {})) _excursion.set(k, v);
     for (const [k, v] of Object.entries(o.entryAt || {})) _entryAt.set(k, v);
@@ -1073,6 +1104,17 @@ function trailTriggerPct(peakGainPct, base) {
 /** Close a held long at market: cancel its resting stop, clear per-symbol state,
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
 async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
+  // Outside RTH a gain-protecting exit records its decision and fills at the open.
+  if (extended && _extDeferEnabled() && _isDeferrableExit(reason) && !_deferredExit.has(sym)) {
+    _deferredExit.set(sym, { reason, decidedAt: now, decidedPx: Number(refPrice) || null });
+    _saveState();
+    logTrade({ event: 'exit_deferred', symbol: sym, qty,
+      entry: hp && hp.avg_entry_price != null ? hp.avg_entry_price : null,
+      mark: Number(refPrice) || null, reason,
+      why: 'extended hours: decision stands, fill deferred to the regular open — extended lows revert 79-88% of the time (2026-08-26)' });
+    if (out) out.skipped.push({ symbol: sym, why: `exit_deferred: ${reason} — filling at the open` });
+    return;
+  }
   // WHOLE-SHARE EXITS (2026-08-10, dust re-entry companion). IBKR CPAPI rejects
   // fractional sells on these ETFs (the 0.8-share SOXS lesson). A position of
   // 300.8 must sell 300 and leave the inert sub-share tail — otherwise the
@@ -1133,6 +1175,21 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
   // holds; the foreign-book problem this draft chased is handled UPSTREAM — the
   // bridge account pin refuses the wrong account's book outright, and the
   // foreign-snapshot tell stands the whole scan down before this function runs.
+  // FLUSH DEFERRED EXITS at the first regular-hours scan, BEFORE any other exit rule,
+  // so an overnight decision is honoured at the open rather than re-derived from the new
+  // session (which would let a position that gapped up sail past a trail it had already
+  // breached).
+  if (!extended && _deferredExit.size) {
+    for (const [sym, d] of [..._deferredExit.entries()]) {
+      const p = heldPos[sym];
+      const dq = Math.floor(Number(p && p.qty) || 0);
+      _deferredExit.delete(sym);
+      if (!(dq >= 1) || exclude.has(sym)) continue;    // gone by other means, or not ours
+      await closeLong(bridge, userId, sym, dq, p, `${d.reason} [deferred from extended hours]`, out, now, { extended: false });
+      delete heldQty[sym];
+    }
+    _saveState();
+  }
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) >= 1);
   if (!longs.length) return;
 
@@ -2974,4 +3031,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
