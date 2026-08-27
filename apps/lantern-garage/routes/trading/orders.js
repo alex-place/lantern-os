@@ -613,6 +613,24 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
               opReq.acceptWarnings = true;
               _autoAccepted = 'risk_reducing_sell';
             }
+            // CANCEL THE OPERATOR BOOK'S STOPS FIRST (2026-08-27). The cancel-first
+            // added for manual sells above runs against the REQUESTING uid — an admin
+            // in the operator view has no linked broker, so that facade resolves null,
+            // the cancel silently no-ops, and this send then hits the operator book
+            // where the stop's share reservation still blocks it ("insufficient qty
+            // available: 0", the SPXS trap, one path deeper). Same engine helper, same
+            // settle wait, resolved for the account the order is actually going to.
+            if (_isSell && !/stop/i.test(String(type || ''))) {
+              try {
+                const { brokerFacadeFor } = require('../../lib/broker-facade');
+                const _opF = await brokerFacadeFor(OPERATOR_UID, bridge);
+                const _F2 = (_opF && (_opF.facade || _opF)) || null;
+                if (_F2 && _F2.getIBKROpenOrders && _F2.cancelIBKROrder) {
+                  await require('../../lib/auto-trader').cancelRestingStops(_F2, OPERATOR_UID, String(ticker).toUpperCase());
+                  _stopsCancelledNote = 'resting stop(s) on the OPERATOR book cancelled first (#3407, operator-view path)';
+                }
+              } catch (_e) { /* fail-soft — proceed exactly as before */ }
+            }
             for (const attempt of [() => bridge.placeIBKROrder(OPERATOR_UID, opReq), () => alpaca.placeOrder(OPERATOR_UID, opReq)]) {
               result = await attempt().catch(() => null);
               if (result) { result.operator_account = true; break; }
