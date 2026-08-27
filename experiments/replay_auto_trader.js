@@ -82,7 +82,10 @@ const barsUpTo = (sym, n) => {
   const a = DATA[String(sym).toUpperCase()] || [];
   const out = [];
   for (let i = a.length - 1; i >= 0 && out.length < n; i--) if (a[i].t <= NOW_MS) out.push(a[i]);
-  return out.reverse().map((b) => ({ time: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c, volume: 0 }));
+  // parseBars emits `timestamp` (ISO); the first stub said `time` and nothing noticed
+  // because the knife reads only closes — the confirm gate parses the timestamp and
+  // silently took ZERO trades against the mismatched field. Emit the REAL shape.
+  return out.reverse().map((b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c, volume: 0 }));
 };
 const stub = {
   getBarsMulti: async (tickers) => ({ bars: Object.fromEntries((tickers || []).map((t) => [String(t).toUpperCase(), { bars: barsUpTo(t, 400) }])) }),
@@ -163,10 +166,10 @@ function signalsAt(day, m) {
 (async () => {
   const days = [...new Set(Object.values(DATA).flat().map((b) => b.d))].sort();
   const VARIANTS = [
-    ["LIVE     persist + knife", { TRADER_REQUIRE_PERSIST: "1", TRADER_ENTRY_KNIFE_FILTER: "1" }],
-    ["PERSIST  alone", { TRADER_REQUIRE_PERSIST: "1", TRADER_ENTRY_KNIFE_FILTER: "0" }],
-    ["KNIFE    alone", { TRADER_REQUIRE_PERSIST: "0", TRADER_ENTRY_KNIFE_FILTER: "1" }],
-    ["NONE     neither", { TRADER_REQUIRE_PERSIST: "0", TRADER_ENTRY_KNIFE_FILTER: "0" }],
+    ["ARMED    persist, no knife", { TRADER_REQUIRE_PERSIST: "1", TRADER_ENTRY_KNIFE_FILTER: "0" }],
+    ["+ T1     one rising close", { TRADER_REQUIRE_PERSIST: "1", TRADER_ENTRY_KNIFE_FILTER: "0", TRADER_ENTRY_CONFIRM: "1" }],
+    ["+ T2     two, no new low", { TRADER_REQUIRE_PERSIST: "1", TRADER_ENTRY_KNIFE_FILTER: "0", TRADER_ENTRY_CONFIRM: "2" }],
+    ["T2 only  (persist off)", { TRADER_REQUIRE_PERSIST: "0", TRADER_ENTRY_KNIFE_FILTER: "0", TRADER_ENTRY_CONFIRM: "2" }],
   ];
   const BASE = {
     TRADER_IBS_MAX: "0.30", TRADER_IBS_MAX_MORNING: "0.12", TRADER_IBS_EXIT: "0.6",
@@ -175,7 +178,8 @@ function signalsAt(day, m) {
     TRADER_ZONE_EXIT: "0", TRADER_TAKE_PROFIT_R: "0", TRADER_MOMENTUM_EXIT: "0",
     TRADER_EXIT_MIN_PWIN: "0", TRADER_EOD_DECARRY: "0", TRADER_STOP_COOLDOWN_DAYS: "0",
     TRADER_SYMBOL_SIZE_MULT: "SOXL:1.5,SMH:1.5,QQQ:1.5,IWM:1.02,XLK:1.0,SPY:0.83,DIA:0.71,GLD:0.5,TLT:0.5",
-    TRADER_SLOT_ORDER: "expectancy", TRADER_LOG_SKIPS: "0",
+    TRADER_SLOT_ORDER: "expectancy", TRADER_LOG_SKIPS: "0", TRADER_ENTRY_CONFIRM: "0",
+    TRADER_EOD_FLAT: "weekend",   // the LIVE policy (#3453): hold weekday overnights, flat into Friday
     // persistWindowMs defaults to 200,000 ms — "about 3 scans" at the live 60s cadence.
     // This replay steps in 5-MINUTE bars, so at the default no streak is ever "fresh"
     // (300,000 > 200,000), the counter resets to 1 every bar and persistence can never
@@ -203,13 +207,23 @@ function signalsAt(day, m) {
         try { await at.runAutoTrade({ signals: signalsAt(day, m) }, { bridge, userId: "replay", now: NOW_MS }); }
         catch (e) { /* fail-soft: a replay gap must not abort the run */ }
       }
-      // flat at the close so days are independent
-      for (const sym of Object.keys(state.pos)) {
-        const b = (DATA[sym] || []).filter((x) => x.d === day).pop();
-        if (b) { const p = state.pos[sym]; state.equity += p.qty * (b.c - p.entry); state.trades.push({ sym, ret: b.c / p.entry - 1, day }); }
-        delete state.pos[sym];
-      }
-      state.orders = [];
+      // OVERNIGHT HOLDS ARE REAL NOW (2026-08-27). The first version flattened every
+      // position at the close so days were independent — the exact same-day-close bias
+      // the operator retired the knife veto over, and the reason every variant's win
+      // rate read ~46% against the live book's 58-70%: weekday overnight holds are 71%
+      // of live profit, and the flatten stamped every would-be overnight winner at the
+      // 16:00 print. Worse, it did NOT bias all variants equally — a confirmation gate
+      // enters later in the session, so its positions had less intraday time to resolve
+      // and the flatten cut them short more often than baseline's.
+      // Positions and GTC stops now carry across days; Friday flattening belongs to the
+      // ENGINE's own TRADER_EOD_FLAT=weekend logic (in BASE below), same as live.
+    }
+    // end of data: mark remaining positions at the last available close (a handful of
+    // rows; tagged so they are distinguishable from real exits)
+    for (const sym of Object.keys(state.pos)) {
+      const a = DATA[sym] || []; const last = a[a.length - 1];
+      if (last) { const p = state.pos[sym]; state.equity += p.qty * (last.c - p.entry); state.trades.push({ sym, ret: last.c / p.entry - 1, day: last.d, why: "end_of_data" }); }
+      delete state.pos[sym];
     }
     const tr = state.trades, w = tr.filter((t) => t.ret > 0), l = tr.filter((t) => t.ret < 0);
     const avg = (a) => (a.length ? a.reduce((s, t) => s + t.ret, 0) / a.length * 100 : 0);
