@@ -327,6 +327,16 @@ function cfg() {
     momentumMinR: n('TRADER_MOMENTUM_MIN_R', 0.5),
     momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
     entryKnifeFilter: process.env.TRADER_ENTRY_KNIFE_FILTER !== '0',      // veto buying into still-cratering momentum (falling knife); on by default
+    // TRADER_ENTRY_CONFIRM (2026-08-27, default OFF): require N consecutive rising
+    // closes on the momentum timeframe before an entry — the operator's reversal
+    // thesis ("it needs an actual sign of the reversal: hitting a low and starting
+    // to go up; bumps look different"). 1 = one up bar; 2 = the lab's T2 (two up
+    // bars, no new low between). Reconstruction evidence only, which is why it is
+    // a flag and not a default: on 60 sessions T2 halved winner MAE (-0.44% ->
+    // -0.22%) and earned baseline's return on a quarter of the drawdown — but the
+    // same harness produced four findings the real engine reversed, so this ships
+    // OFF, to be judged by the replay harness and a live A/B, not by its lab row.
+    entryConfirm: (() => { const v = Math.floor(Number(process.env.TRADER_ENTRY_CONFIRM)); return Number.isFinite(v) && v >= 1 && v <= 2 ? v : 0; })(),
     // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
     // Lets the user protect open positions without arming full autopilot entries.
     manageExits: process.env.TRADER_MANAGE_EXITS === '1',
@@ -1119,6 +1129,40 @@ function knifeReading(closes) {
 function isFallingKnife(closes) {
   const r = knifeReading(closes);
   return !!(r && r.fires);
+}
+
+// REVERSAL CONFIRMATION read (TRADER_ENTRY_CONFIRM). Pure: bars in (the
+// momentum-tf series parseBars emits, multi-day), the required run length, and
+// the wall-clock instant; verdict out. Filters to TODAY'S regular session in ET
+// before judging, because the question is whether THIS washout has turned — a
+// close from yesterday's tape cannot confirm it.
+//   n=1  the last close is above the one before it
+//   n=2  the lab's T2: two rising closes AND no lower low between them
+function _entryConfirmRead(bars, n, nowMs) {
+  const need = n + 1;                                  // n rising closes need n+1 bars
+  const et = new Date(new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
+  const sess = [];
+  for (const b of bars) {
+    const d = new Date(new Date(b.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const bd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (bd !== day) continue;
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (m < 570 || m > 960) continue;                  // regular session only
+    if (Number(b.close) > 0) sess.push(b);
+  }
+  const closes = sess.slice(-need).map((b) => +Number(b.close).toFixed(4));
+  if (sess.length < need) return { ok: false, why: `only ${sess.length} session bar(s) — cannot confirm a turn yet`, closes };
+  const w = sess.slice(-need);
+  for (let i = 1; i < w.length; i++) {
+    if (!(w[i].close > w[i - 1].close)) return { ok: false, why: 'closes not rising — no turn yet', closes };
+  }
+  if (n >= 2) {
+    // "no new low between": the turn bar must not have undercut the prior bar's low
+    const last = w[w.length - 1], prev = w[w.length - 2];
+    if (Number(last.low) < Number(prev.low)) return { ok: false, why: 'rising close but a NEW LOW under it — a bump, not a turn', closes };
+  }
+  return { ok: true, why: 'confirmed', closes };
 }
 
 /**
@@ -2242,7 +2286,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // ENTER candidates, so the BULLISH branch can veto buying into cratering momentum
   // without a per-symbol fetch. Fail-soft — no bars → filter simply doesn't block.
   let entryBars = {};
-  if (c.entryKnifeFilter && enters.length) {
+  if ((c.entryKnifeFilter || c.entryConfirm > 0) && enters.length) {
     try {
       const syms = [...new Set(enters.map((s) => String(s.symbol).toUpperCase()))];
       const bm = await yahoo.getBarsMulti(syms, c.momentumTf);
@@ -2467,6 +2511,23 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           // without re-deriving it from a corpus that disagrees 30% of the time
           knife_hist: r4(_knife.hist), knife_prev: r4(_knife.prev),
           why: 'falling_knife — momentum still cratering (MACD hist<0 & deepening); waiting for the turn' });
+        continue;
+      }
+    }
+    // ── REVERSAL CONFIRMATION (TRADER_ENTRY_CONFIRM, 2026-08-27, default OFF).
+    //    Same family as the knife — waiting for the turn — but read from PRICE
+    //    rather than MACD: the last N closes of TODAY'S session must be rising
+    //    (N=2 also refuses a new low between them). Session bars only: yesterday's
+    //    closes say nothing about whether THIS washout has turned, so with fewer
+    //    than N+1 session bars the verdict is "cannot confirm" and the entry is
+    //    refused with an honest row — a confirmation gate that waves entries
+    //    through when it cannot read is not a gate (the TRADER_EXIT_NEEDS_IBS
+    //    principle, applied at entry).
+    if (c.entryConfirm > 0) {
+      const _cc = _entryConfirmRead((entryBars[sym] && entryBars[sym].bars) || [], c.entryConfirm, now);
+      if (!_cc.ok) {
+        out.skipped.push({ ...record, confirm_closes: _cc.closes,
+          why: `entry_confirm — ${_cc.why} (need ${c.entryConfirm} rising close${c.entryConfirm > 1 ? 's' : ''} on ${c.momentumTf} session bars)` });
         continue;
       }
     }
@@ -3074,4 +3135,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
