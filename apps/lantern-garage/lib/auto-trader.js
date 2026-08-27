@@ -665,6 +665,39 @@ function _entryHourBlocked(etMin, spec) {
 // decides even if it is late (up to half a bar - beyond that it is a different
 // bar), and a second scan inside the same bar never decides twice. `decided` is
 // the boundary (ET minute) of the last decision scan; the caller records it.
+// RECYCLING WAS THE EDGE, AND THE CADENCE ENDED IT (2026-08-26).
+//
+// Live daily history, stable. Week 1 ran 9.4 entries/day with 3.2 SAME-SESSION
+// RE-ENTRIES/day and made +$13,764; its two best days were its two highest-recycle
+// days (08-14 +$6,803 and 08-10 +$3,073, six recycles each). From 08-17 the recycle
+// count is ZERO — every day, ten trading days running — and the book is -$1,368.
+// The session note from week 1 named the mechanism at the time: "the lab's +$874/day
+// ceiling was beaten 3.5x by INTRADAY RECYCLING the daily-bar lab structurally cannot
+// see: SOXL 3 rounds +$1,762, SMH 3 +$541, QQQ 3 +$468, XLK 2 +$336, each re-entry at
+// a lower rung than the prior exit."
+//
+// Since 08-24 `entry_cadence` is the single biggest entry blocker (99, 85, 72 rows a
+// day), and of 26 exits across 08-24..08-26 only TWO ever came back. The lockout
+// compounds: a symbol that exits at 10:20 is held off by the 45-minute cooldown until
+// 11:05, but the cadence only decides at 11:00 — so it misses that bar and waits for
+// 12:00, by which time it must out-rank every fresh candidate.
+//
+// The cadence itself was validated on daily and hourly bars — a surface that cannot
+// represent a second entry into the same symbol on the same day. It measured what it
+// does not affect and was blind to what it destroys, so no backtest can settle this;
+// it is a live question.
+//
+// This exemption is NARROW: it lets a symbol the engine already exited THIS SESSION
+// bypass the cadence gate only. Cooldown, post-stop cooldown, the concurrent cap, the
+// maturity gate, the morning gate, falling-knife and every sizing guard are untouched,
+// and a re-entry never SPENDS the bar, so it cannot cost a fresh symbol its decision.
+// DEFAULT OFF: TRADER_CADENCE_REENTRY=1 to arm.
+function _cadenceReentryExempt(sym, nowMs) {
+  if (process.env.TRADER_CADENCE_REENTRY !== '1') return false;
+  const ea = Number(_exitAt.get(sym)) || 0;
+  if (!ea) return false;
+  return _etDateStr(ea) === _etDateStr(nowMs);   // same ET session only
+}
 let _cadenceDecided = { day: null, boundary: null };   // the boundary whose decision was SPENT (an entry placed), per process
 let _pendingCadence = { day: null, boundary: null };   // the boundary this scan is deciding for; promoted only when an entry places
 // THE BAR'S DECISION IS SPENT WHEN THE WINDOW CLOSES, NOT ON THE FIRST FILL
@@ -2225,6 +2258,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     out.skipped.push({ symbol: '*', why: `extended hours: protective exits only — ${enters.length} entry signal(s) not taken` });
   }
   for (const s of _entryCandidates) {
+    let _cadenceExemptReentry = false;   // set by the cadence gate below; read at the placement site
     const sym = String(s.symbol).toUpperCase();
     const price = Number(s.entry_price) || 0;
     const held = heldQty[sym] || 0;
@@ -2591,7 +2625,13 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       const _ecDay = _etDateStr(now);
       const _ecDecided = _cadenceDecided.day === _ecDay ? _cadenceDecided.boundary : null;   // decisions never carry across sessions
       const _ecb = _entryCadenceBlocked(_ecMin, process.env.TRADER_ENTRY_CADENCE_MIN, process.env.TRADER_ENTRY_CADENCE_PHASE, process.env.TRADER_ENTRY_CADENCE_WINDOW, _ecDecided);
-      if (_ecb) {
+      // a symbol this session already exited is a RECYCLE, not a new decision
+      if (_ecb && _cadenceReentryExempt(sym, now)) {
+        _cadenceExemptReentry = true;
+        logTrade({ event: 'cadence_reentry', symbol: sym, et_min: _ecMin,
+          would_block: _ecb.why, next_decision: _ecb.label,
+          exited_at: new Date(Number(_exitAt.get(sym)) || 0).toISOString() });
+      } else if (_ecb) {
         out.skipped.push({ ...record, why: `entry_cadence: ${String(Math.floor(_ecMin / 60)).padStart(2, '0')}:${String(_ecMin % 60).padStart(2, '0')} ET ${_ecb.why === 'decided' ? 'already decided this bar' : 'is between bar closes'} — next decision ${_ecb.label} (#3435)` });
         continue;
       }
@@ -2782,11 +2822,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       _zoneLadder.set(sym, { r1: _r1, r1top: _r1top, r2: _r2, broke: false });
     }
     if (r && r.status === 'placed') {
-      _markCadenceDecided();   // 2026-08-24: the bar's decision is spent only now, on a real placement
+      // A cadence-exempt RE-ENTRY does not spend the bar: it was never this bar's
+      // decision to make, so consuming the hour would take the slot from a fresh
+      // symbol and re-create the lockout this exemption exists to remove.
+      if (!_cadenceExemptReentry) _markCadenceDecided();
       const pl = s.plan || {};
       _pendingFillBasis.set(sym, { quote: price, ts: now });   // #3407: basis check armed
       _limitShadowArm(sym, price, now);                        // #3424: journal the limits we did not place
-      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), stress_mult: _stress.mult > 1 ? _stress.mult : undefined, stress_why: _stress.why || undefined, vix_prior: _vixPrior != null ? _vixPrior : undefined, sym_mult: _symMult !== 1 ? _symMult : undefined, p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, reentry: _cadenceExemptReentry || undefined, notional: Math.round(qty * price), stress_mult: _stress.mult > 1 ? _stress.mult : undefined, stress_why: _stress.why || undefined, vix_prior: _vixPrior != null ? _vixPrior : undefined, sym_mult: _symMult !== 1 ? _symMult : undefined, p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
         // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
         // the report can split entry outcomes by tape without guessing later.
         spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null,
@@ -3031,4 +3074,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
