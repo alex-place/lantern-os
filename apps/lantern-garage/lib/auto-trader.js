@@ -244,6 +244,15 @@ function cfg() {
     // weekend leg is the part worth cutting, not the overnight leg.
     eodFlat: String(process.env.TRADER_EOD_FLAT || 'off').trim().toLowerCase(),
     eodFlatMin: n('TRADER_EOD_FLAT_MIN', n('TRADER_DECARRY_MIN', 950)),
+    // TRADER_MAX_HOLD_SESSIONS (2026-08-27, default OFF): flatten a position at the
+    // close of its Nth session. NOT a new idea — the lab config every armed number came
+    // from (armed_baseline MONDAY, the 2,866% 26y holdout) includes timeoutS: 5, "exit
+    // at the close of the 5th session", and the engine simply never implemented it.
+    // The gap has a live victim: SPXS on race sat 3 sessions in the DEAD ZONE — always
+    // reading BULLISH (a perma-washout as it fell) so the bearish branch never ran and
+    // the bounce exit was never evaluated; peak +0.64% never armed the +1% floor;
+    // -1.9% never hit the -3% stop. No rule could reach it. This one can.
+    maxHoldSessions: n('TRADER_MAX_HOLD_SESSIONS', 0),
     decarryMin: n('TRADER_DECARRY_MIN', 950),                       // 15:50 ET
     decarrySyms: new Set(String(process.env.TRADER_DECARRY_SYMBOLS
       || 'TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA')
@@ -1131,6 +1140,23 @@ function isFallingKnife(closes) {
   return !!(r && r.fires);
 }
 
+// Trading sessions between two instants, ET, weekends skipped (holidays widen the
+// count by at most a day — conservative for a timeout). Entry day is session 0, so
+// Mon -> next Mon = 5, matching the lab's `si >= entrySi + timeoutS` semantics.
+function _sessionsHeld(entryMs, nowMs) {
+  const d0 = new Date(new Date(entryMs).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const d1 = new Date(new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  d0.setHours(12, 0, 0, 0); d1.setHours(12, 0, 0, 0);
+  let n = 0;
+  const cur = new Date(d0);
+  while (cur < d1 && n < 400) {
+    cur.setDate(cur.getDate() + 1);
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) n++;
+  }
+  return n;
+}
+
 // REVERSAL CONFIRMATION read (TRADER_ENTRY_CONFIRM). Pure: bars in (the
 // momentum-tf series parseBars emits, multi-day), the required run length, and
 // the wall-clock instant; verdict out. Filters to TODAY'S regular session in ET
@@ -1303,6 +1329,30 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
           if (!(_ea && (now - _ea) < c.exitReattemptMs)) {
             await closeLong(bridge, userId, sym, qty, p, 'eod_decarry (leveraged overnight gap risk #3298) — flat into the close', out, now, { extended, refPrice: cur });
             delete heldQty[sym]; continue;
+          }
+        }
+      }
+    }
+
+    // MAX-HOLD TIMEOUT — see cfg.maxHoldSessions. The lab's timeoutS, finally in the
+    // engine. Same discipline as eodFlat: regular hours only, the eod window, pinned
+    // exempt, and a position with no recorded entry time is HELD not sold (a restart
+    // that lost state must not liquidate the book — max_loss still backstops it).
+    if (c.maxHoldSessions > 0 && qty >= 1 && !extended) {
+      const _hEntryAt = _entryAt.get(sym);
+      const _hEt = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const _hMin = _hEt.getHours() * 60 + _hEt.getMinutes();
+      if (_hEntryAt && _hMin >= c.eodFlatMin && _hMin < 960) {
+        const _held = _sessionsHeld(_hEntryAt, now);
+        if (_held >= c.maxHoldSessions) {
+          if (_isPinned(sym)) {
+            out.skipped.push({ symbol: sym, why: `pinned — max_hold suppressed by operator (#3318); held ${_held} sessions deliberately` });
+          } else {
+            const _ea3 = _exitAt.get(sym) || 0;
+            if (!(_ea3 && (now - _ea3) < c.exitReattemptMs)) {
+              await closeLong(bridge, userId, sym, qty, p, `max_hold (${_held} sessions ≥ ${c.maxHoldSessions} — the lab's timeoutS, flat into the close)`, out, now, { extended, refPrice: cur });
+              delete heldQty[sym]; continue;
+            }
           }
         }
       }
@@ -3135,4 +3185,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _sessionsHeld, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

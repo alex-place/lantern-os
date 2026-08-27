@@ -543,6 +543,31 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           _sessionNote = 'extended hours: no quote available to price a limit — sent as market, which will not fill until 09:30';
         }
       }
+      // CANCEL RESTING STOPS BEFORE A MANUAL SELL (2026-08-27). The broker reserves
+      // held shares against a working protective stop, so a manual flatten of a
+      // stopped position is rejected — Alpaca: "insufficient qty available (requested:
+      // 492, available: 0)", today's SPXS; IBKR: oversell protection cancels one of
+      // the two sells (the 2026-08-10 QQQ incident). The ENGINE's exit path has done
+      // cancel-first-and-settle since #3407; this manual path never did, and it has
+      // now trapped the operator twice (the 08-20 champion flatten, today's SPXS).
+      // The engine's own cancelRestingStops is reused via the broker facade, which
+      // duck-types getIBKROpenOrders/cancelIBKROrder for whichever broker holds the
+      // book — including its #3407 settle-before-selling wait. Fail-soft: if the
+      // cancel path errors, the sell proceeds as before (worst case is today's
+      // behaviour, not a new failure).
+      let _stopsCancelledNote = null;
+      if (String(side).toLowerCase() === 'sell' && !/stop/i.test(String(type || ''))) {
+        try {
+          const { brokerFacadeFor } = require('../../lib/broker-facade');
+          const facade = await brokerFacadeFor(uid, bridge);
+          const F = (facade && (facade.facade || facade)) || null;
+          if (F && F.getIBKROpenOrders && F.cancelIBKROrder) {
+            const at = require('../../lib/auto-trader');
+            await at.cancelRestingStops(F, uid, String(ticker).toUpperCase());
+            _stopsCancelledNote = 'resting stop(s) cancelled first so the shares are free to sell (#3407, manual path)';
+          }
+        } catch (_e) { /* fail-soft — proceed exactly as before */ }
+      }
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
@@ -605,6 +630,7 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // about WHEN this order will act — "placed" and "will fill" are different
       // claims, and conflating them is what made a pre-market Flatten look done.
       if (_sessionNote) { result.session = _sess; result.session_note = _sessionNote; }
+      if (_stopsCancelledNote) result.stops_note = _stopsCancelledNote;
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,
