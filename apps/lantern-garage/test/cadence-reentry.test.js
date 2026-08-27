@@ -27,6 +27,17 @@ process.env.TRADER_STATE_FILE = path.join(DIR, 'state.json');
 const at = require('../lib/auto-trader');
 
 const M = (h, m) => h * 60 + m;
+// FIXED ET INSTANTS, NOT THE WALL CLOCK (2026-08-27). These tests originally anchored to
+// `Date.now() - 40 minutes`, which straddles the ET date boundary when the suite runs
+// after midnight: the exit lands on 08-26 at 23:51 and "now" on 08-27 at 00:31, the
+// same-session check correctly returns false, and the assertion fails. It passed when
+// written at 02:35 and went red at 00:31 — the same class of defect as the LNG fixtures
+// (a test whose verdict depends on WHEN it runs). Sessions are the subject here, so the
+// clock has to be an input.
+const ET_AT = (isoDay, h, m) => new Date(`${isoDay}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-04:00`).getTime();
+const WED_1100 = ET_AT('2026-08-19', 11, 0);      // mid-session
+const WED_1020 = ET_AT('2026-08-19', 10, 20);     // 40 minutes earlier, same session
+const TUE_1500 = ET_AT('2026-08-18', 15, 0);      // the session before
 const withEnv = (vars, fn) => {
   const prev = {};
   for (const [k, v] of Object.entries(vars)) { prev[k] = process.env[k]; process.env[k] = v; }
@@ -56,41 +67,47 @@ test('the cadence still admits the first scan of an unspent bar', () => {
 // ---------------------------------------------------------------------------
 test('DEFAULT OFF — an exit this session does not exempt anything unless armed', () => {
   withEnv({ TRADER_CADENCE_REENTRY: undefined }, () => {
-    assert.strictEqual(at._cadenceReentryExempt('SOXL', Date.now()), false);
+    assert.strictEqual(at._cadenceReentryExempt('SOXL', WED_1100), false);
   });
   withEnv({ TRADER_CADENCE_REENTRY: '0' }, () => {
-    assert.strictEqual(at._cadenceReentryExempt('SOXL', Date.now()), false);
+    assert.strictEqual(at._cadenceReentryExempt('SOXL', WED_1100), false);
   });
 });
 
 test('armed: a symbol exited THIS session is exempt', () => {
-  const now = Date.now();
-  at._exitAtSet('SOXL', now - 40 * 60000);          // exited 40 minutes ago
+  at._exitAtSet('SOXL', WED_1020);                  // exited 40 minutes earlier, same session
   withEnv({ TRADER_CADENCE_REENTRY: '1' }, () => {
-    assert.strictEqual(at._cadenceReentryExempt('SOXL', now), true);
+    assert.strictEqual(at._cadenceReentryExempt('SOXL', WED_1100), true);
+  });
+});
+
+test('an exit MINUTES earlier but on the previous ET date is not the same session', () => {
+  // the boundary the wall-clock version tripped over: 23:51 and 00:31 are 40 minutes
+  // apart and belong to different sessions.
+  at._exitAtSet('SPY', ET_AT('2026-08-18', 23, 51));
+  withEnv({ TRADER_CADENCE_REENTRY: '1' }, () => {
+    assert.strictEqual(at._cadenceReentryExempt('SPY', ET_AT('2026-08-19', 0, 31)), false);
   });
 });
 
 test('a symbol never exited is NOT exempt — this is not a general cadence bypass', () => {
   withEnv({ TRADER_CADENCE_REENTRY: '1' }, () => {
-    assert.strictEqual(at._cadenceReentryExempt('NEVERHELD', Date.now()), false);
+    assert.strictEqual(at._cadenceReentryExempt('NEVERHELD', WED_1100), false);
   });
 });
 
 test("YESTERDAY's exit does not exempt today — the recycle is a same-session act", () => {
-  const now = Date.now();
-  at._exitAtSet('XLK', now - 30 * 3600e3);          // ~30h ago, a different ET date
+  at._exitAtSet('XLK', TUE_1500);
   withEnv({ TRADER_CADENCE_REENTRY: '1' }, () => {
-    assert.strictEqual(at._cadenceReentryExempt('XLK', now), false);
+    assert.strictEqual(at._cadenceReentryExempt('XLK', WED_1100), false);
   });
 });
 
 test('the exemption is per SYMBOL, not global', () => {
-  const now = Date.now();
-  at._exitAtSet('SMH', now - 10 * 60000);
+  at._exitAtSet('SMH', ET_AT('2026-08-19', 10, 50));
   withEnv({ TRADER_CADENCE_REENTRY: '1' }, () => {
-    assert.strictEqual(at._cadenceReentryExempt('SMH', now), true);
-    assert.strictEqual(at._cadenceReentryExempt('QQQ', now), false, 'a different symbol is untouched');
+    assert.strictEqual(at._cadenceReentryExempt('SMH', WED_1100), true);
+    assert.strictEqual(at._cadenceReentryExempt('QQQ', WED_1100), false, 'a different symbol is untouched');
   });
 });
 
