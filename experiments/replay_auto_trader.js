@@ -28,6 +28,24 @@
  * T2 is NOT in the engine, so it cannot be replayed here — that part of the finding
  * stays at reconstruction confidence until it is implemented behind a flag.
  *
+ * KNOWN BIAS — READ BEFORE TRUSTING ANY EXIT RESULT (found 2026-08-27, after the run
+ * below was already used). The replay FLATTENS EVERY POSITION AT THE CLOSE so that days
+ * are independent. The live engine does not: weekday overnight holds are 71% of live
+ * profit, and TRADER_EOD_FLAT=weekend means only Friday is flat by policy.
+ *
+ * That is not a small difference. The operator disabled the falling-knife veto on
+ * 2026-08-22 with exactly this reasoning, recorded in .env.local: "its justification used
+ * the same-day-close exit; under the real exits it halves entries for no gain." This
+ * harness reintroduces the same-day-close bias it was built to escape, so its KNIFE row
+ * carries the very objection that retired the rule and MUST NOT be read as overturning
+ * that decision.
+ *
+ * The finding this harness DID establish is unaffected, because it is a comparison
+ * BETWEEN variants under one identical (if biased) exit regime: removing a turn filter
+ * makes things worse in the real engine, not better. Anything about a single rule's
+ * absolute value — especially one whose edge lives in overnight carry — needs the flatten
+ * removed first.
+ *
  * Usage: node experiments/replay_auto_trader.js
  */
 "use strict";
