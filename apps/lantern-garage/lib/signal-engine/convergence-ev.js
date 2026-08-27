@@ -38,7 +38,34 @@ const WEIGHTS = {
 };
 
 const EV_MIN = 0.15; // require ≥ +0.15R edge after costs to act
-const P_MIN = 0.45; // and at least a 45% hit-rate, so a huge target can't carry junk
+
+// P_MIN — the hit-rate floor. Was a hardcoded 0.45; now readable so it can be
+// MEASURED instead of assumed (2026-08-27).
+//
+// 84 live entries joined to their exits, both boxes, from 2026-08-10:
+//
+//   p_win band      n     WR       avg    avg loss     worst
+//   0.00-0.50      23    39%   -0.341%    -0.690%    -2.940%
+//   0.50-0.55      16    63%   +0.594%    -0.349%    -1.514%
+//   0.55-0.60      20    85%   +0.639%    -1.038%    -1.514%
+//   0.60-0.70      22    77%   +0.064%    -1.409%    -4.120%
+//
+// The band the floor currently admits — 0.45 to 0.50 — wins 39% of the time and
+// loses money. Cutting it (n=61 of 84) takes total return from +14.38% to +22.22%
+// and the win rate from 65% to 75%, and the improvement decays cleanly above 0.50
+// (0.52 -> +14.20%, 0.55 -> +12.72%, 0.60 -> -0.06%), so 0.50 is the edge of a bad
+// band rather than a fitted peak.
+//
+// WHY A KNOB AND NOT A NEW DEFAULT: n=84 in one regime, and the entry->exit join is
+// naive where a symbol was re-entered. It also cannot be settled by backtest — the
+// replay harness feeds a constant p_win, and reconstructing the real one from bars
+// would neutralise 41% of the model's weight (grok/claude/news/earnings/sector are
+// not recoverable from price alone). So the honest test is live and side-by-side,
+// which is what the knob is for. Default is unchanged at 0.45.
+const P_MIN = (() => {
+  const v = Number(process.env.TRADER_P_MIN);
+  return Number.isFinite(v) && v > 0 && v < 1 ? v : 0.45;
+})();
 const P_CLAMP = [0.05, 0.95];
 
 function _clamp(x, lo, hi) {
