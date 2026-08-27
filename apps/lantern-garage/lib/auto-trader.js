@@ -470,6 +470,13 @@ function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.posi
 // Per-symbol state (in-process; a restart clears it — safe, just re-checks).
 const _lastOrderAt = new Map(); // sym -> last order ts (re-entry cooldown)
 const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before exit)
+// ADOPTED HOLD CLOCK (2026-08-27). max_hold counts from _entryAt — but a position with
+// no recorded entry time was IMMUNE forever, and the class is live: on the rule's first
+// armed day, stable's state held TLT (entered by the engine at 12:10 that same day)
+// with no persisted entryAt. Kept SEPARATE from _entryAt on purpose: adopting into
+// _entryAt would make an old position look freshly entered to the maturity gate,
+// min-hold and every other consumer of entry time. This clock feeds max_hold ONLY.
+const _holdClockAt = new Map();  // sym -> ts max_hold first SAW an untracked position
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
 const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
 const _trough = new Map();      // sym -> lowest price seen since entry (MAE capture, #3241)
@@ -1005,6 +1012,7 @@ function _saveState() {
 
       entryAt: Object.fromEntries(_entryAt),
       exitAt: Object.fromEntries(_exitAt),
+      holdClockAt: Object.fromEntries(_holdClockAt),
       exitStatus: Object.fromEntries(_exitStatus),
       lastOrderAt: Object.fromEntries(_lastOrderAt),
       dirStreak: Object.fromEntries(_dirStreak),
@@ -1041,6 +1049,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.trough || {})) _trough.set(k, v);
     for (const [k, v] of Object.entries(o.excursion || {})) _excursion.set(k, v);
     for (const [k, v] of Object.entries(o.entryAt || {})) _entryAt.set(k, v);
+    for (const [k, v] of Object.entries(o.holdClockAt || {})) _holdClockAt.set(k, v);
     for (const [k, v] of Object.entries(o.exitAt || {})) _exitAt.set(k, v);
     for (const [k, v] of Object.entries(o.exitStatus || {})) _exitStatus.set(k, v);
     for (const [k, v] of Object.entries(o.lastOrderAt || {})) _lastOrderAt.set(k, v);
@@ -1245,7 +1254,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   // Freeze the excursion run BEFORE clearing per-symbol state — the fill row that
   // needs it is only written later, at broker reconcile (#3241).
   _excursion.set(sym, { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null });
-  _entryAt.delete(sym); _peak.delete(sym); _trough.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
+  _entryAt.delete(sym); _holdClockAt.delete(sym); _peak.delete(sym); _trough.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   _exitIntent.set(sym, reason);
   logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status,
@@ -1339,7 +1348,15 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     // exempt, and a position with no recorded entry time is HELD not sold (a restart
     // that lost state must not liquidate the book — max_loss still backstops it).
     if (c.maxHoldSessions > 0 && qty >= 1 && !extended) {
-      const _hEntryAt = _entryAt.get(sym);
+      let _hEntryAt = _entryAt.get(sym) || _holdClockAt.get(sym);
+      if (!_hEntryAt) {
+        // untracked position: start the clock NOW, journal it once, and let immunity
+        // decay — it becomes mortal N sessions from discovery instead of never.
+        _holdClockAt.set(sym, now); _saveState();
+        logTrade({ event: 'max_hold_clock_adopted', symbol: sym,
+          why: 'no recorded entry time — hold clock starts at discovery; max_hold applies N sessions from here' });
+        _hEntryAt = now;
+      }
       const _hEt = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
       const _hMin = _hEt.getHours() * 60 + _hEt.getMinutes();
       if (_hEntryAt && _hMin >= c.eodFlatMin && _hMin < 960) {
@@ -1925,7 +1942,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         }
         _loggedFills.add(_regStop.id);          // a late feed appearance must not double-book
         _stopOrders.delete(sym);
-        _peak.delete(sym); _trough.delete(sym); _entryAt.delete(sym); _excursion.delete(sym);
+        _peak.delete(sym); _trough.delete(sym); _entryAt.delete(sym); _holdClockAt.delete(sym); _excursion.delete(sym);
         continue;
       }
     }
@@ -1998,7 +2015,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   for (const sym of [..._exitStatus.keys()]) {
     if (!(Number(heldQty[sym]) > 0)) {
       // Position gone → exit resolved. Drop its state.
-      _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
+      _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym); _holdClockAt.delete(sym);
       _stopOrders.delete(sym);                               // #3379: closeLong cancelled it; the record is dead
       _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
       _unclosableAt.delete(sym); _exitNoOrder.delete(sym);
@@ -2470,7 +2487,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           : { ticker: sym, side: 'sell', qty: held, type: 'market', acceptWarnings: true };
         const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
-        _entryAt.delete(sym); _exitAt.set(sym, now);
+        _entryAt.delete(sym); _holdClockAt.delete(sym); _exitAt.set(sym, now);
         _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
@@ -3008,7 +3025,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1;
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); _saveState(); opened += 1; _openedThisScan += 1;
       try { const _b = require('./direction-lock').riskBucket(sym); _bucketOpenedThisScan[_b] = (_bucketOpenedThisScan[_b] || 0) + 1; } catch (_e) { /* bucketing is advisory */ } _grossThisScan += qty * price;
       // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
       // paper cash-secured-put leg for this same signal, paired by symbol+ts.
@@ -3183,6 +3200,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _sessionsHeld, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _sessionsHeld, _holdClockAt, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
