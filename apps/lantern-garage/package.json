@@ -81,7 +81,7 @@
   },
   "optionalDependencies": {
     "win-ca": "^3.5.1",
-    "stripe": "^22.5.0"
+    "stripe": "^22.6.0"
   },
   "overrides": {
     "brace-expansion@1": "1.1.18",
