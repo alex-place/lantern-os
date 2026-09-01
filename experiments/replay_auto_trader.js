@@ -188,6 +188,28 @@ function signalsAt(day, m) {
     // qualifying scans) at this resolution.
     TRADER_PERSIST_WINDOW_MS: String(15 * 60 * 1000),
   };
+  // ── ARMED-ENV PARITY LOADER (2026-08-31) ──────────────────────────────────
+  // The decarry verdict FLIPPED SIGN between runs because BASE was missing ONE
+  // armed knob (the 13:30-14:30 entry-hour block) — a hand-maintained BASE
+  // silently drifts from the boxes' .env.local and the replay then measures a
+  // config nobody runs. REPLAY_ARMED_ENV=<path to .env.local> merges that
+  // file's TRADER_* knobs into BASE and prints every difference, so config
+  // infidelity is visible instead of silent. (Path/broker/infra keys are not
+  // TRADER_* and are never imported.)
+  if (process.env.REPLAY_ARMED_ENV) {
+    const src = process.env.REPLAY_ARMED_ENV;
+    const IGNORE = /^TRADER_(TRADES_LOG|STATE_FILE|LOCK_DIR|LIVE|AUTO_EXECUTE|AUTO_USER|SESSION_REVIEW|MANAGE_EXITS)$/;
+    let imported = 0;
+    for (const line of fs.readFileSync(src, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*(TRADER_[A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (!m || IGNORE.test(m[1])) continue;
+      if (BASE[m[1]] !== m[2]) {
+        console.log(`  [armed-env] ${m[1]}: ${BASE[m[1]] === undefined ? '(unset in BASE)' : BASE[m[1]]} -> ${m[2]}`);
+        BASE[m[1]] = m[2]; imported++;
+      }
+    }
+    console.log(`  [armed-env] ${imported} knob(s) imported from ${src}\n`);
+  }
   console.log(`REPLAY THROUGH THE REAL runAutoTrade — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
   console.log(`  ${"variant".padEnd(26)}${"return".padStart(10)}${"trades".padStart(8)}${"WR".padStart(6)}${"avg win".padStart(10)}${"avg loss".padStart(10)}${"payoff".padStart(8)}`);
 
@@ -197,6 +219,13 @@ function signalsAt(day, m) {
     for (const f of [process.env.TRADER_TRADES_LOG, process.env.TRADER_STATE_FILE]) { try { fs.unlinkSync(f); } catch (_e) {} }
     const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0 };
     const bridge = makeBroker(state);
+    // ZERO-FIRE TRIPWIRE (2026-08-31): twice this harness produced plausible
+    // numbers while an entire gate was silently broken (persist window at the 5m
+    // step; the stub's `time` vs parseBars' `timestamp` starving the confirm
+    // gate) — a variant that looks fine but whose gates never fired is the most
+    // dangerous output a backtest can emit. Tally every skip reason so the gate
+    // census prints alongside the result, and mark low-trade variants INVALID.
+    const skipCensus = {};
     for (const day of days) {
       for (let m = 570; m <= 960; m += 5) {
         const anyBar = SYMS.some((s) => (DATA[s] || []).some((b) => b.d === day && b.m === m));
@@ -204,8 +233,13 @@ function signalsAt(day, m) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
         NOW_MS = cur.t;
-        try { await at.runAutoTrade({ signals: signalsAt(day, m) }, { bridge, userId: "replay", now: NOW_MS }); }
-        catch (e) { /* fail-soft: a replay gap must not abort the run */ }
+        try {
+          const r = await at.runAutoTrade({ signals: signalsAt(day, m) }, { bridge, userId: "replay", now: NOW_MS });
+          for (const s of ((r && r.skipped) || [])) {
+            const k = String(s.why || '?').split(/[—(:]/)[0].trim().slice(0, 30);
+            skipCensus[k] = (skipCensus[k] || 0) + 1;
+          }
+        } catch (e) { /* fail-soft: a replay gap must not abort the run */ }
       }
       // OVERNIGHT HOLDS ARE REAL NOW (2026-08-27). The first version flattened every
       // position at the close so days were independent — the exact same-day-close bias
@@ -230,6 +264,10 @@ function signalsAt(day, m) {
     console.log(`  ${name.padEnd(26)}${((state.equity / 100000 - 1) * 100).toFixed(2).padStart(9)}%${String(tr.length).padStart(8)}`
       + `${(tr.length ? (w.length / tr.length * 100).toFixed(0) + "%" : "-").padStart(6)}`
       + `${(avg(w).toFixed(3) + "%").padStart(10)}${(avg(l).toFixed(3) + "%").padStart(10)}`
-      + `${(avg(l) !== 0 ? Math.abs(avg(w) / avg(l)).toFixed(2) : "-").padStart(8)}`);
+      + `${(avg(l) !== 0 ? Math.abs(avg(w) / avg(l)).toFixed(2) : "-").padStart(8)}`
+      + (tr.length < 5 ? '   << INVALID: too few trades to mean anything — a gate is likely broken or starving' : ''));
+    const cens = Object.entries(skipCensus).sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([k, v]) => `${k}:${v}`).join('  ');
+    if (cens) console.log(`      gates: ${cens}`);
   }
 })().catch((e) => { console.error("replay failed:", e.message, e.stack); process.exit(1); });
