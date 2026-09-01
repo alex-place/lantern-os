@@ -980,6 +980,15 @@ function _reconcileFills(orders) {
       if (_reg && String(row.order_id) === _reg.id) _stopOrders.delete(row.symbol);
       _exitIntent.delete(row.symbol);
       _excursion.delete(row.symbol);   // consumed by the fill row it was frozen for
+      // THE GHOST-PEAK LEAK (live 2026-08-31). This path — a feed-visible broker
+      // fill, the road most protective stops travel — cleared intent/excursion
+      // but left _peak/_trough/_entryAt/_holdClockAt alive. Every OTHER exit path
+      // deletes them; this one leaked, so SOXL's Friday peak survived two stop
+      // fills and a weekend and Monday's re-entry was trail-cut against it. The
+      // position left the book at this fill: all per-position state dies with it.
+      // (Entry placement also resets _peak/_trough now — belt and suspenders.)
+      _peak.delete(row.symbol); _trough.delete(row.symbol);
+      _entryAt.delete(row.symbol); _holdClockAt.delete(row.symbol);
       // A STOP fill arms the re-entry cooldown: today + N trading days.
       const _cdDays = cfg().stopCooldownDays;
       if (_isStopFill) {
@@ -3025,7 +3034,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); _saveState(); opened += 1; _openedThisScan += 1;
+    // FRESH POSITION = FRESH EXCURSIONS (the SOXL ghost peak, live 2026-08-31).
+    // _peak/_trough only ever grow against their existing value, so a stale entry
+    // from a PRIOR position poisons the next one: Friday's SOXL peak ($118.08)
+    // survived a feed-visible stop fill and the weekend, and Monday's fresh entry
+    // at $112.01 was trail-cut at −$878 for a "give-back from peak +5.4%" this
+    // position never came near (real high +0.2%). Reset at placement so no leak
+    // path upstream can matter.
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _peak.delete(sym); _trough.delete(sym); _entryAt.set(sym, now); _saveState(); opened += 1; _openedThisScan += 1;
       try { const _b = require('./direction-lock').riskBucket(sym); _bucketOpenedThisScan[_b] = (_bucketOpenedThisScan[_b] || 0) + 1; } catch (_e) { /* bucketing is advisory */ } _grossThisScan += qty * price;
       // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
       // paper cash-secured-put leg for this same signal, paired by symbol+ts.
@@ -3202,4 +3218,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _sessionsHeld, _holdClockAt, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
