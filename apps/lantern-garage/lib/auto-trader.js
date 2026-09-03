@@ -346,6 +346,7 @@ function cfg() {
     // same harness produced four findings the real engine reversed, so this ships
     // OFF, to be judged by the replay harness and a live A/B, not by its lab row.
     entryConfirm: (() => { const v = Math.floor(Number(process.env.TRADER_ENTRY_CONFIRM)); return Number.isFinite(v) && v >= 1 && v <= 2 ? v : 0; })(),
+    confirmShape: process.env.TRADER_CONFIRM_SHAPE === '1',   // shape-aware turn read: V-bottom fast-track + weak-turn veto (default OFF)
     // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
     // Lets the user protect open positions without arming full autopilot entries.
     manageExits: process.env.TRADER_MANAGE_EXITS === '1',
@@ -1182,7 +1183,7 @@ function _sessionsHeld(entryMs, nowMs) {
 // close from yesterday's tape cannot confirm it.
 //   n=1  the last close is above the one before it
 //   n=2  the lab's T2: two rising closes AND no lower low between them
-function _entryConfirmRead(bars, n, nowMs) {
+function _entryConfirmRead(bars, n, nowMs, shape = false) {
   const need = n + 1;                                  // n rising closes need n+1 bars
   const et = new Date(new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const day = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
@@ -1196,6 +1197,30 @@ function _entryConfirmRead(bars, n, nowMs) {
     if (Number(b.close) > 0) sess.push(b);
   }
   const closes = sess.slice(-need).map((b) => +Number(b.close).toFixed(4));
+  // ── V-BOTTOM FAST-TRACK (shape mode): a capitulation bar (range >= 1.5x the
+  //    average of the ~6 bars before it) followed by ONE strong reclaim bar
+  //    (rising, bar-IBS >= 0.6, close back above half the capitulation range,
+  //    no new low) confirms immediately — a true V announces itself, and the
+  //    second rising close the base read waits for is where the move went. ──
+  if (shape && sess.length >= 4) {
+    const scan = sess.slice(-10);
+    let li = 0; for (let i = 1; i < scan.length - 1; i++) if (Number(scan[i].low) < Number(scan[li].low)) li = i;
+    const lowBar = scan[li];
+    if (li < scan.length - 1) {
+      const before = scan.slice(Math.max(0, li - 6), li);
+      const avgRange = before.length >= 3 ? before.reduce((s, b) => s + (Number(b.high) - Number(b.low)), 0) / before.length : 0;
+      const lowRange = Number(lowBar.high) - Number(lowBar.low);
+      const b1 = scan[scan.length - 1];
+      const prevClose = scan.length >= 2 ? Number(scan[scan.length - 2].close) : Number(lowBar.close);
+      const rising = Number(b1.close) > prevClose;
+      const barIbs = (Number(b1.close) - Number(b1.low)) / Math.max(Number(b1.high) - Number(b1.low), 1e-9);
+      const reclaim = (Number(b1.close) - Number(lowBar.low)) / Math.max(lowRange, 1e-9);
+      const noNewLow = Number(b1.low) >= Number(lowBar.low);
+      if (avgRange > 0 && lowRange >= 1.5 * avgRange && rising && barIbs >= 0.6 && reclaim >= 0.5 && noNewLow) {
+        return { ok: true, why: `V-bottom fast-track (capitulation ${(lowRange / avgRange).toFixed(1)}x avg range, reclaim ${(reclaim * 100).toFixed(0)}%, bar-IBS ${barIbs.toFixed(2)})`, closes };
+      }
+    }
+  }
   if (sess.length < need) return { ok: false, why: `only ${sess.length} session bar(s) — cannot confirm a turn yet`, closes };
   const w = sess.slice(-need);
   for (let i = 1; i < w.length; i++) {
@@ -1205,6 +1230,18 @@ function _entryConfirmRead(bars, n, nowMs) {
     // "no new low between": the turn bar must not have undercut the prior bar's low
     const last = w[w.length - 1], prev = w[w.length - 2];
     if (Number(last.low) < Number(prev.low)) return { ok: false, why: 'rising close but a NEW LOW under it — a bump, not a turn', closes };
+  }
+  // ── WEAK-TURN VETO (shape mode): rising closes that reclaimed almost nothing
+  //    of the drop are bumps ("repeating pattern"), not a turn — refuse. ──
+  if (shape) {
+    const pre = sess.slice(-need - 8, -need);
+    const swingHigh = pre.length ? Math.max(...pre.map((b) => Number(b.high))) : 0;
+    const winLow = Math.min(...w.map((b) => Number(b.low)).filter((x) => x > 0));
+    const drop = swingHigh - winLow;
+    const reclaimed = Number(w[w.length - 1].close) - winLow;
+    if (drop > 0 && reclaimed / drop < 0.25) {
+      return { ok: false, why: `turn too weak — reclaimed ${(100 * reclaimed / drop).toFixed(0)}% of the drop (drift, not a turn)`, closes };
+    }
   }
   return { ok: true, why: 'confirmed', closes };
 }
@@ -2600,7 +2637,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     //    through when it cannot read is not a gate (the TRADER_EXIT_NEEDS_IBS
     //    principle, applied at entry).
     if (c.entryConfirm > 0) {
-      const _cc = _entryConfirmRead((entryBars[sym] && entryBars[sym].bars) || [], c.entryConfirm, now);
+      const _cc = _entryConfirmRead((entryBars[sym] && entryBars[sym].bars) || [], c.entryConfirm, now, c.confirmShape);
+      if (_cc.ok && c.confirmShape && /fast-track/.test(String(_cc.why))) { try { logTrade({ event: 'confirm_path', symbol: sym, path: 'fast_track', why: String(_cc.why).slice(0, 100) }); } catch (_e) { /* observability only */ } }
       if (!_cc.ok) {
         out.skipped.push({ ...record, confirm_closes: _cc.closes,
           why: `entry_confirm — ${_cc.why} (need ${c.entryConfirm} rising close${c.entryConfirm > 1 ? 's' : ''} on ${c.momentumTf} session bars)` });
