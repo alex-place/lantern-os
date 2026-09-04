@@ -336,6 +336,7 @@ function cfg() {
     momentumMinR: n('TRADER_MOMENTUM_MIN_R', 0.5),
     momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
     entryKnifeFilter: process.env.TRADER_ENTRY_KNIFE_FILTER !== '0',      // veto buying into still-cratering momentum (falling knife); on by default
+    inverseSpyGate: (() => { const v = Number(process.env.TRADER_INVERSE_SPY_GATE); return Number.isFinite(v) && v > 0 && v <= 1 ? v : 0; })(),
     // TRADER_ENTRY_CONFIRM (2026-08-27, default OFF): require N consecutive rising
     // closes on the momentum timeframe before an entry — the operator's reversal
     // thesis ("it needs an actual sign of the reversal: hitting a low and starting
@@ -2411,6 +2412,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // IBS is position-within-session-range; the extended session has almost no
   // range, so the entry signal is undefined there and unbacked by any lab gate.
   const _entryCandidates = protectiveOnly ? [] : _orderEntries(enters, process.env.TRADER_SLOT_ORDER);
+  const _spyGateRow = (signals || []).find((x) => x && String(x.symbol).toUpperCase() === "SPY");
+  const _spyGateIbs = _spyGateRow ? Number((_spyGateRow.decision_context && _spyGateRow.decision_context.ibs) != null ? _spyGateRow.decision_context.ibs : _spyGateRow.ibs) : null;
+  const _INVERSE_FAMILY = new Set(["SQQQ", "SOXS", "SPXS", "TZA", "FAZ"]);
   if (protectiveOnly && enters.length) {
     out.skipped.push({ symbol: '*', why: `extended hours: protective exits only — ${enters.length} entry signal(s) not taken` });
   }
@@ -2429,6 +2433,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // never reach this loop, so the ledger does not grow for them.
     const record = { symbol: sym, direction: s.direction, p_win: s.convergence.p_win, news: s.news || null,
       ...(s.decision_context || {}) };
+    // ── INVERSE-SPY GATE: a deep inverse while SPY sits at its highs is the
+    //    trend working, not noise — the SOXS −$3.3k class (09-03, spyIBS 0.99
+    //    at entry). New entries only; exits and held positions untouched. ──
+    if (c.inverseSpyGate > 0 && _INVERSE_FAMILY.has(sym) && (heldQty[sym] || 0) <= 0
+        && Number.isFinite(_spyGateIbs) && _spyGateIbs >= c.inverseSpyGate) {
+      out.skipped.push({ ...record, why: `inverse_spy_gate: SPY session IBS ${_spyGateIbs.toFixed(2)} >= ${c.inverseSpyGate} — an inverse washout against a strong tape is the trend, not a dip` });
+      continue;
+    }
 
     if (price < c.minPrice) { out.skipped.push({ ...record, why: 'price too low' }); continue; }
     // Crypto pairs can't trade through this IBKR path (Paxos needs a US crypto acct
