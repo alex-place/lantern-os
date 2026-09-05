@@ -135,11 +135,17 @@ test('WEEKEND buy rests above the market, not below', async () => {
   assert.ok(c.order.limitPrice > 100, `buy limit must be marketable upward: ${c.order.limitPrice}`);
 });
 
-test('WEEKEND with no quote: stays market and WARNS it may expire — never claims it queues', async () => {
+test('WEEKEND with no quote: REFUSED before anything is cancelled — no dead order, no touched stops', async () => {
+  // Third generation of this test, tracking the path's hardening history:
+  //   v1 asserted "queues" (false — TIF=DAY expired, #3327), v2 asserted the
+  //   degrade + warning, v3 asserts the refuse (bd1002ac, the race book's
+  //   2026-08-28 naked-book incident: the degraded order reached the
+  //   cancel-resting-stops step, cancelled the protective stop, then the broker
+  //   rejected the raw closed-market MARKET sell — position held, unprotected).
   const c = await place(SELL, { now: SUN, price: 0 });
-  assert.strictEqual(c.order.type, 'market');
-  assert.match(c.body.session_note, /may expire unfilled/);
-  assert.doesNotMatch(c.body.session_note, /QUEUES/);
+  assert.strictEqual(c.order, null, 'nothing reaches the broker');
+  assert.strictEqual(c.body.status, 'error');
+  assert.match(c.body.reason, /nothing was placed and no stops were touched/);
 });
 
 test('RTH and extended paths are unchanged by the GTC rule', async () => {

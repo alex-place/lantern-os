@@ -537,7 +537,17 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
             orderReq.timeInForce = 'gtc';
             _sessionNote = `market closed: GTC limit @ ${orderReq.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
           } else {
-            _sessionNote = 'market closed and no quote available to price a resting order — this order may expire unfilled; place it during market hours';
+            // REFUSE, don't degrade (bd1002ac on the race book — the 2026-08-28
+            // naked-book incident, ported). With no quote this stays a raw
+            // MARKET+DAY order on a day with no session: the broker rejects or
+            // expires it — but the cancel-resting-stops step below has ALREADY
+            // run by then, so the click cancelled the position's protective stop
+            // and then placed NOTHING: position held, protection gone, until the
+            // engine's next sweep re-protects. An order already known to be
+            // unplaceable must refuse BEFORE anything is cancelled.
+            sendJson(res, { status: 'error', ticker, side, qty,
+              reason: 'market closed and no quote available to price a resting order — nothing was placed and no stops were touched; try during market hours' }, 200);
+            return true;
           }
         } else {
           _sessionNote = 'extended hours: no quote available to price a limit — sent as market, which will not fill until 09:30';
