@@ -59,7 +59,7 @@ function exitsSince(box, since) {
     if (r.event === 'exit' && r.pnl != null) {
       const e = lastEntry[r.symbol]; delete lastEntry[r.symbol];
       if (DAY(r.ts) < since) continue;
-      out.push({ pnl: r.pnl, mae: r.mae_pct, overnight: e ? DAY(e) !== DAY(r.ts) : true });
+      out.push({ pnl: r.pnl, mae: r.mae_pct, overnight: e ? DAY(e) !== DAY(r.ts) : true, entryDay: e ? DAY(e) : null });
     }
   }
   return out;
@@ -69,8 +69,16 @@ const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length 
 
 function computeMetric(m) {
   if (!m || m.kind === 'manual') return null;
-  const ex = exitsSince(m.box || 'stable', m.since || '2026-09-01');
+  let ex = exitsSince(m.box || 'stable', m.since || '2026-09-01');
   if (!ex) return { error: `journal for ${m.box} unreadable` };
+  // entered_since: true — count only trades ENTERED on/after `since`. An exit
+  // after the arm whose entry predates it carries the OLD config's decision;
+  // for entry-side changes that contamination flips medians (the median_entry_mae
+  // check on t2-engine read −0.05% clean vs −0.23% contaminated). Exit-side rules
+  // (decarry, weekend-flat) keep the default exit-day frame — an old position
+  // exited under the new rule IS the rule's effect. Opt-in so the 17 already-
+  // scored rows keep the semantics they were scored under.
+  if (m.entered_since) ex = ex.filter((x) => x.entryDay && x.entryDay >= (m.since || '2026-09-01'));
   if (m.kind === 'carry_exit_pnl_sum') {
     const s = ex.filter((x) => x.overnight);
     return { value: `$${s.reduce((a, x) => a + x.pnl, 0).toFixed(0)} across ${s.length} carry exits` };
