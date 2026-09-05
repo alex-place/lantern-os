@@ -265,6 +265,16 @@ function cfg() {
     // Max simultaneous positions sharing ONE correlated risk bucket
     // (equity_long / equity_short / metals / per-symbol). 0 disables.
     maxPerBucket: n('TRADER_MAX_PER_BUCKET', 0),
+    // REGIME SIZING (measured 2026-09-05, 60-session armed-parity replay with
+    // identical trade lists): SPY's first-30m close position <= regimeR30Max
+    // reads "trend-down day"; post-10:00 LONG entries then carry
+    // regimeSizeMult x risk for the rest of the session. Size only — entries
+    // are never blocked (the gate form of this read was measured dead;
+    // the dial form: 0.25x @ 0.15 gave +0.20pp return at maxDD 1.11->0.96%,
+    // and thresholds >= 0.20 LOSE — keep it tight). Inverse-family entries
+    // (WITH a falling tape) are exempt. (0,1) enables; 0/unset = off.
+    regimeSizeMult: n('TRADER_REGIME_SIZE_MULT', 0),
+    regimeR30Max: n('TRADER_REGIME_R30_MAX', 0.15),
     // Trail past R2 instead of selling AT it (lab 2026-08-08, Monday-config
     // gate: OOS +0.733%/trade vs +0.328 selling at R2, both windows, WR flat).
     // A mark through R2 upgrades the runner to a ratcheting floor at
@@ -1697,6 +1707,26 @@ function _warnExitAuthority(c) {
 // TRADER_SLOT_ORDER: unset/confidence = the scan's order (current behaviour);
 // depth = deepest session IBS first; expectancy = highest TRADER_SYMBOL_SIZE_MULT
 // weight first, deepest IBS as the tie-break. Pure; never drops a candidate.
+// REGIME SIZING read: SPY's close position within its first-30m range (09:30-
+// 09:59 ET) — the day-type read the sizing dial keys on. Known by 10:00, no
+// lookahead. Pure; bars are parseBars rows ({timestamp, high, low, close});
+// returns r30 in [0,1], or null under 3 first-30m bars / a flat range.
+function _regimeFirst30Read(bars, todayStr) {
+  const w = [];
+  for (const b of (bars || [])) {
+    const bt = Date.parse((b && b.timestamp) || 0); if (!bt) continue;
+    const d = new Date(new Date(bt).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (day !== todayStr) continue;
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (m >= 570 && m < 600) w.push(b);
+  }
+  if (w.length < 3) return null;
+  const hi = Math.max(...w.map((b) => Number(b.high))), lo = Math.min(...w.map((b) => Number(b.low)));
+  if (!(hi > lo)) return null;
+  return (Number(w[w.length - 1].close) - lo) / Math.max(hi - lo, 1e-9);
+}
+let _regimeLoggedDay = null;   // one regime_size journal row per flagged day
 function _orderEntries(enters, mode = process.env.TRADER_SLOT_ORDER) {
   const m = String(mode || 'confidence').toLowerCase();
   if (m !== 'depth' && m !== 'expectancy') return enters;
@@ -2415,6 +2445,20 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   const _spyGateRow = (signals || []).find((x) => x && String(x.symbol).toUpperCase() === "SPY");
   const _spyGateIbs = _spyGateRow ? Number((_spyGateRow.decision_context && _spyGateRow.decision_context.ibs) != null ? _spyGateRow.decision_context.ibs : _spyGateRow.ibs) : null;
   const _INVERSE_FAMILY = new Set(["SQQQ", "SOXS", "SPXS", "TZA", "FAZ"]);
+  // REGIME SIZING — see cfg.regimeSizeMult. One SPY fetch per scan while armed.
+  let _regimeR30 = null;
+  if (c.regimeSizeMult > 0 && c.regimeSizeMult < 1) {
+    try {
+      const _rb = await yahoo.getBarsMulti(["SPY"], "5m");
+      _regimeR30 = _regimeFirst30Read((((_rb || {}).bars || {}).SPY || {}).bars, _etDateStr(now));
+    } catch (_e) { _regimeR30 = null; }
+  }
+  const _regimeNowMin = (() => { const d = new Date(new Date(now).toLocaleString("en-US", { timeZone: "America/New_York" })); return d.getHours() * 60 + d.getMinutes(); })();
+  if (_regimeR30 != null && _regimeR30 <= c.regimeR30Max && _regimeNowMin >= 600 && _regimeLoggedDay !== _etDateStr(now)) {
+    _regimeLoggedDay = _etDateStr(now);
+    logTrade({ event: 'regime_size', r30: +_regimeR30.toFixed(3), mult: c.regimeSizeMult,
+      why: `SPY first-30m close position ${_regimeR30.toFixed(2)} <= ${c.regimeR30Max} — trend-down read; long risk x${c.regimeSizeMult} for the session` });
+  }
   if (protectiveOnly && enters.length) {
     out.skipped.push({ symbol: '*', why: `extended hours: protective exits only — ${enters.length} entry signal(s) not taken` });
   }
@@ -2771,6 +2815,10 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // #3428 STRESS MULTIPLIER: scales the cap AND the risk target (see _stressMultiplier).
     const _stress = _stressMultiplier({ vixPrior: _vixPrior, spyIbs: _spyIbsNow }, _stressC);
     const _symMult = _symbolSizeMult(sym);   // #3434 symbol tilt (1 when unset)
+    // REGIME SIZE — a trend-down first-30m read scales LONG risk down for the
+    // rest of the session. Size only; inverses (WITH the tape) exempt.
+    const _regime = (c.regimeSizeMult > 0 && c.regimeSizeMult < 1 && _regimeNowMin >= 600
+      && _regimeR30 != null && _regimeR30 <= c.regimeR30Max && !_INVERSE_FAMILY.has(sym)) ? c.regimeSizeMult : 1;
     // HARD PER-POSITION CAP (operator, 2026-08-25). The tier / stress / tilt multipliers
     // still scale the RISK TARGET — that is what sizing by expectancy means — but they may
     // no longer lift the NOTIONAL CEILING above TRADER_MAX_POSITION_PCT. Before this, SOXL
@@ -2780,8 +2828,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // d-fit -40%, h2 -22%, d-hold -44% — on the 26-year holdout 2,866% -> 1,202% of return
     // against a drawdown of 22.1% -> 16.5%. Down-weights are untouched: SPY 0.83 still
     // sizes to 9.96%, GLD/TLT 0.5 to 6%.
-    const _capMult = Math.min(1, _tierMult * _stress.mult * _symMult);
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _capMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult, stopDistPct: _stopDistEff });
+    const _capMult = Math.min(1, _tierMult * _stress.mult * _symMult * _regime);
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _capMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult * _regime, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
@@ -3268,4 +3316,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
