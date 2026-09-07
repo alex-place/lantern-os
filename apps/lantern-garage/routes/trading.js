@@ -463,7 +463,6 @@ const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
 const accountModeRoutes = require('./trading/account-mode');   // DEMO/PAPER/TRADE ladder (#2546)
-const optionsShadowRoutes = require('./trading/options-shadow');
 const overnightRoutes = require('./trading/overnight');
 
 
@@ -518,7 +517,6 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;
   if (await accountModeRoutes(req, res, url, ctx)) return true;
-  if (await optionsShadowRoutes(req, res, url, ctx)) return true;
   if (await overnightRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
