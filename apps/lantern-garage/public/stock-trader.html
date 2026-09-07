@@ -8276,6 +8276,20 @@ function _accountDegraded(kind, reason){
   }
   const pe = document.getElementById('hDayPnl');
   if (pe && !el?.innerHTML) { pe.textContent = '—'; pe.className = 'v'; }
+  /* The Positions pane is a SEPARATE surface and the degraded path returns before
+     renderPositions() ever runs -- so the header said STALE while the pane sat
+     completely blank. Blank is the one thing it must not say here: "no positions" and
+     "cannot reach the broker" mean opposite things to someone deciding whether to
+     trade. Only filled when the pane is EMPTY, so genuine last-good rows are kept on
+     screen (dimmed) exactly as the rest of this function intends. */
+  const pp = document.getElementById('tp-positions');
+  if (pp && !pp.innerHTML.trim()) {
+    pp.innerHTML = '<div class="tp-empty">' + (kind === 'session'
+      ? 'Positions unavailable — your session expired. Sign in again to see them.'
+      : 'Positions unavailable — the broker could not be reached.'
+        + (reason ? '<br><span style="opacity:.7">' + String(reason).slice(0, 120) + '</span>' : ''))
+      + '</div>';
+  }
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
     _staleKind = kind;
     _alertToast(kind === 'session'
