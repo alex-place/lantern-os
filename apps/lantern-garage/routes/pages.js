@@ -44,6 +44,7 @@ const PUBLIC_PAGES = {
   // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
   "/stock-trader.html":   "stock-trader.html",
   "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
+  "/journal.html":        "journal.html",   // the trading journal — its own page since it outgrew the panel
   "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="loop-stage" content="verify">
+<title>Unisona Trading Journal</title>
+
+<!-- Apply the saved theme before paint so the global header + light mode don't flash (#1577). -->
+<script>
+  (function(){ try {
+    var stored = localStorage.getItem('lantern-theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var isDark = stored ? stored === 'dark' : prefersDark;
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  } catch(e){ document.documentElement.setAttribute('data-theme','dark'); } })();
+</script>
+<link rel="stylesheet" href="/css/site.css">
+
+<style>
+  @import url('/css/trader.css');
+
+  /* ── Journal page ───────────────────────────────────────────────────────────
+     The journal used to be the fourth tab of the trader's bottom panel, in a
+     306px strip under the charts. A review surface is not a strip: a calendar,
+     an equity curve and a breakdown table all want room at once, and the panel
+     could only ever show one of them at a time.
+     Laid out the way the journal products lay this out (TradeZella, TraderWaves):
+     a KPI band across the top, then the calendar as the centrepiece with the
+     curve beside it, then the tables underneath. */
+  body{margin:0;background:var(--bg0);color:var(--text1);font-family:var(--sans,system-ui,sans-serif)}
+  .jp-shell{max-width:1440px;margin:0 auto;padding:0 16px 40px}
+
+  .jp-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 0 12px}
+  .jp-title{font-size:19px;font-weight:600;color:var(--text0);margin:0}
+  .jp-sub{font-size:11.5px;color:var(--text2)}
+  .jp-controls{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+
+  /* KPI band. auto-fit keeps it one row on a wide screen and reflows rather than
+     scrolling on a narrow one -- a metric you have to scroll to is a metric you
+     will not read. */
+  .jp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+  .jp-kpi{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:11px 13px;min-width:0}
+  .jp-kpi .k{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .jp-kpi .v{font-size:21px;font-weight:600;color:var(--text0);font-variant-numeric:tabular-nums;margin-top:3px;
+    line-height:1.15}
+  .jp-kpi .s{font-size:10.5px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .jp-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;align-items:start}
+  @media (max-width:1080px){ .jp-grid{grid-template-columns:1fr} }
+  .jp-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+  .jp-card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;min-width:0}
+  .jp-card h2{margin:0 0 10px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);
+    font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .jp-card h2 .sp{margin-left:auto;display:flex;gap:4px}
+
+  /* Calendar. Colour carries the sign, the figure carries the size -- colour alone
+     would leave a -$4 day and a -$400 day looking identical. */
+  .jp-cal-head{display:grid;grid-template-columns:repeat(7,1fr) 76px;gap:4px;margin-bottom:4px}
+  .jp-cal-head span{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);text-align:center}
+  .jp-cal{display:grid;grid-template-columns:repeat(7,1fr) 76px;gap:4px}
+  .jp-day{aspect-ratio:1;border-radius:7px;background:var(--bg2);border:1px solid var(--border);padding:5px 6px;
+    display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .jp-day.empty{background:transparent;border-color:transparent}
+  .jp-day .d{font-size:9.5px;color:var(--text2);font-variant-numeric:tabular-nums}
+  .jp-day .p{margin-top:auto;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jp-day.win{background:color-mix(in srgb,var(--green) 15%,var(--bg2));border-color:color-mix(in srgb,var(--green) 35%,var(--border))}
+  .jp-day.loss{background:color-mix(in srgb,var(--red) 15%,var(--bg2));border-color:color-mix(in srgb,var(--red) 35%,var(--border))}
+  .jp-day.flat{background:var(--bg3)}
+  .jp-week{border-radius:7px;background:var(--bg2);border:1px solid var(--border);padding:5px 6px;
+    display:flex;flex-direction:column;justify-content:center;min-width:0}
+  .jp-week .l{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+  .jp-week .v{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .jp-monthbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .jp-monthbar .m{font-size:12.5px;font-weight:600;color:var(--text0)}
+  .jp-navb{background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;
+    width:24px;height:24px;cursor:pointer;font:inherit;font-size:12px;line-height:1;display:grid;place-items:center}
+  .jp-navb:hover:not(:disabled){background:var(--bg3);color:var(--text0)}
+  .jp-navb:disabled{opacity:.35;cursor:default}
+
+  .jp-pos{color:var(--green)} .jp-neg{color:var(--red)} .jp-dim{color:var(--text2)}
+  .jp-chip{font-size:10.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:transparent;
+    color:var(--text2);cursor:pointer;font-family:inherit}
+  .jp-chip.on{background:var(--blue);border-color:var(--blue);color:#08131f}
+  .jp-chip:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+  .jp-table{width:100%;border-collapse:collapse;font-size:12px}
+  .jp-table th{text-align:left;color:var(--text2);font-weight:600;font-size:10px;text-transform:uppercase;
+    letter-spacing:.05em;padding:5px 7px;border-bottom:1px solid var(--border);white-space:nowrap;
+    position:sticky;top:0;background:var(--bg1)}
+  .jp-table td{padding:5px 7px;border-bottom:1px solid var(--border);color:var(--text1);white-space:nowrap}
+  .jp-table tr:last-child td{border-bottom:0}
+  .jp-table .num{text-align:right;font-variant-numeric:tabular-nums}
+  .jp-scroll{overflow:auto;max-height:300px}
+
+  .jp-curve svg{display:block;width:100%;height:auto}
+  .jp-empty{color:var(--text2);padding:16px 2px;max-width:66ch;line-height:1.6}
+  .jp-loading{color:var(--text2);padding:16px 2px}
+  .jp-banner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--bg1);border:1px solid var(--border);
+    border-left:3px solid var(--blue);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px}
+  .jp-banner a{color:var(--blue)}
+  .jp-note{font-size:10.5px;color:var(--text2);margin:6px 0 0;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="jp-shell">
+
+  <div class="jp-head">
+    <div>
+      <h1 class="jp-title">Trading journal</h1>
+      <div class="jp-sub" id="jpRange">Realized results, day by day.</div>
+    </div>
+    <div class="jp-controls">
+      <button type="button" class="jp-chip on" id="jpViewConfirmed" onclick="jpSetView('confirmed')">Confirmed</button>
+      <button type="button" class="jp-chip" id="jpViewSkips" onclick="jpSetView('skips')">Declined</button>
+      <button type="button" class="jp-chip" onclick="jpLoad(true)" title="Reload from the broker record">Refresh</button>
+    </div>
+  </div>
+
+  <div id="jpBody"><div class="jp-loading">Loading the journal…</div></div>
+</div>
+
+<script>
+/* ── Journal page ──────────────────────────────────────────────────────────────
+   Reads the same endpoints the bottom-panel journal read -- /track-record for the
+   realized book, /scorecard for the breakdown slice, /skips for declined trades --
+   and lays them out with room to breathe. No new server surface. */
+const JP_LABELS = { reason:'Exit reason', symbol:'Symbol', hour:'Hour' };
+let jpView = 'confirmed', jpSlice = 'reason', jpBusy = false, jpMonth = null, jpData = null;
+
+const jpEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const jpUsd = (n) => (typeof n !== 'number' || !isFinite(n)) ? '—'
+  : (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const jpPct = (n) => (typeof n === 'number' && isFinite(n)) ? n.toFixed(1) + '%' : '—';
+const jpSign = (n) => (typeof n === 'number' && isFinite(n) && n !== 0) ? (n > 0 ? 'jp-pos' : 'jp-neg') : 'jp-dim';
+
+async function jpFetch(demo) {
+  const qs = demo ? '?demo=champion' : '';
+  const amp = demo ? '&' : '?';
+  const get = (u) => fetch(u, { cache: 'no-store' }).then(r => {
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+    return r.json();
+  });
+  const [rec, slice, skips] = await Promise.all([
+    get('/api/trading/track-record' + qs),
+    get('/api/trading/scorecard' + qs + amp + 'by=' + jpSlice),
+    get('/api/trading/skips' + qs).catch(() => null),
+  ]);
+  return { rec, slice, skips, demo };
+}
+
+async function jpLoad(force) {
+  if (jpBusy && !force) return;
+  jpBusy = true;
+  const host = document.getElementById('jpBody');
+  host.innerHTML = '<div class="jp-loading">Loading the journal…</div>';
+  let demo = !!(window.DEMO_ACCT || window.GUEST);
+  try {
+    let data;
+    try { data = await jpFetch(demo); }
+    catch (e) {
+      // Same fallbacks the panel had: a gated feed shows the demo book rather than a
+      // dead page, and a status-less rejection is usually a server mid-restart.
+      if (!demo && (e.status === 401 || e.status === 403)) { demo = true; data = await jpFetch(true); }
+      else if (!e.status) { await new Promise(r => setTimeout(r, 1500)); data = await jpFetch(demo); }
+      else throw e;
+    }
+    jpData = data;
+    jpRender(host, data);
+  } catch (e) {
+    const network = !(e && e.status);
+    host.innerHTML = '<div class="jp-empty">'
+      + (network ? 'The server didn’t answer — it may be restarting.' : 'The server said ' + jpEsc(e.message) + '.')
+      + ' Nothing is shown rather than something stale. '
+      + '<button type="button" class="jp-chip on" style="margin-left:6px" onclick="jpLoad(true)">Retry</button></div>';
+  } finally { jpBusy = false; }
+}
+
+function jpSetView(v) {
+  if (jpView === v) return;
+  jpView = v;
+  document.getElementById('jpViewConfirmed').classList.toggle('on', v === 'confirmed');
+  document.getElementById('jpViewSkips').classList.toggle('on', v === 'skips');
+  if (jpData) jpRender(document.getElementById('jpBody'), jpData);
+}
+function jpSetSlice(k) { if (jpSlice === k) return; jpSlice = k; jpLoad(true); }
+
+/* Derived from `daily`, not invented: a day counts as a win when its realized P&L is
+   positive, which is the same rule the day-win figure uses in the products this page
+   is modelled on. */
+function jpDayStats(daily) {
+  const d = daily || [];
+  const traded = d.filter(x => typeof x.pnl === 'number' && x.pnl !== 0);
+  const wins = traded.filter(x => x.pnl > 0).length;
+  let streak = 0, dir = 0;
+  for (let i = d.length - 1; i >= 0; i--) {
+    const p = d[i].pnl;
+    if (!p) break;
+    const s = p > 0 ? 1 : -1;
+    if (!dir) dir = s; else if (s !== dir) break;
+    streak++;
+  }
+  return { tradingDays: traded.length, dayWinRate: traded.length ? (wins / traded.length) * 100 : null, streak, dir };
+}
+
+function jpKpis(s, book, ds) {
+  const dd = book.maxDrawdown || { amount: 0 };
+  const card = (k, v, cls, sub) => '<div class="jp-kpi"><div class="k">' + k + '</div>'
+    + '<div class="v ' + (cls || '') + '">' + v + '</div>'
+    + '<div class="s">' + (sub || '&nbsp;') + '</div></div>';
+  const streakTxt = ds.streak ? (ds.streak + (ds.dir > 0 ? ' winning day' : ' losing day') + (ds.streak === 1 ? '' : 's')) : 'no run';
+  return '<div class="jp-kpis">'
+    + card('Net P&amp;L', jpUsd(s.totalRealized), jpSign(s.totalRealized), s.trades + ' closed trade' + (s.trades === 1 ? '' : 's'))
+    + card('Trade win %', jpPct(s.winRate), '', 'risk exits only: ' + jpPct(s.riskExitWinRate))
+    + card('Profit factor', (typeof s.profitFactor === 'number' && isFinite(s.profitFactor)) ? s.profitFactor.toFixed(2) : '—', '',
+           'gross win ÷ gross loss')
+    + card('Day win %', ds.dayWinRate == null ? '—' : jpPct(ds.dayWinRate), '', ds.tradingDays + ' trading day' + (ds.tradingDays === 1 ? '' : 's'))
+    // The paired amounts wrapped to two lines while every other card was one figure.
+    // The RATIO is the headline metric anyway -- how much a winner returns per dollar a
+    // loser costs -- so it leads, and both amounts sit underneath where they still read.
+    + card('Avg win / loss',
+           (typeof s.avgWin === 'number' && typeof s.avgLoss === 'number' && Math.abs(s.avgLoss) > 0)
+             ? (s.avgWin / Math.abs(s.avgLoss)).toFixed(2)
+             : '—',
+           jpSign(s.avgWin + s.avgLoss),
+           jpUsd(s.avgWin) + ' win · ' + jpUsd(s.avgLoss) + ' loss')
+    + card('Expectancy', jpUsd(s.expectancy), jpSign(s.expectancy), 'per trade')
+    + card('Max drawdown', jpUsd(-Math.abs(dd.amount || 0)), 'jp-neg',
+           dd.peakDate ? (jpEsc(dd.peakDate) + ' → ' + jpEsc(dd.troughDate || '')) : 'peak to trough')
+    + card('Current streak', String(ds.streak || 0), ds.streak ? (ds.dir > 0 ? 'jp-pos' : 'jp-neg') : '', streakTxt)
+    + '</div>';
+}
+
+/* Cumulative realized P&L. Deliberately a plain SVG: it is one series and a zero line,
+   and a charting library for that would be more code than the chart. */
+function jpCurve(daily) {
+  if (!daily || !daily.length) return '<div class="jp-empty">No closed days yet.</div>';
+  const W = 620, H = 170, padL = 8, padR = 70, padT = 12, padB = 22;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const cums = daily.map(d => d.cum);
+  let lo = Math.min(0, Math.min.apply(null, cums)), hi = Math.max(0, Math.max.apply(null, cums));
+  if (hi === lo) hi = lo + 1;
+  const x = i => padL + (daily.length === 1 ? iw / 2 : (i / (daily.length - 1)) * iw);
+  const y = v => padT + (1 - (v - lo) / (hi - lo)) * ih;
+  const line = daily.map((d, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(d.cum).toFixed(1)).join(' ');
+  const area = 'M' + x(0).toFixed(1) + ' ' + y(0).toFixed(1) + ' '
+    + daily.map((d, i) => 'L' + x(i).toFixed(1) + ' ' + y(d.cum).toFixed(1)).join(' ')
+    + ' L' + x(daily.length - 1).toFixed(1) + ' ' + y(0).toFixed(1) + ' Z';
+  const last = daily[daily.length - 1];
+  const up = last.cum >= 0;
+  const col = up ? 'var(--green)' : 'var(--red)';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Cumulative realized profit and loss by exchange day, ending at '
+    + jpEsc(jpUsd(last.cum)) + '">'
+    + '<path d="' + area + '" fill="' + col + '" opacity=".12"/>'
+    + '<line x1="' + padL + '" y1="' + y(0).toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y(0).toFixed(1)
+    + '" stroke="var(--border)" stroke-dasharray="3 3"/>'
+    + '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>'
+    + '<circle cx="' + x(daily.length - 1).toFixed(1) + '" cy="' + y(last.cum).toFixed(1) + '" r="3.5" fill="' + col + '"/>'
+    + '<text x="' + (W - padR + 7) + '" y="' + (y(last.cum) + 4).toFixed(1) + '" font-size="12" fill="var(--text0)" font-weight="600">'
+    + jpEsc(jpUsd(last.cum)) + '</text>'
+    + '<text x="' + padL + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)">' + jpEsc(daily[0].date) + '</text>'
+    + '<text x="' + (W - padR) + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)" text-anchor="end">' + jpEsc(last.date) + '</text>'
+    + '</svg>';
+}
+
+/* Per-day bars, so a single outsized day is visible as one day rather than as a step
+   in the cumulative line. */
+function jpBars(daily) {
+  if (!daily || !daily.length) return '';
+  const W = 620, H = 110, padL = 8, padR = 70, padT = 8, padB = 18;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const mags = daily.map(d => Math.abs(d.pnl || 0));
+  const max = Math.max(1, Math.max.apply(null, mags));
+  const zero = padT + ih / 2;
+  const bw = Math.max(1.5, Math.min(14, iw / Math.max(1, daily.length) - 2));
+  const bars = daily.map((d, i) => {
+    const cx = padL + (daily.length === 1 ? iw / 2 : (i / (daily.length - 1)) * iw);
+    const h = (Math.abs(d.pnl || 0) / max) * (ih / 2);
+    const up = (d.pnl || 0) >= 0;
+    return '<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + (up ? zero - h : zero).toFixed(1)
+      + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" rx="1.5" fill="'
+      + (up ? 'var(--green)' : 'var(--red)') + '" opacity=".85"><title>' + jpEsc(d.date + '  ' + jpUsd(d.pnl)) + '</title></rect>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Realized profit and loss for each exchange day">'
+    + '<line x1="' + padL + '" y1="' + zero + '" x2="' + (W - padR) + '" y2="' + zero + '" stroke="var(--border)"/>'
+    + bars + '</svg>';
+}
+
+/* The calendar is the piece both TradeZella and TraderWaves put front and centre, and
+   the weekly column on the right is the part that makes it more than decoration. */
+function jpCalendar(daily) {
+  const byDate = {};
+  (daily || []).forEach(d => { byDate[d.date] = d; });
+  const dates = Object.keys(byDate).sort();
+  if (!dates.length) return '<div class="jp-empty">No closed days yet.</div>';
+  if (!jpMonth) jpMonth = dates[dates.length - 1].slice(0, 7);
+  const [yy, mm] = jpMonth.split('-').map(Number);
+  const first = new Date(Date.UTC(yy, mm - 1, 1));
+  const days = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const lead = first.getUTCDay();                       // 0=Sun, matching the header row
+  const monthName = first.toLocaleString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const months = Array.from(new Set(dates.map(d => d.slice(0, 7)))).sort();
+  const idx = months.indexOf(jpMonth);
+
+  let cells = '', weekPnl = 0, weekHasData = false, out = '';
+  const flushWeek = () => {
+    out += '<div class="jp-week"><div class="l">Week</div><div class="v ' + (weekHasData ? jpSign(weekPnl) : 'jp-dim') + '">'
+      + (weekHasData ? jpUsd(weekPnl) : '—') + '</div></div>';
+    weekPnl = 0; weekHasData = false;
+  };
+  for (let i = 0; i < lead; i++) out += '<div class="jp-day empty"></div>';
+  let col = lead;
+  for (let d = 1; d <= days; d++) {
+    const iso = jpMonth + '-' + String(d).padStart(2, '0');
+    const rec = byDate[iso];
+    const cls = rec ? (rec.pnl > 0 ? 'win' : rec.pnl < 0 ? 'loss' : 'flat') : '';
+    if (rec) { weekPnl += rec.pnl || 0; weekHasData = true; }
+    out += '<div class="jp-day ' + cls + '"><div class="d">' + d + '</div>'
+      + '<div class="p ' + (rec ? jpSign(rec.pnl) : 'jp-dim') + '">' + (rec ? jpUsd(rec.pnl) : '') + '</div></div>';
+    col++;
+    if (col === 7) { flushWeek(); col = 0; }
+  }
+  if (col !== 0) { for (let i = col; i < 7; i++) out += '<div class="jp-day empty"></div>'; flushWeek(); }
+
+  return '<div class="jp-monthbar">'
+    + '<button type="button" class="jp-navb" onclick="jpShiftMonth(-1)"' + (idx <= 0 ? ' disabled' : '') + ' aria-label="Previous month">‹</button>'
+    + '<button type="button" class="jp-navb" onclick="jpShiftMonth(1)"' + (idx >= months.length - 1 ? ' disabled' : '') + ' aria-label="Next month">›</button>'
+    + '<span class="m">' + jpEsc(monthName) + '</span></div>'
+    + '<div class="jp-cal-head"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Total</span></div>'
+    + '<div class="jp-cal">' + out + '</div>';
+}
+function jpShiftMonth(n) {
+  const months = Array.from(new Set(((jpData && jpData.rec && Object.values(jpData.rec.books || {})[0] || {}).daily || [])
+    .map(d => d.date.slice(0, 7)))).sort();
+  const i = months.indexOf(jpMonth);
+  if (i < 0) return;
+  const next = months[i + n];
+  if (!next) return;
+  jpMonth = next;
+  jpRender(document.getElementById('jpBody'), jpData);
+}
+
+function jpBreakdown(slice) {
+  /* The scorecard does NOT return `rows`. It returns an object keyed by the slice value
+     under two headings: `confirmed` = broker-accepted fills, `all` = every exit decision
+     including the ones that never filled. Reading .rows silently produced an empty table
+     for every slice, which looked like "no data" rather than like a bug.
+     Supported slices come from the API itself: symbol, hour, reason, skip. `weekday` is
+     not one of them -- offering it returned unknown_breakdown. */
+  const SLICES = ['reason', 'symbol', 'hour'];
+  const chips = SLICES.map(k =>
+    '<button type="button" class="jp-chip' + (jpSlice === k ? ' on' : '') + '" onclick="jpSetSlice(\'' + k + '\')">'
+    + jpEsc(JP_LABELS[k] || k) + '</button>').join('');
+  const head = '<h2>Breakdown<span class="sp">' + chips + '</span></h2>';
+  const bucket = (slice && slice.confirmed) || {};
+  const keys = Object.keys(bucket);
+  if (!keys.length) return head + '<div class="jp-empty">Nothing to break down yet.</div>';
+  const rows = keys.map(k => Object.assign({ key: k }, bucket[k]))
+    .sort((a, b) => (b.totalRealized || 0) - (a.totalRealized || 0));
+  return head
+    + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
+    + '<th>' + jpEsc(JP_LABELS[jpSlice] || jpSlice) + '</th><th class="num">Trades</th>'
+    + '<th class="num">Win %</th><th class="num">Realized</th></tr></thead><tbody>'
+    + rows.map(r => '<tr><td>' + jpEsc(jpLabelValue(r.key)) + '</td>'
+      + '<td class="num">' + (r.trades != null ? r.trades : '—') + '</td>'
+      + '<td class="num">' + jpPct(r.winRate) + '</td>'
+      + '<td class="num ' + jpSign(r.totalRealized) + '">' + jpUsd(r.totalRealized) + '</td></tr>').join('')
+    + '</tbody></table></div>'
+    + '<p class="jp-note">Broker-accepted fills only. Exit reasons are the engine\'s own names for why a position closed.</p>';
+}
+/* signal_exit -> "signal exit". The engine's keys are snake_case internally. */
+function jpLabelValue(k) { return String(k == null ? '—' : k).replace(/_/g, ' '); }
+
+function jpSkips(sk) {
+  const rows = (sk && (sk.rows || sk.skips)) || [];
+  if (!rows.length) return '<h2>Declined</h2><div class="jp-empty">Nothing was declined in this window. Every candidate that reached the gate was taken.</div>';
+  return '<h2>Declined <span class="jp-dim" style="text-transform:none;letter-spacing:0">' + rows.length + ' passed over</span></h2>'
+    + '<div class="jp-scroll"><table class="jp-table"><thead><tr><th>When</th><th>Symbol</th><th>Why</th></tr></thead><tbody>'
+    + rows.slice(0, 200).map(r => '<tr><td class="jp-dim">' + jpEsc(String(r.ts || r.date || '').slice(0, 16).replace('T', ' ')) + '</td>'
+      + '<td><b>' + jpEsc(r.symbol || '') + '</b></td>'
+      + '<td>' + jpEsc(r.reason || r.why || '') + '</td></tr>').join('')
+    + '</tbody></table></div>';
+}
+
+/* Placement notes. journalLog() on the trader page has captured a snapshot on every
+   order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
+   now nothing read them back. They are device-local and they are NOT P&L: these are
+   intentions, the figures above are outcomes. */
+function jpPlacements() {
+  let rows = [];
+  try { rows = JSON.parse(localStorage.getItem('trader.journal') || '[]'); } catch (_e) { rows = []; }
+  if (!rows.length) return '';
+  const cell = v => (v === null || v === undefined || v === '') ? '<td class="jp-dim">—</td>' : '<td>' + jpEsc(String(v)) + '</td>';
+  const when = ts => { try { return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (_e) { return ts || ''; } };
+  return '<div class="jp-card"><h2>Placement notes — this device</h2>'
+    + '<p class="jp-note">What the screen said at the moment each order went in. Captured locally, never uploaded, '
+    + 'newest first, capped at 500. Not profit and loss — these are intentions, not outcomes.</p>'
+    + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
+    + '<th>When</th><th>Symbol</th><th>Side</th><th class="num">Qty</th><th class="num">Price</th>'
+    + '<th>Signal</th><th>Pattern</th><th class="num">RVOL</th><th>Session</th></tr></thead><tbody>'
+    + rows.slice(0, 100).map(r => '<tr><td class="jp-dim">' + jpEsc(when(r.ts)) + '</td>'
+      + '<td><b>' + jpEsc(r.symbol || '') + '</b></td>'
+      + '<td class="' + (String(r.side).toLowerCase() === 'buy' ? 'jp-pos' : 'jp-neg') + '">' + jpEsc(String(r.side || '').toUpperCase()) + '</td>'
+      + '<td class="num">' + jpEsc(r.qty == null ? '—' : r.qty) + '</td>'
+      + '<td class="num">' + (r.price != null ? jpEsc(jpUsd(r.price)) : '—') + '</td>'
+      + cell(r.signal) + cell(r.pattern) + '<td class="num">' + jpEsc(r.rvol == null ? '—' : r.rvol) + '</td>' + cell(r.session)
+      + '</tr>').join('')
+    + '</tbody></table></div>'
+    + (rows.length > 100 ? '<p class="jp-note">Showing the most recent 100 of ' + rows.length + '.</p>' : '')
+    + '</div>';
+}
+
+function jpRender(host, data) {
+  const bookKey = Object.keys(data.rec.books || {})[0];
+  const book = (data.rec.books || {})[bookKey] || {};
+  const s = book.stats || {};
+  const daily = book.daily || [];
+  let html = '';
+
+  if (data.demo) {
+    html += '<div class="jp-banner"><span><b>' + jpEsc(book.label || 'Demo book')
+      + '</b> — simulated sample data, not real trades. Your own account fills this in once it trades.</span>'
+      + '<a href="/pricing.html" style="margin-left:auto;white-space:nowrap">See plans →</a></div>';
+  }
+
+  const rangeEl = document.getElementById('jpRange');
+  if (rangeEl) {
+    rangeEl.textContent = daily.length
+      ? ('Realized results, ' + daily[0].date + ' to ' + daily[daily.length - 1].date + '.')
+      : 'Realized results, day by day.';
+  }
+
+  if (jpView === 'skips') {
+    html += '<div class="jp-card">' + jpSkips(data.skips) + '</div>';
+    host.innerHTML = html;
+    return;
+  }
+
+  if (!s.trades) {
+    html += '<div class="jp-empty">No confirmed trades yet. As soon as a position closes with a broker-accepted fill, '
+      + 'this page fills in: realized P&amp;L by day, the equity curve with its drawdown, where the exits happened, '
+      + 'and every candidate the autopilot passed over.</div>';
+    html += jpPlacements();          // things you DID still belong here
+    host.innerHTML = html;
+    return;
+  }
+
+  const ds = jpDayStats(daily);
+  html += jpKpis(s, book, ds);
+  html += '<div class="jp-grid">'
+    + '<div class="jp-col">'
+      + '<div class="jp-card"><h2>P&amp;L calendar</h2>' + jpCalendar(daily) + '</div>'
+      + '<div class="jp-card">' + jpBreakdown(data.slice) + '</div>'
+    + '</div>'
+    + '<div class="jp-col">'
+      + '<div class="jp-card jp-curve"><h2>Equity curve — realized, by exchange day</h2>' + jpCurve(daily) + '</div>'
+      + '<div class="jp-card jp-curve"><h2>Net P&amp;L per day</h2>' + jpBars(daily) + '</div>'
+      + '<div class="jp-card">' + jpSkips(data.skips) + '</div>'
+    + '</div>'
+  + '</div>';
+  html += jpPlacements();
+
+  if (book.disclosures) {
+    html += '<p class="jp-note">' + jpEsc(String(book.disclosures)) + '</p>';
+  }
+  host.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', () => jpLoad());
+</script>
+
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+</body>
+</html>
