@@ -125,7 +125,10 @@
      their own padding (10 / 12 / 16px) and type scale, so nothing lined up across
      the surfaces. Tabs stay a touch larger than labels because they are hit targets,
      but everything shares the same rhythm, colour and border. */
-  :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
+  /* --hdr-h joins the header tokens because min-height alone did not make these agree:
+     the three headers carry different paddings, so they settled at 30 / 32 / 30px and the
+     dock sat 2px proud of the bottom panel beside it. An explicit height ends the argument. */
+  :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2);--hdr-h:32px}
   /* Popup surfaces. Every overlay had grown its own corner, shadow and scrim, so a
      flyout, a modal and a floating toolbar read as three different materials. These
      are the alert dialog's values -- the newest and best-judged of them -- promoted
@@ -161,7 +164,7 @@
 
   .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
   .dock-panel[hidden]{display:none}
-  .dock-head{display:flex;align-items:center;gap:8px;padding:var(--hdr-py) var(--hdr-px);border-bottom:1px solid var(--border);flex:0 0 auto;min-height:30px}
+  .dock-head{display:flex;align-items:center;gap:8px;padding:var(--hdr-py) var(--hdr-px);border-bottom:1px solid var(--border);flex:0 0 auto;height:var(--hdr-h);box-sizing:border-box}
   .dock-title{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);flex:1}
   .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
   .dock-x:hover{color:var(--text0);background:var(--bg3)}
@@ -541,7 +544,7 @@
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
   .tp-stat .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text0)}
   .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
-  .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;min-height:30px;align-items:stretch}
+  .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;height:var(--hdr-h);box-sizing:border-box;align-items:stretch}
   .tp-tab{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--hdr-fg);background:none;border:none;border-bottom:2px solid transparent;padding:0 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:color .12s,border-color .12s}
   .tp-tab:hover{color:var(--text1)}
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
@@ -626,7 +629,11 @@
      signal on a tight second line. */
   /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
      right-aligned tracks so figures line up down the whole list. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  /* The trailing 18px track is the remove button's own space. It used to be positioned
+     absolutely at right:5px, which put it 9px ON TOP of the Chg% figure on every row --
+     invisible at rest, but on hover it covered the number being read and a click aimed at
+     the percentage could land on remove. A real track cannot overlap. */
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 18px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -642,8 +649,12 @@
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
   /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
      exactly over the figures they name. */
-  .wl-head{position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;
+  /* flex:0 0 auto is what makes the height stick. This is a flex ITEM, so its default
+     flex-shrink:1 let the column squeeze it to 29.6px even though it declares 32px --
+     the declared height is only a basis, not a floor. .dock-head held 32px all along
+     because it already carried this; .wl-head did not, which is the whole 2px. */
+  .wl-head{height:var(--hdr-h);flex:0 0 auto;box-sizing:border-box;position:sticky;top:0;z-index:5;display:grid;
+    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 18px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
@@ -704,7 +715,7 @@
   /* #1709: single full-width "Add symbol" button → opens the search popup */
   .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
-  .wl-remove{position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
+  .wl-remove{grid-column:7;justify-self:center;opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
@@ -879,7 +890,12 @@
     margin:-4px 0 0 -4px;border-radius:50%;background:transparent;border:1.3px solid var(--accent,#3b9eff);
     box-shadow:0 0 0 1px var(--bg1,#111)}
   /* Header chart controls */
-  .chart-ctrl{font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  /* One explicit height for every toolbar chip. Without it each chip's height fell out
+     of its element type's default line-height -- native buttons landed on 21-22px while
+     the custom-select buttons inherited a 17.6px line-height and came out at 26px, so the
+     dropdowns sat visibly proud of their neighbours in the same row. */
+  .chart-ctrl{height:24px;line-height:1;display:inline-flex;align-items:center;box-sizing:border-box;
+    font-family:var(--mono);font-size:11px;padding:0 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .chart-ctrl:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   /* Patterns toggle "on" state — not colour-only: the label text flips to "ON" and the
      icon fills, so the state is legible without relying on the accent colour (WCAG 1.4.1). */
@@ -1457,9 +1473,9 @@
 <!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
 <div class="dockR" id="dockR" role="region" aria-label="Right panels">
 
-  <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
+  <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-label="Watchlist">
     <header class="dock-head"><span class="dock-title">Watchlist</span>
-      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+      </header>
     <div class="dock-body">
       <div class="wl-add">
         <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
@@ -1484,7 +1500,7 @@
 
   <section class="dock-panel rw-panel" id="rwp-alerts" role="tabpanel" aria-labelledby="rtab-alerts" hidden>
     <header class="dock-head"><span class="dock-title">Alerts</span>
-      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+      </header>
     <div class="dock-body" id="rwAlertsBody"></div>
   </section>
 
@@ -1492,7 +1508,9 @@
 
 <!-- Right widget rail — TradingView's right-hand switcher. -->
 <nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
-  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist" data-ico="menu"></button>
+  <!-- The watchlist rail tab was removed (operator): with only two panels, the bell now
+       toggles alerts ON and OFF over the watchlist, so a second button for the panel
+       that is already the resting state was one button too many. -->
   <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts" data-ico="bell"></button>
   <span class="rail-sep"></span>
   <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket" data-ico="swap"></button>
@@ -3718,7 +3736,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
-  const lineColor = priceLabel ? '#9aa0ad' : '#e8eaf0';
+  // Tokens, not hex. These two literals were the dark palette's --text0/--text1, so in
+  // LIGHT theme the current-price label rendered near-white on a white --bg1 chip --
+  // invisible on every chart card. The line and the label share this colour, so the
+  // line disappeared with it.
+  const lineColor = priceLabel ? 'var(--text2)' : 'var(--text0)';
   html += `<div style="position:absolute;left:0;right:0;top:${pct(currentPrice)};height:1.5px;background:${lineColor};z-index:5;"></div>`;
   html += `<div style="position:absolute;left:4px;top:${pct(currentPrice)};transform:translateY(-110%);z-index:6;
     font-family:var(--mono);font-size:11px;font-weight:600;color:${lineColor};
@@ -7480,7 +7502,11 @@ let _rwPanel = RW_PANELS.includes(_lsGet('trader.rwPanel', '')) ? _lsGet('trader
 const DESK_FULL_MIN_W = 1500;
 const _deskNarrow = (typeof window !== 'undefined' ? window.innerWidth : 1920) < DESK_FULL_MIN_W;
 let _leftOpen = _lsGet('trader.leftOpen', _deskNarrow ? '0' : '1') !== '0';
-let _rightOpen = _lsGet('trader.rightOpen', '1') !== '0';
+/* The right column is permanent. It holds the watchlist, which is the page's frame of
+   reference -- hiding it left the trader looking at charts with no prices beside them.
+   Deliberately NOT read from storage: anyone carrying a saved '0' from before this
+   change would otherwise come back to a hidden dock that no control can reopen. */
+let _rightOpen = true;
 let _ticketOpen = _lsGet('trader.ticketOpen', '1') !== '0';
 
 function _applyDocks() {
@@ -7513,10 +7539,18 @@ function _saveDocks() {
 }
 function setRightWidget(name) {
   if (!RW_PANELS.includes(name)) return;
-  if (_rightOpen && _rwPanel === name) _rightOpen = false; else { _rwPanel = name; _rightOpen = true; }
+  // Re-clicking the active tab used to collapse the column. It only switches now --
+  // the tabs choose WHICH panel shows, never whether the column exists.
+  // The watchlist lost its own rail tab, so the remaining tabs must be able to get BACK
+  // to it: pressing the active one returns to the watchlist rather than doing nothing.
+  // Without this the bell is a one-way trip and the watchlist is unreachable.
+  _rwPanel = (_rightOpen && _rwPanel === name && name !== 'watchlist') ? 'watchlist' : name;
+  _rightOpen = true;
   _saveDocks(); _applyDocks();
 }
-function closeRightWidget() { _rightOpen = false; _saveDocks(); _applyDocks(); }
+/* Kept as a deliberate no-op: the column cannot be closed, but leaving the function
+   defined means any remaining caller fails harmlessly instead of throwing. */
+function closeRightWidget() { /* the right column is permanent -- see _rightOpen */ }
 function toggleLeftDock() { _leftOpen = !_leftOpen; _saveDocks(); _applyDocks(); }
 function closeLeftDock() { _leftOpen = false; _saveDocks(); _applyDocks(); }
 function toggleTicketDock() {
@@ -8252,6 +8286,20 @@ function _accountDegraded(kind, reason){
   }
   const pe = document.getElementById('hDayPnl');
   if (pe && !el?.innerHTML) { pe.textContent = '—'; pe.className = 'v'; }
+  /* The Positions pane is a SEPARATE surface and the degraded path returns before
+     renderPositions() ever runs -- so the header said STALE while the pane sat
+     completely blank. Blank is the one thing it must not say here: "no positions" and
+     "cannot reach the broker" mean opposite things to someone deciding whether to
+     trade. Only filled when the pane is EMPTY, so genuine last-good rows are kept on
+     screen (dimmed) exactly as the rest of this function intends. */
+  const pp = document.getElementById('tp-positions');
+  if (pp && !pp.innerHTML.trim()) {
+    pp.innerHTML = '<div class="tp-empty">' + (kind === 'session'
+      ? 'Positions unavailable — your session expired. Sign in again to see them.'
+      : 'Positions unavailable — the broker could not be reached.'
+        + (reason ? '<br><span style="opacity:.7">' + String(reason).slice(0, 120) + '</span>' : ''))
+      + '</div>';
+  }
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
     _staleKind = kind;
     _alertToast(kind === 'session'
