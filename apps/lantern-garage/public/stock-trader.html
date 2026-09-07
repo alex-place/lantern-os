@@ -1473,7 +1473,7 @@
 <!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
 <div class="dockR" id="dockR" role="region" aria-label="Right panels">
 
-  <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
+  <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-label="Watchlist">
     <header class="dock-head"><span class="dock-title">Watchlist</span>
       </header>
     <div class="dock-body">
@@ -1508,7 +1508,9 @@
 
 <!-- Right widget rail — TradingView's right-hand switcher. -->
 <nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
-  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist" data-ico="menu"></button>
+  <!-- The watchlist rail tab was removed (operator): with only two panels, the bell now
+       toggles alerts ON and OFF over the watchlist, so a second button for the panel
+       that is already the resting state was one button too many. -->
   <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts" data-ico="bell"></button>
   <span class="rail-sep"></span>
   <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket" data-ico="swap"></button>
@@ -7535,7 +7537,11 @@ function setRightWidget(name) {
   if (!RW_PANELS.includes(name)) return;
   // Re-clicking the active tab used to collapse the column. It only switches now --
   // the tabs choose WHICH panel shows, never whether the column exists.
-  _rwPanel = name; _rightOpen = true;
+  // The watchlist lost its own rail tab, so the remaining tabs must be able to get BACK
+  // to it: pressing the active one returns to the watchlist rather than doing nothing.
+  // Without this the bell is a one-way trip and the watchlist is unreachable.
+  _rwPanel = (_rightOpen && _rwPanel === name && name !== 'watchlist') ? 'watchlist' : name;
+  _rightOpen = true;
   _saveDocks(); _applyDocks();
 }
 /* Kept as a deliberate no-op: the column cannot be closed, but leaving the function
