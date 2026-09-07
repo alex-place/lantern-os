@@ -30,7 +30,7 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 // ── CORE — the convergence loop itself ──────────────────────────────────────────
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
-  "journal.html":                  ["trading", "TRADING_ENABLED"], // trading journal — read-only review surface
+  "journal.html":           "Verify",    // trading journal — did the trades do what the plan said? (its own <meta loop-stage> agrees)
   "watch.html":             "Observe",   // market watch — tracking watchlist/charts/signals (the trader's Observe surface; trading split to stock-trader.html)
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
