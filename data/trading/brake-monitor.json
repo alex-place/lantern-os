@@ -1,18 +1,18 @@
 {
-  "equity": 25042.61186591557,
-  "peak": 25441.695597699607,
+  "equity": 25824.08701740433,
+  "peak": 25826.249506102573,
   "gross": 2,
   "lastPrices": {
-    "SPY": 757.67,
-    "QQQ": 700.07,
-    "IWM": 296.22,
-    "EFA": 106.02,
-    "TLT": 82.19,
-    "GLD": 371.71,
-    "XMMO": 156.4,
-    "SPMO": 145.35
+    "SPY": 769.55,
+    "QQQ": 717.54,
+    "IWM": 295.01,
+    "EFA": 108.29,
+    "TLT": 82.2,
+    "GLD": 406.5303,
+    "XMMO": 152.66,
+    "SPMO": 147.39
   },
-  "lastMarkTs": 1785828343851,
+  "lastMarkTs": 1788814893069,
   "grossHistory": [
     {
       "ts": "2026-08-03T18:33:17.578Z",
@@ -481,7 +481,73 @@
       "from": 1.96,
       "to": 2,
       "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T04:43:31.167Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T04:45:08.633Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T04:46:48.327Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T04:48:10.549Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T04:49:49.177Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T14:45:27.658Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T14:49:18.627Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T18:11:26.013Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T18:15:30.771Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T18:18:21.856Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
+    },
+    {
+      "ts": "2026-09-07T21:01:33.069Z",
+      "from": null,
+      "to": 2,
+      "action": "holding 2.0×"
     }
   ],
-  "savedAt": "2026-08-04T07:25:46.241Z"
+  "savedAt": "2026-09-07T21:01:35.866Z"
 }

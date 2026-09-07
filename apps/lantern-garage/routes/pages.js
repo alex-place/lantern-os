@@ -45,7 +45,6 @@ const PUBLIC_PAGES = {
   "/stock-trader.html":   "stock-trader.html",
   "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
   "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
-  "/options.html":        "options.html",   // options trader (shadow) + chain — advisory, no orders placeable
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js
   // (orchestrationControlGuard) and the sensitive panels are hidden client-side
