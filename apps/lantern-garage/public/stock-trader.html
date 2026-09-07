@@ -8353,12 +8353,28 @@ let _armedBtn=null, _armedTimer=null;
    Coalesced on purpose: firing several orders in a row should not queue N full
    portfolio reloads against the broker. */
 let _postOrderRefresh = null;
-function refreshAfterOrder() {
-  if (_postOrderRefresh) return _postOrderRefresh;
+let _settleTimers = [];
+/* A broker does not report a fill the instant it accepts the order. ONE refresh
+   straight after placing usually reads the book BEFORE the fill lands -- and the next
+   scheduled poll is 60s away for orders and 30s for positions, which is why a manual
+   order could sit invisible on screen for up to a minute after it had actually filled.
+   So don't refresh once: poll a short, bounded burst. Frequent enough to catch a fill
+   within a second or so, few enough that it is a rounding error in broker load, and
+   over within 6s so it never becomes a second polling loop. */
+const _SETTLE_AT_MS = [350, 1200, 2500, 6000];
+function _settleOnce() {
+  if (_postOrderRefresh) return _postOrderRefresh;   // one in flight is enough
   _postOrderRefresh = Promise.all([loadOrders(), loadPortfolio()])
     .catch((e) => { try { console.warn('[order] background refresh failed:', e && e.message); } catch (_e) {} })
     .then(() => { _postOrderRefresh = null; });
   return _postOrderRefresh;
+}
+function refreshAfterOrder() {
+  // A new order restarts the burst rather than stacking a second one.
+  _settleTimers.forEach(clearTimeout); _settleTimers = [];
+  const r = _settleOnce();
+  _settleTimers = _SETTLE_AT_MS.map((ms) => setTimeout(_settleOnce, ms));
+  return r;
 }
 function _twoStep(btn, confirmText, action){
   if(_rapid || (btn && btn===_armedBtn)){
