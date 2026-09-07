@@ -5872,7 +5872,7 @@ async function placeMarketOrder(sym, side, qty, source){
     if(!r.ok || result.status!=='placed'){ _alertToast(''+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
     _alertToast(`${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
     journalLog({ symbol:sym, side, qty, type:'market', source: source||'rapid' });
-    await Promise.all([loadOrders(), loadPortfolio()]);
+    refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
     return true;
   }catch(e){ _alertToast('order failed: '+e.message); return false; }
 }
@@ -5949,7 +5949,7 @@ async function submitOrderTicket(){
       _alertToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
       journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
       closeOrderTicket();
-      await Promise.all([loadOrders(), loadPortfolio()]);
+      refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
     } else if(result && result.status === 'dry_run'){
       // Real broker connected but not armed — NOT a failure; explain plainly.
       _alertToast(`Not placed — your broker isn’t armed for real orders. ${result.reason||''}`.trim());
@@ -8342,6 +8342,24 @@ let _lastPositions = [];
 // ("label → confirm text") for 4s; second click runs `action`. Rapid mode runs
 // immediately. Returns true when it actually fired.
 let _armedBtn=null, _armedTimer=null;
+
+/* -- Post-order refresh ------------------------------------------------------
+   The order is DONE the moment the broker accepts it. Re-reading the order book and
+   the portfolio afterwards is BOOKKEEPING, and awaiting it held the button in
+   "Placing..." for two further broker round-trips after the trade was already live --
+   so a fill that took 200ms felt like it took three times that.
+   Kick it off; do not wait for it. Failures are surfaced by the next scheduled poll
+   rather than by blocking the person who just traded.
+   Coalesced on purpose: firing several orders in a row should not queue N full
+   portfolio reloads against the broker. */
+let _postOrderRefresh = null;
+function refreshAfterOrder() {
+  if (_postOrderRefresh) return _postOrderRefresh;
+  _postOrderRefresh = Promise.all([loadOrders(), loadPortfolio()])
+    .catch((e) => { try { console.warn('[order] background refresh failed:', e && e.message); } catch (_e) {} })
+    .then(() => { _postOrderRefresh = null; });
+  return _postOrderRefresh;
+}
 function _twoStep(btn, confirmText, action){
   if(_rapid || (btn && btn===_armedBtn)){
     if(btn){ btn.textContent=btn.dataset.orig||btn.textContent; btn.classList.remove('armed'); }
@@ -8379,10 +8397,10 @@ async function dustClear(symbol, btn){
     // IBKR's "fractional not supported on this account" verdict sat in the probe
     // log for four days while the same question was asked three more ways.
     if(j && j.prior_rejection){
-      _alertToast(`ℹ ${symbol}: this account previously rejected a fractional order — IBKR said "${j.prior_rejection.broker_said}" (${String(j.prior_rejection.ts).slice(0,10)}). Enable Fractional Trading in Client Portal, or have IBKR sweep the residue.`);
+      _alertToast(`${symbol}: this account previously rejected a fractional order — IBKR said "${j.prior_rejection.broker_said}" (${String(j.prior_rejection.ts).slice(0,10)}). Enable Fractional Trading in Client Portal, or have IBKR sweep the residue.`);
     }
   }catch(e){ _alertToast('Dust probe failed: '+e.message); }
-  await Promise.all([loadOrders(), loadPortfolio()]);
+  refreshAfterOrder();   // the probe is done; the reload need not hold the button
 }
 async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   const exitSide = String(side).toLowerCase()==='short' ? 'buy' : 'sell';
@@ -8409,7 +8427,7 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
     // 'Placed' is not 'filled' outside RTH — say which one happened (#3326).
     _alertToast(`${result.session_note?'Order placed for':'Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
-    await Promise.all([loadOrders(), loadPortfolio()]);
+    refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
     return true;
   }catch(e){ _alertToast('Couldn’t flatten '+symbol+': '+e.message); return false; }
 }
@@ -8508,7 +8526,7 @@ async function cancelOrder(id, btn){
     if(j && j.ok) _alertToast('Canceled '+id+(j.broker?' ('+j.broker+')':''));
     else _alertToast('Cancel failed: '+((j && j.error) || r.statusText || r.status));
   }catch(e){ _alertToast('Cancel failed: '+e.message); }
-  await loadOrders();
+  refreshAfterOrder();   // same reason: the cancel is already through
 }
 function renderOrders(orders){
   const openEl=document.getElementById('tp-orders'), histEl=document.getElementById('tp-history');
