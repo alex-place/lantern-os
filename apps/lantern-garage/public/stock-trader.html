@@ -3736,7 +3736,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
-  const lineColor = priceLabel ? '#9aa0ad' : '#e8eaf0';
+  // Tokens, not hex. These two literals were the dark palette's --text0/--text1, so in
+  // LIGHT theme the current-price label rendered near-white on a white --bg1 chip --
+  // invisible on every chart card. The line and the label share this colour, so the
+  // line disappeared with it.
+  const lineColor = priceLabel ? 'var(--text2)' : 'var(--text0)';
   html += `<div style="position:absolute;left:0;right:0;top:${pct(currentPrice)};height:1.5px;background:${lineColor};z-index:5;"></div>`;
   html += `<div style="position:absolute;left:4px;top:${pct(currentPrice)};transform:translateY(-110%);z-index:6;
     font-family:var(--mono);font-size:11px;font-weight:600;color:${lineColor};
