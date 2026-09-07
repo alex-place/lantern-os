@@ -1419,7 +1419,18 @@
     .jr-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
     .jr-cell{height:20px;border-radius:4px;background:var(--bg3)}
     .jr-curve svg{display:block;width:100%;height:auto}
-    .jr-empty{color:var(--text2);padding:14px 4px;max-width:60ch;line-height:1.5}
+    /* Placement-notes table. Shares the journal card's language; scrolls on its own so a
+     long history never stretches the panel. */
+  .jr-note{margin:0 0 8px;font-size:11.5px;line-height:1.5;color:var(--text2)}
+  .jr-scroll{overflow:auto;max-height:220px}
+  .jr-table{width:100%;border-collapse:collapse;font-size:12px}
+  .jr-table th{position:sticky;top:0;background:var(--bg1);text-align:left;font-weight:600;
+    font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;
+    color:var(--hdr-fg);padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .jr-table td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap;color:var(--text1)}
+  .jr-table tr:last-child td{border-bottom:0}
+  .jr-table .jr-dim{color:var(--text2)}
+  .jr-empty{color:var(--text2);padding:14px 4px;max-width:60ch;line-height:1.5}
     .jr-loading{color:var(--text2);padding:14px 4px}
     .jr-flag{color:var(--gold);font-size:10px}
   </style>
@@ -8023,6 +8034,41 @@ function jrBreakdownTable(slice){
   return '<table class="jr-table"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table>'+flag;
 }
 
+
+/* -- Placement notes ----------------------------------------------------------
+   journalLog() has captured a snapshot on every order since #2446 -- signal
+   direction and confidence, the detected pattern, RVOL, session phase, the price at
+   the moment of placement -- and kept 500 of them in localStorage. Nothing ever read
+   them back. The capture was written, the review surface never was, so the tab that
+   exists to review trades was the one place this data could not be seen.
+   It is DEVICE-LOCAL and it is not P&L: these are the notes for orders as they were
+   PLACED, which is why they show even when nothing has closed yet. That empty case is
+   the one where they are worth the most -- the alternative is a journal that says
+   "no trades" to someone who has been trading all morning. */
+function jrPlacements(){
+  let rows = [];
+  try { rows = JSON.parse(localStorage.getItem('trader.journal') || '[]'); } catch (_e) { rows = []; }
+  if (!rows.length) return '';
+  const cell = (v) => (v === null || v === undefined || v === '') ? '<td class="jr-dim">—</td>' : '<td>' + jrEsc(String(v)) + '</td>';
+  const when = (ts) => { try { return new Date(ts).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }); } catch (_e) { return ts || ''; } };
+  const body = rows.slice(0, 50).map(r =>
+      '<tr><td class="jr-dim">' + jrEsc(when(r.ts)) + '</td>'
+    + '<td><b>' + jrEsc(r.symbol || '') + '</b></td>'
+    + '<td class="' + (String(r.side).toLowerCase() === 'buy' ? 'jr-pos' : 'jr-neg') + '">' + jrEsc(String(r.side || '').toUpperCase()) + '</td>'
+    + cell(r.qty)
+    + cell(r.price != null ? jrUsd(r.price) : null)
+    + cell(r.signal) + cell(r.pattern) + cell(r.rvol) + cell(r.session)
+    + '</tr>').join('');
+  return '<div class="jr-card"><h4>Placement notes — this device</h4>'
+    + '<p class="jr-note">What the screen said at the moment each order went in. Captured locally, '
+    + 'never uploaded, capped at 500 and newest first. Not profit and loss — these are intentions, not outcomes.</p>'
+    + '<div class="jr-scroll"><table class="jr-table"><thead><tr>'
+    + '<th>When</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th>'
+    + '<th>Signal</th><th>Pattern</th><th>RVOL</th><th>Session</th>'
+    + '</tr></thead><tbody>' + body + '</tbody></table></div>'
+    + (rows.length > 50 ? '<p class="jr-note">Showing the most recent 50 of ' + rows.length + '.</p>' : '')
+    + '</div>';
+}
 function jrRender(pane, data){
   const bookKey=Object.keys(data.rec.books||{})[0];
   const book=(data.rec.books||{})[bookKey]||{};
@@ -8034,7 +8080,9 @@ function jrRender(pane, data){
   }
   if(!s.trades){
     html+='<div class="jr-empty">No confirmed trades yet. As soon as the first position closes with a broker-accepted fill, this tab fills in: realized P&L by day, the equity curve with drawdown, where exits happened, and every opportunity the autopilot declined with its reason.</div></div>';
-    pane.innerHTML=html; return;
+    // Placements are things the user DID, so they survive the no-closed-trades case.
+    html += jrPlacements();
+    pane.innerHTML=html+'</div>'; return;
   }
   const dd=book.maxDrawdown||{amount:0};
   const ex=s.excursions||{};
@@ -8045,6 +8093,7 @@ function jrRender(pane, data){
     +'<div class="jr-kpi"><div class="k">Expectancy</div><div class="v">'+jrUsd(s.expectancy)+'</div><div class="s">per trade · profit factor '+(s.profitFactor==null?'∞':(typeof s.profitFactor==='number'?s.profitFactor.toFixed(2):'—'))+'</div></div>'
     +'<div class="jr-kpi"><div class="k">Avg MFE / MAE</div><div class="v">'+(ex.nMfe? (jrPct(ex.avgMfePct)+' / '+jrPct(ex.avgMaePct)) : '—')+'</div><div class="s">'+(ex.nMfe?('n='+ex.nMfe):'accruing — needs observed runs')+'</div></div>'
     +'</div>';
+  html+=jrPlacements();
   html+='<div class="jr-cols"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">'
     +'<div class="jr-card jr-curve"><h4>Equity curve — realized, by exchange day</h4>'+jrCurveSvg(book.daily)+'</div>'
     +'<div class="jr-card"><h4>Daily P&L calendar</h4>'+jrCalendar(book.daily)+'</div>'
