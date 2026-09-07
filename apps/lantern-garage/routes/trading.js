@@ -454,7 +454,6 @@ const aiTraderRoutes = require('./trading/ai-trader');
 const newsRoutes = require('./trading/news');
 const miscRoutes = require('./trading/misc');
 const portfolioRoutes = require('./trading/portfolio');
-const optionsRoutes = require('./trading/options');
 const brakeRoutes = require('./trading/brake');
 const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
@@ -464,7 +463,6 @@ const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
 const accountModeRoutes = require('./trading/account-mode');   // DEMO/PAPER/TRADE ladder (#2546)
-const optionsShadowRoutes = require('./trading/options-shadow');
 const overnightRoutes = require('./trading/overnight');
 
 
@@ -510,7 +508,6 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await aiTraderRoutes(req, res, url, ctx)) return true;
   if (await newsRoutes(req, res, url, ctx)) return true;
   if (await portfolioRoutes(req, res, url, ctx)) return true;
-  if (await optionsRoutes(req, res, url, ctx)) return true;
   if (await brakeRoutes(req, res, url, ctx)) return true;
   if (await demoRoutes(req, res, url, ctx)) return true;
   if (await scorecardRoutes(req, res, url, ctx)) return true;
@@ -520,7 +517,6 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;
   if (await accountModeRoutes(req, res, url, ctx)) return true;
-  if (await optionsShadowRoutes(req, res, url, ctx)) return true;
   if (await overnightRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 

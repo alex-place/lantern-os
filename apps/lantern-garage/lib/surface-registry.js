@@ -62,7 +62,6 @@ const EXTENSION = {
   // An EXTENSION beside the loop: it serves none of the six stages, so it honestly names a module
   // + flag rather than claiming a loop stage.
   "budget.html":                   ["budget", "BUDGET_ENABLED"],
-  "options.html":                  ["trading", "TRADING_ENABLED"], // options trader (shadow) + live chain + advisory strategies — no orders placeable
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
