@@ -1475,7 +1475,7 @@
 
   <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
     <header class="dock-head"><span class="dock-title">Watchlist</span>
-      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+      </header>
     <div class="dock-body">
       <div class="wl-add">
         <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
@@ -1500,7 +1500,7 @@
 
   <section class="dock-panel rw-panel" id="rwp-alerts" role="tabpanel" aria-labelledby="rtab-alerts" hidden>
     <header class="dock-head"><span class="dock-title">Alerts</span>
-      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+      </header>
     <div class="dock-body" id="rwAlertsBody"></div>
   </section>
 
@@ -7496,7 +7496,11 @@ let _rwPanel = RW_PANELS.includes(_lsGet('trader.rwPanel', '')) ? _lsGet('trader
 const DESK_FULL_MIN_W = 1500;
 const _deskNarrow = (typeof window !== 'undefined' ? window.innerWidth : 1920) < DESK_FULL_MIN_W;
 let _leftOpen = _lsGet('trader.leftOpen', _deskNarrow ? '0' : '1') !== '0';
-let _rightOpen = _lsGet('trader.rightOpen', '1') !== '0';
+/* The right column is permanent. It holds the watchlist, which is the page's frame of
+   reference -- hiding it left the trader looking at charts with no prices beside them.
+   Deliberately NOT read from storage: anyone carrying a saved '0' from before this
+   change would otherwise come back to a hidden dock that no control can reopen. */
+let _rightOpen = true;
 let _ticketOpen = _lsGet('trader.ticketOpen', '1') !== '0';
 
 function _applyDocks() {
@@ -7529,10 +7533,14 @@ function _saveDocks() {
 }
 function setRightWidget(name) {
   if (!RW_PANELS.includes(name)) return;
-  if (_rightOpen && _rwPanel === name) _rightOpen = false; else { _rwPanel = name; _rightOpen = true; }
+  // Re-clicking the active tab used to collapse the column. It only switches now --
+  // the tabs choose WHICH panel shows, never whether the column exists.
+  _rwPanel = name; _rightOpen = true;
   _saveDocks(); _applyDocks();
 }
-function closeRightWidget() { _rightOpen = false; _saveDocks(); _applyDocks(); }
+/* Kept as a deliberate no-op: the column cannot be closed, but leaving the function
+   defined means any remaining caller fails harmlessly instead of throwing. */
+function closeRightWidget() { /* the right column is permanent -- see _rightOpen */ }
 function toggleLeftDock() { _leftOpen = !_leftOpen; _saveDocks(); _applyDocks(); }
 function closeLeftDock() { _leftOpen = false; _saveDocks(); _applyDocks(); }
 function toggleTicketDock() {
