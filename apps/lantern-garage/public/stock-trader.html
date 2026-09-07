@@ -125,7 +125,10 @@
      their own padding (10 / 12 / 16px) and type scale, so nothing lined up across
      the surfaces. Tabs stay a touch larger than labels because they are hit targets,
      but everything shares the same rhythm, colour and border. */
-  :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2)}
+  /* --hdr-h joins the header tokens because min-height alone did not make these agree:
+     the three headers carry different paddings, so they settled at 30 / 32 / 30px and the
+     dock sat 2px proud of the bottom panel beside it. An explicit height ends the argument. */
+  :root{--hdr-px:12px;--hdr-py:7px;--hdr-size:10.5px;--hdr-track:.08em;--hdr-fg:var(--text2);--hdr-h:32px}
   /* Popup surfaces. Every overlay had grown its own corner, shadow and scrim, so a
      flyout, a modal and a floating toolbar read as three different materials. These
      are the alert dialog's values -- the newest and best-judged of them -- promoted
@@ -161,7 +164,7 @@
 
   .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
   .dock-panel[hidden]{display:none}
-  .dock-head{display:flex;align-items:center;gap:8px;padding:var(--hdr-py) var(--hdr-px);border-bottom:1px solid var(--border);flex:0 0 auto;min-height:30px}
+  .dock-head{display:flex;align-items:center;gap:8px;padding:var(--hdr-py) var(--hdr-px);border-bottom:1px solid var(--border);flex:0 0 auto;height:var(--hdr-h);box-sizing:border-box}
   .dock-title{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);flex:1}
   .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
   .dock-x:hover{color:var(--text0);background:var(--bg3)}
@@ -541,7 +544,7 @@
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
   .tp-stat .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text0)}
   .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
-  .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;min-height:30px;align-items:stretch}
+  .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;height:var(--hdr-h);box-sizing:border-box;align-items:stretch}
   .tp-tab{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--hdr-fg);background:none;border:none;border-bottom:2px solid transparent;padding:0 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:color .12s,border-color .12s}
   .tp-tab:hover{color:var(--text1)}
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
@@ -626,7 +629,11 @@
      signal on a tight second line. */
   /* TradingView column rhythm: the symbol grows, the three numerics sit in fixed
      right-aligned tracks so figures line up down the whole list. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  /* The trailing 18px track is the remove button's own space. It used to be positioned
+     absolutely at right:5px, which put it 9px ON TOP of the Chg% figure on every row --
+     invisible at rest, but on hover it covered the number being read and a click aimed at
+     the percentage could land on remove. A real track cannot overlap. */
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 18px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -642,8 +649,12 @@
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
   /* Column header: sticky, quiet, and on the SAME grid as the rows so the labels sit
      exactly over the figures they name. */
-  .wl-head{position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px;align-items:center;gap:8px;
+  /* flex:0 0 auto is what makes the height stick. This is a flex ITEM, so its default
+     flex-shrink:1 let the column squeeze it to 29.6px even though it declares 32px --
+     the declared height is only a basis, not a floor. .dock-head held 32px all along
+     because it already carried this; .wl-head did not, which is the whole 2px. */
+  .wl-head{height:var(--hdr-h);flex:0 0 auto;box-sizing:border-box;position:sticky;top:0;z-index:5;display:grid;
+    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 18px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
@@ -704,7 +715,7 @@
   /* #1709: single full-width "Add symbol" button → opens the search popup */
   .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
-  .wl-remove{position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
+  .wl-remove{grid-column:7;justify-self:center;opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
@@ -879,7 +890,12 @@
     margin:-4px 0 0 -4px;border-radius:50%;background:transparent;border:1.3px solid var(--accent,#3b9eff);
     box-shadow:0 0 0 1px var(--bg1,#111)}
   /* Header chart controls */
-  .chart-ctrl{font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  /* One explicit height for every toolbar chip. Without it each chip's height fell out
+     of its element type's default line-height -- native buttons landed on 21-22px while
+     the custom-select buttons inherited a 17.6px line-height and came out at 26px, so the
+     dropdowns sat visibly proud of their neighbours in the same row. */
+  .chart-ctrl{height:24px;line-height:1;display:inline-flex;align-items:center;box-sizing:border-box;
+    font-family:var(--mono);font-size:11px;padding:0 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .chart-ctrl:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   /* Patterns toggle "on" state — not colour-only: the label text flips to "ON" and the
      icon fills, so the state is legible without relying on the accent colour (WCAG 1.4.1). */
