@@ -410,7 +410,17 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       }
       const uid = getEffectiveUserId(req);
       const alpaca = require('../../lib/alpaca-adapter');
-      const out = await alpaca.getPortfolioHistory(uid, range);
+      let out = await alpaca.getPortfolioHistory(uid, range);
+      // Fall through to IBKR when this account has no Alpaca side. Same return shape
+      // from both adapters, so the route and the journal card are broker-agnostic.
+      if (!out || out.ok === false) {
+        try {
+          const IbkrCpapi = require('../../lib/ibkr-cpapi');
+          const ib = await new IbkrCpapi().getPortfolioHistory();
+          if (ib && ib.ok) out = ib;
+          else if (ib && ib.reason && (!out || !out.reason)) out = ib;
+        } catch (_e) { /* keep the Alpaca answer, whatever it was */ }
+      }
       sendJson(res, out, 200);
     } catch (error) {
       sendJson(res, { ok: false, reason: error.message }, 200);
