@@ -201,12 +201,19 @@ async function jpFetch(demo) {
     if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
     return r.json();
   });
-  const [rec, slice, skips] = await Promise.all([
+  const [rec, slice, skips, equity] = await Promise.all([
     get('/api/trading/track-record' + qs),
     get('/api/trading/scorecard' + qs + amp + 'by=' + jpSlice),
     get('/api/trading/skips' + qs).catch(() => null),
+    // The broker's OWN equity series -- a different question from the ledger. The
+    // ledger answers "what did the autopilot do"; this answers "what is the money
+    // doing", so it includes manual trades, deposits, and everything from before the
+    // autopilot started, anchored to the opening balance rather than to zero.
+    // Never fatal: a broker that cannot answer simply gets no card.
+    get('/api/trading/portfolio/history' + (demo ? qs + '&range=ALL' : '?range=ALL'))
+      .catch(() => null),
   ]);
-  return { rec, slice, skips, demo };
+  return { rec, slice, skips, equity, demo };
 }
 
 async function jpLoad(force) {
@@ -481,6 +488,60 @@ function jpPlacements() {
     + '</div>';
 }
 
+
+/* Account equity, from the broker's own record. Deliberately NOT the same chart as the
+   realized curve above it: that one starts at zero and counts only what the autopilot
+   booked, this one starts at the opening balance and counts everything the account did.
+   Showing both is the point -- the gap between them IS the manual trades, the deposits,
+   and the history from before the ledger existed. */
+function jpEquityCurve(h) {
+  if (!h || h.ok === false || !Array.isArray(h.timestamps) || h.timestamps.length < 2) return '';
+  const ts = h.timestamps, eqRaw = h.equity || [];
+  const pts = [];
+  for (let i = 0; i < ts.length; i++) if (eqRaw[i] != null && isFinite(eqRaw[i])) pts.push({ t: ts[i], v: Number(eqRaw[i]) });
+  if (pts.length < 2) return '';
+  const base = Number(h.base_value) || pts[0].v;
+  const last = pts[pts.length - 1];
+  const net = last.v - base;
+
+  const W = 620, H = 190, padL = 8, padR = 78, padT = 14, padB = 22;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const vals = pts.map(p => p.v).concat([base]);
+  let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (hi === lo) { hi = lo + 1; }
+  // Pad the band so the line never rides the top or bottom edge of the box.
+  const padV = (hi - lo) * 0.08; lo -= padV; hi += padV;
+  const x = i => padL + (pts.length === 1 ? iw / 2 : (i / (pts.length - 1)) * iw);
+  const y = v => padT + (1 - (v - lo) / (hi - lo)) * ih;
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  const area = 'M' + x(0).toFixed(1) + ' ' + y(base).toFixed(1) + ' '
+    + pts.map((p, i) => 'L' + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ')
+    + ' L' + x(pts.length - 1).toFixed(1) + ' ' + y(base).toFixed(1) + ' Z';
+  const col = net >= 0 ? 'var(--green)' : 'var(--red)';
+  const day = (t) => { try { return new Date(t * 1000).toISOString().slice(0, 10); } catch (_e) { return ''; } };
+
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Account equity from '
+    + jpEsc(day(pts[0].t)) + ' to ' + jpEsc(day(last.t)) + ', opening balance ' + jpEsc(jpUsd(base))
+    + ', now ' + jpEsc(jpUsd(last.v)) + '">'
+    + '<path d="' + area + '" fill="' + col + '" opacity=".12"/>'
+    // The opening balance is the reference line -- above it is profit, below it is not.
+    + '<line x1="' + padL + '" y1="' + y(base).toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y(base).toFixed(1)
+    + '" stroke="var(--text2)" stroke-dasharray="3 3" opacity=".7"/>'
+    + '<text x="' + padL + '" y="' + (y(base) - 4).toFixed(1) + '" font-size="9" fill="var(--text2)">opened '
+    + jpEsc(jpUsd(base)) + '</text>'
+    + '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>'
+    + '<circle cx="' + x(pts.length - 1).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3.5" fill="' + col + '"/>'
+    + '<text x="' + (W - padR + 7) + '" y="' + (y(last.v) + 4).toFixed(1) + '" font-size="12" fill="var(--text0)" font-weight="600">'
+    + jpEsc(jpUsd(last.v)) + '</text>'
+    + '<text x="' + padL + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)">' + jpEsc(day(pts[0].t)) + '</text>'
+    + '<text x="' + (W - padR) + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)" text-anchor="end">'
+    + jpEsc(day(last.t)) + '</text>'
+    + '</svg>'
+    + '<p class="jp-note">Opened ' + jpEsc(jpUsd(base)) + ' on ' + jpEsc(day(pts[0].t)) + ' — now '
+    + jpEsc(jpUsd(last.v)) + ' (<span class="' + jpSign(net) + '">' + jpEsc((net >= 0 ? '+' : '') + jpUsd(net))
+    + '</span>). Straight from the broker, so it counts manual trades and deposits too — '
+    + 'the realized curve above counts only what the autopilot booked.</p>';
+}
 function jpRender(host, data) {
   const bookKey = Object.keys(data.rec.books || {})[0];
   const book = (data.rec.books || {})[bookKey] || {};
@@ -524,7 +585,10 @@ function jpRender(host, data) {
       + '<div class="jp-card">' + jpBreakdown(data.slice) + '</div>'
     + '</div>'
     + '<div class="jp-col">'
-      + '<div class="jp-card jp-curve"><h2>Equity curve — realized, by exchange day</h2>' + jpCurve(daily) + '</div>'
+      + (jpEquityCurve(data.equity)
+          ? '<div class="jp-card jp-curve"><h2>Account equity — all time, from the broker</h2>' + jpEquityCurve(data.equity) + '</div>'
+          : '')
+      + '<div class="jp-card jp-curve"><h2>Autopilot realized — by exchange day</h2>' + jpCurve(daily) + '</div>'
       + '<div class="jp-card jp-curve"><h2>Net P&amp;L per day</h2>' + jpBars(daily) + '</div>'
       + '<div class="jp-card">' + jpSkips(data.skips) + '</div>'
     + '</div>'
