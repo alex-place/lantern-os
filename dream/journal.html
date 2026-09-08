@@ -69,7 +69,13 @@
   .jp-cal-head{display:grid;grid-template-columns:repeat(7,1fr) 76px;gap:4px;margin-bottom:4px}
   .jp-cal-head span{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);text-align:center}
   .jp-cal{display:grid;grid-template-columns:repeat(7,1fr) 76px;gap:4px}
-  .jp-day{aspect-ratio:1;border-radius:7px;background:var(--bg2);border:1px solid var(--border);padding:5px 6px;
+  /* NOT aspect-ratio:1. A square cell takes its HEIGHT from the column width, so the
+     calendar grew as the window did -- 95px tall to hold a date and one figure that
+     need about 34px. Five rows spent 493px, which put the last week flush against the
+     fold on a 1080p screen at 125% scaling (viewport 1536x864: calendar bottom 862).
+     A bounded min-height sizes the cell to its CONTENT and stops the month growing
+     off-screen on a wider monitor. */
+  .jp-day{min-height:clamp(44px,4.6vh,62px);border-radius:7px;background:var(--bg2);border:1px solid var(--border);padding:5px 6px;
     display:flex;flex-direction:column;min-width:0;overflow:hidden}
   .jp-day.empty{background:transparent;border-color:transparent}
   .jp-day .d{font-size:9.5px;color:var(--text2);font-variant-numeric:tabular-nums}
@@ -88,6 +94,20 @@
   .jp-week .l{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
   .jp-week .v{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis}
+  .jp-day .p-abbr{display:none}
+  /* Narrow screens: the 76px week column is a fifth of a 375px viewport, and the full
+     figure cannot fit what is left. Drop the column, show the short figure. The week
+     totals are not lost -- they are a sum of days already on screen. */
+  @media (max-width:560px){
+    .jp-cal, .jp-cal-head{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+    .jp-cal-head span:last-child, .jp-week{display:none}
+    .jp-day{padding:3px 4px;min-height:clamp(40px,5.2vh,52px)}
+    .jp-day .d{font-size:9px}
+    .jp-day .p{font-size:9.5px}
+    .jp-day .p-full{display:none}
+    .jp-day .p-abbr{display:inline}
+    .jp-shell{padding:0 10px 32px}
+  }
   .jp-monthbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
   .jp-monthbar .m{font-size:12.5px;font-weight:600;color:var(--text0)}
   .jp-navb{background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;
@@ -161,6 +181,16 @@ let jpView = 'confirmed', jpSlice = 'reason', jpBusy = false, jpMonth = null, jp
 const jpEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const jpUsd = (n) => (typeof n !== 'number' || !isFinite(n)) ? '—'
   : (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/* A 375px screen gives each day ~30px of text box; "-$65.11" needs 38. Rather than
+   hide the figure (colour alone cannot tell a -$4 day from a -$400 one -- the whole
+   point of the calendar) both forms are rendered and CSS shows one. Doing it in CSS
+   rather than JS means a rotate or a resize cannot leave the wrong one showing. */
+const jpUsdShort = (n) => {
+  if (typeof n !== 'number' || !isFinite(n)) return '';
+  const a = Math.abs(n), sign = n < 0 ? '-' : '';
+  if (a >= 1000) return sign + '$' + (a / 1000).toFixed(a >= 10000 ? 0 : 1) + 'k';
+  return sign + '$' + Math.round(a);
+};
 const jpPct = (n) => (typeof n === 'number' && isFinite(n)) ? n.toFixed(1) + '%' : '—';
 const jpSign = (n) => (typeof n === 'number' && isFinite(n) && n !== 0) ? (n > 0 ? 'jp-pos' : 'jp-neg') : 'jp-dim';
 
@@ -355,7 +385,9 @@ function jpCalendar(daily) {
     if (rec) { weekPnl += rec.pnl || 0; weekHasData = true; }
     out += '<div class="jp-day ' + cls + isToday + '"'
       + (isToday ? ' aria-current="date"' : '') + '><div class="d">' + d + '</div>'
-      + '<div class="p ' + (rec ? jpSign(rec.pnl) : 'jp-dim') + '">' + (rec ? jpUsd(rec.pnl) : '') + '</div></div>';
+      + '<div class="p ' + (rec ? jpSign(rec.pnl) : 'jp-dim') + '">'
+      + (rec ? '<span class="p-full">' + jpUsd(rec.pnl) + '</span><span class="p-abbr">' + jpUsdShort(rec.pnl) + '</span>' : '')
+      + '</div></div>';
     col++;
     if (col === 7) { flushWeek(); col = 0; }
   }
