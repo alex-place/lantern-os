@@ -364,6 +364,135 @@ class IbkrCpapi {
     return normalizeSummary(r.json);
   }
 
+
+  /** POST /pa/performance -> { ok, base_value, timestamps, equity, source } -- the SAME
+   *  shape lib/alpaca-adapter.js returns from getPortfolioHistory, so the existing route
+   *  and the journal's equity card work against either broker unchanged.
+   *
+   *  Two things make this deliberately paranoid rather than a straight field read:
+   *
+   *  1. IBKR does not publish this endpoint's response schema. Their own Web API
+   *     reference lists /pa/performance in the pacing table (POST, 1 req/15 min) and
+   *     says "not all endpoints in our Web API are currently included in this
+   *     Reference". So the shape below is DISCOVERED, not declared: we walk the
+   *     response for a date array and a parallel numeric array instead of asserting
+   *     `json.nav.data[0].navs`. getPnl already does this for keys that "vary by
+   *     build" -- same reasoning, less documentation.
+   *  2. The 15-minute pacing limit means a wrong guess costs 15 minutes per attempt.
+   *     A walker that tolerates several plausible shapes is worth more than one that
+   *     matches a single guessed one.
+   *
+   *  Returns { ok:false, reason } for anything it cannot read. The journal renders no
+   *  card in that case, which is exactly today's behaviour -- so this cannot regress
+   *  the page, only improve it.
+   *
+   *  NOT YET VERIFIED against a live session: at the time of writing this gateway was
+   *  unauthenticated (no local gateway listening, no credentials in env), so the parser
+   *  has never met a real response. scripts/probe-ibkr-performance.js captures one in a
+   *  single command when a session is up -- run it before trusting the output. */
+  async getPortfolioHistory(accountId) {
+    const id = accountId || (await this.resolveAccountId());
+    if (!id) return { ok: false, reason: 'no IBKR account' };
+
+    const r = await this._request('POST', '/pa/performance', { acctIds: [id], freq: 'D' });
+    if (!r.ok || !r.json || typeof r.json !== 'object') {
+      return { ok: false, reason: r.error || `HTTP ${r.status}` };
+    }
+
+    const found = IbkrCpapi._findNavSeries(r.json);
+    if (!found) return { ok: false, reason: 'no NAV series in /pa/performance response' };
+
+    const { dates, values } = found;
+    const timestamps = [], equity = [];
+    for (let i = 0; i < dates.length && i < values.length; i++) {
+      const t = IbkrCpapi._toEpochSeconds(dates[i]);
+      const v = Number(values[i]);
+      if (t == null || !isFinite(v)) continue;
+      timestamps.push(t); equity.push(v);
+    }
+    if (timestamps.length < 2) return { ok: false, reason: 'NAV series too short to plot' };
+
+    return {
+      ok: true,
+      range: 'ALL',
+      timeframe: '1D',
+      // The account's true OPENING balance is not in this payload -- this is the first
+      // NAV in the window IBKR chose to return. Labelled honestly rather than presented
+      // as the inception value: see the issue for wiring /pa/transactions if the real
+      // opening balance is needed.
+      base_value: equity[0],
+      base_is_window_start: true,
+      timestamps,
+      equity,
+      source: 'ibkr',
+    };
+  }
+
+  /** IBKR dates arrive as "20260507", "2026-05-07", or epoch ms/s depending on build.
+   *  Returns epoch SECONDS (what the journal's curve expects) or null. */
+  static _toEpochSeconds(d) {
+    if (d == null) return null;
+    if (typeof d === 'number' && isFinite(d)) return d > 1e11 ? Math.round(d / 1000) : Math.round(d);
+    const str = String(d).trim();
+    let m = str.match(/^(\d{4})-?(\d{2})-?(\d{2})$/);
+    if (m) return Math.round(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 1000);
+    if (/^\d{10}$/.test(str)) return Number(str);
+    if (/^\d{13}$/.test(str)) return Math.round(Number(str) / 1000);
+    const t = Date.parse(str);
+    return isFinite(t) ? Math.round(t / 1000) : null;
+  }
+
+  /** Walk an unknown response for a date array and a parallel numeric array of the same
+   *  length. Prefers keys that name themselves (nav/navs/values against dates/labels)
+   *  but falls back to any same-length pair, because the schema is not published. */
+  static _findNavSeries(root) {
+    const DATE_KEYS = ['dates', 'date', 'labels', 'x'];
+    const VAL_KEYS = ['navs', 'nav', 'values', 'data', 'y', 'returns'];
+    const seen = new Set();
+    const out = [];
+
+    const isDateArr = (a) => Array.isArray(a) && a.length > 1
+      && a.every((v) => IbkrCpapi._toEpochSeconds(v) != null);
+    const isNumArr = (a) => Array.isArray(a) && a.length > 1
+      && a.every((v) => typeof v === 'number' && isFinite(v));
+
+    const walk = (node) => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+
+      let dates = null;
+      for (const k of DATE_KEYS) if (isDateArr(node[k])) { dates = node[k]; break; }
+      if (dates) {
+        // A sibling numeric array of matching length is the NAV series.
+        for (const k of VAL_KEYS) {
+          if (isNumArr(node[k]) && node[k].length === dates.length) { out.push({ dates, values: node[k] }); break; }
+        }
+        // Some builds nest the values one level down: { dates, data: [ { navs: [...] } ] }.
+        if (!out.length && Array.isArray(node.data)) {
+          for (const row of node.data) {
+            if (!row || typeof row !== 'object') continue;
+            for (const k of VAL_KEYS) {
+              if (isNumArr(row[k]) && row[k].length === dates.length) { out.push({ dates, values: row[k] }); break; }
+            }
+            if (out.length) break;
+          }
+        }
+        // Last resort: ANY same-length numeric array beside the dates.
+        if (!out.length) {
+          for (const v of Object.values(node)) {
+            if (isNumArr(v) && v.length === dates.length) { out.push({ dates, values: v }); break; }
+          }
+        }
+      }
+      if (out.length) return;
+      Object.values(node).forEach(walk);
+    };
+
+    walk(root);
+    return out[0] || null;
+  }
+
   /** GET /iserver/account/pnl/partitioned → { dailyPnl, unrealizedPnl, realizedPnl } for
    *  this account, or null. IBKR's `dpl` is the broker-authoritative DAY P&L (it reconciles
    *  with the day's equity change); `upl`/`rpl` are today's unrealized/realized. Response
