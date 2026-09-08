@@ -96,7 +96,8 @@ const STRAY_HARD = [
 // HIGH-blocked or auto-untracked. A deliberately-named, *consumed* file can
 // legitimately contain `tmp`/`scratch` or end in `.log` — e.g.
 // `manifests/TMP-REPO-RAG-INDEX.json`, which `Invoke-LanternConvergenceLoop.ps1`
-// and `oss-repo-validation.yml` actually read. Don't gate commits on a guess.
+// reads. Don't gate commits on a guess. (oss-repo-validation.yml used to read it
+// too; that workflow is gone.)
 const STRAY_SOFT = [
   /(^|[._-])tmp([._-]|$)/i,      // tmp.js, steptoe_tmp.html, x-tmp.json
   /(^|[._-])scratch([._-]|$)/i,
