@@ -29,6 +29,13 @@
      Laid out the way the journal products lay this out (TradeZella, TraderWaves):
      a KPI band across the top, then the calendar as the centrepiece with the
      curve beside it, then the tables underneath. */
+  /* --green and --red are declared INLINE in stock-trader.html and watch.html, not in
+     any shared stylesheet. This page loads site.css + trader.css, one of which happens
+     to define --green -- but NOTHING defines --red. So gains rendered green and every
+     LOSS fell back to the inherited text colour: white on dark, black on light. A
+     trading journal that shows losses in the same colour as ordinary text is worse than
+     one with no colour at all. Same values as the trader page, so the two agree. */
+  :root{--green:#00d4aa;--red:#ff5f6d}
   body{margin:0;background:var(--bg0);color:var(--text1);font-family:var(--sans,system-ui,sans-serif)}
   .jp-shell{max-width:1440px;margin:0 auto;padding:0 16px 40px}
 
@@ -71,6 +78,11 @@
   .jp-day.win{background:color-mix(in srgb,var(--green) 15%,var(--bg2));border-color:color-mix(in srgb,var(--green) 35%,var(--border))}
   .jp-day.loss{background:color-mix(in srgb,var(--red) 15%,var(--bg2));border-color:color-mix(in srgb,var(--red) 35%,var(--border))}
   .jp-day.flat{background:var(--bg3)}
+  /* Today is a RING, never a fill: it has to be legible on a green day, a red day and
+     an empty one alike, and a fill would fight the P&L colour that the cell exists to
+     show. inset keeps it inside the 7px radius instead of bleeding into the gap. */
+  .jp-day.today{box-shadow:inset 0 0 0 1.5px var(--accent),0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+  .jp-day.today .d{color:var(--accent);font-weight:700}
   .jp-week{border-radius:7px;background:var(--bg2);border:1px solid var(--border);padding:5px 6px;
     display:flex;flex-direction:column;justify-content:center;min-width:0}
   .jp-week .l{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
@@ -83,7 +95,19 @@
   .jp-navb:hover:not(:disabled){background:var(--bg3);color:var(--text0)}
   .jp-navb:disabled{opacity:.35;cursor:default}
 
-  .jp-pos{color:var(--green)} .jp-neg{color:var(--red)} .jp-dim{color:var(--text2)}
+  /* .jp-kpi .v declares color:var(--text0) at (0,2,0); .jp-neg alone is (0,1,0) and
+     loses, so Max drawdown rendered WHITE while the same figure in the calendar was
+     red. The sign has to read the same wherever it appears. */
+  /* A sign colour has to win WHEREVER it lands. Both `.jp-kpi .v` (0,2,0) and
+     `.jp-table td` (0,1,1) declare their own colour, out-specifying a bare `.jp-neg`
+     at (0,1,0) -- so losses rendered white in the KPI band, and then again in the
+     tables after the KPI band was fixed. Naming the containers here settles it once,
+     for every place a figure can appear, without reaching for !important. */
+  .jp-dim{color:var(--text2)}
+  .jp-pos, .jp-kpi .v.jp-pos, .jp-table td.jp-pos,
+  .jp-week .v.jp-pos, .jp-day .p.jp-pos{color:var(--green)}
+  .jp-neg, .jp-kpi .v.jp-neg, .jp-table td.jp-neg,
+  .jp-week .v.jp-neg, .jp-day .p.jp-neg{color:var(--red)}
   .jp-chip{font-size:10.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:transparent;
     color:var(--text2);cursor:pointer;font-family:inherit}
   .jp-chip.on{background:var(--blue);border-color:var(--blue);color:#08131f}
@@ -228,7 +252,9 @@ function jpKpis(s, book, ds) {
            (typeof s.avgWin === 'number' && typeof s.avgLoss === 'number' && Math.abs(s.avgLoss) > 0)
              ? (s.avgWin / Math.abs(s.avgLoss)).toFixed(2)
              : '—',
-           jpSign(s.avgWin + s.avgLoss),
+           // Above 1.0 means the average winner outruns the average loser. Colour it
+           // by that, not by the sum -- the headline figure IS the ratio.
+           (Math.abs(s.avgLoss) > 0 ? jpSign((s.avgWin / Math.abs(s.avgLoss)) - 1) : ''),
            jpUsd(s.avgWin) + ' win · ' + jpUsd(s.avgLoss) + ' loss')
     + card('Expectancy', jpUsd(s.expectancy), jpSign(s.expectancy), 'per trade')
     + card('Max drawdown', jpUsd(-Math.abs(dd.amount || 0)), 'jp-neg',
@@ -308,6 +334,11 @@ function jpCalendar(daily) {
   const months = Array.from(new Set(dates.map(d => d.slice(0, 7)))).sort();
   const idx = months.indexOf(jpMonth);
 
+  /* The calendar's rows are exchange days, so "today" is the exchange day too --
+     en-CA gives YYYY-MM-DD directly, which is the shape the ledger already uses. */
+  let todayIso = '';
+  try { todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
+  catch (_e) { todayIso = new Date().toISOString().slice(0, 10); }
   let cells = '', weekPnl = 0, weekHasData = false, out = '';
   const flushWeek = () => {
     out += '<div class="jp-week"><div class="l">Week</div><div class="v ' + (weekHasData ? jpSign(weekPnl) : 'jp-dim') + '">'
@@ -320,8 +351,10 @@ function jpCalendar(daily) {
     const iso = jpMonth + '-' + String(d).padStart(2, '0');
     const rec = byDate[iso];
     const cls = rec ? (rec.pnl > 0 ? 'win' : rec.pnl < 0 ? 'loss' : 'flat') : '';
+    const isToday = (iso === todayIso) ? ' today' : '';
     if (rec) { weekPnl += rec.pnl || 0; weekHasData = true; }
-    out += '<div class="jp-day ' + cls + '"><div class="d">' + d + '</div>'
+    out += '<div class="jp-day ' + cls + isToday + '"'
+      + (isToday ? ' aria-current="date"' : '') + '><div class="d">' + d + '</div>'
       + '<div class="p ' + (rec ? jpSign(rec.pnl) : 'jp-dim') + '">' + (rec ? jpUsd(rec.pnl) : '') + '</div></div>';
     col++;
     if (col === 7) { flushWeek(); col = 0; }
