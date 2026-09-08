@@ -23,6 +23,19 @@ const { internalUserId } = require('../../lib/request-auth');
 // PER-USER (#3275) — see routes/trading/track-record.js for the scoping rule.
 const scopeFor = (req) => getEffectiveUserId(req) || internalUserId(req) || 'local-owner';
 
+/**
+ * OPERATOR VIEW -- same rule as routes/trading/track-record.js and market.js: the
+ * trader books under a fixed operator id while this route resolves the browser
+ * session id, so an operator signed in normally read an empty breakdown beside a
+ * full KPI band. ADMIN ONLY and only as a FALLBACK.
+ */
+function operatorFallbackUid(req, hadRows) {
+  if (hadRows) return null;
+  let admin = false;
+  try { admin = require('../../lib/auth-middleware').isAdmin(req); } catch (_e) { admin = false; }
+  if (!admin) return null;
+  return process.env.TRADER_OPERATOR_UID || 'local-owner';
+}
 module.exports = async function scorecardRoutes(req, res, url, ctx) {
   if (url.pathname !== '/api/trading/scorecard' || req.method !== 'GET') return false;
   const { sendJson } = ctx;
@@ -41,11 +54,19 @@ module.exports = async function scorecardRoutes(req, res, url, ctx) {
         sendJson(res, { ...breakdownFromRows(by, exits, skips), demo: true, source: 'champion-demo' }, 200);
         return true;
       }
-      sendJson(res, breakdown(by, undefined, scopeFor(req)), 200);
+      let _bd = breakdown(by, undefined, scopeFor(req));
+      const _bdHas = Object.keys((_bd && _bd.confirmed) || {}).length > 0;
+      const _bdOp = operatorFallbackUid(req, _bdHas);
+      if (_bdOp) _bd = breakdown(by, undefined, _bdOp);
+      sendJson(res, _bd, 200);
       return true;
     }
     if (demo) { sendJson(res, { error: 'demo_requires_by', supported: BREAKDOWN_KEYS }, 400); return true; }
-    sendJson(res, scorecard(undefined, scopeFor(req)), 200);
+    let _sc = scorecard(undefined, scopeFor(req));
+    const _scHas = !!(_sc && ((_sc.confirmed && _sc.confirmed.trades) || _sc.trades));
+    const _scOp = operatorFallbackUid(req, _scHas);
+    if (_scOp) _sc = scorecard(undefined, _scOp);
+    sendJson(res, _sc, 200);
   } catch (e) {
     sendJson(res, { error: 'scorecard_failed', message: e.message }, 500);
   }

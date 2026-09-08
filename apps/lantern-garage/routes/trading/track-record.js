@@ -23,6 +23,27 @@ const { internalUserId } = require('../../lib/request-auth');
 // stamped account read as that same house book.
 const scopeFor = (req) => getEffectiveUserId(req) || internalUserId(req) || 'local-owner';
 
+/**
+ * OPERATOR VIEW (mirrors routes/trading/market.js, 2026-08-06).
+ *
+ * The autonomous trader books under a FIXED operator id ('local-owner'), but these
+ * routes resolve the BROWSER session's profile id. Those are different identities,
+ * so an operator signed in normally read an empty slice while their own ledger held
+ * a month of confirmed fills -- the journal could not see the book it exists to
+ * review. market.js hit the same wall and reported $0.00 while the bot traded a
+ * $960k IBKR account.
+ *
+ * ADMIN ONLY, and only as a FALLBACK: an admin who HAS trades of their own still
+ * sees their own, and a non-admin is never redirected to the house book, so no real
+ * ledger can leak to a normal user.
+ */
+function operatorFallbackUid(req, hadRows) {
+  if (hadRows) return null;
+  let admin = false;
+  try { admin = require('../../lib/auth-middleware').isAdmin(req); } catch (_e) { admin = false; }
+  if (!admin) return null;
+  return process.env.TRADER_OPERATOR_UID || 'local-owner';
+}
 module.exports = async function trackRecordRoutes(req, res, url, ctx) {
   if (url.pathname !== '/api/trading/track-record' || req.method !== 'GET') return false;
   const { sendJson } = ctx;
@@ -43,7 +64,13 @@ module.exports = async function trackRecordRoutes(req, res, url, ctx) {
       }, 200);
       return true;
     }
-    sendJson(res, getTrackRecord(undefined, scopeFor(req)), 200);
+    let rec = getTrackRecord(undefined, scopeFor(req));
+    // Did the session's own slice actually contain anything?
+    const _has = Object.values((rec && rec.books) || {})
+      .some((b) => b && b.stats && b.stats.trades > 0);
+    const _op = operatorFallbackUid(req, _has);
+    if (_op) rec = getTrackRecord(undefined, _op);
+    sendJson(res, rec, 200);
   } catch (e) {
     sendJson(res, { error: 'track_record_failed', message: e.message }, 500);
   }
