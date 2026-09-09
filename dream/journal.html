@@ -35,7 +35,19 @@
      LOSS fell back to the inherited text colour: white on dark, black on light. A
      trading journal that shows losses in the same colour as ordinary text is worse than
      one with no colour at all. Same values as the trader page, so the two agree. */
-  :root{--green:#00d4aa;--red:#ff5f6d}
+  /* THE FULL TOKEN SET, not just the two colours. Neither site.css nor trader.css
+     defines --text0/--text1/--text2/--bg0..--bg3, so on this page every one of them was
+     UNDEFINED. HTML text got away with it -- an invalid var() on `color` falls back
+     through inheritance to a UA default that happens to be light in dark mode. SVG did
+     not: an invalid var() in a `fill` resolves to fill's INITIAL value, which is BLACK.
+     That is why every label on every chart was black on a dark background while the
+     surrounding text looked fine. Same values as stock-trader.html so the pages agree. */
+  :root{--bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
+    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;--text2:#828a99;
+    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:var(--accent,#4a9eff)}
+  html[data-theme="light"]{
+    --bg0:#f4f6fa;--bg1:#ffffff;--bg2:#eef1f6;--bg3:#e3e8f0;
+    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#828b9c}
   body{margin:0;background:var(--bg0);color:var(--text1);font-family:var(--sans,system-ui,sans-serif)}
   .jp-shell{max-width:1440px;margin:0 auto;padding:0 16px 40px}
 
@@ -143,6 +155,21 @@
   .jp-scroll{overflow:auto;max-height:300px}
 
   .jp-curve svg{display:block;width:100%;height:auto}
+  /* A chart you cannot read a value off is decoration. The readout replaces the
+     crosshair: it follows the pointer and names the point, without drawing the two
+     lines across the plot that were explicitly not wanted. */
+  .jp-chart{position:relative}
+  .jp-chart .jp-read{position:absolute;top:6px;left:8px;display:none;gap:10px;align-items:baseline;
+    background:color-mix(in srgb,var(--bg2) 92%,transparent);border:1px solid var(--border);
+    border-radius:7px;padding:4px 9px;font-size:11.5px;pointer-events:none;z-index:2;
+    box-shadow:0 4px 14px rgba(0,0,0,.28);white-space:nowrap}
+  .jp-chart.on .jp-read{display:flex}
+  .jp-read .d{color:var(--text2);font-variant-numeric:tabular-nums}
+  .jp-read .v{color:var(--text0);font-weight:600;font-variant-numeric:tabular-nums}
+  .jp-chart .jp-dot{display:none;pointer-events:none}
+  .jp-chart.on .jp-dot{display:block}
+  /* A finger is not a mouse: give the plot room so the readout is not under the thumb. */
+  @media (max-width:560px){ .jp-chart .jp-read{font-size:11px;padding:3px 7px} }
   .jp-empty{color:var(--text2);padding:16px 2px;max-width:66ch;line-height:1.6}
   .jp-loading{color:var(--text2);padding:16px 2px}
   .jp-banner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--bg1);border:1px solid var(--border);
@@ -302,58 +329,9 @@ function jpKpis(s, book, ds) {
 
 /* Cumulative realized P&L. Deliberately a plain SVG: it is one series and a zero line,
    and a charting library for that would be more code than the chart. */
-function jpCurve(daily) {
-  if (!daily || !daily.length) return '<div class="jp-empty">No closed days yet.</div>';
-  const W = 620, H = 170, padL = 8, padR = 70, padT = 12, padB = 22;
-  const iw = W - padL - padR, ih = H - padT - padB;
-  const cums = daily.map(d => d.cum);
-  let lo = Math.min(0, Math.min.apply(null, cums)), hi = Math.max(0, Math.max.apply(null, cums));
-  if (hi === lo) hi = lo + 1;
-  const x = i => padL + (daily.length === 1 ? iw / 2 : (i / (daily.length - 1)) * iw);
-  const y = v => padT + (1 - (v - lo) / (hi - lo)) * ih;
-  const line = daily.map((d, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(d.cum).toFixed(1)).join(' ');
-  const area = 'M' + x(0).toFixed(1) + ' ' + y(0).toFixed(1) + ' '
-    + daily.map((d, i) => 'L' + x(i).toFixed(1) + ' ' + y(d.cum).toFixed(1)).join(' ')
-    + ' L' + x(daily.length - 1).toFixed(1) + ' ' + y(0).toFixed(1) + ' Z';
-  const last = daily[daily.length - 1];
-  const up = last.cum >= 0;
-  const col = up ? 'var(--green)' : 'var(--red)';
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Cumulative realized profit and loss by exchange day, ending at '
-    + jpEsc(jpUsd(last.cum)) + '">'
-    + '<path d="' + area + '" fill="' + col + '" opacity=".12"/>'
-    + '<line x1="' + padL + '" y1="' + y(0).toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y(0).toFixed(1)
-    + '" stroke="var(--border)" stroke-dasharray="3 3"/>'
-    + '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>'
-    + '<circle cx="' + x(daily.length - 1).toFixed(1) + '" cy="' + y(last.cum).toFixed(1) + '" r="3.5" fill="' + col + '"/>'
-    + '<text x="' + (W - padR + 7) + '" y="' + (y(last.cum) + 4).toFixed(1) + '" font-size="12" fill="var(--text0)" font-weight="600">'
-    + jpEsc(jpUsd(last.cum)) + '</text>'
-    + '<text x="' + padL + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)">' + jpEsc(daily[0].date) + '</text>'
-    + '<text x="' + (W - padR) + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)" text-anchor="end">' + jpEsc(last.date) + '</text>'
-    + '</svg>';
-}
 
 /* Per-day bars, so a single outsized day is visible as one day rather than as a step
    in the cumulative line. */
-function jpBars(daily) {
-  if (!daily || !daily.length) return '';
-  const W = 620, H = 110, padL = 8, padR = 70, padT = 8, padB = 18;
-  const iw = W - padL - padR, ih = H - padT - padB;
-  const mags = daily.map(d => Math.abs(d.pnl || 0));
-  const max = Math.max(1, Math.max.apply(null, mags));
-  const zero = padT + ih / 2;
-  const bw = Math.max(1.5, Math.min(14, iw / Math.max(1, daily.length) - 2));
-  const bars = daily.map((d, i) => {
-    const cx = padL + (daily.length === 1 ? iw / 2 : (i / (daily.length - 1)) * iw);
-    const h = (Math.abs(d.pnl || 0) / max) * (ih / 2);
-    const up = (d.pnl || 0) >= 0;
-    return '<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + (up ? zero - h : zero).toFixed(1)
-      + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" rx="1.5" fill="'
-      + (up ? 'var(--green)' : 'var(--red)') + '" opacity=".85"><title>' + jpEsc(d.date + '  ' + jpUsd(d.pnl)) + '</title></rect>';
-  }).join('');
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Realized profit and loss for each exchange day">'
-    + '<line x1="' + padL + '" y1="' + zero + '" x2="' + (W - padR) + '" y2="' + zero + '" stroke="var(--border)"/>'
-    + bars + '</svg>';
-}
 
 /* The calendar is the piece both TradeZella and TraderWaves put front and centre, and
    the weekly column on the right is the part that makes it more than decoration. */
@@ -494,54 +472,208 @@ function jpPlacements() {
    booked, this one starts at the opening balance and counts everything the account did.
    Showing both is the point -- the gap between them IS the manual trades, the deposits,
    and the history from before the ledger existed. */
-function jpEquityCurve(h) {
-  if (!h || h.ok === false || !Array.isArray(h.timestamps) || h.timestamps.length < 2) return '';
-  const ts = h.timestamps, eqRaw = h.equity || [];
-  const pts = [];
-  for (let i = 0; i < ts.length; i++) if (eqRaw[i] != null && isFinite(eqRaw[i])) pts.push({ t: ts[i], v: Number(eqRaw[i]) });
-  if (pts.length < 2) return '';
-  const base = Number(h.base_value) || pts[0].v;
-  const last = pts[pts.length - 1];
-  const net = last.v - base;
+/* ── Plot engine ───────────────────────────────────────────────────────────────
+   One builder for every chart on the page, because the three hand-rolled SVGs had
+   drifted apart: two of them drew the same shape from different data, and the bar
+   chart shipped with no axis at all -- bars floating over a baseline with no dates
+   and no values, which tells you a day was red but not which day or by how much.
 
-  const W = 620, H = 190, padL = 8, padR = 78, padT = 14, padB = 22;
-  const iw = W - padL - padR, ih = H - padT - padB;
-  const vals = pts.map(p => p.v).concat([base]);
-  let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
-  if (hi === lo) { hi = lo + 1; }
-  // Pad the band so the line never rides the top or bottom edge of the box.
-  const padV = (hi - lo) * 0.08; lo -= padV; hi += padV;
-  const x = i => padL + (pts.length === 1 ? iw / 2 : (i / (pts.length - 1)) * iw);
-  const y = v => padT + (1 - (v - lo) / (hi - lo)) * ih;
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
-  const area = 'M' + x(0).toFixed(1) + ' ' + y(base).toFixed(1) + ' '
-    + pts.map((p, i) => 'L' + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ')
-    + ' L' + x(pts.length - 1).toFixed(1) + ' ' + y(base).toFixed(1) + ' Z';
-  const col = net >= 0 ? 'var(--green)' : 'var(--red)';
-  const day = (t) => { try { return new Date(t * 1000).toISOString().slice(0, 10); } catch (_e) { return ''; } };
+   Every plot gets:
+     - a labelled Y axis (values) and X axis (dates)
+     - a readout that follows the pointer and names the point under it
+   and deliberately NOT a crosshair: no horizontal or vertical rule across the plot.
+   The readout is the tracker.
 
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Account equity from '
-    + jpEsc(day(pts[0].t)) + ' to ' + jpEsc(day(last.t)) + ', opening balance ' + jpEsc(jpUsd(base))
-    + ', now ' + jpEsc(jpUsd(last.v)) + '">'
-    + '<path d="' + area + '" fill="' + col + '" opacity=".12"/>'
-    // The opening balance is the reference line -- above it is profit, below it is not.
-    + '<line x1="' + padL + '" y1="' + y(base).toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y(base).toFixed(1)
-    + '" stroke="var(--text2)" stroke-dasharray="3 3" opacity=".7"/>'
-    + '<text x="' + padL + '" y="' + (y(base) - 4).toFixed(1) + '" font-size="9" fill="var(--text2)">opened '
-    + jpEsc(jpUsd(base)) + '</text>'
-    + '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>'
-    + '<circle cx="' + x(pts.length - 1).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3.5" fill="' + col + '"/>'
-    + '<text x="' + (W - padR + 7) + '" y="' + (y(last.v) + 4).toFixed(1) + '" font-size="12" fill="var(--text0)" font-weight="600">'
-    + jpEsc(jpUsd(last.v)) + '</text>'
-    + '<text x="' + padL + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)">' + jpEsc(day(pts[0].t)) + '</text>'
-    + '<text x="' + (W - padR) + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)" text-anchor="end">'
-    + jpEsc(day(last.t)) + '</text>'
-    + '</svg>'
-    + '<p class="jp-note">Opened ' + jpEsc(jpUsd(base)) + ' on ' + jpEsc(day(pts[0].t)) + ' — now '
-    + jpEsc(jpUsd(last.v)) + ' (<span class="' + jpSign(net) + '">' + jpEsc((net >= 0 ? '+' : '') + jpUsd(net))
-    + '</span>). Straight from the broker, so it counts manual trades and deposits too — '
-    + 'the realized curve above counts only what the autopilot booked.</p>';
+   Series are kept in _jpPlots rather than serialised into the DOM, so the numbers a
+   tooltip shows are the numbers the chart was drawn from -- not a re-parse that can
+   disagree with it. */
+const _jpPlots = {};
+let _jpPlotSeq = 0;
+
+/* Nice round tick values, so the axis reads 100k / 102k rather than 99,812.37. */
+function jpTicks(lo, hi, n) {
+  if (!(hi > lo)) return [lo];
+  const raw = (hi - lo) / Math.max(1, n);
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(v => v >= raw) || mag * 10;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(v);
+  return out.length ? out : [lo, hi];
 }
+/* Axis labels want to be short: $102k reads at a glance, $102,033.33 does not. */
+function jpAxisMoney(v) {
+  const a = Math.abs(v), sign = v < 0 ? '-' : '';
+  if (a >= 1000) return sign + '$' + (a / 1000).toFixed(a >= 10000 ? 0 : 1) + 'k';
+  if (a >= 1) return sign + '$' + Math.round(a);
+  return sign + '$' + a.toFixed(2);
+}
+
+/**
+ * pts  : [{ d:'YYYY-MM-DD', v:Number }]
+ * opts : { type:'line'|'bar', baseline:Number|null, baselineLabel:String, height:Number }
+ */
+function jpPlot(pts, opts) {
+  const o = opts || {};
+  if (!Array.isArray(pts) || pts.length < 1) return '';
+  const id = 'jpp' + (++_jpPlotSeq);
+  const bar = o.type === 'bar';
+  const H = o.height || 190, W = 620;
+  const padL = 8, padR = 8, padT = 14, padB = 22, axisW = 44;
+  const iw = W - padL - padR - axisW, ih = H - padT - padB;
+  const x0 = padL + axisW;
+
+  const vals = pts.map(p => p.v).filter(v => typeof v === 'number' && isFinite(v));
+  if (!vals.length) return '';
+  let lo, hi;
+  if (bar) { const m = Math.max.apply(null, vals.map(Math.abs)) || 1; lo = -m; hi = m; }
+  else {
+    lo = Math.min.apply(null, vals); hi = Math.max.apply(null, vals);
+    if (o.baseline != null) { lo = Math.min(lo, o.baseline); hi = Math.max(hi, o.baseline); }
+    if (hi === lo) hi = lo + 1;
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  }
+  const X = i => x0 + (pts.length === 1 ? iw / 2 : (i / (pts.length - 1)) * iw);
+  const Y = v => padT + (1 - (v - lo) / (hi - lo)) * ih;
+
+  // ── axes ──────────────────────────────────────────────────────────────────
+  let g = '';
+  for (const t of jpTicks(lo, hi, 4)) {
+    const y = Y(t);
+    if (y < padT - 1 || y > padT + ih + 1) continue;
+    g += '<line x1="' + x0 + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1)
+      + '" stroke="var(--border)" opacity=".55"/>'
+      + '<text x="' + (x0 - 6) + '" y="' + (y + 3.5).toFixed(1) + '" font-size="9.5" fill="var(--text2)" '
+      + 'text-anchor="end">' + jpEsc(jpAxisMoney(t)) + '</text>';
+  }
+  // X labels: first, middle, last — enough to place the series in time without clutter.
+  const marks = pts.length <= 2 ? [0, pts.length - 1] : [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
+  for (const i of Array.from(new Set(marks))) {
+    const anchor = i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle');
+    g += '<text x="' + X(i).toFixed(1) + '" y="' + (H - 5) + '" font-size="9.5" fill="var(--text2)" '
+      + 'text-anchor="' + anchor + '">' + jpEsc(pts[i].d) + '</text>';
+  }
+
+  // ── series ────────────────────────────────────────────────────────────────
+  let body = '';
+  const net = o.baseline != null ? (pts[pts.length - 1].v - o.baseline) : (pts[pts.length - 1].v);
+  const col = net >= 0 ? 'var(--green)' : 'var(--red)';
+  if (bar) {
+    g += '<line x1="' + x0 + '" y1="' + Y(0).toFixed(1) + '" x2="' + (W - padR) + '" y2="' + Y(0).toFixed(1)
+      + '" stroke="var(--text2)" opacity=".5"/>';
+    const bw = Math.max(1.5, Math.min(16, iw / Math.max(1, pts.length) - 2));
+    body = pts.map((p, i) => {
+      const h = Math.abs(Y(p.v) - Y(0));
+      const up = p.v >= 0;
+      return '<rect x="' + (X(i) - bw / 2).toFixed(1) + '" y="' + (up ? Y(p.v) : Y(0)).toFixed(1)
+        + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" rx="1.5" fill="'
+        + (up ? 'var(--green)' : 'var(--red)') + '" opacity=".9"/>';
+    }).join('');
+  } else {
+    const base = o.baseline != null ? o.baseline : 0;
+    const line = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ');
+    const area = 'M' + X(0).toFixed(1) + ' ' + Y(base).toFixed(1) + ' '
+      + pts.map((p, i) => 'L' + X(i).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ')
+      + ' L' + X(pts.length - 1).toFixed(1) + ' ' + Y(base).toFixed(1) + ' Z';
+    if (o.baseline != null) {
+      g += '<line x1="' + x0 + '" y1="' + Y(o.baseline).toFixed(1) + '" x2="' + (W - padR) + '" y2="'
+        + Y(o.baseline).toFixed(1) + '" stroke="var(--text2)" stroke-dasharray="3 3" opacity=".75"/>';
+      if (o.baselineLabel) {
+        g += '<text x="' + (x0 + 4) + '" y="' + (Y(o.baseline) - 4).toFixed(1) + '" font-size="9" '
+          + 'fill="var(--text2)">' + jpEsc(o.baselineLabel) + '</text>';
+      }
+    }
+    body = '<path d="' + area + '" fill="' + col + '" opacity=".12"/>'
+      + '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>';
+  }
+
+  _jpPlots[id] = { pts: pts, geom: { W: W, H: H, x0: x0, iw: iw, padT: padT, ih: ih, lo: lo, hi: hi }, bar: bar };
+
+  return '<div class="jp-chart" id="' + id + '">'
+    + '<div class="jp-read"><span class="d"></span><span class="v"></span></div>'
+    + '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + jpEsc(o.aria || 'chart') + '">'
+    + g + body
+    + '<circle class="jp-dot" r="3.5" fill="var(--text0)" stroke="var(--bg1)" stroke-width="1.5"/>'
+    + '</svg></div>';
+}
+
+/* Bind after every render. Pointer events cover mouse, pen AND touch from one code
+   path, so the phone behaves the way the desktop does rather than getting a second
+   implementation that drifts. touch-action:none would kill page scrolling, so the
+   readout tracks on move and clears on leave/cancel instead of capturing the gesture. */
+function jpBindPlots() {
+  Object.keys(_jpPlots).forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.bound === '1') return;
+    el.dataset.bound = '1';
+    const rec = _jpPlots[id], svg = el.querySelector('svg');
+    const dot = el.querySelector('.jp-dot');
+    const rd = el.querySelector('.jp-read'), rdD = rd.querySelector('.d'), rdV = rd.querySelector('.v');
+    const show = (clientX) => {
+      const r = svg.getBoundingClientRect();
+      if (!r.width) return;
+      const vx = ((clientX - r.left) / r.width) * rec.geom.W;      // client px -> viewBox units
+      const f = (vx - rec.geom.x0) / (rec.geom.iw || 1);
+      const i = Math.max(0, Math.min(rec.pts.length - 1, Math.round(f * (rec.pts.length - 1))));
+      const p = rec.pts[i];
+      if (!p) return;
+      rdD.textContent = p.d;
+      rdV.textContent = jpUsd(p.v);
+      rdV.className = 'v ' + jpSign(p.v);
+      const gx = rec.geom.x0 + (rec.pts.length === 1 ? rec.geom.iw / 2 : (i / (rec.pts.length - 1)) * rec.geom.iw);
+      const gy = rec.geom.padT + (1 - (p.v - rec.geom.lo) / (rec.geom.hi - rec.geom.lo)) * rec.geom.ih;
+      dot.setAttribute('cx', gx.toFixed(1));
+      dot.setAttribute('cy', gy.toFixed(1));
+      el.classList.add('on');
+    };
+    const clear = () => el.classList.remove('on');
+    el.addEventListener('pointermove', (e) => show(e.clientX));
+    el.addEventListener('pointerdown', (e) => show(e.clientX));
+    el.addEventListener('pointerleave', clear);
+    el.addEventListener('pointercancel', clear);
+  });
+}
+
+
+/* ONE balance chart, not two. The page used to draw the broker's equity AND the
+   autopilot's cumulative realized as separate line charts -- two near-identical shapes
+   asking the reader to work out which was which. The broker's series is the real
+   account balance, so that is the one that stays; the autopilot's cumulative line is
+   the same information the calendar and the bar chart already carry, per day.
+   When the broker cannot answer (a box with no linked account), the autopilot's own
+   cumulative curve stands in rather than leaving an empty slot. */
+function jpBalanceChart(h, daily) {
+  const iso = (t) => { try { return new Date(t * 1000).toISOString().slice(0, 10); } catch (_e) { return ''; } };
+  if (h && h.ok !== false && Array.isArray(h.timestamps) && h.timestamps.length > 1) {
+    const eq = h.equity || [], pts = [];
+    for (let i = 0; i < h.timestamps.length; i++) {
+      const v = eq[i];
+      if (v != null && isFinite(v)) pts.push({ d: iso(h.timestamps[i]), v: Number(v) });
+    }
+    if (pts.length > 1) {
+      const base = Number(h.base_value) || pts[0].v;
+      const last = pts[pts.length - 1], net = last.v - base;
+      return {
+        title: 'Account balance — all time, from the broker',
+        html: jpPlot(pts, { type: 'line', baseline: base, baselineLabel: 'opened ' + jpAxisMoney(base),
+          aria: 'Account balance from ' + pts[0].d + ' to ' + last.d + ', opened ' + jpUsd(base) + ', now ' + jpUsd(last.v) })
+          + '<p class="jp-note">Opened <b>' + jpEsc(jpUsd(base)) + '</b> on ' + jpEsc(pts[0].d)
+          + ' — now <b>' + jpEsc(jpUsd(last.v)) + '</b> (<span class="' + jpSign(net) + '">'
+          + jpEsc((net >= 0 ? '+' : '') + jpUsd(net)) + '</span>). Straight from the broker, so it counts '
+          + 'manual trades and deposits too — the calendar below counts only what the autopilot booked.</p>',
+      };
+    }
+  }
+  if (!daily || !daily.length) return null;
+  const pts = daily.map(d => ({ d: d.date, v: d.cum }));
+  return {
+    title: 'Autopilot cumulative — realized, by exchange day',
+    html: jpPlot(pts, { type: 'line', baseline: 0, baselineLabel: 'flat',
+      aria: 'Cumulative realized profit and loss by exchange day' })
+      + '<p class="jp-note">The broker did not return an account history for this box, so this is the '
+      + 'autopilot\'s own realized total instead — it starts at zero, not at the opening balance.</p>',
+  };
+}
+
 function jpRender(host, data) {
   const bookKey = Object.keys(data.rec.books || {})[0];
   const book = (data.rec.books || {})[bookKey] || {};
@@ -565,6 +697,7 @@ function jpRender(host, data) {
   if (jpView === 'skips') {
     html += '<div class="jp-card">' + jpSkips(data.skips) + '</div>';
     host.innerHTML = html;
+  jpBindPlots();
     return;
   }
 
@@ -574,6 +707,7 @@ function jpRender(host, data) {
       + 'and every candidate the autopilot passed over.</div>';
     html += jpPlacements();          // things you DID still belong here
     host.innerHTML = html;
+  jpBindPlots();
     return;
   }
 
@@ -585,11 +719,14 @@ function jpRender(host, data) {
       + '<div class="jp-card">' + jpBreakdown(data.slice) + '</div>'
     + '</div>'
     + '<div class="jp-col">'
-      + (jpEquityCurve(data.equity)
-          ? '<div class="jp-card jp-curve"><h2>Account equity — all time, from the broker</h2>' + jpEquityCurve(data.equity) + '</div>'
-          : '')
-      + '<div class="jp-card jp-curve"><h2>Autopilot realized — by exchange day</h2>' + jpCurve(daily) + '</div>'
-      + '<div class="jp-card jp-curve"><h2>Net P&amp;L per day</h2>' + jpBars(daily) + '</div>'
+      + (function () {
+          const b = jpBalanceChart(data.equity, daily);
+          return b ? '<div class="jp-card jp-curve"><h2>' + b.title + '</h2>' + b.html + '</div>' : '';
+        })()
+      + '<div class="jp-card jp-curve"><h2>Net P&amp;L per day — realized</h2>'
+        + jpPlot(daily.map(d => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
+            aria: 'Realized profit and loss for each exchange day' })
+        + '</div>'
       + '<div class="jp-card">' + jpSkips(data.skips) + '</div>'
     + '</div>'
   + '</div>';
@@ -599,6 +736,7 @@ function jpRender(host, data) {
     html += '<p class="jp-note">' + jpEsc(String(book.disclosures)) + '</p>';
   }
   host.innerHTML = html;
+  jpBindPlots();
 }
 
 document.addEventListener('DOMContentLoaded', () => jpLoad());
