@@ -652,14 +652,23 @@ function jpBalanceChart(h, daily) {
     if (pts.length > 1) {
       const base = Number(h.base_value) || pts[0].v;
       const last = pts[pts.length - 1], net = last.v - base;
+      // The payload says whether it is real. champion-demo is a SIMULATED 26-year DCA
+      // book -- coherent on its own terms, but calling it "from the broker" would be a
+      // false claim about provenance on the one page whose job is an honest record.
+      const sim = h.demo === true || h.source === 'champion-demo';
       return {
-        title: 'Account balance — all time, from the broker',
+        title: sim ? 'Account balance — simulated demo book'
+                   : 'Account balance — all time, from the broker',
         html: jpPlot(pts, { type: 'line', baseline: base, baselineLabel: 'opened ' + jpAxisMoney(base),
           aria: 'Account balance from ' + pts[0].d + ' to ' + last.d + ', opened ' + jpUsd(base) + ', now ' + jpUsd(last.v) })
           + '<p class="jp-note">Opened <b>' + jpEsc(jpUsd(base)) + '</b> on ' + jpEsc(pts[0].d)
           + ' — now <b>' + jpEsc(jpUsd(last.v)) + '</b> (<span class="' + jpSign(net) + '">'
-          + jpEsc((net >= 0 ? '+' : '') + jpUsd(net)) + '</span>). Straight from the broker, so it counts '
-          + 'manual trades and deposits too — the calendar below counts only what the autopilot booked.</p>',
+          + jpEsc((net >= 0 ? '+' : '') + jpUsd(net)) + '</span>). '
+          + (sim
+              ? 'Simulated sample data for the demo book — not a real account, and not a real track record.'
+              : 'Straight from the broker, so it counts manual trades and deposits too — the calendar '
+                + 'below counts only what the autopilot booked.')
+          + '</p>',
       };
     }
   }
