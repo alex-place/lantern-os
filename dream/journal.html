@@ -748,7 +748,36 @@ function jpRender(host, data) {
   jpBindPlots();
 }
 
-document.addEventListener('DOMContentLoaded', () => jpLoad());
+/* ── Staying current ──────────────────────────────────────────────────────────
+   This page used to call jpLoad() exactly once, on DOMContentLoaded, and never again.
+   No interval, no refresh on focus. A tab left open showed whatever was true when it
+   was opened -- so a session could close, the ledger could gain a day, and the journal
+   would still be reporting yesterday with no sign anything was stale.
+
+   Refreshing on FOCUS rather than on a timer, because that is how a review surface is
+   actually used: you glance at it, go somewhere else, and come back wanting the number
+   to be right. A hidden tab costs nothing, which a fixed interval cannot say -- the
+   trader page runs seven of those, and it is a live surface that earns them.
+
+   The slow poll underneath is a floor, not the mechanism: it only fires while the page
+   is VISIBLE, so a forgotten tab in the background is not quietly hammering the broker
+   all night. STALE_MS is deliberately larger than the poll so a refresh triggered by
+   coming back to the tab does not re-fetch something fetched seconds ago. */
+const JP_POLL_MS = 120000;   // visible-only background refresh
+const JP_STALE_MS = 45000;   // don't re-fetch on focus if we just did
+let _jpLastLoad = 0;
+
+async function jpRefresh(reason) {
+  if (document.visibilityState !== 'visible') return;
+  if (Date.now() - _jpLastLoad < JP_STALE_MS) return;
+  _jpLastLoad = Date.now();
+  try { await jpLoad(true); } catch (_e) { /* the error card already explains itself */ }
+}
+
+document.addEventListener('DOMContentLoaded', () => { _jpLastLoad = Date.now(); jpLoad(); });
+document.addEventListener('visibilitychange', () => jpRefresh('visible'));
+window.addEventListener('focus', () => jpRefresh('focus'));
+setInterval(() => jpRefresh('poll'), JP_POLL_MS);
 </script>
 
 <script src="/js/theme-toggle.js" defer></script>
