@@ -359,6 +359,7 @@ const routes = [
   require("./routes/training"),
   require("./routes/gpu-training"),
   require("./routes/token-audit"),
+  require("./routes/journal-layout"),  // per-user journal arrangement (#3543)
   require("./routes/ibkr"),               // per-user IBKR connect/disconnect (ADR-0022)
   require("./routes/broker-alpaca"),      // one-click Alpaca OAuth2 connect (ADR-0027)
   require("./routes/indeed"),             // per-user Indeed OAuth connect (MCP connector)

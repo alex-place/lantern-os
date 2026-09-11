@@ -111,9 +111,9 @@ test('the tiles name the measure they show', () => {
   }
 });
 
-test('jpRender feeds the tiles the calendar\'s series', () => {
-  const render = grabFn('jpRender');
-  assert.match(render, /const dsr = jpDaySeries\(daily, liveToday, acct\);/);
-  assert.match(render, /const ds = Object\.assign\(jpDayStats\(dsr\.days\), \{ mode: dsr\.mode \}\);/);
-  assert.doesNotMatch(render, /jpDayStats\(daily\)/, 'the booked-only call is gone');
+test('the tiles are built from the calendar\'s series', () => {
+  const card = grabFn('jpCardBody');
+  assert.match(card, /jpDaySeries\(L\.daily, L\.liveToday, L\.acct\)/);
+  assert.match(card, /Object\.assign\(jpDayStats\(dsr\.days\), \{ mode: dsr\.mode \}\)/);
+  assert.doesNotMatch(card + grabFn('jpRender'), /jpDayStats\(daily\)/, 'nothing builds the tiles from booked days alone');
 });
