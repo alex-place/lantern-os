@@ -276,6 +276,7 @@ async function jpLoad(force) {
       else throw e;
     }
     jpData = data;
+    jpSliceCache[jpSlice] = data.slice;   // the slice this load already brought (#3541)
     jpRender(host, data);
     jpStampLoaded();
   } catch (e) {
