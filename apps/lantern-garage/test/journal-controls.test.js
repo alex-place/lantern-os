@@ -89,6 +89,7 @@ function harness({ sliceBody = { confirmed: { SPY: { trades: 2, winRate: 50, tot
     const jpDaySeries = () => ({ days: [], mode: 'account' });
     const jpDayStats = () => ({ streak: 0 });
     const jpKpis = () => 'KPIS';
+    const jpMonthly = () => 'MONTHLY';
   `;
   const api = new Function('document', 'fetch', preamble + grabFn('jpSetSlice') + '\n' + grabFn('jpPaintCalendar')
     + '\nreturn { jpSetSlice, jpPaintCalendar, slice: () => jpSlice, cache: () => jpSliceCache };')(document, fetchStub);
@@ -121,10 +122,13 @@ test('the demo book asks the demo endpoint', async () => {
   assert.deepStrictEqual(fetches, ['/api/trading/scorecard?demo=champion&by=hour']);
 });
 
-test('the calendar toggle repaints the calendar and its two tiles, nothing else', () => {
+test('the calendar toggle repaints the cards that read the same series, nothing else', () => {
+  // The monthly table (#3548) counts the same days the calendar and the tiles do, so it
+  // has to move with the measure -- a table still showing booked days beside a calendar
+  // showing account sessions is two answers to one question.
   const { api, writes, fetches } = harness();
   api.jpPaintCalendar();
-  assert.deepStrictEqual(writes, ['jpCalCard', 'jpKpis']);
+  assert.deepStrictEqual(writes, ['jpCalCard', 'jpKpis', 'jpMonthlyCard']);
   assert.strictEqual(fetches.length, 0, 'switching the measure never hits the network');
 });
 
