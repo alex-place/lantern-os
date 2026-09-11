@@ -10,7 +10,7 @@ builds + attaches the Windows installer to the same release), so a single
 
 | File | Role |
 |------|------|
-| `lantern-release-deploy.sh` | Polls `releases/latest`; on a new tag → `git checkout` the tag, `npm install`, restart `lantern.service`. |
+| `lantern-release-deploy.sh` | Polls `releases/latest`; on a new tag → `git checkout` the tag, `npm install`, restart `lantern.service`. During the US session the whole deploy waits for the close (#3524). |
 | `lantern-release-deploy.service` | systemd oneshot that runs the script (as root). |
 | `lantern-release-deploy.timer` | Fires 3 min after boot, then every 15 min. |
 
@@ -35,7 +35,27 @@ sudo systemctl enable --now lantern-release-deploy.timer
 ```
 
 To force a deploy now: `sudo systemctl start lantern-release-deploy.service`, then
-`journalctl -u lantern-release-deploy.service -n 30`.
+`journalctl -u lantern-release-deploy.service -n 30`. During the US session that
+run only logs `release … waits for the close`; to ship anyway, touch the one-shot
+flag first: `sudo touch /var/lib/lantern/deploy-now` (see below).
+
+## Market-hours guard (#3524)
+
+The app this restarts is also the users' trader. So while the US regular session is
+on (Mon–Fri 09:25–16:05 ET: the 09:30–16:00 bell plus 5 minutes either side) the
+script holds the **whole** deploy, checkout and `npm install` included. The running
+app `require()`s modules lazily, so new files under the old process would be a
+mixed-version app. The first timer tick after 16:05 ET ships the release. Holidays
+and early closes aren't modeled; they only delay a deploy to 16:05.
+
+- **Ship in session anyway** (an urgent fix): `sudo touch /var/lib/lantern/deploy-now`,
+  then `sudo systemctl start lantern-release-deploy.service`. The next run consumes
+  the flag even when there's nothing to deploy, so a stale flag can't force a later
+  release mid-session. By hand: `sudo LANTERN_DEPLOY_FORCE=1 /usr/local/bin/lantern-release-deploy.sh`.
+- **See the clock the script sees:** `/usr/local/bin/lantern-release-deploy.sh --session`
+  prints `yes` in session and `no` outside it.
+- Eastern time comes from node's `Intl`, DST included. If node can't answer, the
+  script deploys as it did before this guard and says so in its log.
 
 ## Setting a secret (e.g. the Stripe key)
 

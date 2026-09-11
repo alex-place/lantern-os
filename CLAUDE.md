@@ -262,6 +262,8 @@ on top of CSF.
   tag, so **publishing a GitHub Release is a production deploy** — while merging to
   `master` moves nothing until a Release is cut (ship an unreleased `master` with the
   manual pull in the runbook). See [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
+  A release found during the US session (Mon–Fri 09:25–16:05 ET) waits for the
+  close, so it never restarts the users' trader mid-session (#3524).
   Config comes from systemd drop-ins in `/etc/systemd/system/lantern.service.d/`,
   **not** from a `.env` file (there is none on the host).
 - **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. It is **not

@@ -7,7 +7,8 @@ Compute Engine, fronted by Cloudflare. This is the first concrete instance of th
 > **Status: release-gated self-update.** The VM does **not** track `master` — merges
 > alone never reach it. It moves when a **GitHub Release is published**: a
 > `systemd` timer polls `releases/latest` every 15 minutes, checks out the new tag,
-> reinstalls deps and restarts `lantern.service`. So shipping a change to prod
+> reinstalls deps and restarts `lantern.service`. During the US session the whole
+> deploy waits for the close (#3524). So shipping a change to prod
 > means cutting a release (`/release`), not merging. See
 > [`ops/gce/README.md`](../../ops/gce/README.md) for the mechanism and
 > [Updating the running app](#updating-the-running-app) for the manual override.
@@ -20,10 +21,11 @@ Compute Engine, fronted by Cloudflare. This is the first concrete instance of th
 > (This block previously read "manual deploy, no CI/CD … one-time git clone",
 > which contradicted `ops/gce/README.md` and is what #3119 flagged.)
 
-**Force a deploy now** instead of waiting for the timer:
+**Force a deploy now** instead of waiting for the timer. The `touch` lets it through
+during the US session; see the market-hours guard in [`ops/gce/README.md`](../../ops/gce/README.md).
 
 ```bash
-gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48   --command="sudo systemctl start lantern-release-deploy.service"
+gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48   --command="sudo touch /var/lib/lantern/deploy-now && sudo systemctl start lantern-release-deploy.service"
 ```
 
 ## What's running
@@ -267,7 +269,8 @@ last-deployed tag is `/var/lib/lantern/deployed-release.tag`.
 Consequences worth knowing before you publish anything:
 
 - **Publishing a GitHub Release *is* a production deploy.** Prod rolls within ~15
-  minutes, unattended. Cut a prerelease tag (any tag with a hyphen, e.g.
+  minutes, unattended. If the US session is open (Mon–Fri 09:25–16:05 ET), it rolls
+  at the first tick after the close instead (#3524). Cut a prerelease tag (any tag with a hyphen, e.g.
   `v1.16.0-rc1`) if you want artifacts without moving prod — those never become
   `latest`.
 - **Merging to `master` does *not* move the box.** Only a published Release does.
@@ -279,7 +282,8 @@ gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d
   --command='cat /var/lib/lantern/deployed-release.tag; systemctl list-timers lantern-release-deploy.timer --no-pager'
 ```
 
-To ship `master` (or a merged PR) to the box ahead of a Release:
+To ship `master` (or a merged PR) to the box ahead of a Release. This restarts the
+users' trader, so do it outside the US session:
 
 ```bash
 export CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
