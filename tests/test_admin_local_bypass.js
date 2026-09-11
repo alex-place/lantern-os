@@ -10,8 +10,9 @@
  * This test now asserts the new contract:
  *   - No token, no session → guest (isAdmin false), even on a direct loopback hit.
  *   - LANTERN_LOCAL_ADMIN has NO effect anymore.
- *   - A valid X-Test-Auth token on a DIRECT hit → the emulated role (admin by
- *     default, or whatever X-Test-Role requests).
+ *   - A valid X-Test-Auth token on a DIRECT hit → the role X-Test-Role names.
+ *     With NO role named it fail-closes to guest (#2645) — emulating an operator
+ *     is always a deliberate, named act, never a default.
  *   - The token is refused on any PROXIED/tunnelled request (never bypassable from
  *     the internet), and refused when the token mismatches.
  *   - A real admin session still works regardless of proxy headers.
@@ -57,13 +58,44 @@ try {
   // ── Token-gated test-auth ──
   process.env.LANTERN_TEST_AUTH_TOKEN = TOKEN;
 
-  // Valid token, direct hit, default role → admin.
-  assert.strictEqual(isAdmin(req({ headers: { "x-test-auth": TOKEN } })), true);
-  ok("valid X-Test-Auth token, direct hit → admin (default role)");
+  // Valid token but NO role named → fail-closed to guest (#2645). This test used to
+  // assert "default role → admin"; that was the pre-#2645 contract, and the test was
+  // wired into no CI lane, so it silently rotted when the default flipped.
+  assert.strictEqual(isAdmin(req({ headers: { "x-test-auth": TOKEN } })), false);
+  ok("valid X-Test-Auth token, no role named → NOT admin (#2645 fail-closed)");
+  assert.strictEqual(getSessionRole(req({ headers: { "x-test-auth": TOKEN } })), "guest");
+  ok("valid token, no role named → emulated role is guest");
 
-  // Token via ?__test= query param also works (browser-navigation path).
-  assert.strictEqual(isAdmin(req({ url: "/orchestration.html?__test=" + TOKEN })), true);
-  ok("valid ?__test= token, direct hit → admin");
+  // Naming the role grants exactly that role — header and ?__test= query forms.
+  assert.strictEqual(
+    isAdmin(req({ headers: { "x-test-auth": TOKEN, "x-test-role": "admin" } })),
+    true
+  );
+  ok("X-Test-Role=admin → admin");
+  assert.strictEqual(
+    isAdmin(req({ url: "/orchestration.html?__test=" + TOKEN + "&__test_role=admin" })),
+    true
+  );
+  ok("?__test= + __test_role=admin (browser-navigation path) → admin");
+
+  // Every roster role emulates as itself (the picker offers Free / Pro / Pilot /
+  // Admin / Tech Support)…
+  for (const role of ["supporter", "deep_dreamer", "pilot", "tech_support"]) {
+    assert.strictEqual(
+      getSessionRole(req({ headers: { "x-test-auth": TOKEN, "x-test-role": role } })),
+      role,
+      `role ${role} should emulate as itself`
+    );
+  }
+  ok("supporter / deep_dreamer / pilot / tech_support each emulate as themselves");
+  // …and the retired legacy alias does not: "founder" left the roster when the picker
+  // was de-duped (it rendered as a second identical Pro), so it now normalizes to
+  // guest like any unknown role.
+  assert.strictEqual(
+    getSessionRole(req({ headers: { "x-test-auth": TOKEN, "x-test-role": "founder" } })),
+    "guest"
+  );
+  ok("X-Test-Role=founder (retired alias) → fail-closed to guest");
 
   // Role override: X-Test-Role downgrades the emulated identity.
   assert.strictEqual(

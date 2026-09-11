@@ -67,8 +67,11 @@ const TEST_EMAIL = "test@unisona.local";
 const TEST_NAME = "Test User";
 const TEST_DEFAULT_PASSWORD = "test-account-1234";
 
-/** Roles the picker/header may emulate. "guest" is excluded (guest = not logged in). */
-const TEST_ROLES = ["supporter", "deep_dreamer", "pilot", "founder", "admin", "tech_support"];
+/** Roles the picker/header may emulate. "guest" is excluded (guest = not logged in),
+ *  and so is "founder" — it's a legacy alias of deep_dreamer (#698), so offering both
+ *  rendered two identical "Pro" buttons in the picker. The five that remain map 1:1
+ *  onto the sold ladder + staff: Free, Pro, Pilot, Admin, Tech Support. */
+const TEST_ROLES = ["supporter", "deep_dreamer", "pilot", "admin", "tech_support"];
 
 /** Is the test-auth mechanism switched on for this process? */
 function testAuthEnabled() {

@@ -47,9 +47,17 @@ the token refuse — it can never be used from the public internet.
 ### 1. Role picker (browser)
 
 Open `/auth.html` on the dev machine. A "🔧 test sign-in" panel appears with a button
-per role (Supporter, Deep Dreamer, Founder, Admin, Tech Support). Clicking one signs
+per role — **Free, Pro, Pilot, Admin, Tech Support** (the legacy `founder` alias was
+dropped from the picker; it rendered as a second identical "Pro"). Clicking one signs
 you in as the test account **with that role** and returns you to `?returnTo=…`. This
 is the "pick a role, no default" flow — you choose your identity every time.
+
+Below the role buttons there is also **"Continue with Google (test)"**: it mints the
+same session a first-time real Google sign-in would (Free tier, `provider: "google"`)
+via `POST /api/auth/test-login { role, provider }` — no OAuth round-trip, no client
+secret. The REAL "Continue with Google" button only renders when
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are configured on the server (#1877), which
+they normally aren't locally.
 
 ### 2. Header (Playwright / curl / API tests)
 
