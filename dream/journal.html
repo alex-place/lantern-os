@@ -70,6 +70,22 @@
   .jp-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;align-items:start}
   @media (max-width:1080px){ .jp-grid{grid-template-columns:1fr} }
   .jp-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+  /* The reader's own arrangement (#3543): one grid, each card one column or both. */
+  .jp-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  @media (max-width:1080px){ .jp-cards{grid-template-columns:1fr} }
+  .jp-cards > .jp-card.w2{grid-column:1/-1}
+  .jp-cards > .jp-card.bare{background:none;border:0;padding:0}
+  .jp-bar{display:none;align-items:center;gap:6px;margin:0 0 10px}
+  .jp-editing .jp-bar{display:flex}
+  .jp-editing .jp-cards > .jp-card{outline:1px dashed color-mix(in srgb,var(--accent) 45%,var(--border))}
+  .jp-editing .jp-cards > .jp-card.drag{opacity:.45}
+  .jp-editing .jp-cards > .jp-card.over{outline:2px solid var(--accent)}
+  .jp-bar .grip{cursor:grab;color:var(--muted);letter-spacing:-2px}
+  .jp-bar .name{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:auto}
+  .jp-bar .jp-chip{padding:2px 8px;font-size:11px}
+  .jp-tray{display:none;flex-wrap:wrap;gap:6px;align-items:center;grid-column:1/-1;
+    border:1px dashed var(--border);border-radius:10px;padding:10px 12px}
+  .jp-editing .jp-tray{display:flex}
 
   .jp-card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;min-width:0}
   .jp-card h2{margin:0 0 10px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);
@@ -196,6 +212,7 @@
     </div>
     <div class="jp-controls">
       <span class="jp-dim" id="jpLoadedAt" title="This page never reloads itself — this is when it last read the broker record"></span>
+      <button type="button" class="jp-chip" id="jpEditBtn" onclick="jpSetEdit(!jpEdit)" title="Arrange the cards: drag them, set half or full width, hide what you do not read">Edit layout</button>
       <button type="button" class="jp-chip" onclick="jpLoad(true)" title="Read the broker record again">Refresh</button>
     </div>
   </div>
@@ -596,13 +613,14 @@ function jpLabelValue(k) { return String(k == null ? '—' : k).replace(/_/g, ' 
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
    intentions, the figures above are outcomes. */
-function jpPlacements() {
+function jpPlacements(opts) {
+  const bare = !!(opts && opts.bare);
   let rows = [];
   try { rows = JSON.parse(localStorage.getItem('trader.journal') || '[]'); } catch (_e) { rows = []; }
   if (!rows.length) return '';
   const cell = v => (v === null || v === undefined || v === '') ? '<td class="jp-dim">—</td>' : '<td>' + jpEsc(String(v)) + '</td>';
   const when = ts => { try { return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (_e) { return ts || ''; } };
-  return '<div class="jp-card"><h2>Placement notes — this device</h2>'
+  return (bare ? '' : '<div class="jp-card">') + '<h2>Placement notes — this device</h2>'
     + '<p class="jp-note">What the screen said at the moment each order went in. Captured locally, never uploaded, '
     + 'newest first, capped at 500. Not profit and loss — these are intentions, not outcomes.</p>'
     + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
@@ -617,7 +635,7 @@ function jpPlacements() {
       + '</tr>').join('')
     + '</tbody></table></div>'
     + (rows.length > 100 ? '<p class="jp-note">Showing the most recent 100 of ' + rows.length + '.</p>' : '')
-    + '</div>';
+    + (bare ? '' : '</div>');
 }
 
 
@@ -895,6 +913,224 @@ function jpBalanceChart(h, daily, liveToday) {
   };
 }
 
+/* ── The reader's arrangement (#3543) ─────────────────────────────────────────
+   Every card here is a widget with an id. Which ones show, in what order, at what width
+   is the reader's business: TradeZella and TraderWaves both let a trader build the
+   dashboard they actually read, and this is that without a layout library -- one CSS
+   grid, cards spanning one column or two, dragged or nudged into place.
+
+   It is kept per user on the server so it follows them to another device, with a copy in
+   this browser so the first paint is already the right shape. A guest keeps theirs in the
+   browser alone. A layout that names a card this page no longer has loses that card, and
+   a card the layout never heard of is appended -- so a new card appears for everyone
+   instead of being hidden by omission. */
+const JP_WIDGETS = [
+  { id: 'kpis', name: 'Key figures', w: 2 },
+  { id: 'calendar', name: 'P&L calendar', w: 1 },
+  { id: 'balance', name: 'Account balance', w: 1 },
+  { id: 'pnlday', name: 'Net P&L per day', w: 1 },
+  { id: 'breakdown', name: 'Breakdown', w: 1 },
+  { id: 'placements', name: 'Placement notes', w: 2 },
+];
+const JP_WIDGET = {};
+JP_WIDGETS.forEach((w) => { JP_WIDGET[w.id] = w; });
+const JP_LAYOUT_KEY = 'jp-layout-v1';
+let jpEdit = false;
+
+function jpLayoutDefault() {
+  return { v: 1, order: JP_WIDGETS.map((w) => w.id), hidden: [], width: {} };
+}
+function jpLayoutMerge(stored) {
+  const base = jpLayoutDefault();
+  if (!stored || !Array.isArray(stored.order)) return base;
+  const known = new Set(base.order);
+  const order = [];
+  for (const id of stored.order) if (known.has(id) && !order.includes(id)) order.push(id);
+  for (const id of base.order) if (!order.includes(id)) order.push(id);
+  const hidden = [];
+  for (const id of (Array.isArray(stored.hidden) ? stored.hidden : [])) if (known.has(id) && !hidden.includes(id)) hidden.push(id);
+  const width = {};
+  const w = (stored.width && typeof stored.width === 'object') ? stored.width : {};
+  for (const id of Object.keys(w)) if (known.has(id) && (w[id] === 1 || w[id] === 2)) width[id] = w[id];
+  return { v: 1, order, hidden, width };
+}
+const jpWidthOf = (l, id) => l.width[id] || (JP_WIDGET[id] ? JP_WIDGET[id].w : 1);
+function jpLayoutMove(l, id, delta) {
+  const order = l.order.slice();
+  const i = order.indexOf(id), j = i + delta;
+  if (i < 0 || j < 0 || j >= order.length) return l;
+  order.splice(j, 0, order.splice(i, 1)[0]);
+  return { v: 1, order, hidden: l.hidden, width: l.width };
+}
+function jpLayoutPlace(l, id, beforeId) {
+  if (id === beforeId || !l.order.includes(id)) return l;
+  const order = l.order.filter((x) => x !== id);
+  const at = order.indexOf(beforeId);
+  order.splice(at < 0 ? order.length : at, 0, id);
+  return { v: 1, order, hidden: l.hidden, width: l.width };
+}
+function jpLayoutWidth(l, id, w) {
+  const width = Object.assign({}, l.width);
+  width[id] = w === 2 ? 2 : 1;
+  return { v: 1, order: l.order, hidden: l.hidden, width };
+}
+const jpLayoutHide = (l, id) => (l.hidden.includes(id) || !l.order.includes(id)
+  ? l : { v: 1, order: l.order, hidden: l.hidden.concat(id), width: l.width });
+const jpLayoutShow = (l, id) => ({ v: 1, order: l.order, hidden: l.hidden.filter((x) => x !== id), width: l.width });
+
+function jpLayoutRead() {
+  try { return JSON.parse(localStorage.getItem(JP_LAYOUT_KEY) || 'null'); } catch (_e) { return null; }
+}
+let jpLayout = jpLayoutMerge(jpLayoutRead());
+
+function jpApplyLayout(next) {
+  jpLayout = next;
+  try { localStorage.setItem(JP_LAYOUT_KEY, JSON.stringify(next)); } catch (_e) { /* private window: this tab only */ }
+  fetch('/api/journal/layout', { method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: next }) }).catch(() => {});
+  jpPaintCards();
+}
+/* The server's copy is the one that follows the reader between devices; the browser's is
+   only so the first paint is right. Quiet either way: an offline page keeps what it has. */
+async function jpLayoutSync() {
+  try {
+    const r = await fetch('/api/journal/layout', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.layout) return;
+    const merged = jpLayoutMerge(j.layout);
+    if (JSON.stringify(merged) === JSON.stringify(jpLayout)) return;
+    jpLayout = merged;
+    try { localStorage.setItem(JP_LAYOUT_KEY, JSON.stringify(merged)); } catch (_e) { /* nothing to keep it in */ }
+    jpPaintCards();
+  } catch (_e) { /* offline: what the browser has stands */ }
+}
+function jpLayoutReset() {
+  jpLayout = jpLayoutDefault();
+  try { localStorage.removeItem(JP_LAYOUT_KEY); } catch (_e) { /* nothing stored */ }
+  fetch('/api/journal/layout', { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+  jpPaintCards();
+}
+function jpSetEdit(on) {
+  jpEdit = !!on;
+  document.body.classList.toggle('jp-editing', jpEdit);
+  const b = document.getElementById('jpEditBtn');
+  if (b) { b.classList.toggle('on', jpEdit); b.textContent = jpEdit ? 'Done' : 'Edit layout'; }
+  jpPaintCards();
+}
+
+/* One card's contents. The ids the in-place painters look for (#3541) live INSIDE the
+   card, so rearranging the page never breaks them. */
+function jpCardBody(id, data) {
+  const L = jpLast || {};
+  if (id === 'kpis') {
+    const dsr = jpDaySeries(L.daily, L.liveToday, L.acct);
+    return '<div id="jpKpis">' + jpKpis(L.s, L.book, Object.assign(jpDayStats(dsr.days), { mode: dsr.mode })) + '</div>';
+  }
+  if (id === 'calendar') return '<div id="jpCalCard">' + jpCalendarCard(L.daily, L.liveToday, L.acct) + '</div>';
+  if (id === 'breakdown') return '<div id="jpBreakdownCard">' + jpBreakdown(data.slice) + '</div>';
+  if (id === 'balance') {
+    const b = jpBalanceChart(data.equity, L.daily, L.liveToday);
+    return b ? '<h2>' + b.title + '</h2>' + b.html : '';
+  }
+  if (id === 'pnlday') {
+    return '<h2>Net P&amp;L per day — realized</h2>'
+      + jpPlot((L.daily || []).map((d) => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
+          aria: 'Realized profit and loss for each exchange day' });
+  }
+  if (id === 'placements') return jpPlacements({ bare: true });
+  return '';
+}
+
+function jpCardBar(id, w) {
+  if (!jpEdit) return '';
+  const name = (JP_WIDGET[id] || {}).name || id;
+  return '<div class="jp-bar"><span class="grip" aria-hidden="true">⠿⠿</span>'
+    + '<span class="name">' + jpEsc(name) + '</span>'
+    + '<button type="button" class="jp-chip" data-act="left" aria-label="Move ' + jpEsc(name) + ' earlier">◀</button>'
+    + '<button type="button" class="jp-chip" data-act="right" aria-label="Move ' + jpEsc(name) + ' later">▶</button>'
+    + '<button type="button" class="jp-chip' + (w === 2 ? ' on' : '') + '" data-act="width" aria-label="Width of ' + jpEsc(name) + '">'
+    + (w === 2 ? 'Full' : 'Half') + '</button>'
+    + '<button type="button" class="jp-chip" data-act="hide" aria-label="Hide ' + jpEsc(name) + '">Hide</button></div>';
+}
+
+function jpTray() {
+  if (!jpEdit) return '';
+  const hidden = jpLayout.order.filter((id) => jpLayout.hidden.includes(id));
+  return '<div class="jp-tray">'
+    + (hidden.length
+      ? '<span class="jp-dim">Hidden:</span>' + hidden.map((id) => '<button type="button" class="jp-chip" data-act="show" data-id="'
+        + id + '">+ ' + jpEsc((JP_WIDGET[id] || {}).name || id) + '</button>').join('')
+      : '<span class="jp-dim">Drag a card to move it, or use ◀ ▶. Hide what you do not read.</span>')
+    + '<button type="button" class="jp-chip" data-act="reset" style="margin-left:auto">Reset</button></div>';
+}
+
+/* Repaints the cards from data already in hand -- arranging the page never refetches. */
+function jpPaintCards() {
+  const host = document.getElementById('jpCards');
+  if (!host || !jpData || !jpLast) return;
+  const visible = jpLayout.order.filter((id) => !jpLayout.hidden.includes(id));
+  host.innerHTML = visible.map((id) => {
+    const body = jpCardBody(id, jpData);
+    if (!body) return '';
+    const w = jpWidthOf(jpLayout, id);
+    return '<section class="jp-card' + (w === 2 ? ' w2' : '') + (id === 'kpis' ? ' bare' : '') + '"'
+      + ' data-card="' + id + '"' + (jpEdit ? ' draggable="true"' : '') + '>'
+      + jpCardBar(id, w) + body + '</section>';
+  }).join('') + jpTray();
+  jpBindPlots();
+}
+
+/* Bound once, on the body host, because the cards themselves are replaced on every
+   arrangement. Dragging is for a mouse; the arrows do the same thing from a keyboard. */
+function jpBindLayout(root) {
+  if (!root) return;
+  let dragId = null;
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
+    if (act === 'reset') { jpLayoutReset(); return; }
+    const card = btn.closest('[data-card]');
+    const id = btn.getAttribute('data-id') || (card && card.getAttribute('data-card'));
+    if (!id) return;
+    if (act === 'left') jpApplyLayout(jpLayoutMove(jpLayout, id, -1));
+    else if (act === 'right') jpApplyLayout(jpLayoutMove(jpLayout, id, 1));
+    else if (act === 'width') jpApplyLayout(jpLayoutWidth(jpLayout, id, jpWidthOf(jpLayout, id) === 2 ? 1 : 2));
+    else if (act === 'hide') jpApplyLayout(jpLayoutHide(jpLayout, id));
+    else if (act === 'show') jpApplyLayout(jpLayoutShow(jpLayout, id));
+  });
+  root.addEventListener('dragstart', (e) => {
+    const c = e.target.closest && e.target.closest('[data-card]');
+    if (!jpEdit || !c) return;
+    dragId = c.getAttribute('data-card');
+    c.classList.add('drag');
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', dragId); } catch (_e) { /* older browsers */ } }
+  });
+  root.addEventListener('dragend', () => {
+    dragId = null;
+    root.querySelectorAll('.drag, .over').forEach((x) => x.classList.remove('drag', 'over'));
+  });
+  root.addEventListener('dragover', (e) => {
+    const c = e.target.closest && e.target.closest('[data-card]');
+    if (!jpEdit || !dragId || !c || c.getAttribute('data-card') === dragId) return;
+    e.preventDefault();
+    c.classList.add('over');
+  });
+  root.addEventListener('dragleave', (e) => {
+    const c = e.target.closest && e.target.closest('[data-card]');
+    if (c) c.classList.remove('over');
+  });
+  root.addEventListener('drop', (e) => {
+    const c = e.target.closest && e.target.closest('[data-card]');
+    if (!jpEdit || !dragId || !c) return;
+    e.preventDefault();
+    const moved = dragId;
+    dragId = null;
+    jpApplyLayout(jpLayoutPlace(jpLayout, moved, c.getAttribute('data-card')));
+  });
+}
+
 function jpRender(host, data) {
   const bookKey = Object.keys(data.rec.books || {})[0];
   const book = (data.rec.books || {})[bookKey] || {};
@@ -930,33 +1166,14 @@ function jpRender(host, data) {
     return;
   }
 
-  const dsr = jpDaySeries(daily, liveToday, acct);   // the calendar's measure (#3538)
-  const ds = Object.assign(jpDayStats(dsr.days), { mode: dsr.mode });
   jpLast = { s, book, daily, liveToday, acct };
-  html += '<div id="jpKpis">' + jpKpis(s, book, ds) + '</div>';
-  html += '<div class="jp-grid">'
-    + '<div class="jp-col">'
-      + '<div class="jp-card" id="jpCalCard">' + jpCalendarCard(daily, liveToday, acct) + '</div>'
-      + '<div class="jp-card" id="jpBreakdownCard">' + jpBreakdown(data.slice) + '</div>'
-    + '</div>'
-    + '<div class="jp-col">'
-      + (function () {
-          const b = jpBalanceChart(data.equity, daily, liveToday);
-          return b ? '<div class="jp-card jp-curve"><h2>' + b.title + '</h2>' + b.html + '</div>' : '';
-        })()
-      + '<div class="jp-card jp-curve"><h2>Net P&amp;L per day — realized</h2>'
-        + jpPlot(daily.map(d => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
-            aria: 'Realized profit and loss for each exchange day' })
-        + '</div>'
-    + '</div>'
-  + '</div>';
-  html += jpPlacements();
+  html += '<div class="jp-cards" id="jpCards"></div>';   // filled by jpPaintCards (#3543)
 
   if (book.disclosures) {
     html += '<p class="jp-note">' + jpEsc(String(book.disclosures)) + '</p>';
   }
   host.innerHTML = html;
-  jpBindPlots();
+  jpPaintCards();
 }
 
 /* ── Staying current ──────────────────────────────────────────────────────────
@@ -974,7 +1191,11 @@ function jpStampLoaded(at) {
   el.textContent = t ? 'Loaded ' + t : '';
 }
 
-document.addEventListener('DOMContentLoaded', () => jpLoad());
+document.addEventListener('DOMContentLoaded', () => {
+  jpBindLayout(document.getElementById('jpBody'));
+  jpLoad();
+  jpLayoutSync();            // the copy that follows the reader between devices (#3543)
+});
 </script>
 
 <script src="/js/theme-toggle.js" defer></script>
