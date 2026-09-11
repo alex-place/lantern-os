@@ -572,7 +572,7 @@
   .tp-sym:hover{color:var(--blue)}
   .tp-empty{font-family:var(--mono);font-size:12px;color:var(--text2);padding:24px;text-align:center}
   /* #2437: one-click exits */
-  .tp-actions{display:flex;justify-content:flex-end;padding:6px 10px 2px}
+  .tp-actions{display:flex;justify-content:flex-end;align-items:center;gap:6px;padding:6px 10px 2px}
    /* The .adv-* and .brake-* rules went with the Advisor tab (#3331) — the only
       markup that used them was renderAdvisor()/startBrakePoll(). brake_status is
       still a chat tool, so the overlay is readable, just not rendered here. */
@@ -580,6 +580,31 @@
     border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
   .tp-flat-btn.armed,.tp-flatten-all.armed{background:rgba(255,95,109,.32);animation:otArmPulse 1s ease-in-out infinite}
+  /* ── Positions panel styles (#3518): density + choosable columns ─────────────
+     Data columns size to their content and the actions column takes the slack, so a
+     row reads as one line of numbers instead of ten islands spread across the panel. */
+  /* No percentage widths on the data cells: under .tp-pane's min-width:max-content a 1%
+     column must fit its content in 1% of the table, which drew the table at 100x its
+     content (11,391px in a 726px pane). The action column alone takes the slack. */
+  .tp-pane .tp-table.tp-pos-table{min-width:0}
+  .tp-pos-table .tp-act{width:100%}
+  .tp-pos-table th,.tp-pos-table td{padding:4px 10px}
+  .tp-pos-table .tp-act{text-align:right}
+  .tp-dim{color:var(--text2)}
+  .tp-sub{color:var(--text2);font-size:10.5px;margin-left:5px}
+  .tp-lev-hi{color:var(--amber);font-weight:600}
+  .tp-cols-btn{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+    border:1px solid var(--border);background:transparent;color:var(--text1);white-space:nowrap;transition:background .15s,color .15s}
+  .tp-cols-btn:hover,.tp-cols-btn[aria-expanded="true"]{background:var(--bg2);color:var(--text0)}
+  .tp-cols-menu{position:fixed;z-index:80;min-width:210px;max-height:62vh;overflow:auto;padding:6px 0;background:var(--bg1);
+    border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-family:var(--mono);font-size:12px}
+  .tp-cols-menu h4{margin:6px 12px 3px;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+  .tp-cols-menu label{display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:pointer;color:var(--text1)}
+  .tp-cols-menu label:hover{background:var(--bg2);color:var(--text0)}
+  .tp-cols-menu input{accent-color:var(--blue);margin:0}
+  .tp-cols-foot{border-top:1px solid var(--border);margin-top:6px;padding:6px 12px 2px;text-align:right}
+  .tp-cols-reset{background:none;border:none;padding:0;cursor:pointer;font:inherit;font-size:11px;color:var(--blue)}
+  .tp-cols-reset:hover{text-decoration:underline}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   /* Watch | Trade | Options — in-page switcher (the header nav has one Trader entry) */
@@ -8213,29 +8238,218 @@ function _dayPnlTip(a){
     ? ` Excludes ${amt} that carried positions had already earned before today.`
     : ` Carried positions came into today down ${amt}, which is not counted against today.`);
 }
-function renderTpSummary(a){
+/* ── Positions panel (#3518) ──────────────────────────────────────────────────
+   ONE registry per surface -- _TP_COLS for the table, _TP_TILES for the summary strip --
+   drives the header, the cells and the Columns menu, so a column can never show in one
+   place and be missing from another. Symbol and each row's action (Flatten / Clear dust)
+   are not in the registry: they always show. `def` is the out-of-the-box set; whatever
+   the operator picks in the Columns menu is remembered per browser. */
+
+// The engine's own fund multipliers -- lib/direction-lock.js LEVERAGE (magnitude) and the
+// FAMILY sign (inverse = -1) -- mirrored so the page needs no extra request.
+// test/trader-positions-panel.test.js fails CI the moment the two drift apart.
+const _TP_LEVERAGE = {
+  SPXL: 3, UPRO: 3, SPXS: 3, SPXU: 3, TQQQ: 3, SQQQ: 3, TNA: 3, TZA: 3,
+  SOXL: 3, SOXS: 3, UDOW: 3, SDOW: 3,
+  SSO: 2, SDS: 2, QLD: 2, QID: 2, UWM: 2, TWM: 2, GLL: 2, TBT: 2,
+};
+const _TP_INVERSE = new Set(['SH', 'SPXS', 'SPXU', 'SDS', 'SQQQ', 'PSQ', 'QID', 'TZA', 'RWM', 'TWM',
+  'SOXS', 'SDOW', 'DOG', 'GLL', 'TBT', 'TBF']);
+/** Signed multiplier: SOXL 3, SQQQ -3; anything the engine does not list is 1. */
+function _tpLev(sym){
+  const u = String(sym || '').toUpperCase();
+  return (_TP_LEVERAGE[u] || 1) * (_TP_INVERSE.has(u) ? -1 : 1);
+}
+const _tpAttr = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Working orders, cached by renderOrders(): the Stop and Take profit columns read them.
+let _tpWorking = [];
+function _tpExitOrders(p){
+  const exitSide = String(p.side || 'long').toLowerCase() === 'short' ? 'buy' : 'sell';
+  const sym = String(p.symbol || '').toUpperCase();
+  return _tpWorking.filter((o) => String(o.symbol || '').toUpperCase() === sym && String(o.side || '').toLowerCase() === exitSide);
+}
+/** The resting protective stop: the nearest one, since that is the one that fires first.
+ *  Its trigger rides in stop_price, or in limit_price where the broker adapter folds it
+ *  there (Alpaca's normalized orders do). */
+function _tpStop(p){
+  const long = String(p.side || 'long').toLowerCase() !== 'short';
+  const px = (o) => Number(o.stop_price != null ? o.stop_price : o.limit_price);
+  const v = _tpExitOrders(p).filter((o) => /stop/i.test(o.type || '') && px(o) > 0).map(px);
+  return v.length ? v.sort((x, y) => long ? y - x : x - y)[0] : null;
+}
+/** A resting limit on the exit side: the nearest one. */
+function _tpTarget(p){
+  const long = String(p.side || 'long').toLowerCase() !== 'short';
+  const v = _tpExitOrders(p).filter((o) => String(o.type || '').toLowerCase() === 'limit' && Number(o.limit_price) > 0)
+    .map((o) => Number(o.limit_price));
+  return v.length ? v.sort((x, y) => long ? x - y : y - x)[0] : null;
+}
+function _tpPriceCell(px, p, none){
+  if (px == null) return `<td class="tp-dim" title="${none}">—</td>`;
+  const last = Number(p.current_price) || 0;
+  const d = last > 0 ? (px - last) / last * 100 : null;
+  return `<td>$${fmt(px, 2)}${d == null ? '' : `<span class="tp-sub">${d >= 0 ? '+' : '-'}${fmt(Math.abs(d), 1)}%</span>`}</td>`;
+}
+
+const _TP_COLS = [
+  { id: 'side', label: 'Side', def: true, cell: (p, x) => `<td class="tp-side ${x.short ? 'short' : 'long'}">${x.short ? 'Short' : 'Long'}</td>` },
+  { id: 'qty', label: 'Qty', def: true, cell: (p) => `<td>${p.qty}</td>` },
+  { id: 'avg', label: 'Avg fill', def: true, cell: (p) => `<td>$${fmt(p.avg_entry_price,2)}</td>` },
+  { id: 'last', label: 'Last', def: true, cell: (p) => `<td>$${fmt(p.current_price,2)}</td>` },
+  { id: 'stop', label: 'Stop', def: true,
+    tip: 'The resting protective stop for this position, and how far it sits from the last price.',
+    cell: (p, x) => _tpPriceCell(x.stop, p, 'No resting stop order for this position.') },
+  { id: 'target', label: 'Take profit', def: false,
+    tip: 'A resting limit order on the exit side, and how far it sits from the last price.',
+    cell: (p, x) => _tpPriceCell(x.target, p, 'No resting take-profit order for this position.') },
+  { id: 'day', label: 'Day P&L', def: true,
+    tip: "Today's move on this position — what it contributed to Day P&L. For a position carried from an earlier day this is measured from yesterday's close, not from your entry.",
+    cell: (p) => {
+      // Day column: today's slice, which is what sums to the header's Day P&L.
+      // Carried positions differ from Unrealized here — that gap IS the point.
+      const dpnl=p.day_pnl, dc=(dpnl||0)>=0?'var(--green)':'var(--red)';
+      return `<td style="color:${dpnl==null?'var(--text2)':dc}"${p.day_basis?` title="basis: ${p.day_basis==='prev_close'?'carried — measured from yesterday\'s close':p.day_basis==='entry'?'opened today — measured from entry':p.day_basis==='no_session'?'no session yet today':'prev close unavailable — shown since entry'}"`:''}>${dpnl==null?'—':(dpnl>=0?'+':'')+fmt(dpnl,2)}</td>`;
+    } },
+  { id: 'upl', label: 'Unrealized P&L', def: true,
+    tip: "Since entry — the position's whole life, however many days it has been held.",
+    cell: (p) => { const pnl=p.unrealized_pl||0, c=pnl>=0?'var(--green)':'var(--red)'; return `<td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>`; } },
+  { id: 'pct', label: 'P&L %', def: true,
+    cell: (p) => { const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0, c=pnl>=0?'var(--green)':'var(--red)'; return `<td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>`; } },
+  { id: 'cost', label: 'Trade value', def: true, cell: (p) => `<td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td>` },
+  { id: 'mv', label: 'Market value', def: true, cell: (p) => `<td>$${fmt(p.market_value,2)}</td>` },
+  { id: 'weight', label: 'Weight', def: true,
+    tip: 'This position’s market value as a share of the account value.',
+    cell: (p, x) => `<td>${x.eq > 0 ? fmt(Math.abs(Number(p.market_value) || 0) / x.eq * 100, 1) + '%' : '—'}</td>` },
+  { id: 'lev', label: 'Leverage', def: true,
+    tip: 'The fund’s own multiplier: SOXL moves about 3x its index, and an inverse fund such as SQQQ shows −3x. Plain stocks and funds are 1x.',
+    cell: (p, x) => `<td${Math.abs(x.lev) > 1 ? ' class="tp-lev-hi"' : ''}>${x.lev < 0 ? '−' : ''}${Math.abs(x.lev)}x</td>` },
+  { id: 'exposure', label: 'Exposure', def: false,
+    tip: 'Market value × the fund’s multiplier: what the position moves like.',
+    cell: (p, x) => `<td>$${fmt(Math.abs(Number(p.market_value) || 0) * Math.abs(x.lev), 2)}</td>` },
+];
+const _TP_TILES = [
+  { id: 'equity', label: 'Account value', def: true },
+  { id: 'cash', label: 'Cash', def: true },
+  { id: 'realized', label: 'Realized P&L', def: true },
+  { id: 'unrealized', label: 'Unrealized P&L', def: true },
+  { id: 'day', label: 'Day P&L', def: true },
+  { id: 'bp', label: 'Buying power', def: true },
+  { id: 'lev', label: 'Leverage', def: true },
+  { id: 'exposure', label: 'Exposure', def: false },
+];
+
+// What the operator chose. Nothing stored means the defaults, so a column added later
+// with def:true appears for anyone who never customised, and stays out of the way of
+// anyone who did. Kept in memory too, so a browser that refuses storage still applies it.
+const _TP_PREFS_KEY = 'tp-panel-v1';
+let _tpMem = null;
+function _tpPrefs(){
+  if (_tpMem) return _tpMem;
+  try {
+    const j = JSON.parse(localStorage.getItem(_TP_PREFS_KEY) || 'null');
+    if (j && Array.isArray(j.cols) && Array.isArray(j.tiles)) return j;
+  } catch (_e) { /* private mode or bad JSON: defaults */ }
+  return null;
+}
+function _tpShown(kind){
+  const reg = kind === 'cols' ? _TP_COLS : _TP_TILES, pr = _tpPrefs();
+  const pick = pr ? new Set(pr[kind]) : null;
+  return reg.filter((c) => pick ? pick.has(c.id) : c.def).map((c) => c.id);
+}
+
+// The Columns menu. It lives on <body>, outside the panel, because the panel re-renders
+// on every poll: a menu inside it would snap shut mid-click.
+let _tpMenu = null;
+function _tpColsButton(){
+  const open = !!(_tpMenu && !_tpMenu.hidden);
+  return `<button type="button" class="tp-cols-btn" id="tpColsBtn" onclick="_tpToggleCols(this)" aria-haspopup="dialog" aria-expanded="${open}" title="Choose which columns and summary figures the panel shows">`
+    + '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1.5v9M6 1.5v9M10 1.5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>Columns</button>';
+}
+function _tpToggleCols(btn){
+  if (!_tpMenu) {
+    _tpMenu = document.createElement('div');
+    _tpMenu.className = 'tp-cols-menu'; _tpMenu.id = 'tpColsMenu'; _tpMenu.hidden = true;
+    _tpMenu.setAttribute('role', 'dialog'); _tpMenu.setAttribute('aria-label', 'Choose what the positions panel shows');
+    document.body.appendChild(_tpMenu);
+    document.addEventListener('mousedown', (e) => {
+      if (!_tpMenu || _tpMenu.hidden) return;
+      if (_tpMenu.contains(e.target) || (e.target.closest && e.target.closest('#tpColsBtn'))) return;
+      _tpCloseCols();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !_tpMenu || _tpMenu.hidden) return;
+      _tpCloseCols();
+      const bt = document.getElementById('tpColsBtn'); if (bt) bt.focus();
+    });
+  }
+  if (!_tpMenu.hidden) { _tpCloseCols(); return; }
+  _tpDrawCols();
+  _tpMenu.hidden = false;
+  // The panel sits at the bottom of the screen: open upward unless there is room below.
+  const r = btn.getBoundingClientRect(), mh = _tpMenu.offsetHeight, mw = _tpMenu.offsetWidth;
+  _tpMenu.style.top = ((r.bottom + 6 + mh <= innerHeight) ? r.bottom + 6 : Math.max(8, r.top - 6 - mh)) + 'px';
+  _tpMenu.style.left = Math.max(8, Math.min(innerWidth - mw - 8, r.right - mw)) + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+  const first = _tpMenu.querySelector('input'); if (first) first.focus();
+}
+function _tpCloseCols(){
+  if (_tpMenu) _tpMenu.hidden = true;
+  const bt = document.getElementById('tpColsBtn'); if (bt) bt.setAttribute('aria-expanded', 'false');
+}
+function _tpDrawCols(){
+  const cols = new Set(_tpShown('cols')), tiles = new Set(_tpShown('tiles'));
+  const box = (kind, c, on) => `<label><input type="checkbox" data-kind="${kind}" value="${c.id}"${on ? ' checked' : ''} onchange="_tpPick()">${c.label}</label>`;
+  _tpMenu.innerHTML = '<h4>Columns</h4>' + _TP_COLS.map((c) => box('cols', c, cols.has(c.id))).join('')
+    + '<h4>Summary</h4>' + _TP_TILES.map((t) => box('tiles', t, tiles.has(t.id))).join('')
+    + '<div class="tp-cols-foot"><button type="button" class="tp-cols-reset" onclick="_tpResetCols()">Reset to default</button></div>';
+}
+function _tpPick(){
+  const pick = (k) => [..._tpMenu.querySelectorAll(`input[data-kind="${k}"]`)].filter((i) => i.checked).map((i) => i.value);
+  _tpMem = { cols: pick('cols'), tiles: pick('tiles') };
+  try { localStorage.setItem(_TP_PREFS_KEY, JSON.stringify(_tpMem)); } catch (_e) { /* applied, just not remembered */ }
+  _tpRedraw();
+}
+function _tpResetCols(){
+  _tpMem = null;
+  try { localStorage.removeItem(_TP_PREFS_KEY); } catch (_e) { /* nothing stored to clear */ }
+  _tpDrawCols(); _tpRedraw();
+}
+function _tpRedraw(){
+  if (_tpLastAccount) renderTpSummary(_tpLastAccount, _lastPositions);
+  renderPositionsTable(_lastPositions);
+}
+
+let _tpLastAccount = null;
+function renderTpSummary(a, positions){
   const el=document.getElementById('tpSummary'); if(!el) return;
   a=a||{};
+  _tpLastAccount = a;
   const cell=(l,v,cls,tip)=>`<div class="tp-stat"${tip?` title="${tip}"`:''}><div class="l">${l}</div><div class="v ${cls||''}">${v}</div></div>`;
   const money=(v)=> v==null?'—':'$'+fmt(v,2);
   const signed=(v)=> v==null?'—':(v>=0?'+':'-')+'$'+fmt(Math.abs(v),2);
   const cls=(v)=> v>0?'pos':v<0?'neg':'';
-  el.innerHTML =
+  // Gross exposure the way the engine counts it (lib/direction-lock familyBetaNotional):
+  // |market value| x the fund's multiplier, dust excluded (#3518).
+  const pos = positions || _lastPositions || [];
+  const gross = pos.reduce((t,p)=> Math.abs(Number(p.qty)||0) < 1 ? t : t + Math.abs(Number(p.market_value)||0) * Math.abs(_tpLev(p.symbol)), 0);
+  const eq = Number(a.equity) || 0;
+  const tile = {
     // Account value = equity (net liquidation) — the TRUE worth of the account, which
     // tracks P&L. `cash` (totalcashvalue) is shown separately because in a margin
     // account it is INFLATED by short-sale proceeds: opening a short deposits the sale
     // proceeds into cash while creating an equal buy-back liability, so cash can read far
     // higher than the account is actually worth (e.g. cash $1.22M vs equity $957k with a
     // large short open). Labeling cash "Account balance" made a losing account look rich.
-    cell('Account value', money(a.equity), '', 'Net liquidation value — what the account is actually worth (cash + positions). Tracks your P&L.') +
-    cell('Cash', money(a.cash), '', 'Total cash, including short-sale proceeds. In a margin account with open shorts this is HIGHER than the account is worth — see Account value.') +
+    equity: () => cell('Account value', money(a.equity), '', 'Net liquidation value — what the account is actually worth (cash + positions). Tracks your P&L.'),
+    cash: () => cell('Cash', money(a.cash), '', 'Total cash, including short-sale proceeds. In a margin account with open shorts this is HIGHER than the account is worth — see Account value.'),
     // Row contract (#3409): Realized and Day P&L mean TODAY (ledger basis);
     // Unrealized means SINCE ENTRY and reconciles with the table column below.
     // Day's tooltip carries the decomposition (Realized + today's open-position
     // move = Day). The 2026-08-13 whole-lot Realized bug and the 2026-08-22
     // mislabeled-Unrealized bug were both attempts to force one basis on the
     // whole row — each broke a different tile.
-    cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)) +
+    realized: () => cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)),
     // #3409: this tile ALWAYS shows since-entry unrealized — the number that
     // reconciles with the Unrealized column below it. #3380 briefly wired the
     // day-basis move here so the row summed (Realized+Unrealized=Day); the
@@ -8243,11 +8457,18 @@ function renderTpSummary(a){
     // reading +$1,658 above a table summing -$679, and mirroring Day P&L
     // exactly every morning (realized 0 ⇒ day = unrealized-move). The trio
     // arithmetic lives in the Day P&L tooltip now, labeled as what it is.
-    cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized),
+    unrealized: () => cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized),
       'Since entry — the sum of the Unrealized column in the table below (lifetime vs avg fill).' +
-      (a.unrealized_today != null ? ` Today’s move on the open positions alone: ${(a.unrealized_today>=0?'+':'-')}$${fmt(Math.abs(a.unrealized_today),2)} — see Day P&L.` : '')) +
-    cell(a.pnl_today_source === 'broker_reset' ? 'Day P&L (broker)' : 'Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) +
-    cell('Buying power', money(a.buying_power));
+      (a.unrealized_today != null ? ` Today’s move on the open positions alone: ${(a.unrealized_today>=0?'+':'-')}$${fmt(Math.abs(a.unrealized_today),2)} — see Day P&L.` : '')),
+    day: () => cell(a.pnl_today_source === 'broker_reset' ? 'Day P&L (broker)' : 'Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)),
+    bp: () => cell('Buying power', money(a.buying_power)),
+    lev: () => cell('Leverage', eq > 0 ? fmt(gross / eq, 2) + 'x' : '—', '',
+      'Gross exposure ÷ account value: each position’s market value times its fund multiplier (SOXL counts 3x), summed, over what the account is worth. Under 1x, part of the account is in cash.'),
+    exposure: () => cell('Exposure', money(gross), '',
+      'Gross exposure: each position’s market value times its fund multiplier (SOXL counts 3x), summed.'),
+  };
+  const shown = new Set(_tpShown('tiles'));
+  el.innerHTML = _TP_TILES.filter((t) => shown.has(t.id)).map((t) => tile[t.id]()).join('');
 }
 // #2437: one-click exits. Flatten = market order for the opposite side, full size.
 let _lastPositions = [];
@@ -8386,26 +8607,21 @@ function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
   _lastPositions = positions||[];
   const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).filter(p=>Math.abs(Number(p.qty)||0)>=1).length;   // dust is not a position (#3298 rider)
-  if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
-  el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll(this)" title="Market-close every open position">✕ Close all</button></div>`+
-    `<table class="tp-table"><thead><tr>
-    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th title="Today's move on this position — what it contributed to Day P&L. For a position carried from an earlier day this is measured from yesterday's close, not from your entry.">Day P&L</th><th title="Since entry — the position's whole life, however many days it has been held.">Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
+  // The toolbar shows even with nothing open, so the Columns menu is always reachable (#3518).
+  const has = !!(positions && positions.length);
+  const tools = `<div class="tp-actions">${_tpColsButton()}${has ? `<button class="tp-flatten-all" onclick="flattenAll(this)" title="Market-close every open position">✕ Close all</button>` : ''}</div>`;
+  if(!has){ el.innerHTML = tools + '<div class="tp-empty">No open positions</div>'; return; }
+  const shown = new Set(_tpShown('cols'));
+  const cols = _TP_COLS.filter((c) => shown.has(c.id));
+  const eq = Number((_tpLastAccount || {}).equity) || 0;
+  el.innerHTML = tools +
+    `<table class="tp-table tp-pos-table"><thead><tr><th>Symbol</th>${cols.map((c) => `<th${c.tip ? ` title="${_tpAttr(c.tip)}"` : ''}>${c.label}</th>`).join('')}<th class="tp-act"></th></tr></thead><tbody>`+
     positions.map(p=>{
       const side=(p.side||'long').toLowerCase();
-      const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0;
-      const c=pnl>=0?'var(--green)':'var(--red)';
-      // Day column: today's slice, which is what sums to the header's Day P&L.
-      // Carried positions differ from Unrealized here — that gap IS the point.
-      const dpnl=p.day_pnl, dc=(dpnl||0)>=0?'var(--green)':'var(--red)';
+      const x = { side, short: side === 'short', lev: _tpLev(p.symbol), stop: _tpStop(p), target: _tpTarget(p), eq };
       return `<tr>
-        <td><span class="tp-sym" onclick="focusTicker('${p.symbol}')">${p.symbol}</span></td>
-        <td class="tp-side ${side==='short'?'short':'long'}">${side==='short'?'Short':'Long'}</td>
-        <td>${p.qty}</td><td>$${fmt(p.avg_entry_price,2)}</td><td>$${fmt(p.current_price,2)}</td>
-        <td style="color:${dpnl==null?'var(--muted)':dc}"${p.day_basis?` title="basis: ${p.day_basis==='prev_close'?'carried — measured from yesterday\'s close':p.day_basis==='entry'?'opened today — measured from entry':p.day_basis==='no_session'?'no session yet today':'prev close unavailable — shown since entry'}"`:''}>${dpnl==null?'—':(dpnl>=0?'+':'')+fmt(dpnl,2)}</td>
-        <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
-        <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
-        <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
-        <td>${Math.abs(p.qty||0)<1?`<button class="tp-flat-btn" onclick="dustClear('${p.symbol}',this)" title="Sub-share remnant. The normal exit path floors every quantity, so floor(${Math.abs(p.qty||0)})=0 and it cannot be expressed. This sends the EXACT held quantity, unfloored, and reports IBKR's verdict — if the broker refuses, clear it in Client Portal (enable Fractional Trading, then close there).">✕ Clear dust</button>`:`<button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button>`}</td></tr>`;
+        <td><span class="tp-sym" onclick="focusTicker('${p.symbol}')">${p.symbol}</span></td>${cols.map((c) => c.cell(p, x)).join('')}
+        <td class="tp-act">${Math.abs(p.qty||0)<1?`<button class="tp-flat-btn" onclick="dustClear('${p.symbol}',this)" title="Sub-share remnant. The normal exit path floors every quantity, so floor(${Math.abs(p.qty||0)})=0 and it cannot be expressed. This sends the EXACT held quantity, unfloored, and reports IBKR's verdict — if the broker refuses, clear it in Client Portal (enable Fractional Trading, then close there).">✕ Clear dust</button>`:`<button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button>`}</td></tr>`;
     }).join('') + '</tbody></table>';
 }
 // The Advisor tab was removed (#3331). Its deterministic math did not go anywhere:
@@ -8468,6 +8684,7 @@ function renderOrders(orders){
     <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td>${withActions?`<td>${o.id?`<button class="tp-flat-btn" onclick="cancelOrder('${String(o.id).replace(/[^A-Za-z0-9-]/g,'')}',this)" title="Cancel this working order. To change it: cancel, then re-place from the ticket.">✕ Cancel</button>`:''}</td>`:''}</tr>`;
   const tbl=(rows,withActions)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th>${withActions?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
   const working = arr.filter(_isWorkingOrder);
+  _tpWorking = working;   // #3518: the positions panel's Stop / Take profit columns read these
   // Count badge, same convention as Positions (operator ask #3309: "it should
   // show how many orders there are just like positions"). Working orders only —
   // history is not a number anyone needs at a glance.
@@ -8477,6 +8694,10 @@ function renderOrders(orders){
   // 30 most recent — capping here was the visible half of "not all trades saved":
   // a busy session closes dozens in an hour, so 30 rows hid most of the day.
   if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!_isWorkingOrder(o)).slice(0,500).map(o=>row(o,false)).join(''), false);
+  // Stops that land after the positions render show now, not at the next 30s poll.
+  // Never while a Flatten is armed: re-rendering would swap the armed button for an
+  // unarmed one, and the second click would re-arm instead of firing (#3518).
+  if (_lastPositions.length && !_armedBtn) renderPositionsTable(_lastPositions);
 }
 
 // Day P&L from the actual per-position day move: Σ (last − prevClose)·qty, where
@@ -8548,7 +8769,7 @@ async function loadPortfolio(){
     const _hp=document.getElementById('hPos'); if(_hp) _hp.textContent = (d.positions||[]).length;
     s0Status.equity = a.equity; s0Status.pnl = pnl || 0; s0Status.positions = (d.positions||[]).length;
     renderSigma0Signals();
-    renderTpSummary(a);                     // #1712
+    renderTpSummary(a, d.positions||[]);    // #1712 (+ positions: the Leverage / Exposure tiles, #3518)
     renderPositionsTable(d.positions||[]);
     // Empty logged-in account: no equity and no open positions → the balance +
     // positions/orders/history panel carries no value, so collapse it and give the
