@@ -75,6 +75,21 @@
     .modal-box input:focus { outline: none; border-color: var(--accent); }
     .modal-box .m-err { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 0; }
     .modal-box .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+    /* Broker picker (#3530): a TradingView-style grid, one tile per broker, a Connect modal per tile. */
+    .brokers { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+    .broker { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; text-align: center; cursor: pointer; }
+    .broker:hover, .broker:focus-visible { border-color: var(--accent); outline: none; }
+    .b-mono { width: 44px; height: 44px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; letter-spacing: .02em; flex-shrink: 0; }
+    .b-mono.alpaca { background: #f5c518; color: #1a1a1a; }
+    .b-mono.ibkr { background: #c4302b; color: #fff; }
+    .broker .b-name { font-size: 14px; font-weight: 700; }
+    .broker .b-state { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+    .broker .b-state.on { color: var(--green); font-weight: 600; }
+    .broker .b-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+    .modal-box .b-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .modal-box .b-head h3 { margin: 0; }
+    .modal-box .b-note { color: var(--muted); font-size: 12.5px; margin: 12px 0 0; line-height: 1.55; }
+    .banner.ok { background: color-mix(in srgb, var(--green) 14%, transparent); border-color: color-mix(in srgb, var(--green) 40%, var(--border)); }
     @media (max-width: 720px) {
       .settings-shell { grid-template-columns: 1fr; gap: 14px; }
       .set-nav { position: static; }
@@ -390,6 +405,121 @@
     { id: "openai", label: "◯ ChatGPT (OpenAI)" },
     { id: "gemini", label: "✧ Gemini (Google)" },
   ];
+  /* ── Broker picker (#3530) ──────────────────────────────────────────────────
+     A TradingView-style "trade with your broker" grid: one tile per broker, and a
+     Connect modal per tile that sends the user to the broker's own sign-in page when
+     that's possible. Alpaca one-click needs Alpaca to have activated our OAuth app; the
+     server checks (/api/broker/alpaca/status -> oneClick) and until then the modal
+     takes paper API keys. IBKR only offers one-click to approved vendors (#3529), so
+     its tile opens the guided self-service setup. brokerState / brokerTilesHtml /
+     brokerModalSpec / alpacaReturnNote are pure (no DOM, no fetch) so
+     test/broker-picker.test.js can drive them. */
+  const BROKERS = [
+    { id: "alpaca", name: "Alpaca", mono: "A" },
+    { id: "ibkr", name: "Interactive Brokers", mono: "IB" },
+  ];
+  function brokerState(ib, al) {
+    const live = ib && ib.live;
+    return {
+      alpaca: { connected: !!(al && (al.connected || al.status === "connected")), account: (al && al.accountNumber) || "", via: (al && al.via) || "", oneClick: !!(al && al.oneClick) },
+      ibkr: { connected: !!(live && live.connected), saved: !!(ib && ib.hasCredentials), account: (live && live.accountId) || "" },
+    };
+  }
+  function brokerTilesHtml(s) {
+    return `<div class="brokers">${BROKERS.map((b) => {
+      const x = s[b.id];
+      const state = x.connected
+        ? `Connected${b.id === "alpaca" ? " · paper" : ""}${x.account ? " · " + x.account : ""}`
+        : (b.id === "ibkr" && x.saved ? "Saved, not connected" : "Not connected");
+      const tag = x.connected ? "" : b.id === "alpaca" ? (x.oneClick ? "One-click" : "API keys") : "Guided setup";
+      return `<button type="button" class="broker" data-broker="${b.id}" aria-label="${esc(b.name + ": " + state)}">`
+        + `<span class="b-mono ${b.id}" aria-hidden="true">${b.mono}</span><span class="b-name">${esc(b.name)}</span>`
+        + `<span class="b-state${x.connected ? " on" : ""}">${esc(state)}</span>${tag ? `<span class="b-tag">${tag}</span>` : ""}</button>`;
+    }).join("")}</div>`;
+  }
+  function brokerModalSpec(id, s) {
+    const x = s[id], name = BROKERS.find((b) => b.id === id).name;
+    if (id === "alpaca" && x.connected && x.via === "server-keys") {
+      return { kind: "info", title: name, sub: "Connected to a paper account through this server's own Alpaca keys. There's nothing stored for you to disconnect." };
+    }
+    if (x.connected) {
+      return { kind: "connected", title: name, action: "Disconnect",
+        sub: `Connected${id === "alpaca" ? " to your paper account" : ""}${x.account ? " (" + x.account + ")" : ""}. Disconnecting removes the credentials stored for you, and the trader stops using this account.` };
+    }
+    if (id === "alpaca" && x.oneClick) {
+      return { kind: "oauth", title: name, action: "Connect with Alpaca",
+        sub: "You'll sign in on Alpaca's own page and approve Unisona for your paper account. Unisona never sees your Alpaca password.",
+        href: "/api/broker/alpaca/connect?returnTo=" + encodeURIComponent("/settings.html#connections") };
+    }
+    if (id === "alpaca") {
+      return { kind: "keys", title: name, action: "Connect",
+        sub: "Paste the API keys from your Alpaca paper account (alpaca.markets → Paper Trading → API Keys). They're encrypted on the server and never shared.",
+        note: "One-click sign-in with Alpaca turns on here once Alpaca approves Unisona's app." };
+    }
+    return { kind: "guided", title: name, action: x.saved ? "Reconnect" : "Open guided setup",
+      sub: "Interactive Brokers only offers one-click sign-in to approved partners, and Unisona isn't one yet. Until then you connect with your own IBKR API access: create the keys on IBKR's site, then paste them in the guided setup.",
+      href: "/orchestration.html#broker" };
+  }
+  function alpacaReturnNote(st, reason) {
+    if (st === "connected") return { ok: true, text: "Alpaca connected. Your paper account is linked." };
+    if (!st) return null;
+    const r = String(reason || "unknown");
+    const why = r === "access_denied" ? "you declined on Alpaca's page" : r === "state" ? "the sign-in expired or was started in another tab" : r;
+    return { ok: false, text: `Alpaca didn't connect: ${why}. Try again, or paste your paper API keys instead.` };
+  }
+  // Back from Alpaca's sign-in, the callback lands on /settings.html?alpaca=…#connections.
+  // Say what happened once, then scrub the query so a reload doesn't repeat it.
+  let _alpacaNoteTaken = false;
+  function takeAlpacaNote() {
+    if (_alpacaNoteTaken) return "";
+    _alpacaNoteTaken = true;
+    const q = new URLSearchParams(location.search);
+    const n = alpacaReturnNote(q.get("alpaca"), q.get("reason"));
+    if (q.has("alpaca")) history.replaceState(null, "", location.pathname + location.hash);
+    return n ? `<div class="banner${n.ok ? " ok" : ""}" role="status">${esc(n.text)}</div>` : "";
+  }
+  function openBrokerModal(id, s) {
+    const spec = brokerModalSpec(id, s), b = BROKERS.find((y) => y.id === id);
+    const root = $("modal-root");
+    const fields = spec.kind === "keys"
+      ? `<label for="m-keyId">API Key ID</label><input id="m-keyId" placeholder="PK…" autocomplete="off" spellcheck="false">`
+        + `<label for="m-secretKey">Secret Key</label><input id="m-secretKey" type="password" placeholder="your secret key" autocomplete="off">`
+      : "";
+    root.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="m-title">`
+      + `<div class="b-head"><span class="b-mono ${id}" aria-hidden="true">${b.mono}</span><h3 id="m-title">${esc(spec.title)}</h3></div>`
+      + `<p class="m-sub">${esc(spec.sub)}</p>${fields}${spec.note ? `<p class="b-note">${esc(spec.note)}</p>` : ""}<div class="m-err" id="m-err"></div>`
+      + `<div class="m-actions"><button class="btn" id="m-cancel">${spec.action ? "Cancel" : "Close"}</button>`
+      + `${spec.action ? `<button class="btn ${spec.kind === "connected" ? "danger" : "primary"}" id="m-submit">${esc(spec.action)}</button>` : ""}</div></div>`;
+    root.classList.add("open");
+    const close = () => { root.classList.remove("open"); root.innerHTML = ""; };
+    $("m-cancel").onclick = close;
+    root.onclick = (e) => { if (e.target === root) close(); };
+    root.onkeydown = (e) => { if (e.key === "Escape") close(); };
+    const go = $("m-submit");
+    if (go) go.onclick = async () => {
+      if (spec.href) { location.href = spec.href; return; }
+      go.disabled = true; $("m-err").textContent = "";
+      const err = spec.kind === "keys" ? await submitAlpacaKeys() : await disconnectBroker(id);
+      go.disabled = false;
+      if (err) { $("m-err").textContent = err; return; }
+      close(); renderConnections();
+    };
+    root.querySelectorAll("input").forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter" && go) go.click(); }));
+    const first = root.querySelector("input") || go || $("m-cancel");
+    if (first) first.focus();
+  }
+  async function submitAlpacaKeys() {
+    const keyId = (($("m-keyId") || {}).value || "").trim(), secretKey = (($("m-secretKey") || {}).value || "").trim();
+    if (!keyId || !secretKey) return "Enter both your API Key ID and Secret Key.";
+    const o = await api("/api/broker/alpaca/connect-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keyId, secretKey, env: "paper" }) });
+    return o.ok ? "" : ((o.body && o.body.message) || "Couldn't connect. Check your keys and try again.");
+  }
+  async function disconnectBroker(id) {
+    const o = await api(id === "alpaca" ? "/api/broker/alpaca/disconnect" : "/api/trading/ibkr/disconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    return o.ok ? "" : "Couldn't disconnect. Try again.";
+  }
+  /* ── end broker picker (#3530) */
+
   async function renderConnections() {
     const el = $("p-connections");
     if (!profile) return needSignIn(el, "Connections");
@@ -405,10 +535,10 @@
     const keyStatus = {}; ((keys.body && keys.body.keys) || []).forEach((k) => { keyStatus[k.provider || k.id] = k.set || k.configured || k.hasKey; });
     const indeedOn = indeed.body && (indeed.body.connected || indeed.body.status === "connected");
 
-    const brokerRows = `
-      <div class="group-label">Brokerage</div>
-      <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/orchestration.html#broker">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
-      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? `Connected — paper trading${al.body && al.body.accountNumber ? ` · ${esc(al.body.accountNumber)}` : ""}` : "Paste your Alpaca API keys to trade a paper account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn primary" id="c-al-on">Connect</button>`}</div></div>`;
+    const bState = brokerState(ib.body, al.body);
+    const brokerRows = `${takeAlpacaNote()}
+      <div class="group-label">Trade with your broker</div>
+      ${brokerTilesHtml(bState)}`;
 
     // Active-broker switch — WHICH broker the stock day-trader executes through. Only
     // meaningful when BOTH brokers are connected (else there's nothing to choose). Auto
@@ -465,22 +595,7 @@
     el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p>${brokerRows}${brokerSwitchRow}${traderRow}${keyRows}${connectorRows}${inviteRows}
       <p class="muted-note">Everything here is stored encrypted on the server and never leaves it. Your AI keys let the app run on your own provider quota; brokerage credentials stay server-side (Alpaca paper-only, IBKR paper or live).</p>`;
 
-    const on = $("c-al-on"); if (on) on.onclick = () => openModal({
-      title: "Connect Alpaca",
-      sub: "Paste the API keys from your Alpaca PAPER account (alpaca.markets → Paper Trading → API Keys). They're encrypted on the server and never shared.",
-      fields: [
-        { name: "keyId", label: "API Key ID", placeholder: "PK…" },
-        { name: "secretKey", label: "Secret Key", type: "password", placeholder: "your secret key" },
-      ],
-      submitLabel: "Connect",
-      onSubmit: async ({ keyId, secretKey }, close) => {
-        if (!keyId.trim() || !secretKey.trim()) return "Enter both your API Key ID and Secret Key.";
-        const o = await api("/api/broker/alpaca/connect-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keyId: keyId.trim(), secretKey: secretKey.trim(), env: "paper" }) });
-        if (!o.ok) return (o.body && o.body.message) || "Couldn't connect — check your keys and try again.";
-        close(); renderConnections();
-      },
-    });
-    const off = $("c-al-off"); if (off) off.onclick = async () => { if (!confirm("Disconnect Alpaca? Your stored keys will be removed.")) return; await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
+    el.querySelectorAll("[data-broker]").forEach((t) => t.onclick = () => openBrokerModal(t.dataset.broker, bState));
     // Active-trader switch: POST the choice and update the row IN PLACE (no full re-render).
     // Active-broker switch: POST the choice and update in place (no full re-render).
     const bSeg = $("b-pref"); if (bSeg) bSeg.querySelectorAll("button[data-b]").forEach((b) => b.onclick = async () => {
