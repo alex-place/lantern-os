@@ -182,7 +182,10 @@
     /* Dev role picker: pack the roles into a compact 2-up grid so the card still fits
        one screen instead of stacking five full-width buttons. */
     #test-role-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    #test-role-buttons .test-role-btn { padding: 8px 10px; font-size: 12.5px; border-radius: 10px; }
+    /* Theme-safe: --surface/--text come from site.css and flip with the theme. The old
+       inline style used var(--fg, #e5e7eb) — a token this page never defines — so light
+       mode rendered near-white text on the near-white surface (buttons looked disabled). */
+    #test-role-buttons .test-role-btn { padding: 8px 10px; font-size: 12.5px; border-radius: 10px; background: var(--surface); color: var(--text); }
 
     /* Provider (OAuth) buttons */
     .auth-actions { display: flex; flex-direction: column; gap: 7px; }
@@ -411,6 +414,7 @@
       <div class="auth-divider">🔧 test sign-in</div>
       <p class="sub" style="margin-top:0">Dev only — pick a role to sign in as the test account.</p>
       <div class="auth-actions" id="test-role-buttons"></div>
+      <div class="auth-actions" id="test-provider-buttons" style="margin-top:8px"></div>
       <div class="field-error" id="test-login-error"></div>
     </div>
     </div><!-- /#signin-view -->
@@ -951,7 +955,7 @@
   // as the seeded test account with that role via /api/auth/test-login, then lands
   // on returnTo. Only ever rendered when the SERVER reports testMode.
   const TEST_ROLE_LABELS = {
-    supporter: "Free", deep_dreamer: "Pro", founder: "Pro",
+    supporter: "Free", deep_dreamer: "Pro", founder: "Pro", pilot: "Pilot",
     admin: "Admin", tech_support: "Tech Support",
   };
   function renderTestPanel(session) {
@@ -964,16 +968,30 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "provider-btn test-role-btn";
-      btn.style.background = "var(--surface, #1f2430)";
-      btn.style.color = "var(--fg, #e5e7eb)";
       btn.textContent = TEST_ROLE_LABELS[role] || role;
       btn.addEventListener("click", () => testLogin(role));
       wrap.appendChild(btn);
     });
+    // Emulated Google sign-in: the server's test-login accepts { role, provider } and
+    // mints the same session a first-time "Continue with Google" would (Free tier,
+    // provider "google") — no client secret or OAuth round-trip needed. This is how
+    // the SSO path is exercised locally, where the REAL Google button is hidden
+    // because GOOGLE_CLIENT_ID/SECRET aren't configured (#1877).
+    const provWrap = document.getElementById("test-provider-buttons");
+    if (provWrap) {
+      provWrap.innerHTML = "";
+      const g = document.createElement("button");
+      g.type = "button";
+      g.className = "provider-btn";
+      g.setAttribute("data-provider", "google");
+      g.innerHTML = `<span class="pi">${BRAND_SVG.google}</span> Continue with Google (test)`;
+      g.addEventListener("click", () => testLogin("supporter", "google"));
+      provWrap.appendChild(g);
+    }
     panel.hidden = false;
   }
 
-  async function testLogin(role) {
+  async function testLogin(role, provider) {
     const errEl = document.getElementById("test-login-error");
     if (errEl) errEl.textContent = "";
     try {
@@ -981,7 +999,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ role }),
+        body: JSON.stringify(provider ? { role, provider } : { role }),
       });
       if (!res.ok) throw new Error("test-login failed (" + res.status + ")");
       location.href = safeReturnTo();
