@@ -2955,6 +2955,12 @@ async function handleStreamChat(req, url, res) {
           return;
         }
       } catch (err) {
+        // Say WHY tools vanished: this catch used to be silent, so a thrown tool
+        // turn (bad tools payload, adapter bug, upstream 4xx) silently degraded
+        // every chat to the single-shot no-tools path — and the model, still asked
+        // to act, fabricated "done" claims. The cascade catches below all log;
+        // this one must too. (#toolless-fabrication)
+        console.warn(`[stream-chat] openai tool loop failed — falling back to single-shot, NO TOOLS this turn (${err && err.stack ? err.stack.split("\n").slice(0, 3).join(" | ") : err}`);
         recordProviderFailure("openai", `tool_loop: ${err.message}`);
         if (fullReply) {
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);

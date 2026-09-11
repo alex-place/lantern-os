@@ -194,9 +194,24 @@ function augment(base) {
     const baseTools = base.anthropicTools(opts);
     return opts.operator ? baseTools.concat(anthropicMcpTools()) : baseTools;
   };
+  // OpenAI hard-caps `tools` at 128 entries and 400s the whole request past that
+  // ("Invalid 'tools': array too long" — observed live 2026-09-11: 20 native + 123
+  // MCP = 143). The catch then fell back to single-shot with NO tools, and the
+  // model — still holding live trader context and asked to act — fabricated
+  // "alert created" outcomes. On a loopback box every request is operator
+  // (request-auth), so every local chat turn hit this. Native registry tools carry
+  // the product surface (alerts, quotes, positions, docs); they always make the
+  // cut — MCP operational tools fill whatever room is left.
+  const OPENAI_MAX_TOOLS = 128;
   wrapper.openaiTools = function (opts = {}) {
     const baseTools = base.openaiTools(opts);
-    return opts.operator ? baseTools.concat(openaiMcpTools()) : baseTools;
+    if (!opts.operator) return baseTools;
+    const room = Math.max(0, OPENAI_MAX_TOOLS - baseTools.length);
+    const mcp = openaiMcpTools();
+    if (mcp.length > room) {
+      console.warn(`[mcp-tools] trimming MCP tools ${mcp.length} → ${room} to honor OpenAI's ${OPENAI_MAX_TOOLS}-tool request cap`);
+    }
+    return baseTools.concat(mcp.slice(0, room));
   };
   wrapper.geminiTools = function (opts = {}) {
     const baseTools = base.geminiTools(opts);
