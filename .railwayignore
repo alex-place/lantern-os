@@ -41,6 +41,8 @@ data/*
 # Agent/session scratch.
 .claude/
 .git/
+# a worktree's .git is a FILE, and scripts/railway-deploy.mjs uploads from a worktree (#3524)
+.git
 
 # Installed at build time from the lockfiles.
 node_modules/

@@ -255,19 +255,23 @@ on top of CSF.
 ### Cloud vs local
 
 - **Local:** server binds to `127.0.0.1:4177`
-- **Production (GCE):** the VM `lantern-app` runs `server.js` directly under
-  `lantern.service` (`PORT=8080`, `LANTERN_GARAGE_HOST=0.0.0.0`), fronted by a
-  Cloudflare tunnel → `unisona.ai`. Deployment is **release-gated, not push-gated**:
-  a systemd timer on the box polls `releases/latest` every 15 min and rolls the new
-  tag, so **publishing a GitHub Release is a production deploy** — while merging to
-  `master` moves nothing until a Release is cut (ship an unreleased `master` with the
-  manual pull in the runbook). See [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
-  Config comes from systemd drop-ins in `/etc/systemd/system/lantern.service.d/`,
-  **not** from a `.env` file (there is none on the host).
-- **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. It is **not
-  used by any current deployment** (verified 2026-08-14: no Railway config exists
-  anywhere in the repo). Earlier revisions of this file claimed "Railway
-  auto-deploys from master" — that was never true of the current stack.
+- **Production (Railway):** `unisona.ai` is the Railway project `unisona` (service
+  `unisona`, environment `production`), built by Nixpacks from `railway.json` +
+  `nixpacks.toml`: start `node apps/lantern-garage/server.js`, healthcheck
+  `/api/status`, restart on failure (3 retries). It runs **whatever was last uploaded
+  with `railway up`**. Merging to `master` and publishing a GitHub Release move
+  nothing (verified 2026-09-11: every deployment in `railway deployment list` is a
+  CLI upload or a redeploy, with no commit attached). **Ship with
+  `node scripts/railway-deploy.mjs --yes`.** It refuses during the US session (a deploy
+  restarts the users' trader), uploads a clean checkout of a known commit, and leaves
+  `build-info.json` so `/api/version` names the commit. Config and secrets are
+  **Railway Variables** (`railway variable set KEY=value`, which redeploys). See
+  [docs/ops/railway-runbook.md](docs/ops/railway-runbook.md).
+- **GCE VM (`lantern-app`):** the release-gated systemd setup in `ops/gce/` and
+  [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md) no
+  longer serves `unisona.ai`. Kept for history until the VM is decommissioned.
+- **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. Railway doesn't
+  use it: `railway.json` starts `server.js` directly.
 - **Static UI:** deployed from `gh-pages` branch via GitHub Actions
   (`.github/workflows/deploy.yml`, `peaceiris/actions-gh-pages`); source in
   `apps/lantern-garage/public/`. **This is the marketing/static surface only** —

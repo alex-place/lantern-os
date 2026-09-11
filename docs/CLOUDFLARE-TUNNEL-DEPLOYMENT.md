@@ -18,6 +18,9 @@
 > **[GCE Cloud Deploy Runbook](ops/gce-cloud-deploy-runbook.md)** — do not point live DNS at a
 > local tunnel. This tunnel remains usable for **local dev exposure or as a fallback** only;
 > the steps below are retained for that purpose and for historical reference.
+>
+> **Update 2026-09-11:** `unisona.ai` is now served by **Railway**, not the GCE VM above. Operate
+> production via the **[Railway runbook](ops/railway-runbook.md)**.
 
 ---
 
