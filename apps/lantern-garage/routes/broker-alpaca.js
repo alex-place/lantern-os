@@ -22,7 +22,7 @@ const store = require('../lib/alpaca-credentials');
 // The signed short-TTL state cookie is the same primitive every other OAuth2 provider
 // here already uses, so reuse it rather than keeping a second copy of the HMAC: one
 // signer, one secret resolution, one place to harden. (lib/oauth-core, ADR-0016.)
-const { signOauth, verifyOauth, readCookie } = require('../lib/oauth-core');
+const { signOauth, verifyOauth, readCookie, safeReturnTo } = require('../lib/oauth-core');
 
 const AUTHORIZE_URL = 'https://app.alpaca.markets/oauth/authorize';
 const TOKEN_HOST = 'api.alpaca.markets';
@@ -33,6 +33,40 @@ const SCOPE = 'account:write trading';   // read account + place trades on the u
 function _clientId() { return process.env.ALPACA_OAUTH_CLIENT_ID || ''; }
 function _clientSecret() { return process.env.ALPACA_OAUTH_CLIENT_SECRET || ''; }
 function _configured() { return !!(_clientId() && _clientSecret()); }
+
+// Is our OAuth client actually LIVE at Alpaca (#3530)? A registered-but-unapproved
+// app gets `invalid_client` from the token endpoint -- the same reply a made-up client
+// id gets -- and ours sat in that state for months. An active client answers a dummy
+// code with a different error (invalid_grant). The Settings broker picker offers
+// one-click only when this says yes, so nobody is sent to an Alpaca error page. One
+// probe per 10 minutes per process (1 minute after a network failure), and a slow
+// probe never holds a status call past waitMs: it finishes in the background and
+// fills the cache for the next one.
+const PROBE_TTL_MS = 10 * 60 * 1000;
+const PROBE_RETRY_MS = 60 * 1000;
+let _probe = { at: 0, ttl: 0, active: false, pending: null };
+function _classifyProbe(r) {
+  if (!r || r.error || !r.status || r.status >= 500) return null;             // unknown: network, or Alpaca down
+  const j = r.json || {};
+  const said = String(j.error || j.message || '').toLowerCase();
+  if (said.includes('invalid_client') || said.includes('unknown client')) return false;
+  return r.status >= 400 && r.status < 500;                                    // invalid_grant & co: the client is known
+}
+async function _oauthActive(redirectUri, { waitMs = 1500 } = {}) {
+  if (!_configured()) return false;
+  if (Date.now() - _probe.at < _probe.ttl) return _probe.active;
+  if (!_probe.pending) {
+    _probe.pending = _exchangeCode({ code: 'unisona-oauth-probe', redirectUri }).then((r) => {
+      const v = _classifyProbe(r);
+      _probe = { at: Date.now(), ttl: v === null ? PROBE_RETRY_MS : PROBE_TTL_MS, active: v === true, pending: null };
+      return _probe.active;
+    });
+  }
+  const timer = new Promise((res) => { const t = setTimeout(() => res(_probe.active), waitMs); if (t.unref) t.unref(); });
+  return Promise.race([_probe.pending, timer]);
+}
+// Where the browser goes after the OAuth round trip: a path on THIS site only.
+const RETURN_DEFAULT = '/orchestration.html#broker';
 
 function _origin(req) {
   const host = (req.headers && req.headers.host) || '127.0.0.1';
@@ -178,6 +212,7 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
   // GET /status — redacted connection state (safe for guests to poll)
   if (method === 'GET' && p === '/api/broker/alpaca/status') {
     const st = store.publicStatus(userId);
+    const oneClick = await _oauthActive(redirectUri);   // one-click only once Alpaca has activated our app (#3530)
     // If the user has no OAuth token but the operator set server paper keys, the
     // trader still trades a real Alpaca paper account — report that as connected.
     if (!st.connected) {
@@ -185,10 +220,10 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
       if (adapter.available(userId)) {
         return _json(res, 200, { connected: true, hasCredentials: true, provider: 'alpaca',
           env: process.env.ALPACA_ENV === 'live' ? 'live' : 'paper', mode: 'paper',
-          via: 'server-keys', accountNumber: null, configured: _configured() }), true;
+          via: 'server-keys', accountNumber: null, configured: _configured(), oneClick }), true;
       }
     }
-    return _json(res, 200, { ...st, configured: _configured() }), true;
+    return _json(res, 200, { ...st, configured: _configured(), oneClick }), true;
   }
 
   // GET /connect — start OAuth2. ?env=live opts into the live account; default paper.
@@ -197,7 +232,7 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
       return _json(res, 503, { error: 'not_configured', message: 'Alpaca one-click is not set up on this server yet (missing ALPACA_OAUTH_CLIENT_ID / _SECRET). Register the app at app.alpaca.markets → OAuth.' }), true;
     }
     const env = url.searchParams.get('env') === 'live' ? 'live' : 'paper';
-    const returnTo = url.searchParams.get('returnTo') || '/orchestration.html#broker';
+    const returnTo = safeReturnTo(url.searchParams.get('returnTo'), RETURN_DEFAULT);   // same-site paths only (#3530)
     const state = crypto.randomBytes(16).toString('hex');
     const cookie = signOauth({ state, env, userId, returnTo, redirectUri, exp: Date.now() + 10 * 60 * 1000 });
     const secure = redirectUri.startsWith('https://') ? '; Secure' : '';
@@ -218,7 +253,14 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
   if (method === 'GET' && p === '/api/broker/alpaca/callback') {
     const clear = `${COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
     const ck = verifyOauth(readCookie(req, COOKIE));
-    const back = (msg) => { res.writeHead(302, { 'Set-Cookie': clear, Location: `${(ck && ck.returnTo) || '/orchestration.html#broker'}${((ck && ck.returnTo) || '').includes('?') ? '&' : '?'}alpaca=${msg}` }); return res.end(), true; };
+    // The result rides in the query, which must come BEFORE any #hash (#3530). Appended
+    // after it, it became part of the hash, and a returnTo like /settings.html#connections
+    // opened the wrong panel with no word of the result.
+    const back = (msg) => {
+      const [path, hash] = safeReturnTo(ck && ck.returnTo, RETURN_DEFAULT).split('#');
+      res.writeHead(302, { 'Set-Cookie': clear, Location: `${path}${path.includes('?') ? '&' : '?'}alpaca=${msg}${hash ? '#' + hash : ''}` });
+      return res.end(), true;
+    };
     const err = url.searchParams.get('error');
     if (err) return back(`error&reason=${encodeURIComponent(err)}`);
     const code = url.searchParams.get('code');
@@ -277,3 +319,8 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
 
   return _json(res, 404, { error: 'not_found' }), true;
 };
+
+// Test hooks (#3530): the probe's classifier, the probe itself, and a cache reset.
+module.exports._classifyProbe = _classifyProbe;
+module.exports._oauthActive = _oauthActive;
+module.exports._resetProbe = () => { _probe = { at: 0, ttl: 0, active: false, pending: null }; };
