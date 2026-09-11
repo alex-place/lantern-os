@@ -325,18 +325,43 @@ function jpDayStats(daily) {
   return { tradingDays: traded.length, dayWinRate: traded.length ? (wins / traded.length) * 100 : null, streak, dir };
 }
 
+/* The day tiles read the calendar's measure (#3538). The calendar shows the account's
+   change per session by default (#3517), but Current streak and Day win % still counted
+   booked days. So on 2026-09-11 the calendar showed seven green sessions in a row while
+   the tile said "2 winning days" -- 9/9 had no closes. Same series as the calendar now:
+   Account -- every session from the account, today's live figure included; Booked --
+   what closed each day. Account days start at the journal's first booked day, so the
+   day win rate covers the same window as every other tile. A flat "today so far" is
+   left out rather than read as a session that broke the run. */
+function jpDaySeries(daily, liveToday, acct) {
+  const d = daily || [];
+  const mode = (jpCalMode === 'account' && acct) ? 'account' : 'booked';
+  if (mode === 'booked') return { mode, days: d };
+  const m = Object.assign({}, acct);
+  if (liveToday && liveToday.pnl) m[liveToday.date] = liveToday.pnl;
+  const from = d.length ? d[0].date : '';
+  const days = Object.keys(m).filter(k => k >= from).sort().map(k => ({ date: k, pnl: m[k] }));
+  return { mode, days };
+}
+
 function jpKpis(s, book, ds) {
   const dd = book.maxDrawdown || { amount: 0 };
   const card = (k, v, cls, sub) => '<div class="jp-kpi"><div class="k">' + k + '</div>'
     + '<div class="v ' + (cls || '') + '">' + v + '</div>'
     + '<div class="s">' + (sub || '&nbsp;') + '</div></div>';
-  const streakTxt = ds.streak ? (ds.streak + (ds.dir > 0 ? ' winning day' : ' losing day') + (ds.streak === 1 ? '' : 's')) : 'no run';
+  // The labels name the measure the calendar is showing (#3538).
+  const acctMode = ds.mode === 'account';
+  const plural = (n) => (n === 1 ? '' : 's');
+  const streakTxt = !ds.streak ? 'no run'
+    : ds.streak + (acctMode ? (ds.dir > 0 ? ' green session' : ' red session') : (ds.dir > 0 ? ' winning day' : ' losing day'))
+      + plural(ds.streak);
   return '<div class="jp-kpis">'
     + card('Net P&amp;L', jpUsd(s.totalRealized), jpSign(s.totalRealized), s.trades + ' closed trade' + (s.trades === 1 ? '' : 's'))
     + card('Trade win %', jpPct(s.winRate), '', 'risk exits only: ' + jpPct(s.riskExitWinRate))
     + card('Profit factor', (typeof s.profitFactor === 'number' && isFinite(s.profitFactor)) ? s.profitFactor.toFixed(2) : '—', '',
            'gross win ÷ gross loss')
-    + card('Day win %', ds.dayWinRate == null ? '—' : jpPct(ds.dayWinRate), '', ds.tradingDays + ' trading day' + (ds.tradingDays === 1 ? '' : 's'))
+    + card('Day win %', ds.dayWinRate == null ? '—' : jpPct(ds.dayWinRate), '',
+           ds.tradingDays + (acctMode ? ' session' : ' trading day') + plural(ds.tradingDays))
     // The paired amounts wrapped to two lines while every other card was one figure.
     // The RATIO is the headline metric anyway -- how much a winner returns per dollar a
     // loser costs -- so it leads, and both amounts sit underneath where they still read.
@@ -890,7 +915,8 @@ function jpRender(host, data) {
     return;
   }
 
-  const ds = jpDayStats(daily);
+  const dsr = jpDaySeries(daily, liveToday, acct);   // the calendar's measure (#3538)
+  const ds = Object.assign(jpDayStats(dsr.days), { mode: dsr.mode });
   html += jpKpis(s, book, ds);
   html += '<div class="jp-grid">'
     + '<div class="jp-col">'
