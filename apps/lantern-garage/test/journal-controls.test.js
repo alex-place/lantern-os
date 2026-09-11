@@ -39,7 +39,7 @@ test('the page never reloads itself: no focus, visibility or timer refresh', () 
   assert.doesNotMatch(code, /window\.addEventListener\('focus'/, 'no focus refresh');
   assert.doesNotMatch(code, /setInterval\(/, 'no background timer');
   assert.strictEqual((code.match(/addEventListener\('DOMContentLoaded'/g) || []).length, 1, 'one load, when the page opens');
-  assert.match(code, /document\.addEventListener\('DOMContentLoaded', \(\) => jpLoad\(\)\);/);
+  assert.match(code, /addEventListener\('DOMContentLoaded', \(\) => \{[\s\S]{0,240}jpLoad\(\);/, 'the one load is on open');
   assert.match(code, /id="jpLoadedAt"/, 'the header says when it last read the record');
 });
 
@@ -56,13 +56,15 @@ test('the slice the page loaded with is already in the cache, so going back to i
   assert.match(grabFn('jpLoad'), /jpSliceCache\[jpSlice\] = data\.slice;/);
 });
 
-test('jpRender marks the cards its controls repaint, and keeps what they need', () => {
+test('the cards its controls repaint keep their ids, wherever the card is built', () => {
   const render = grabFn('jpRender');
   assert.match(render, /jpLast = \{ s, book, daily, liveToday, acct \};/);
-  assert.match(render, /id="jpKpis"/);
-  assert.match(render, /id="jpCalCard"/);
-  assert.match(render, /id="jpBreakdownCard"/);
+  assert.match(render, /id="jpCards"/, 'the arrangement fills this host (#3543)');
   assert.doesNotMatch(render, /jpSkips/);
+  const body = grabFn('jpCardBody');
+  for (const id of ['jpKpis', 'jpCalCard', 'jpBreakdownCard']) {
+    assert.match(body, new RegExp('id="' + id + '"'), id + ' survives rearranging');
+  }
 });
 
 // A fake page: every getElementById hands back an element that records what was written.
