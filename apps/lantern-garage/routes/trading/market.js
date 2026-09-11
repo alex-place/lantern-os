@@ -7,6 +7,43 @@
  * bindings arrive via the ctx object built in trading.js.
  */
 
+/* The Alpaca path's day P&L (#3520). The IBKR path and the operator view both run
+   lib/day-pnl on their positions and hand each row its own day figure. The Alpaca path
+   handed its rows nothing, so the trader's Day P&L column read "—" on every Alpaca
+   position, and its account tile was the broker's equity - last_equity instead of the
+   ledger basis the other two paths use. Same module, same wiring as the IBKR path.
+   Fail-soft: an unreadable ledger leaves the broker's figures standing -- never a crash,
+   never an invented number. */
+async function alpacaDayPnl(account, positions) {
+  try {
+    const fs = require('fs'), path = require('path');
+    const dayPnlLib = require('../../lib/day-pnl');
+    const dataDir = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading');
+    const d = await dayPnlLib.computeDayPnl({
+      positions,
+      ledgerText: fs.readFileSync(dayPnlLib.resolveTradesLog(dataDir), 'utf8'),
+      now: Date.now(),
+      getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
+      getPrevClose: dayPnlLib.prevCloseFromBarsFactory(dayPnlLib.resolveBarsDir(dataDir)),
+    });
+    account.realized_today = d.realized_today;
+    account.realized_booked = d.realized_booked;
+    account.unrealized_today = d.unrealized_today;
+    account.pnl_today = d.pnl_today;
+    account.pnl_carry_adjustment = d.pnl_carry_adjustment;
+    account.pnl_pct = account.equity ? (d.pnl_today / account.equity) * 100 : 0;
+    account.pnl_basis = 'alpaca: ' + d.pnl_basis;
+    const bySym = new Map((d.per_position || []).map((x) => [x.symbol, x]));
+    for (const p of positions) {
+      const x = bySym.get(String(p.symbol).toUpperCase());
+      if (x) { p.day_pnl = x.day_pnl; p.day_basis = x.day_basis; }
+    }
+    return true;
+  } catch (_e) {
+    return false;   // ledger unreadable: the broker's own figures stand
+  }
+}
+
 module.exports = async function marketRoutes(req, res, url, ctx) {
   const { deps, sendJson, bridge, traderAgent, getPriceFeed, tradingMemory, getEffectiveUserId } = ctx;
 
@@ -230,6 +267,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         if (!alpacaAccount) return false;
         const ap = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
         alpacaAccount.unrealized = (ap.positions || []).reduce((s, p) => s + (Number(p.unrealized_pl) || 0), 0);
+        await alpacaDayPnl(alpacaAccount, ap.positions || []);   // each row gets its Day P&L (#3520)
         sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
         return true;
       };
