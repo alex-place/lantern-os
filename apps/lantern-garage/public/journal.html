@@ -181,6 +181,11 @@
   .jp-sort:hover{color:var(--text1)}
   .jp-sort:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .jp-scroll{overflow:auto;max-height:300px}
+  /* A cell that jumps the calendar is a button, not a styled span. */
+  .jp-linkish{all:unset;cursor:pointer;border-bottom:1px dotted var(--border)}
+  .jp-linkish:hover{color:var(--blue);border-bottom-color:var(--blue)}
+  .jp-linkish:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  .jp-table tr.on td{background:color-mix(in srgb, var(--blue) 9%, transparent)}
 
   .jp-curve svg{display:block;width:100%;height:auto}
   /* A chart you cannot read a value off is decoration. The readout replaces the
@@ -356,13 +361,15 @@ async function jpSetSlice(k) {
    that read the same series. Nothing else on the page moves (#3541). */
 function jpPaintCalendar() {
   if (!jpLast) return;
+  const dsr = jpDaySeries(jpLast.daily, jpLast.liveToday, jpLast.acct);
   const card = document.getElementById('jpCalCard');
   if (card) card.innerHTML = jpCalendarCard(jpLast.daily, jpLast.liveToday, jpLast.acct);
   const tiles = document.getElementById('jpKpis');
-  if (tiles) {
-    const dsr = jpDaySeries(jpLast.daily, jpLast.liveToday, jpLast.acct);
-    tiles.innerHTML = jpKpis(jpLast.s, jpLast.book, Object.assign(jpDayStats(dsr.days), { mode: dsr.mode }));
-  }
+  if (tiles) tiles.innerHTML = jpKpis(jpLast.s, jpLast.book, Object.assign(jpDayStats(dsr.days), { mode: dsr.mode }));
+  // The monthly table reads the same series and marks the month on show, so it moves
+  // with the measure and with the arrows rather than drifting out of agreement (#3548).
+  const monthly = document.getElementById('jpMonthlyCard');
+  if (monthly) monthly.innerHTML = jpMonthly(dsr);
 }
 
 /* The calendar's measure (#3517): 'account' -- the account's change each session, the
@@ -744,6 +751,118 @@ async function jpEnsureSymbols() {
   if (card) card.innerHTML = jpSymbols(jpSliceCache.symbol);
 }
 
+/* Monthly report (#3548) -- months against each other.
+   A trading record is noise at the trade level and signal at the month level, which is
+   why RocketSheets sells a Monthly Reports sheet and TradeZella leads its dashboard with
+   one. The calendar already shows a month; nothing showed months side by side, and that
+   is the view that answers "is this getting better or worse" -- the question a reader of
+   an autonomous trader asks most, because they cannot read it off the strategy.
+
+   It follows the calendar's measure, so the two never disagree: 'account' counts every
+   session the broker reports, 'booked' counts what closed that day.
+
+   There is no trade count here on purpose. The daily series carries {date, pnl, cum} and
+   no per-day trade count, so "trades this month" would have to be invented or fetched.
+   Trading days is the honest column, and it is the one the day-win figure already uses. */
+function jpMonthRows(days) {
+  const byMonth = new Map();
+  for (const d of (days || [])) {
+    if (!d || typeof d.date !== 'string' || d.date.length < 7) continue;
+    const m = d.date.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(m)) continue;
+    if (!byMonth.has(m)) byMonth.set(m, []);
+    byMonth.get(m).push(d);
+  }
+  const rows = [];
+  byMonth.forEach((ds, month) => {
+    ds.sort((a, b) => (a.date < b.date ? -1 : 1));
+    // A day with no P&L is not a trading day -- the same rule the day-win tile uses.
+    const traded = ds.filter((x) => typeof x.pnl === 'number' && isFinite(x.pnl) && x.pnl !== 0);
+    let pnl = 0, cum = 0, peak = 0, dd = 0, best = null, worst = null, wins = 0;
+    for (const x of traded) {
+      pnl += x.pnl;
+      cum += x.pnl;
+      if (cum > peak) peak = cum;
+      if (peak - cum > dd) dd = peak - cum;      // the worst run-down INSIDE the month
+      if (!best || x.pnl > best.pnl) best = x;
+      if (!worst || x.pnl < worst.pnl) worst = x;
+      if (x.pnl > 0) wins++;
+    }
+    const round = (n) => Math.round(n * 100) / 100;
+    rows.push({ month, days: traded.length, winRate: traded.length ? (wins / traded.length) * 100 : null,
+      pnl: round(pnl), best, worst, drawdown: round(dd) });
+  });
+  return rows.sort((a, b) => (a.month < b.month ? 1 : -1));   // newest first: this month is the one being lived
+}
+
+/* 2026-09 -> "Sep 2026", built from the numbers rather than parsed, so no timezone can
+   turn the first of a month into the last of the one before. */
+function jpMonthLabel(m) {
+  const [y, mo] = String(m || '').split('-').map(Number);
+  if (!y || !mo) return String(m || '');
+  try { return new Date(y, mo - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
+  catch (_e) { return m; }
+}
+
+/* 2026-09-04 -> "Sep 4", built from the numbers for the same reason jpMonthLabel is:
+   parsing a bare date string is a timezone away from naming the day before. */
+function jpShortDate(iso) {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  if (!y || !m || !d) return String(iso || '');
+  try { return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+  catch (_e) { return String(iso); }
+}
+
+function jpMonthly(ds) {
+  const head = '<h2>Monthly report</h2>';
+  const rows = jpMonthRows(ds && ds.days);
+  if (!rows.length) return head + '<div class="jp-empty">Nothing to summarise by month yet.</div>';
+  const max = rows.reduce((m, r) => Math.max(m, Math.abs(r.pnl)), 0) || 1;
+  /* "$154.27 04" reads as a count, not a date. Name the day. */
+  const dayCell = (d) => (d ? '<span class="' + jpSign(d.pnl) + '">' + jpUsd(d.pnl) + '</span>'
+    + ' <span class="jp-dim">' + jpEsc(jpShortDate(d.date)) + '</span>' : '\u2014');
+  const body = rows.map((r) => {
+    // The bar is the P&L cell's own background, so it needs no column and cannot be read
+    // as a figure in its own right. Scaled against the biggest month, either direction.
+    const pct = Math.round((Math.abs(r.pnl) / max) * 100);
+    const tint = r.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const bar = pct > 0
+      ? ' style="background:linear-gradient(to left, color-mix(in srgb, ' + tint + ' 18%, transparent) '
+        + pct + '%, transparent ' + pct + '%)"'
+      : '';
+    return '<tr' + (r.month === jpMonth ? ' class="on"' : '') + '>'
+      + '<td><button type="button" class="jp-linkish" onclick="jpGotoMonth(\'' + r.month + '\')"'
+      + ' aria-label="Show ' + jpEsc(jpMonthLabel(r.month)) + ' on the calendar">' + jpEsc(jpMonthLabel(r.month)) + '</button></td>'
+      + '<td class="num">' + r.days + '</td>'
+      + '<td class="num">' + jpPct(r.winRate) + '</td>'
+      + '<td class="num ' + jpSign(r.pnl) + '"' + bar + '>' + jpUsd(r.pnl) + '</td>'
+      + '<td class="num">' + dayCell(r.best) + '</td>'
+      + '<td class="num">' + dayCell(r.worst) + '</td>'
+      + '<td class="num ' + (r.drawdown > 0 ? 'jp-neg' : 'jp-dim') + '">' + (r.drawdown > 0 ? jpUsd(-r.drawdown) : '\u2014') + '</td>'
+      + '</tr>';
+  }).join('');
+  const acct = ds && ds.mode === 'account';
+  return head
+    + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
+    + '<th>Month</th><th class="num">' + (acct ? 'Sessions' : 'Trading days') + '</th>'
+    + '<th class="num">Day win %</th><th class="num">P&amp;L</th>'
+    + '<th class="num">Best day</th><th class="num">Worst day</th><th class="num">Drawdown</th>'
+    + '</tr></thead><tbody>' + body + '</tbody></table></div>'
+    + '<p class="jp-note">'
+    + (acct ? 'Every session the account reported, today included.' : 'What closed each day \u2014 a trade held across days books on the day it closes.')
+    + ' Drawdown is the worst run-down inside that month, not since the start. Pick a month to show it on the calendar.</p>';
+}
+
+/* Zero requests: the calendar is already holding every day of every month. */
+function jpGotoMonth(m) {
+  if (!/^\d{4}-\d{2}$/.test(String(m || ''))) return;
+  if (jpCalMonths(jpData).indexOf(m) < 0) return;      // a month the calendar cannot show
+  jpMonth = m;
+  jpPaintCalendar();
+  const cal = document.getElementById('jpCalCard');
+  if (cal) { try { cal.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_e) { cal.scrollIntoView(); } }
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -1066,6 +1185,7 @@ const JP_WIDGETS = [
   { id: 'pnlday', name: 'Net P&L per day', w: 1 },
   { id: 'breakdown', name: 'Breakdown', w: 1 },
   { id: 'symbols', name: 'Symbol statistics', w: 2 },
+  { id: 'monthly', name: 'Monthly report', w: 2 },
   { id: 'placements', name: 'Placement notes', w: 2 },
 ];
 const JP_WIDGET = {};
@@ -1175,6 +1295,9 @@ function jpCardBody(id, data) {
           aria: 'Realized profit and loss for each exchange day' });
   }
   if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
+  if (id === 'monthly') {
+    return '<div id="jpMonthlyCard">' + jpMonthly(jpDaySeries(L.daily, L.liveToday, L.acct)) + '</div>';
+  }
   if (id === 'placements') return jpPlacements({ bare: true });
   return '';
 }
