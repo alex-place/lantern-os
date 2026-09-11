@@ -11,6 +11,9 @@
  *   - 87 dated lab notes each claiming a card
  *   - a hero card advertising version 1.8 while the app shipped 1.14.1
  *
+ * The document library moved off the guide to its own page, /library.html (#3503): the
+ * library's invariants read library.html, the guide's read knowledgecenter.html.
+ *
  * Run: node --test apps/lantern-garage/test/knowledge-center.test.js
  */
 'use strict';
@@ -21,10 +24,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
-const HTML = fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'public', 'knowledgecenter.html'), 'utf8');
+const PUB = path.join(REPO, 'apps', 'lantern-garage', 'public');
+const HTML = fs.readFileSync(path.join(PUB, 'knowledgecenter.html'), 'utf8');   // the guide
+const LIB = fs.readFileSync(path.join(PUB, 'library.html'), 'utf8');            // the library (#3503)
 const CATALOG = JSON.parse(fs.readFileSync(path.join(REPO, 'data', 'knowledge', 'doc-catalog.json'), 'utf8'));
 
-const cards = [...HTML.matchAll(/<a class="doc-card"([^>]*)>/g)].map((m) => m[1]);
+const cards = [...LIB.matchAll(/<a class="doc-card"([^>]*)>/g)].map((m) => m[1]);
 const attr = (card, name) => (card.match(new RegExp(`${name}="([^"]*)"`)) || [])[1] || '';
 
 test('no audience:internal doc is published', () => {
@@ -67,18 +72,18 @@ test('every card carries the metadata the sort control needs', () => {
 
 test('the default order is the generator ranking, not alphabetical', () => {
   // The regression: sortGrid() used to re-sort by title unconditionally on load.
-  assert.match(HTML, /activeSort = 'curated'/, 'curated is the default sort');
-  assert.ok(!/function sortGrid\(\)\s*\{\s*cards\(\)\s*\.sort\(\(a, b\) => collator/.test(HTML),
+  assert.match(LIB, /activeSort = 'curated'/, 'curated is the default sort');
+  assert.ok(!/function sortGrid\(\)\s*\{\s*cards\(\)\s*\.sort\(\(a, b\) => collator/.test(LIB),
     'the unconditional alphabetical re-sort must be gone');
   const ranks = cards.map((c) => attr(c, 'data-rank'));
   assert.deepStrictEqual(ranks, [...ranks].sort(), 'cards are emitted in rank order');
 });
 
 test('public PDFs are allowlisted, and the allowlist fails closed', () => {
-  assert.match(HTML, /report-manifest/, 'the page consults the report manifest');
-  assert.match(HTML, /let allowed = new Set\(\);/,
+  assert.match(LIB, /report-manifest/, 'the page consults the report manifest');
+  assert.match(LIB, /let allowed = new Set\(\);/,
     'the allowlist starts empty so a fetch failure publishes nothing');
-  assert.ok(!/allowed\s*=\s*null/.test(HTML), 'no null sentinel that means "allow all"');
+  assert.ok(!/allowed\s*=\s*null/.test(LIB), 'no null sentinel that means "allow all"');
   const manifest = JSON.parse(fs.readFileSync(path.join(REPO, 'data', 'knowledge', 'report-manifest.json'), 'utf8'));
   assert.ok(Array.isArray(manifest.reports), 'manifest exposes a reports array');
 });
@@ -96,25 +101,36 @@ test('dated research notes roll up into one card plus a generated index', () => 
 });
 
 test('the Human Flourishing Frameworks cards are gone', () => {
-  assert.ok(!/data-cat="hff"/.test(HTML), 'no HFF cards');
-  assert.ok(!/Convergence \(HFF\)/.test(HTML), 'no HFF filter chip');
+  for (const [name, page] of [['guide', HTML], ['library', LIB]]) {
+    assert.ok(!/data-cat="hff"/.test(page), `no HFF cards on the ${name}`);
+    assert.ok(!/Convergence \(HFF\)/.test(page), `no HFF filter chip on the ${name}`);
+  }
 });
 
 test('the hero does not hard-code a version that goes stale', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'package.json'), 'utf8'));
-  // Only the hero — a doc CARD legitimately titled "Unisona 1.8 — …" is a historical
+  // Only the heroes — a doc CARD legitimately titled "Unisona 1.8 — …" is a historical
   // release note, not a stale claim about the current version.
-  const hero = HTML.slice(HTML.indexOf('link-grid essentials'), HTML.indexOf('id="documents"'));
-  const claimed = hero.match(/Unisona (\d+\.\d+(?:\.\d+)?)/g) || [];
-  for (const c of claimed) {
-    const v = c.replace('Unisona ', '');
-    assert.ok(pkg.version.startsWith(v) || v === pkg.version,
-      `hero names version ${v} but the app ships ${pkg.version}`);
+  const heroOf = (html) => {
+    const a = html.indexOf('<div class="kc-hero">');
+    if (a < 0) return '';
+    const b = html.indexOf('\n  </div>', a);
+    return html.slice(a, b < 0 ? a + 2000 : b);
+  };
+  for (const [name, page] of [['guide', HTML], ['library', LIB]]) {
+    const hero = heroOf(page);
+    assert.ok(hero, `the ${name} has a hero to check`);
+    for (const c of hero.match(/Unisona (\d+\.\d+(?:\.\d+)?)/g) || []) {
+      const v = c.replace('Unisona ', '');
+      assert.ok(pkg.version.startsWith(v) || v === pkg.version,
+        `the ${name} hero names version ${v} but the app ships ${pkg.version}`);
+    }
   }
 });
 
 test('every filter chip matches a category the generator emits', () => {
-  const chipCats = [...HTML.matchAll(/<button class="chip[^"]*" data-cat="([^"]+)"/g)].map((m) => m[1]);
+  const chipCats = [...LIB.matchAll(/<button class="chip[^"]*" data-cat="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(chipCats.length > 1, 'the library still has its category chips');
   const cardCats = new Set(cards.map((c) => attr(c, 'data-cat')));
   for (const cat of chipCats) {
     if (cat === 'all') continue;
@@ -129,7 +145,22 @@ test('the "no account required" FAQ link is actually public (#3161)', () => {
   assert.match(HTML, /href="\/faq\.html"/, 'the Knowledge Center still links the FAQ');
   const pages = fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'routes', 'pages.js'), 'utf8');
   assert.match(pages, /["']\/faq\.html["']\s*:/, 'faq.html must be in PUBLIC_PAGES (server serves it to guests)');
-  const authGate = fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'public', 'js', 'auth-gate.js'), 'utf8');
+  const authGate = fs.readFileSync(path.join(PUB, 'js', 'auth-gate.js'), 'utf8');
   const publicLine = (authGate.match(/const PUBLIC\s*=\s*\[[^\]]*\]/) || [''])[0];
   assert.match(publicLine, /['"]\/faq\.html['"]/, 'faq.html must be in the auth-gate.js PUBLIC allowlist (client twin)');
+});
+
+test('the library has its own public page, and the guide points to it (#3503)', () => {
+  // The guide is for someone brand new; the technical library moved off it. Same two
+  // gates as the FAQ above: a guide link to a page that bounces guests to /auth.html
+  // would be a dead end.
+  assert.ok(!/<a class="doc-card"/.test(HTML), 'the guide carries no library cards');
+  assert.ok(!/id="documents"/.test(HTML), 'the guide has no library section');
+  assert.match(HTML, /href="\/library\.html"/, 'the guide links the library');
+  assert.match(LIB, /<meta name="loop-stage" content="remember">/, 'the library declares its loop stage');
+  const pages = fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'routes', 'pages.js'), 'utf8');
+  assert.match(pages, /["']\/library\.html["']\s*:/, 'library.html is in PUBLIC_PAGES (served to guests)');
+  const authGate = fs.readFileSync(path.join(PUB, 'js', 'auth-gate.js'), 'utf8');
+  const publicLine = (authGate.match(/const PUBLIC\s*=\s*\[[^\]]*\]/) || [''])[0];
+  assert.match(publicLine, /['"]\/library\.html['"]/, 'library.html is in the auth-gate.js PUBLIC allowlist (client twin)');
 });
