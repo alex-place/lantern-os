@@ -35,18 +35,26 @@ const grab = (re) => {
 
 const src = [/^function _isWorkingOrder\(/, /^function renderOrders\(/].map(grab).join('\n');
 
-function render(orders) {
+function render(orders, { positions = [], armed = null } = {}) {
   const els = { 'tp-orders': { innerHTML: '' }, 'tp-history': { innerHTML: '' }, 'tpOrdCount': { textContent: '' } };
+  const refreshed = [];
   const sandbox = {
     document: { getElementById: (id) => els[id] },
     fmt: (v, d) => Number(v).toFixed(d),
     _fmtOrderTime: () => 't',
     focusTicker: () => {},
+    // The positions panel (#3518): renderOrders caches the working orders for its Stop /
+    // Take profit columns and re-renders the table, so a stop that lands after the
+    // positions shows at once -- never while a Flatten button is armed.
+    _lastPositions: positions,
+    _armedBtn: armed,
+    _tpWorking: null,
+    renderPositionsTable: (p) => refreshed.push(p),
   };
-  const fn = new Function(...Object.keys(sandbox), src + '\nreturn { renderOrders, _isWorkingOrder };');
+  const fn = new Function(...Object.keys(sandbox), src + '\nreturn { renderOrders, _isWorkingOrder, cached: () => _tpWorking };');
   const api = fn(...Object.values(sandbox));
   api.renderOrders(orders);
-  return { open: els['tp-orders'].innerHTML, hist: els['tp-history'].innerHTML, badge: els['tpOrdCount'].textContent, api };
+  return { open: els['tp-orders'].innerHTML, hist: els['tp-history'].innerHTML, badge: els['tpOrdCount'].textContent, api, refreshed, cached: api.cached() };
 }
 
 const ORDERS = [
@@ -106,4 +114,13 @@ test('_isWorkingOrder vocabulary covers every broker/ledger working status', () 
   for (const s of ['filled', 'canceled', 'inactive', 'rejected', 'expired', '', undefined]) {
     assert.strictEqual(api._isWorkingOrder({ status: s }), false, String(s) + ' is not working');
   }
+});
+
+test('the positions panel reads the working orders, and refreshes unless a Flatten is armed (#3518)', () => {
+  const pos = [{ symbol: 'SQQQ', qty: 1614 }];
+  const r = render(ORDERS, { positions: pos });
+  assert.deepStrictEqual(r.cached.map((o) => o.id).sort(), ['1765890034', '1765890035', '99001'], 'the Stop column reads exactly the working orders');
+  assert.strictEqual(r.refreshed.length, 1, 'a stop that lands after the positions shows at once');
+  assert.strictEqual(render(ORDERS, { positions: pos, armed: {} }).refreshed.length, 0, 'never under an armed Flatten: its second click must fire, not re-arm');
+  assert.strictEqual(render(ORDERS).refreshed.length, 0, 'no positions, nothing to refresh');
 });
