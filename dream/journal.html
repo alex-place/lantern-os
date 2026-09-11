@@ -642,7 +642,22 @@ function jpBindPlots() {
    When the broker cannot answer (a box with no linked account), the autopilot's own
    cumulative curve stands in rather than leaving an empty slot. */
 function jpBalanceChart(h, daily) {
-  const iso = (t) => { try { return new Date(t * 1000).toISOString().slice(0, 10); } catch (_e) { return ''; } };
+  /* Which exchange day a broker point belongs to (#3501). The brokers stamp a day
+     differently. IBKR (ibkr-cpapi _toEpochSeconds) and the demo stamp the session's own
+     date at 00:00 UTC, which the UTC date reads correctly. Alpaca stamps each daily bar
+     at the END of the session it closes -- 00:00 UTC the next day, 8 PM ET -- so its UTC
+     date ran a day late: Friday's close showed as a Saturday, the Tuesday after a Monday
+     holiday vanished, and the point labelled today was yesterday's close. Alpaca stamps
+     are read in ET instead, backed off 5 hours so a stamp at or just after midnight
+     (either side of daylight saving) still lands on the session it closed. */
+  const alpaca = !!(h && h.source === 'alpaca');
+  const iso = (t) => {
+    try {
+      return alpaca
+        ? new Date((t - 5 * 3600) * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+        : new Date(t * 1000).toISOString().slice(0, 10);
+    } catch (_e) { return ''; }
+  };
   if (h && h.ok !== false && Array.isArray(h.timestamps) && h.timestamps.length > 1) {
     const eq = h.equity || [], pts = [];
     for (let i = 0; i < h.timestamps.length; i++) {
