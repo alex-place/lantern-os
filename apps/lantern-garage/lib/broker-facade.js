@@ -45,7 +45,23 @@ function preferredBroker(userId, req) {
   const uid = userId != null ? userId : 'local-owner';
   const own = require('./broker-preference').get(uid);
   if (own === 'alpaca' || own === 'ibkr') return own;
-  return process.env.BROKER_PREFER === 'alpaca' ? 'alpaca' : 'ibkr';
+  if (process.env.BROKER_PREFER === 'alpaca' || process.env.BROKER_PREFER === 'ibkr') {
+    return process.env.BROKER_PREFER;
+  }
+  // No cookie, no stored choice, no env override → the broker the user actually
+  // HAS. The old hard 'ibkr' default sent every Alpaca-BYOK user with no stored
+  // preference down the empty-IBKR path: /api/trading/orders answered [] while
+  // the connected Alpaca paper account held five fresh fills and three working
+  // stops the UI could neither show nor cancel (2026-09-11, first armed run on a
+  // rebuilt box whose preference files were wiped). Cheap existence probes only —
+  // no decrypt on the request path. Both brokers on file keeps the legacy IBKR
+  // precedence; so does neither (server-env-keys setups set BROKER_PREFER).
+  try {
+    if (require('./alpaca-credentials').has(uid) && !require('./ibkr-credentials').has(uid)) {
+      return 'alpaca';
+    }
+  } catch (_e) { /* stores unavailable — keep the legacy default */ }
+  return 'ibkr';
 }
 
 /**

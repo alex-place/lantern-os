@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: **the Orders tab followed a broker you don't have.** With no cookie, no stored choice, and no `BROKER_PREFER`, the broker preference hard-defaulted to IBKR — so on a box with only Alpaca connected, `/api/trading/orders` walked the empty IBKR/agent/ledger chain and answered `[]` while the connected Alpaca paper account held five fresh autopilot fills and three working stop orders the UI could neither display nor cancel. The no-preference default now resolves to the broker the user actually has on file (cheap existence probe, no decrypt on the request path); an explicit cookie, stored choice, or `BROKER_PREFER` still wins, and dual-broker users keep the legacy IBKR precedence.
