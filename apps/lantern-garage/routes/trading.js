@@ -71,6 +71,8 @@ function _isUsExtendedHours() {
 }
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const accountLock = require('../lib/account-lock');       // one account, one managing process
+const processRole = require('../lib/process-role');     // which half of the app this process runs (#3523)
+const traderForward = require('../lib/trader-forward');
 const _lockNoticed = new Set();                          // accounts we've already logged a stand-down for
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
@@ -468,6 +470,10 @@ const overnightRoutes = require('./trading/overnight');
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
+  // Split (#3523): the few routes whose state lives in the trader process go there.
+  if (processRole.role() === 'web' && traderForward.shouldForward(url.pathname)) {
+    return traderForward.forward(req, res, url, { target: processRole.traderUrl() });
+  }
   const bridge = new TradingAPIBridge();
 
   // Shared context handed to every endpoint-group module. Over-inclusive by
