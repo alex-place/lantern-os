@@ -62,6 +62,7 @@ jobs:
       - name: Gate on the Railway token (skip cleanly until wired)
         id: gate
         run: |
+          echo "started=$(date -u +%s)" >> "$GITHUB_OUTPUT"
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::notice::RAILWAY_TOKEN secret is not set — Railway deploy skipped. Add a Railway project token as the RAILWAY_TOKEN repo secret to activate this pipeline (see the header of this workflow)."
@@ -89,19 +90,29 @@ jobs:
           # broken deploy is a RED run here, not a silent Railway-side failure.
           railway up --ci $SERVICE_ARG
 
-      - name: Verify the serving host answers with the deployed head
+      - name: Verify the serving host rebooted onto this deploy
         if: steps.gate.outputs.skip == 'false' && vars.RAILWAY_APP_URL != ''
         env:
           APP_URL: ${{ vars.RAILWAY_APP_URL }}
-          EXPECT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          JOB_STARTED: ${{ steps.gate.outputs.started }}
         run: |
+          # The Railway image carries no .git (.railwayignore strips it), so
+          # /api/version reports commit "unknown" — verified live 2026-09-11 on
+          # the production service. A commit-equality check can never pass here.
+          # Verify by BOOT TIME instead: the serving host must answer with a
+          # version.date NEWER than this job's start, meaning the process now
+          # serving is the container this run pushed.
           for i in $(seq 1 30); do
             BODY=$(curl -fsS --max-time 10 "$APP_URL/api/version" || true)
-            if echo "$BODY" | grep -q "\"commit\": *\"$EXPECT_SHA\""; then
-              echo "serving host answers with the deployed commit $EXPECT_SHA"
-              exit 0
+            BOOT=$(echo "$BODY" | grep -oE '"date": *"[^"]+"' | head -1 | sed -E 's/.*"date": *"([^"]+)".*/\1/')
+            if [ -n "$BOOT" ]; then
+              BOOT_TS=$(date -u -d "$BOOT" +%s 2>/dev/null || echo 0)
+              if [ "$BOOT_TS" -ge "$JOB_STARTED" ]; then
+                echo "serving host rebooted at $BOOT (>= job start) — this deploy is what answers"
+                exit 0
+              fi
             fi
             sleep 10
           done
-          echo "::error::the serving host never answered /api/version with commit $EXPECT_SHA within 5 minutes — the deploy is NOT verified"
+          echo "::error::the serving host never answered /api/version with a boot time after this job started — the deploy is NOT verified"
           exit 1

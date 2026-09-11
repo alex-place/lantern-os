@@ -272,9 +272,15 @@ on top of CSF.
   (Node pinned, `--ignore-scripts` two-step install) + `.railwayignore` (trims the
   ~20 GB tree; persistent state belongs on a volume at `/app/data`), and the boot
   needs `SESSION_SECRET` set as a Railway variable (PORT is injected → server.js
-  fail-closes without a real secret, #867). **This does not replace GCE**: unisona.ai
-  production remains the release-gated GCE deploy above; Railway tracks the moving
-  master head. `cloud-server.js` remains the 7-line `PORT`-defaulting PaaS entry
+  fail-closes without a real secret, #867). **Verified 2026-09-11: unisona.ai is
+  served BY this Railway service** (project `unisona`, env `production` — the
+  custom domain and unisona-production.up.railway.app answer from the same
+  container), so a Railway deploy IS a production deploy; the GCE VM above is the
+  previous origin and remains a fallback (DNS decides). Because `.railwayignore`
+  strips `.git`, `/api/version` on Railway reports commit `unknown` — verify
+  deploys by boot time or content marker, never by commit equality. Manual deploy
+  path: `railway up` from a clean master worktree (CLI auth: founder account).
+  `cloud-server.js` remains the 7-line `PORT`-defaulting PaaS entry
   (railway.json's startCommand runs `server.js` directly — equivalent, since
   Railway always injects `PORT`).
 - **Static UI:** deployed from `gh-pages` branch via GitHub Actions
