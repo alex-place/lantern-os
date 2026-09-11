@@ -3553,9 +3553,21 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     if(!currentPrice || currentPrice <= 0){
       currentPrice = getCurrentPrice(ticker);
       if(!currentPrice || currentPrice <= 0){
-        overlay.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
-          + 'height:100%;font-family:var(--mono);font-size:11px;color:var(--text2)'
-          + '">Waiting for price data</div>';
+        // Two very different states share this branch: the feed hasn't answered
+        // YET (keep "waiting"), and the feed HAS answered and simply doesn't
+        // carry this symbol — a chart slot that outlived the tradelist (#3514).
+        // The latter never resolves on its own, so offer the repair instead of
+        // implying data is on the way. The button goes through addWatchlistSymbol,
+        // which runs _tradelistEditGuard — membership in the AI tradelist only
+        // ever changes on an explicit, warned action. Symbol is user-typed via
+        // the slot editor: strip it to ticker charset before innerHTML.
+        const _sym = String(ticker).replace(/[^A-Za-z0-9._\-]/g, '');
+        const _noFeed = pricesLoadedOnce && !feedTickers.has(_sym.toUpperCase());
+        overlay.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;'
+          + 'height:100%;font-family:var(--mono);font-size:11px;color:var(--text2);text-align:center'
+          + '">' + (_noFeed
+            ? 'No live feed for ' + _sym
+            : 'Waiting for price data') + '</div>';
         if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
         return;
       }
@@ -6667,6 +6679,28 @@ async function addWatchlistSymbol(sym){
   }catch(e){}
 }
 
+// #3514: chart slots persist in localStorage while the tradelist lives
+// server-side, so a slot can name a symbol the list no longer carries and its
+// card then charts nothing forever. The list is the source of truth ("why does
+// AAPL show if it's not on the watchlist") — once it's known, drop any slot it
+// doesn't carry and let the deck refill from real tradelist symbols. Runs once
+// per page load after the FIRST successful list fetch — never on later polls,
+// so it can't race the slot editor's add-then-POST flow (commitSlotSymbol), and
+// a failed list fetch prunes nothing. Charting a NEW symbol still goes through
+// the guarded editor path, so tradelist membership only changes on an explicit,
+// warned action.
+let _slotsPruned = false;
+function pruneStaleSlots(list){
+  if (_slotsPruned || !list) return;
+  _slotsPruned = true;
+  const kept = chartSlots.filter(t => t && list.has(String(t).toUpperCase()));
+  if (kept.length === chartSlots.length) return;
+  chartSlots = kept;
+  persistSlots();
+  lastCardOrder = '';
+  renderCards();
+}
+
 async function removeWatchlistTicker(ticker, evt){
   if(evt) evt.stopPropagation();
   if(!_tradelistEditGuard()) return;
@@ -7035,8 +7069,13 @@ async function _loadWatchlistPricesNow(){
   try{
     const r = await fetch('/api/trading/watchlist-prices');
     wlPrices = await r.json();
+    // Record the feed's raw coverage BEFORE the my-list filter — the "no live feed"
+    // overlay state keys off this set (#3514).
+    pricesLoadedOnce = true;
+    feedTickers = new Set((wlPrices||[]).map(t=>String(t.ticker).toUpperCase()));
     const _ml = await loadMyList();
     if(_ml) wlPrices = wlPrices.filter(t=>_ml.has(String(t.ticker).toUpperCase()));
+    pruneStaleSlots(_ml);   // #3514: the tradelist is the slots' source of truth
     _feedStatus(true);
     checkPriceAlerts();
     renderWatchlist();
@@ -7075,6 +7114,12 @@ let barsLoading = false;
 // so a chart with zero bars can be told apart from one that simply hasn't loaded
 // yet — the former shows a clean "no data" state, the latter stays blank silently.
 let barsLoadedOnce = false;
+// Same idea for the price feed: true once /api/trading/watchlist-prices has
+// answered, with the tickers it covered (BEFORE the my-list filter). A charted
+// symbol the feed does not serve can then say so honestly instead of sitting on
+// "Waiting for price data" forever (#3514 — a chart slot outlives the tradelist).
+let pricesLoadedOnce = false;
+let feedTickers = new Set();
 // ── Chart bar cache: stale-while-revalidate ──────────────────────────────────
 // Charts paint instantly from the last fetch (localStorage), then loadBars()
 // replaces it with live data. Keyed per timeframe — purely a paint speed-up, the
