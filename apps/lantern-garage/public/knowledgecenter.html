@@ -79,17 +79,6 @@
       border-color: var(--tile); background: var(--surface2);
       transform: translateY(-2px); box-shadow: var(--shadow-hover);
     }
-    .link-card .icon {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 44px; height: 44px; border-radius: 12px; font-size: 22px; line-height: 1;
-      background: color-mix(in srgb, var(--tile) 14%, transparent);
-      border: 1px solid color-mix(in srgb, var(--tile) 30%, transparent);
-      transition: transform 0.2s, background 0.2s, border-color 0.2s;
-    }
-    .link-card:hover .icon {
-      transform: translateY(-1px) scale(1.05) rotate(-3deg);
-      background: color-mix(in srgb, var(--tile) 24%, transparent);
-    }
     .link-card h3 { font-size: 0.96rem; font-weight: 600; margin-top: 2px; color: var(--text); }
     .link-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
     .link-card .go { margin-top: auto; padding-top: 6px; font-size: 0.78rem; font-weight: 600; color: var(--tile); }
@@ -298,8 +287,7 @@
     .gd-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 14px; margin: 16px 0 4px; }
     .gd-card { background: var(--surface); border: 1px solid var(--border);
                border-radius: var(--radius, 10px); padding: 16px 18px; }
-    .gd-card-i { font-size: 1.35rem; line-height: 1; }
-    .gd-card h3 { margin: 8px 0 6px; font-size: 1rem; }
+    .gd-card h3 { margin: 0 0 6px; font-size: 1rem; }
     .gd-card p { font-size: 0.9rem; color: var(--muted); margin: 0 0 10px; line-height: 1.55; }
     .gd-go { font-size: 0.85rem; color: var(--accent); text-decoration: none; font-weight: 600; }
     .gd-go:hover { text-decoration: underline; }
@@ -395,7 +383,6 @@
         <p>Four surfaces. You can use any one of them and ignore the rest.</p>
         <div class="gd-cards">
           <div class="gd-card">
-            <span class="gd-card-i">💬</span>
             <h3>Chat</h3>
             <p>The main way you use Unisona. Ask questions, get help writing, have it search the web,
               read your files, or explain what the market is doing. It remembers earlier
@@ -403,21 +390,18 @@
             <a class="gd-go" href="#chat">How to use it →</a>
           </div>
           <div class="gd-card">
-            <span class="gd-card-i">📈</span>
             <h3>Trader</h3>
             <p>A live chart terminal. Watch prices, read charts, and — once you connect a brokerage
               account — place orders. It starts in <b>paper</b> mode, which means practice money.</p>
             <a class="gd-go" href="#trader">How to use it →</a>
           </div>
           <div class="gd-card">
-            <span class="gd-card-i">👁</span>
             <h3>Watchlist</h3>
             <p>The list of symbols you care about, down the left side of the trader. Everything else —
               charts, alerts, what the assistant talks about — follows from this list.</p>
             <a class="gd-go" href="#trader">How to use it →</a>
           </div>
           <div class="gd-card">
-            <span class="gd-card-i">🔔</span>
             <h3>Alerts</h3>
             <p>Tell Unisona to watch for something and it will message you when it happens — on the
               site and by email — so you don't have to sit and stare at a screen.
@@ -492,8 +476,8 @@
         <h3>It can actually do things, not just talk</h3>
         <p>When it needs information it doesn't have, it uses a <b>tool</b> — a real action, like
           searching the web, reading a file you uploaded, fetching a live stock price, or checking
-          your watchlist. You'll see a small marker in the reply (for example <code>🔧
-          trader_watchlist</code>) telling you which tool ran. That marker is your receipt: it means
+          your watchlist. You'll see a small marker in the reply (for example
+          <code>trader_watchlist</code>) telling you which tool ran. That marker is your receipt: it means
           the answer came from looking something up, not from memory.</p>
 
         <h3>It knows your market setup</h3>
@@ -730,7 +714,7 @@
             orders is done by you in the trader.</dd>
 
           <dt>An answer looks wrong.</dt>
-          <dd>Say so in the chat and ask where the number came from. If a tool marker (🔧) is shown,
+          <dd>Say so in the chat and ask where the number came from. If a tool marker is shown,
             the figure came from a live lookup; if not, treat it more carefully. You can also report
             it with the camera button in the header, which attaches a screenshot.</dd>
 
@@ -1765,12 +1749,10 @@
     </div>
     <div class="link-grid">
       <a class="link-card tile-cyan" href="/changelog.html">
-        <span class="icon">📝</span>
         <h3>Changelog</h3>
         <p>Release notes and version history.</p>
       </a>
       <a class="link-card tile-violet" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">
-        <span class="icon">⚙️</span>
         <h3>GitHub</h3>
         <p>Source code, issues, and contributions.</p>
       </a>
