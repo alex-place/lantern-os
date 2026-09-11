@@ -292,6 +292,21 @@ function jpSetView(v) {
 }
 function jpSetSlice(k) { if (jpSlice === k) return; jpSlice = k; jpLoad(true); }
 
+/* The calendar's measure (#3517): 'account' -- the account's change each session, the
+   default -- or 'booked', what closed that day. Remembered per browser; a private window
+   just starts on the default. */
+let jpCalMode = (function () {
+  try { return localStorage.getItem('jp-cal-mode') === 'booked' ? 'booked' : 'account'; }
+  catch (_e) { return 'account'; }
+})();
+function jpSetCalMode(m) {
+  if (m !== 'account' && m !== 'booked') return;
+  if (jpCalMode === m) return;
+  jpCalMode = m;
+  try { localStorage.setItem('jp-cal-mode', m); } catch (_e) { /* not remembered, still switches */ }
+  if (jpData) jpRender(document.getElementById('jpBody'), jpData);
+}
+
 /* Derived from `daily`, not invented: a day counts as a win when its realized P&L is
    positive, which is the same rule the day-win figure uses in the products this page
    is modelled on. */
@@ -365,18 +380,44 @@ function jpLiveToday(live, now) {
   return { date, pnl, equity: Number(live.equity), source: String(live.source || ''), asOf };
 }
 
+/* The calendar card (#3517): the measure toggle rides in the heading the way the
+   Breakdown's does, and one line under the grid says which measure is showing. */
+function jpCalendarCard(daily, liveToday, acct) {
+  const mode = (jpCalMode === 'account' && acct) ? 'account' : 'booked';
+  const chip = (m, label, title) => '<button type="button" class="jp-chip' + (mode === m ? ' on' : '') + '"'
+    + ' onclick="jpSetCalMode(\'' + m + '\')" title="' + jpEsc(title) + '">' + label + '</button>';
+  const chips = acct
+    ? '<span class="sp">' + chip('account', 'Account', 'Each day: the account’s change from the previous close')
+      + chip('booked', 'Booked', 'Each day: what closed that day') + '</span>'
+    : '';
+  const note = !acct ? ''
+    : mode === 'account'
+      ? '<p class="jp-note">Each day is the account’s change from the previous close, open positions included, '
+        + 'straight from the broker. <b>Booked</b> shows only what closed that day.</p>'
+      : '<p class="jp-note">Each day is what closed that day: a trade held across days books on the day it closes, '
+        + 'so a day spent holding is blank. <b>Account</b> shows every session.</p>';
+  return '<h2>P&amp;L calendar' + chips + '</h2>' + jpCalendar(daily, liveToday, acct) + note;
+}
+
 /* The calendar is the piece both TradeZella and TraderWaves put front and centre, and
    the weekly column on the right is the part that makes it more than decoration. */
-function jpCalendar(daily, liveToday) {
+function jpCalendar(daily, liveToday, acct) {
   const byDate = {};
   (daily || []).forEach(d => { byDate[d.date] = d; });
-  const dates = Object.keys(byDate).sort();
-  if (!dates.length && !liveToday) return '<div class="jp-empty">No closed days yet.</div>';
-  // Every month with something to show: booked days, plus today while it has a live
-  // figure -- so the first session of a month opens on the month that is moving (#3502).
-  const months = Array.from(new Set(dates.map(d => d.slice(0, 7))
-    .concat(liveToday ? [liveToday.date.slice(0, 7)] : []))).sort();
-  if (!jpMonth) jpMonth = months[months.length - 1];
+  // ONE measure per view (#3517). Mixed in one grid, a week total would count a trade
+  // twice: once while the account carries it, again on the day it books.
+  const mode = (jpCalMode === 'account' && acct) ? 'account' : 'booked';
+  const valueOf = (iso) => {
+    if (mode === 'account') {
+      if (liveToday && iso === liveToday.date) return liveToday.pnl;
+      return (typeof acct[iso] === 'number') ? acct[iso] : null;
+    }
+    return byDate[iso] ? byDate[iso].pnl : null;
+  };
+  const dates = (mode === 'account' ? Object.keys(acct) : Object.keys(byDate)).sort();
+  const months = jpMonthList(dates, (mode === 'account' && liveToday) ? liveToday.date : null);
+  if (!months.length) return '<div class="jp-empty">No closed days yet.</div>';
+  if (!jpMonth || months.indexOf(jpMonth) < 0) jpMonth = months[months.length - 1];
   const [yy, mm] = jpMonth.split('-').map(Number);
   const first = new Date(Date.UTC(yy, mm - 1, 1));
   const days = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
@@ -402,19 +443,26 @@ function jpCalendar(daily, liveToday) {
   for (let d = 1; d <= days; d++) {
     const iso = jpMonth + '-' + String(d).padStart(2, '0');
     const rec = byDate[iso];
-    /* Today, live (#3502): while a session runs, today's cell shows the broker's figure
-       for the day so far, open positions included, rather than waiting for a close. It
-       stands in for anything already booked today -- it includes it -- so nothing is
-       counted twice, and at the close the cell becomes an ordinary booked day. */
-    const lv = (liveToday && iso === liveToday.date) ? liveToday : null;
-    const val = lv ? lv.pnl : (rec ? rec.pnl : null);
-    const cls = lv ? 'live' : rec ? (rec.pnl > 0 ? 'win' : rec.pnl < 0 ? 'loss' : 'flat') : '';
+    /* Today, live (#3502): in the account view today's cell is the broker's figure for
+       the session so far, open positions included; at the close it becomes an ordinary
+       day. The booked view shows only what has actually closed today. */
+    const lv = (mode === 'account' && liveToday && iso === liveToday.date) ? liveToday : null;
+    const val = valueOf(iso);
+    const cls = lv ? 'live' : (val != null ? (val > 0 ? 'win' : val < 0 ? 'loss' : 'flat') : '');
     const isToday = (iso === todayIso) ? ' today' : '';
-    if (val != null) { weekPnl += val || 0; weekHasData = true; if (lv) weekLive = true; }
-    const tip = lv
-      ? 'Live: today so far, from the broker, open positions included' + (lv.asOf ? ' (as of ' + lv.asOf + ')' : '')
-        + '. It becomes a booked result as trades close.' + (rec ? ' Booked so far today: ' + jpUsd(rec.pnl) + '.' : '')
-      : '';
+    if (val != null) { weekPnl += val; weekHasData = true; if (lv) weekLive = true; }
+    let tip = '';
+    if (lv) {
+      tip = 'Live: today so far, from the broker, open positions included' + (lv.asOf ? ' (as of ' + lv.asOf + ')' : '')
+        + '. It settles into an ordinary day at the close.' + (rec ? ' Booked so far today: ' + jpUsd(rec.pnl) + '.' : '');
+    } else if (val != null && mode === 'account') {
+      tip = 'Account: ' + jpUsd(val) + ', the broker’s close against the one before, open positions included.'
+        + (rec ? ' Booked from trades that closed this day: ' + jpUsd(rec.pnl) + '.' : ' No trade closed this day.');
+    } else if (val != null) {
+      const moved = acct && typeof acct[iso] === 'number' ? acct[iso] : null;
+      tip = 'Booked: ' + jpUsd(val) + ' from trades that closed this day.'
+        + (moved != null ? ' The account itself moved ' + jpUsd(moved) + '.' : '');
+    }
     out += '<div class="jp-day ' + cls + isToday + '"'
       + (isToday ? ' aria-current="date"' : '') + (tip ? ' title="' + jpEsc(tip) + '"' : '')
       + '><div class="d">' + d + (lv ? '<span class="lv">live</span>' : '') + '</div>'
@@ -433,11 +481,20 @@ function jpCalendar(daily, liveToday) {
     + '<div class="jp-cal-head"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Total</span></div>'
     + '<div class="jp-cal">' + out + '</div>';
 }
+/* The months the calendar can show for the measure it is showing (#3517), so the
+   arrows walk exactly the months the grid would draw. */
+function jpMonthList(dates, extraIso) {
+  return Array.from(new Set(dates.map(d => d.slice(0, 7)).concat(extraIso ? [extraIso.slice(0, 7)] : []))).sort();
+}
+function jpCalMonths(data) {
+  const daily = ((data && data.rec && Object.values(data.rec.books || {})[0]) || {}).daily || [];
+  const acct = (data && !data.demo) ? jpAccountDaily(data.equity) : null;
+  const lt = (data && !data.demo) ? jpLiveToday(data.live) : null;
+  if (jpCalMode === 'account' && acct) return jpMonthList(Object.keys(acct), lt ? lt.date : null);
+  return jpMonthList(daily.map(d => d.date), null);
+}
 function jpShiftMonth(n) {
-  const booked = ((jpData && jpData.rec && Object.values(jpData.rec.books || {})[0] || {}).daily || [])
-    .map(d => d.date.slice(0, 7));
-  const lt = (jpData && !jpData.demo) ? jpLiveToday(jpData.live) : null;   // same months the calendar shows
-  const months = Array.from(new Set(booked.concat(lt ? [lt.date.slice(0, 7)] : []))).sort();
+  const months = jpCalMonths(jpData);
   const i = months.indexOf(jpMonth);
   if (i < 0) return;
   const next = months[i + n];
@@ -684,6 +741,55 @@ function jpBindPlots() {
 }
 
 
+/* Which exchange day a broker point belongs to (#3501). The brokers stamp a day
+   differently. IBKR (ibkr-cpapi _toEpochSeconds) and the demo stamp the session's own
+   date at 00:00 UTC, which the UTC date reads correctly. Alpaca stamps each daily bar
+   at the END of the session it closes -- 00:00 UTC the next day, 8 PM ET -- so its UTC
+   date ran a day late: Friday's close showed as a Saturday, the Tuesday after a Monday
+   holiday vanished, and the point labelled today was yesterday's close. Alpaca stamps
+   are read in ET instead, backed off 5 hours so a stamp at or just after midnight
+   (either side of daylight saving) still lands on the session it closed. The balance
+   chart and the calendar's account view both label days through here. */
+function jpDayOf(h) {
+  const alpaca = !!(h && h.source === 'alpaca');
+  return (t) => {
+    try {
+      return alpaca
+        ? new Date((t - 5 * 3600) * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+        : new Date(t * 1000).toISOString().slice(0, 10);
+    } catch (_e) { return ''; }
+  };
+}
+
+/* The account's own change for each session (#3517): the broker's daily closing
+   equity minus the close before it. Booked P&L lands on the day a trade CLOSES, so a
+   day spent holding showed nothing -- Wed 9/9 was blank while the account made
+   +$183.46. This gives every session a number, the way the broker reports a day.
+   Daily series only: the demo book's monthly points would read as one-day jumps. A
+   day that did not move at all stays blank rather than printing $0.00. */
+function jpAccountDaily(h) {
+  if (!h || h.ok === false || h.demo === true || h.source === 'champion-demo') return null;
+  const ts = Array.isArray(h.timestamps) ? h.timestamps : [], eq = h.equity || [];
+  if (ts.length < 3) return null;
+  const gaps = [];
+  for (let i = 1; i < ts.length; i++) gaps.push(ts[i] - ts[i - 1]);
+  gaps.sort((a, b) => a - b);
+  if (!(gaps[Math.floor(gaps.length / 2)] <= 4 * 86400)) return null;   // a long weekend is 4 days
+  const dayOf = jpDayOf(h), out = {};
+  let prev = null;
+  for (let i = 0; i < ts.length; i++) {
+    const v = eq[i];
+    if (v == null || !isFinite(v)) continue;
+    const d = dayOf(ts[i]);
+    if (prev != null && d) {
+      const chg = Math.round((Number(v) - prev) * 100) / 100;
+      if (chg !== 0) out[d] = chg;
+    }
+    prev = Number(v);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /* ONE balance chart, not two. The page used to draw the broker's equity AND the
    autopilot's cumulative realized as separate line charts -- two near-identical shapes
    asking the reader to work out which was which. The broker's series is the real
@@ -692,22 +798,7 @@ function jpBindPlots() {
    When the broker cannot answer (a box with no linked account), the autopilot's own
    cumulative curve stands in rather than leaving an empty slot. */
 function jpBalanceChart(h, daily, liveToday) {
-  /* Which exchange day a broker point belongs to (#3501). The brokers stamp a day
-     differently. IBKR (ibkr-cpapi _toEpochSeconds) and the demo stamp the session's own
-     date at 00:00 UTC, which the UTC date reads correctly. Alpaca stamps each daily bar
-     at the END of the session it closes -- 00:00 UTC the next day, 8 PM ET -- so its UTC
-     date ran a day late: Friday's close showed as a Saturday, the Tuesday after a Monday
-     holiday vanished, and the point labelled today was yesterday's close. Alpaca stamps
-     are read in ET instead, backed off 5 hours so a stamp at or just after midnight
-     (either side of daylight saving) still lands on the session it closed. */
-  const alpaca = !!(h && h.source === 'alpaca');
-  const iso = (t) => {
-    try {
-      return alpaca
-        ? new Date((t - 5 * 3600) * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
-        : new Date(t * 1000).toISOString().slice(0, 10);
-    } catch (_e) { return ''; }
-  };
+  const iso = jpDayOf(h);   // the exchange day each broker point belongs to (#3501)
   if (h && h.ok !== false && Array.isArray(h.timestamps) && h.timestamps.length > 1) {
     const eq = h.equity || [], pts = [];
     for (let i = 0; i < h.timestamps.length; i++) {
@@ -764,6 +855,8 @@ function jpRender(host, data) {
   const daily = book.daily || [];
   // Today's live figure (#3502); the demo book has no live account behind it.
   const liveToday = data.demo ? null : jpLiveToday(data.live);
+  // The account's own change per session (#3517); the demo book's series is monthly.
+  const acct = data.demo ? null : jpAccountDaily(data.equity);
   let html = '';
 
   if (data.demo) {
@@ -801,7 +894,7 @@ function jpRender(host, data) {
   html += jpKpis(s, book, ds);
   html += '<div class="jp-grid">'
     + '<div class="jp-col">'
-      + '<div class="jp-card"><h2>P&amp;L calendar</h2>' + jpCalendar(daily, liveToday) + '</div>'
+      + '<div class="jp-card">' + jpCalendarCard(daily, liveToday, acct) + '</div>'
       + '<div class="jp-card">' + jpBreakdown(data.slice) + '</div>'
     + '</div>'
     + '<div class="jp-col">'
