@@ -4,6 +4,10 @@ Operational record of the live single-tenant cloud deployment of `master` on Goo
 Compute Engine, fronted by Cloudflare. This is the first concrete instance of the
 [ADR-0018](../adr/0018-web-tier-split-and-cloud-multi-tenancy.md) GCE origin decision.
 
+> **Superseded 2026-09-11 (#3524): `unisona.ai` is served by Railway, not this VM.** See
+> [railway-runbook.md](railway-runbook.md). This page describes the GCE path, which no longer
+> serves the site.
+
 > **Status: release-gated self-update.** The VM does **not** track `master` — merges
 > alone never reach it. It moves when a **GitHub Release is published**: a
 > `systemd` timer polls `releases/latest` every 15 minutes, checks out the new tag,

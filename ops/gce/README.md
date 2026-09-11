@@ -1,5 +1,10 @@
 # GCE cloud VM — release-gated self-update
 
+> **Superseded 2026-09-11 (#3524): `unisona.ai` is served by Railway, not this VM.** See
+> [railway-runbook.md](../../docs/ops/railway-runbook.md). This page describes the GCE path, which no longer
+> serves the site.
+
+
 "Update on release only" for the `unisona.ai` cloud VM. The box does **not** track
 `master`; it moves only when a new **GitHub Release** is published. Companion to the
 desktop side (the `build-desktop` job in [`.github/workflows/release.yml`](../../.github/workflows/release.yml)
