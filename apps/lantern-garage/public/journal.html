@@ -175,6 +175,11 @@
   .jp-table td{padding:5px 7px;border-bottom:1px solid var(--border);color:var(--text1);white-space:nowrap}
   .jp-table tr:last-child td{border-bottom:0}
   .jp-table .num{text-align:right;font-variant-numeric:tabular-nums}
+  /* A sortable header is a real button (keyboard, screen reader) wearing the th's clothes. */
+  .jp-sort{all:unset;cursor:pointer;display:inline-block;width:100%}
+  .jp-table th.num .jp-sort{text-align:right}
+  .jp-sort:hover{color:var(--text1)}
+  .jp-sort:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .jp-scroll{overflow:auto;max-height:300px}
 
   .jp-curve svg{display:block;width:100%;height:auto}
@@ -609,6 +614,118 @@ function jpBreakdown(slice) {
 /* signal_exit -> "signal exit". The engine's keys are snake_case internally. */
 function jpLabelValue(k) { return String(k == null ? '—' : k).replace(/_/g, ' '); }
 
+/* Symbol statistics (#3547) -- where the trader makes and loses money.
+   Every journal we looked at has a version of this, and it is the one competitor feature
+   that survives the translation: TradeZella and RocketSheets are built for someone
+   reviewing their OWN decisions (tags, mistakes, setups), which our reader never made.
+   "Which symbols is it good at?" they can act on -- it is the tradelist question.
+
+   No new endpoint: this is the by=symbol slice the breakdown card already loaded, shown
+   in full. Sorting happens here, in rows the page already holds, so a click costs nothing. */
+const JP_THIN_TRADES = 5;    // below this, a win rate is noise dressed as a number
+const JP_SYM_COLS = [
+  { key: 'key', label: 'Symbol', dir: 1 },
+  { key: 'trades', label: 'Trades', num: true, fmt: (r) => (r.trades != null ? String(r.trades) : '\u2014') },
+  { key: 'winRate', label: 'Win %', num: true, fmt: (r) => jpPct(r.winRate) },
+  { key: 'totalRealized', label: 'Realized', num: true, sign: true, fmt: (r) => jpUsd(r.totalRealized) },
+  { key: 'avgWin', label: 'Avg win', num: true, fmt: (r) => jpUsd(r.avgWin) },
+  { key: 'avgLoss', label: 'Avg loss', num: true, fmt: (r) => jpUsd(r.avgLoss) },
+  { key: 'expectancy', label: 'Per trade', num: true, sign: true, fmt: (r) => jpUsd(r.expectancy) },
+  { key: 'profitFactor', label: 'Profit factor', num: true, fmt: (r) => jpProfitFactor(r),
+    /* A symbol that has never lost shows as infinite, so it must SORT as infinite too --
+       otherwise the biggest number in the column sits at the bottom of a descending sort. */
+    sortVal: (r) => (typeof r.profitFactor === 'number' && isFinite(r.profitFactor) ? r.profitFactor
+      : (!r.losses && r.wins ? Infinity : null)) },
+];
+let jpSymSort = { key: 'totalRealized', dir: -1 };
+
+/* profitFactor is Infinity when a symbol has never lost -- and JSON turns Infinity into
+   null, which is the same thing it sends for "not computed". The row itself settles it:
+   wins with no losses is an infinite factor, not a missing one. */
+function jpProfitFactor(r) {
+  if (typeof r.profitFactor === 'number' && isFinite(r.profitFactor)) return r.profitFactor.toFixed(2);
+  if (!r.losses && r.wins) return '\u221e';
+  return '\u2014';
+}
+
+/* Pure: the confirmed bucket as sorted rows. Missing values sort last in BOTH directions,
+   so a symbol the scorecard could not price never heads the table. */
+function jpSymbolRows(slice, sort) {
+  const bucket = (slice && slice.confirmed) || {};
+  const rows = Object.keys(bucket).map((k) => Object.assign({ key: k }, bucket[k]));
+  const key = (sort && sort.key) || 'totalRealized';
+  const dir = (sort && sort.dir === 1) ? 1 : -1;
+  const col = JP_SYM_COLS.find((c) => c.key === key);
+  const val = (r) => {
+    if (col && col.sortVal) { const c = col.sortVal(r); return (typeof c === 'number' && !isNaN(c)) ? c : null; }
+    const v = r[key];
+    if (key === 'key') return String(v == null ? '' : v);
+    return (typeof v === 'number' && isFinite(v)) ? v : null;
+  };
+  return rows.sort((a, b) => {
+    const x = val(a), y = val(b);
+    if (x === null && y === null) return String(a.key).localeCompare(String(b.key));
+    if (x === null) return 1;                       // no value: last, either way
+    if (y === null) return -1;
+    if (typeof x === 'string') return dir * x.localeCompare(y);
+    return x === y ? String(a.key).localeCompare(String(b.key)) : dir * (x < y ? -1 : 1);
+  });
+}
+
+function jpSymbols(slice) {
+  const head = '<h2>Symbol statistics</h2>';
+  if (slice === undefined) return head + '<div class="jp-empty" aria-busy="true">Loading\u2026</div>';
+  const rows = jpSymbolRows(slice, jpSymSort);
+  if (!rows.length) return head + '<div class="jp-empty">No closed trades to break down by symbol yet.</div>';
+  const thin = rows.some((r) => (r.trades || 0) < JP_THIN_TRADES);
+  const arrow = (c) => (jpSymSort.key === c.key ? (jpSymSort.dir === 1 ? ' \u25b2' : ' \u25bc') : '');
+  const th = JP_SYM_COLS.map((c) =>
+    '<th' + (c.num ? ' class="num"' : '')
+    + (jpSymSort.key === c.key ? ' aria-sort="' + (jpSymSort.dir === 1 ? 'ascending' : 'descending') + '"' : '')
+    + '><button type="button" class="jp-sort" onclick="jpSetSymSort(\'' + c.key + '\')">'
+    + jpEsc(c.label) + arrow(c) + '</button></th>').join('');
+  const tr = rows.map((r) => {
+    const few = (r.trades || 0) < JP_THIN_TRADES;
+    return '<tr>' + JP_SYM_COLS.map((c) => {
+      const cls = (c.num ? 'num' : '') + (c.sign ? ' ' + jpSign(r[c.key]) : '');
+      const text = c.key === 'key' ? jpEsc(jpLabelValue(r.key)) : c.fmt(r);
+      const mark = (c.key === 'trades' && few) ? '<span class="jp-dim" aria-hidden="true">\u2020</span> ' : '';
+      return '<td' + (cls.trim() ? ' class="' + cls.trim() + '"' : '') + '>' + mark + text + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+  return head
+    + '<div class="jp-scroll"><table class="jp-table"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>'
+    + '<p class="jp-note">Broker-accepted fills only. Per trade is expectancy \u2014 the average dollar outcome of one trade in this symbol.'
+    + (thin ? ' \u2020 fewer than ' + JP_THIN_TRADES + ' closed trades: those rates are not yet a measurement.' : '') + '</p>';
+}
+
+/* A header click re-sorts rows already in hand and repaints one card. Same rule as the
+   slice chips (#3541): nothing on this page reloads the record to change how it looks. */
+function jpSetSymSort(key) {
+  const col = JP_SYM_COLS.find((c) => c.key === key);
+  if (!col) return;
+  jpSymSort = (jpSymSort.key === key)
+    ? { key: key, dir: jpSymSort.dir === 1 ? -1 : 1 }
+    : { key: key, dir: col.dir === 1 ? 1 : -1 };     // names read A-Z, figures biggest first
+  const card = document.getElementById('jpSymbolsCard');
+  if (card) card.innerHTML = jpSymbols(jpSliceCache.symbol);
+}
+
+/* The page loads with the symbol slice (jpSlice starts there), so this normally does
+   nothing. It covers the one case that would otherwise leave an empty card forever: the
+   slice never arrived, or a later page starts on a different one. */
+async function jpEnsureSymbols() {
+  if (jpSliceCache.symbol !== undefined) return;
+  if (!document.getElementById('jpSymbolsCard')) return;
+  const demo = !!(jpData && jpData.demo);
+  try {
+    const r = await fetch('/api/trading/scorecard' + (demo ? '?demo=champion&' : '?') + 'by=symbol', { cache: 'no-store' });
+    jpSliceCache.symbol = r.ok ? await r.json() : null;
+  } catch (_e) { jpSliceCache.symbol = null; }
+  const card = document.getElementById('jpSymbolsCard');
+  if (card) card.innerHTML = jpSymbols(jpSliceCache.symbol);
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -930,6 +1047,7 @@ const JP_WIDGETS = [
   { id: 'balance', name: 'Account balance', w: 1 },
   { id: 'pnlday', name: 'Net P&L per day', w: 1 },
   { id: 'breakdown', name: 'Breakdown', w: 1 },
+  { id: 'symbols', name: 'Symbol statistics', w: 2 },
   { id: 'placements', name: 'Placement notes', w: 2 },
 ];
 const JP_WIDGET = {};
@@ -1038,6 +1156,7 @@ function jpCardBody(id, data) {
       + jpPlot((L.daily || []).map((d) => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
           aria: 'Realized profit and loss for each exchange day' });
   }
+  if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
   if (id === 'placements') return jpPlacements({ bare: true });
   return '';
 }
@@ -1079,6 +1198,7 @@ function jpPaintCards() {
       + jpCardBar(id, w) + body + '</section>';
   }).join('') + jpTray();
   jpBindPlots();
+  jpEnsureSymbols();
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every
