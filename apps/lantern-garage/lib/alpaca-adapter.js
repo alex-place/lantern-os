@@ -389,6 +389,36 @@ async function getAllOrders(userId, limit = 200) {
   }));
 }
 
+/**
+ * Historical FILL activities, order-row shaped — the Order-history fallback.
+ * /v2/orders only reaches back so far; an account can hold months-old positions
+ * whose orders it no longer returns (observed live: 8 ETF positions, orders []).
+ * /v2/account/activities?activity_types=FILL is Alpaca's canonical execution
+ * history, so history renders from it whenever the orders list comes back empty.
+ * Rows use the FILL's own status vocabulary ('filled') so the UI's
+ * working-vs-history split keeps them on the history tab, and carry order_id so
+ * nothing here ever looks cancelable.
+ */
+async function getFillActivities(userId, pageSize = 100) {
+  const auth = _authFor(userId);
+  if (!auth) return [];
+  const n = Math.min(100, Math.max(1, Number(pageSize) || 100));
+  const r = await _req(auth, 'GET', `/v2/account/activities?activity_types=FILL&direction=desc&page_size=${n}`);
+  if (!r.ok || !Array.isArray(r.json)) return [];
+  return r.json.map((a) => ({
+    id: a.order_id || a.id, symbol: a.symbol, side: String(a.side || '').toLowerCase(),
+    qty: Number(a.qty) || Number(a.cum_qty) || 0,
+    type: 'market',
+    limit_price: null,
+    status: 'filled',
+    filled_avg_price: Number(a.price) || 0,
+    filled_at: a.transaction_time || '', created_at: a.transaction_time || '',
+    // Partial executions arrive as their own FILL rows; mark them so the UI could
+    // group later without re-fetching.
+    ...(String(a.type || '') === 'partial_fill' ? { partial: true } : {}),
+  }));
+}
+
 async function getDayPnl(userId) {
   const acct = await getAccount(userId).catch(() => null);
   if (!acct) return null;
@@ -489,4 +519,4 @@ async function getPortfolioHistory(userId, range = '1D') {
   };
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getEngineOrders, getOrder, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };
+module.exports = { available, getAccount, getPositions, getOpenOrders, getEngineOrders, getOrder, getAllOrders, getFillActivities, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };

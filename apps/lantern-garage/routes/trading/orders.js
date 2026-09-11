@@ -321,8 +321,22 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // usable and the user hasn't explicitly chosen IBKR (was `pref === 'alpaca'` only,
       // so an Alpaca-via-keys user on the default preference saw empty IBKR history).
       if (alpaca.available(uid) && pref !== 'ibkr') {
-        const all = await alpaca.getAllOrders(uid, limitParam > 0 ? limitParam : 200).catch(() => []);
+        const all = await alpaca.getAllOrders(uid, limitParam > 0 ? limitParam : 200)
+          .catch((e) => { console.warn('[Trading] alpaca getAllOrders failed:', e.message); return []; });
         if (Array.isArray(all) && all.length) { sendJson(res, all, 200); return true; }
+        // /v2/orders answered with nothing, but the account can still hold
+        // months-old positions whose orders that endpoint no longer returns
+        // (observed live: 8 ETF positions, orders []). FILL activities are
+        // Alpaca's canonical execution history — serve those as Order history
+        // rather than a blank pane, and say which path answered.
+        const fills = await alpaca.getFillActivities(uid, limitParam > 0 ? Math.min(limitParam, 100) : 100)
+          .catch((e) => { console.warn('[Trading] alpaca fill activities failed:', e.message); return []; });
+        if (Array.isArray(fills) && fills.length) {
+          console.info(`[Trading] orders: /v2/orders empty for ${uid} — served ${fills.length} FILL activities as history`);
+          sendJson(res, fills, 200);
+          return true;
+        }
+        console.info(`[Trading] orders: alpaca returned no orders AND no fill activities for ${uid} — falling through`);
       }
       // Prefer the connected IBKR account's own orders (working + filled) so the
       // Orders / Order-history tabs reflect the autopilot's trades — the legacy
