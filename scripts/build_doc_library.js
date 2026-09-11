@@ -40,7 +40,7 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO = path.resolve(__dirname, '..');
-const KC_HTML = path.join(REPO, 'apps', 'lantern-garage', 'public', 'knowledgecenter.html');
+const LIBRARY_HTML = path.join(REPO, 'apps', 'lantern-garage', 'public', 'library.html');
 const CATALOG = path.join(REPO, 'data', 'knowledge', 'doc-catalog.json');
 const EXTERNAL_OUT = path.join(REPO, 'data', 'knowledge', 'external-sources.json');
 
@@ -354,7 +354,7 @@ function inRepoCards() {
 
 // ── main ──────────────────────────────────────────────────────────────────────
 function main() {
-  let html = fs.readFileSync(KC_HTML, 'utf8');
+  let html = fs.readFileSync(LIBRARY_HTML, 'utf8');
   const repo = inRepoCards();
 
   const block = [
@@ -367,10 +367,10 @@ function main() {
   const reAuto = new RegExp(
     MARK_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\\s\\S]*?' +
     MARK_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  if (!reAuto.test(html)) throw new Error('AUTO markers not found in knowledgecenter.html');
+  if (!reAuto.test(html)) throw new Error('AUTO markers not found in library.html');
   html = html.replace(reAuto, block);
 
-  fs.writeFileSync(KC_HTML, html, 'utf8');
+  fs.writeFileSync(LIBRARY_HTML, html, 'utf8');
   console.log(`doc library: ${repo.cards.length} cards (published=${repo.stats.keep}, ` +
     `notes rolled up=${repo.stats.notes}, internal withheld=${repo.stats.internal}, ` +
     `catalog-excluded=${repo.stats.excluded}, uncatalogued skipped=${repo.stats.uncatalogued})`);

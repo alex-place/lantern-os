@@ -29,7 +29,7 @@ MAX_SECTION_CHARS = 1200
 # docs it links (`/repo/*.md`) so the index always matches what users see, plus a
 # small CORE set of required-reading docs. Add a KC card → it's grounded. No
 # hand-maintained list to drift out of sync.
-KC_HTML = REPO / "apps" / "lantern-garage" / "public" / "knowledgecenter.html"
+LIBRARY_HTML = REPO / "apps" / "lantern-garage" / "public" / "library.html"
 CORE_DOCS = ["README.md", "CLAUDE.md", "AGENTS.md", "QUICKSTART.md"]
 
 # External (out-of-repo) sources — Human Flourishing Frameworks. RETIRED in the
@@ -60,8 +60,8 @@ def external_docs() -> list[dict]:
 
 def knowledge_base_docs() -> list[str]:
     docs = list(CORE_DOCS)
-    if KC_HTML.exists():
-        html = KC_HTML.read_text(encoding="utf-8", errors="replace")
+    if LIBRARY_HTML.exists():
+        html = LIBRARY_HTML.read_text(encoding="utf-8", errors="replace")
         for m in re.findall(r'href="/repo/([^"]+\.md)"', html):
             if m not in docs:
                 docs.append(m)

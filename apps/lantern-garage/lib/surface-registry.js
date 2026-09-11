@@ -36,6 +36,7 @@ const CORE = {
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
   "knowledgecenter.html":   "Remember",  // grounding knowledge base
+  "library.html":           "Remember",  // reference library: the docs the grounding corpus is built from (#3503)
   "wide-search.html":       "Remember",  // cross-archive search
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
