@@ -52,6 +52,10 @@ test('Declined and Exit reason are gone, and Symbol is what opens', () => {
   assert.match(code, /const SLICES = \['symbol', 'hour'\];/);
 });
 
+test('the slice the page loaded with is already in the cache, so going back to it is free', () => {
+  assert.match(grabFn('jpLoad'), /jpSliceCache\[jpSlice\] = data\.slice;/);
+});
+
 test('jpRender marks the cards its controls repaint, and keeps what they need', () => {
   const render = grabFn('jpRender');
   assert.match(render, /jpLast = \{ s, book, daily, liveToday, acct \};/);
