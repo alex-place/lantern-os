@@ -264,10 +264,19 @@ on top of CSF.
   manual pull in the runbook). See [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
   Config comes from systemd drop-ins in `/etc/systemd/system/lantern.service.d/`,
   **not** from a `.env` file (there is none on the host).
-- **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. It is **not
-  used by any current deployment** (verified 2026-08-14: no Railway config exists
-  anywhere in the repo). Earlier revisions of this file claimed "Railway
-  auto-deploys from master" — that was never true of the current stack.
+- **Railway (CI-gated master-head deploy):** `.github/workflows/deploy-railway.yml`
+  deploys the head of `master` to Railway **only after the "CI" workflow completes
+  green** on that commit (GitHub is the deployer — Railway's own repo watcher stays
+  disconnected because it ships red pushes). The pipeline is inert until the
+  operator adds a `RAILWAY_TOKEN` repo secret; the build plan is `nixpacks.toml`
+  (Node pinned, `--ignore-scripts` two-step install) + `.railwayignore` (trims the
+  ~20 GB tree; persistent state belongs on a volume at `/app/data`), and the boot
+  needs `SESSION_SECRET` set as a Railway variable (PORT is injected → server.js
+  fail-closes without a real secret, #867). **This does not replace GCE**: unisona.ai
+  production remains the release-gated GCE deploy above; Railway tracks the moving
+  master head. `cloud-server.js` remains the 7-line `PORT`-defaulting PaaS entry
+  (railway.json's startCommand runs `server.js` directly — equivalent, since
+  Railway always injects `PORT`).
 - **Static UI:** deployed from `gh-pages` branch via GitHub Actions
   (`.github/workflows/deploy.yml`, `peaceiris/actions-gh-pages`); source in
   `apps/lantern-garage/public/`. **This is the marketing/static surface only** —

@@ -1,0 +1,107 @@
+# Deploy master's head to Railway — but ONLY behind green CI.
+#
+# GitHub is the deployer (not Railway's own repo watcher): this workflow fires
+# when the "CI" workflow COMPLETES on master and deploys only on SUCCESS, so a
+# red master can never ship. Railway's native GitHub integration deploys on
+# push regardless of checks — leave it disconnected; this workflow is the path.
+#
+# Activation (operator, one time):
+#   1. Railway: create the project + service, then a PROJECT token
+#      (Project → Settings → Tokens — a project token scopes railway CLI to the
+#      project/environment with no login).
+#   2. Repo secret  RAILWAY_TOKEN  = that token. Until it exists, this workflow
+#      SKIPS cleanly (notice, green) instead of failing every merge.
+#   3. Repo variable RAILWAY_SERVICE = the service name (only needed when the
+#      project has more than one service).
+#   4. Optional repo variable RAILWAY_APP_URL = the public https URL of the
+#      service; when set, the deploy is verified by asking the SERVING host for
+#      /api/version — the post-2026-08-14 rule: a deploy is verified on the
+#      machine that serves it, not by a green build.
+#   5. Railway service variables the app needs to BOOT: SESSION_SECRET is
+#      REQUIRED (Railway injects PORT, and server.js fail-closes without a real
+#      session secret when PORT is set — #867), plus at least one provider key
+#      (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY), and
+#      LANTERN_CLOUDFLARE_TUNNEL=false so the dyno never spawns cloudflared.
+#      Persistent state wants a volume mounted at /app/data (.railwayignore
+#      excludes local data from the upload for exactly that reason).
+#
+# The build side already exists and stays untouched: nixpacks.toml pins the
+# Node provider and does the --ignore-scripts two-step install (#3401 + the
+# 2026-08-21 .csproj fix), and .railwayignore trims the ~20 GB working tree to
+# the source the image needs. `railway up` here uploads the checked-out green
+# head through those same files.
+
+name: Deploy to Railway
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Master head moving is the trigger, so only the NEWEST deploy matters: a
+# superseded in-flight deploy is cancelled rather than queued behind.
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Railway deploy (green master head)
+    runs-on: ubuntu-latest
+    # workflow_run fires on every completion; deploy only when CI succeeded.
+    # workflow_dispatch is the manual escape hatch (deploys the current head).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - name: Gate on the Railway token (skip cleanly until wired)
+        id: gate
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::RAILWAY_TOKEN secret is not set — Railway deploy skipped. Add a Railway project token as the RAILWAY_TOKEN repo secret to activate this pipeline (see the header of this workflow)."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout the exact green head
+        if: steps.gate.outputs.skip == 'false'
+        uses: actions/checkout@v7
+        with:
+          # The commit CI actually validated — not whatever master points at by
+          # the time this job runs.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Deploy to Railway
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
+        run: |
+          npm install -g @railway/cli@4
+          SERVICE_ARG=""
+          if [ -n "$RAILWAY_SERVICE" ]; then SERVICE_ARG="--service $RAILWAY_SERVICE"; fi
+          # --ci streams the build and exits nonzero on a failed build, so a
+          # broken deploy is a RED run here, not a silent Railway-side failure.
+          railway up --ci $SERVICE_ARG
+
+      - name: Verify the serving host answers with the deployed head
+        if: steps.gate.outputs.skip == 'false' && vars.RAILWAY_APP_URL != ''
+        env:
+          APP_URL: ${{ vars.RAILWAY_APP_URL }}
+          EXPECT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          for i in $(seq 1 30); do
+            BODY=$(curl -fsS --max-time 10 "$APP_URL/api/version" || true)
+            if echo "$BODY" | grep -q "\"commit\": *\"$EXPECT_SHA\""; then
+              echo "serving host answers with the deployed commit $EXPECT_SHA"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::the serving host never answered /api/version with commit $EXPECT_SHA within 5 minutes — the deploy is NOT verified"
+          exit 1
