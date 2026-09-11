@@ -101,6 +101,12 @@
      show. inset keeps it inside the 7px radius instead of bleeding into the gap. */
   .jp-day.today{box-shadow:inset 0 0 0 1.5px var(--accent),0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
   .jp-day.today .d{color:var(--accent);font-weight:700}
+  /* Today, live (#3502): the broker's figure for a session still running. It is not a
+     booked result, so it takes no win/loss fill -- the figure carries the sign, and a
+     dashed edge plus a "live" tag say it is still moving. At the close it becomes an
+     ordinary booked day. */
+  .jp-day.live, .jp-week.live{border-style:dashed;border-color:color-mix(in srgb,var(--accent) 55%,var(--border))}
+  .jp-day .lv{float:right;font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);line-height:1.2}
   .jp-week{border-radius:7px;background:var(--bg2);border:1px solid var(--border);padding:5px 6px;
     display:flex;flex-direction:column;justify-content:center;min-width:0}
   .jp-week .l{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
@@ -117,6 +123,7 @@
     .jp-day .d{font-size:9px}
     .jp-day .p{font-size:9.5px}
     .jp-day .p-full{display:none}
+    .jp-day .lv{font-size:0;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:3px}
     .jp-day .p-abbr{display:inline}
     .jp-shell{padding:0 10px 32px}
   }
@@ -228,7 +235,7 @@ async function jpFetch(demo) {
     if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
     return r.json();
   });
-  const [rec, slice, skips, equity] = await Promise.all([
+  const [rec, slice, skips, equity, live] = await Promise.all([
     get('/api/trading/track-record' + qs),
     get('/api/trading/scorecard' + qs + amp + 'by=' + jpSlice),
     get('/api/trading/skips' + qs).catch(() => null),
@@ -239,8 +246,14 @@ async function jpFetch(demo) {
     // Never fatal: a broker that cannot answer simply gets no card.
     get('/api/trading/portfolio/history' + (demo ? qs + '&range=ALL' : '?range=ALL'))
       .catch(() => null),
+    // Today, live (#3502). Everything else here is closed trades or the broker's daily
+    // history, whose newest bar is the previous close -- so without this, today read
+    // blank until something closed. It is the trader header's own figure; a demo book
+    // has no live account behind it, so it asks for none.
+    demo ? Promise.resolve(null)
+         : get('/api/trading/positions').then(j => (j && j.account) || null).catch(() => null),
   ]);
-  return { rec, slice, skips, equity, demo };
+  return { rec, slice, skips, equity, live, demo };
 }
 
 async function jpLoad(force) {
@@ -333,20 +346,42 @@ function jpKpis(s, book, ds) {
 /* Per-day bars, so a single outsized day is visible as one day rather than as a step
    in the cumulative line. */
 
+/* Today's live figure, or null (#3502). The number is the one the trader's header
+   shows -- realized today plus today's move on open positions, worked out by the server
+   (routes/trading/market.js). It is $0 before the open and on a day with no session, and
+   a blank cell says that better than "$0.00 live" would -- so a zero, a weekend or a
+   missing account shows nothing at all. */
+function jpLiveToday(live, now) {
+  if (!live || live.pnl_today == null) return null;
+  const pnl = Number(live.pnl_today);
+  if (!isFinite(pnl) || pnl === 0) return null;
+  const t = now || new Date();
+  let date = '';
+  try { date = t.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); } catch (_e) { return null; }
+  const wd = new Date(date + 'T12:00:00Z').getUTCDay();
+  if (wd === 0 || wd === 6) return null;
+  let asOf = '';
+  try { asOf = t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (_e) { /* cosmetic */ }
+  return { date, pnl, equity: Number(live.equity), source: String(live.source || ''), asOf };
+}
+
 /* The calendar is the piece both TradeZella and TraderWaves put front and centre, and
    the weekly column on the right is the part that makes it more than decoration. */
-function jpCalendar(daily) {
+function jpCalendar(daily, liveToday) {
   const byDate = {};
   (daily || []).forEach(d => { byDate[d.date] = d; });
   const dates = Object.keys(byDate).sort();
-  if (!dates.length) return '<div class="jp-empty">No closed days yet.</div>';
-  if (!jpMonth) jpMonth = dates[dates.length - 1].slice(0, 7);
+  if (!dates.length && !liveToday) return '<div class="jp-empty">No closed days yet.</div>';
+  // Every month with something to show: booked days, plus today while it has a live
+  // figure -- so the first session of a month opens on the month that is moving (#3502).
+  const months = Array.from(new Set(dates.map(d => d.slice(0, 7))
+    .concat(liveToday ? [liveToday.date.slice(0, 7)] : []))).sort();
+  if (!jpMonth) jpMonth = months[months.length - 1];
   const [yy, mm] = jpMonth.split('-').map(Number);
   const first = new Date(Date.UTC(yy, mm - 1, 1));
   const days = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
   const lead = first.getUTCDay();                       // 0=Sun, matching the header row
   const monthName = first.toLocaleString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const months = Array.from(new Set(dates.map(d => d.slice(0, 7)))).sort();
   const idx = months.indexOf(jpMonth);
 
   /* The calendar's rows are exchange days, so "today" is the exchange day too --
@@ -354,24 +389,37 @@ function jpCalendar(daily) {
   let todayIso = '';
   try { todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
   catch (_e) { todayIso = new Date().toISOString().slice(0, 10); }
-  let cells = '', weekPnl = 0, weekHasData = false, out = '';
+  let weekPnl = 0, weekHasData = false, weekLive = false, out = '';
   const flushWeek = () => {
-    out += '<div class="jp-week"><div class="l">Week</div><div class="v ' + (weekHasData ? jpSign(weekPnl) : 'jp-dim') + '">'
+    out += '<div class="jp-week' + (weekLive ? ' live' : '') + '"'
+      + (weekLive ? ' title="Includes today\'s live figure."' : '')
+      + '><div class="l">Week</div><div class="v ' + (weekHasData ? jpSign(weekPnl) : 'jp-dim') + '">'
       + (weekHasData ? jpUsd(weekPnl) : '—') + '</div></div>';
-    weekPnl = 0; weekHasData = false;
+    weekPnl = 0; weekHasData = false; weekLive = false;
   };
   for (let i = 0; i < lead; i++) out += '<div class="jp-day empty"></div>';
   let col = lead;
   for (let d = 1; d <= days; d++) {
     const iso = jpMonth + '-' + String(d).padStart(2, '0');
     const rec = byDate[iso];
-    const cls = rec ? (rec.pnl > 0 ? 'win' : rec.pnl < 0 ? 'loss' : 'flat') : '';
+    /* Today, live (#3502): while a session runs, today's cell shows the broker's figure
+       for the day so far, open positions included, rather than waiting for a close. It
+       stands in for anything already booked today -- it includes it -- so nothing is
+       counted twice, and at the close the cell becomes an ordinary booked day. */
+    const lv = (liveToday && iso === liveToday.date) ? liveToday : null;
+    const val = lv ? lv.pnl : (rec ? rec.pnl : null);
+    const cls = lv ? 'live' : rec ? (rec.pnl > 0 ? 'win' : rec.pnl < 0 ? 'loss' : 'flat') : '';
     const isToday = (iso === todayIso) ? ' today' : '';
-    if (rec) { weekPnl += rec.pnl || 0; weekHasData = true; }
+    if (val != null) { weekPnl += val || 0; weekHasData = true; if (lv) weekLive = true; }
+    const tip = lv
+      ? 'Live: today so far, from the broker, open positions included' + (lv.asOf ? ' (as of ' + lv.asOf + ')' : '')
+        + '. It becomes a booked result as trades close.' + (rec ? ' Booked so far today: ' + jpUsd(rec.pnl) + '.' : '')
+      : '';
     out += '<div class="jp-day ' + cls + isToday + '"'
-      + (isToday ? ' aria-current="date"' : '') + '><div class="d">' + d + '</div>'
-      + '<div class="p ' + (rec ? jpSign(rec.pnl) : 'jp-dim') + '">'
-      + (rec ? '<span class="p-full">' + jpUsd(rec.pnl) + '</span><span class="p-abbr">' + jpUsdShort(rec.pnl) + '</span>' : '')
+      + (isToday ? ' aria-current="date"' : '') + (tip ? ' title="' + jpEsc(tip) + '"' : '')
+      + '><div class="d">' + d + (lv ? '<span class="lv">live</span>' : '') + '</div>'
+      + '<div class="p ' + (val != null ? jpSign(val) : 'jp-dim') + '">'
+      + (val != null ? '<span class="p-full">' + jpUsd(val) + '</span><span class="p-abbr">' + jpUsdShort(val) + '</span>' : '')
       + '</div></div>';
     col++;
     if (col === 7) { flushWeek(); col = 0; }
@@ -386,8 +434,10 @@ function jpCalendar(daily) {
     + '<div class="jp-cal">' + out + '</div>';
 }
 function jpShiftMonth(n) {
-  const months = Array.from(new Set(((jpData && jpData.rec && Object.values(jpData.rec.books || {})[0] || {}).daily || [])
-    .map(d => d.date.slice(0, 7)))).sort();
+  const booked = ((jpData && jpData.rec && Object.values(jpData.rec.books || {})[0] || {}).daily || [])
+    .map(d => d.date.slice(0, 7));
+  const lt = (jpData && !jpData.demo) ? jpLiveToday(jpData.live) : null;   // same months the calendar shows
+  const months = Array.from(new Set(booked.concat(lt ? [lt.date.slice(0, 7)] : []))).sort();
   const i = months.indexOf(jpMonth);
   if (i < 0) return;
   const next = months[i + n];
@@ -641,7 +691,7 @@ function jpBindPlots() {
    the same information the calendar and the bar chart already carry, per day.
    When the broker cannot answer (a box with no linked account), the autopilot's own
    cumulative curve stands in rather than leaving an empty slot. */
-function jpBalanceChart(h, daily) {
+function jpBalanceChart(h, daily, liveToday) {
   /* Which exchange day a broker point belongs to (#3501). The brokers stamp a day
      differently. IBKR (ibkr-cpapi _toEpochSeconds) and the demo stamp the session's own
      date at 00:00 UTC, which the UTC date reads correctly. Alpaca stamps each daily bar
@@ -664,20 +714,29 @@ function jpBalanceChart(h, daily) {
       const v = eq[i];
       if (v != null && isFinite(v)) pts.push({ d: iso(h.timestamps[i]), v: Number(v) });
     }
+    // The payload says whether it is real. champion-demo is a SIMULATED 26-year DCA
+    // book -- coherent on its own terms, but calling it "from the broker" would be a
+    // false claim about provenance on the one page whose job is an honest record.
+    const sim = h.demo === true || h.source === 'champion-demo';
+    /* Today, live (#3502). The daily history's newest bar is the previous close, so
+       during a session the chart ended a day behind. The live equity -- same broker,
+       same account -- adds today's point, and the readout names it as today. */
+    let live = false;
+    if (!sim && liveToday && liveToday.equity > 0 && pts.length && pts[pts.length - 1].d < liveToday.date
+        && (!liveToday.source || !h.source || liveToday.source === h.source)) {
+      pts.push({ d: liveToday.date, v: liveToday.equity });
+      live = true;
+    }
     if (pts.length > 1) {
       const base = Number(h.base_value) || pts[0].v;
       const last = pts[pts.length - 1], net = last.v - base;
-      // The payload says whether it is real. champion-demo is a SIMULATED 26-year DCA
-      // book -- coherent on its own terms, but calling it "from the broker" would be a
-      // false claim about provenance on the one page whose job is an honest record.
-      const sim = h.demo === true || h.source === 'champion-demo';
       return {
         title: sim ? 'Account balance — simulated demo book'
                    : 'Account balance — all time, from the broker',
         html: jpPlot(pts, { type: 'line', baseline: base, baselineLabel: 'opened ' + jpAxisMoney(base),
           aria: 'Account balance from ' + pts[0].d + ' to ' + last.d + ', opened ' + jpUsd(base) + ', now ' + jpUsd(last.v) })
           + '<p class="jp-note">Opened <b>' + jpEsc(jpUsd(base)) + '</b> on ' + jpEsc(pts[0].d)
-          + ' — now <b>' + jpEsc(jpUsd(last.v)) + '</b> (<span class="' + jpSign(net) + '">'
+          + ' — now <b>' + jpEsc(jpUsd(last.v)) + '</b>' + (live ? ' live' : '') + ' (<span class="' + jpSign(net) + '">'
           + jpEsc((net >= 0 ? '+' : '') + jpUsd(net)) + '</span>). '
           + (sim
               ? 'Simulated sample data for the demo book — not a real account, and not a real track record.'
@@ -703,6 +762,8 @@ function jpRender(host, data) {
   const book = (data.rec.books || {})[bookKey] || {};
   const s = book.stats || {};
   const daily = book.daily || [];
+  // Today's live figure (#3502); the demo book has no live account behind it.
+  const liveToday = data.demo ? null : jpLiveToday(data.live);
   let html = '';
 
   if (data.demo) {
@@ -713,9 +774,10 @@ function jpRender(host, data) {
 
   const rangeEl = document.getElementById('jpRange');
   if (rangeEl) {
-    rangeEl.textContent = daily.length
+    rangeEl.textContent = (daily.length
       ? ('Realized results, ' + daily[0].date + ' to ' + daily[daily.length - 1].date + '.')
-      : 'Realized results, day by day.';
+      : 'Realized results, day by day.')
+      + (liveToday ? ' Today so far: ' + (liveToday.pnl > 0 ? '+' : '') + jpUsd(liveToday.pnl) + ', live.' : '');
   }
 
   if (jpView === 'skips') {
@@ -739,12 +801,12 @@ function jpRender(host, data) {
   html += jpKpis(s, book, ds);
   html += '<div class="jp-grid">'
     + '<div class="jp-col">'
-      + '<div class="jp-card"><h2>P&amp;L calendar</h2>' + jpCalendar(daily) + '</div>'
+      + '<div class="jp-card"><h2>P&amp;L calendar</h2>' + jpCalendar(daily, liveToday) + '</div>'
       + '<div class="jp-card">' + jpBreakdown(data.slice) + '</div>'
     + '</div>'
     + '<div class="jp-col">'
       + (function () {
-          const b = jpBalanceChart(data.equity, daily);
+          const b = jpBalanceChart(data.equity, daily, liveToday);
           return b ? '<div class="jp-card jp-curve"><h2>' + b.title + '</h2>' + b.html + '</div>' : '';
         })()
       + '<div class="jp-card jp-curve"><h2>Net P&amp;L per day — realized</h2>'
