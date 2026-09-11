@@ -257,7 +257,7 @@ on top of CSF.
 - **Local:** server binds to `127.0.0.1:4177`
 - **Production (Railway):** `unisona.ai` is the Railway project `unisona` (service
   `unisona`, environment `production`), built by Nixpacks from `railway.json` +
-  `nixpacks.toml`: start `node apps/lantern-garage/server.js`, healthcheck
+  `nixpacks.toml`: start `node apps/lantern-garage/start.js`, healthcheck
   `/api/status`, restart on failure (3 retries). It runs **whatever was last uploaded
   with `railway up`**. Merging to `master` and publishing a GitHub Release move
   nothing (verified 2026-09-11: every deployment in `railway deployment list` is a
@@ -265,8 +265,10 @@ on top of CSF.
   `node scripts/railway-deploy.mjs --yes`.** It refuses during the US session (a deploy
   restarts the users' trader), uploads a clean checkout of a known commit, and leaves
   `build-info.json` so `/api/version` names the commit. Config and secrets are
-  **Railway Variables** (`railway variable set KEY=value`, which redeploys). See
-  [docs/ops/railway-runbook.md](docs/ops/railway-runbook.md).
+  **Railway Variables** (`railway variable set KEY=value`, which redeploys). With the
+  variable `LANTERN_SPLIT=1`, `start.js` runs the website and the trader as two processes
+  in the one service (#3523): Railway can't share a volume between services. Unset, it is
+  exactly `node server.js`. See [docs/ops/railway-runbook.md](docs/ops/railway-runbook.md).
 - **GCE VM (`lantern-app`):** the release-gated systemd setup in `ops/gce/` and
   [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md) no
   longer serves `unisona.ai`. Kept for history until the VM is decommissioned.

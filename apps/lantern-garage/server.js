@@ -56,6 +56,13 @@ for (const { path: envPath, override } of candidateEnvFiles) {
   });
 }
 
+// Which half of the app this process runs (#3523): all (unset, as always), web, or
+// trader -- see lib/process-role.js. Set before routes/trading.js loads: the web
+// process must not schedule the trading loops that module starts on load.
+const processRole = require("./lib/process-role");
+processRole.applyRoleEnv();
+if (processRole.role() !== "all") console.info(`[role] ${processRole.role()} process (LANTERN_ROLE)`);
+
 const { sendJson, sendFile, sendHtml, collectRequestBody } = require("./lib/http-utils");
 
 // #2068: a 500 must never leak raw exception text (paths, stack, internals) to the
@@ -102,7 +109,7 @@ const maxDreamerTextLength = 2000;
 // Initialize Creator Suite job queue and worker
 const jobQueue = new JobQueue(repoRoot);
 const jobWorker = new JobWorker(jobQueue, repoRoot);
-jobWorker.start(2000); // Poll every 2 seconds for new jobs
+if (processRole.runsWeb()) jobWorker.start(2000); // Poll every 2 seconds for new jobs (the web process's job when split, #3523)
 
 // Expose the live JobQueue singleton to in-process chat tools (lib/tool-runner)
 // so the Creator video tools enqueue onto the same instance JobWorker polls.
@@ -619,6 +626,8 @@ function startMcpChild({ label, script, port, portEnvKey, enabled }) {
   });
 }
 
+// The MCP servers belong to the web process when the app is split (#3523).
+if (processRole.runsWeb()) {
 // ── MCP Server (no-auth, port 8771) ──
 startMcpChild({
   label: "MCP Server",
@@ -636,6 +645,7 @@ startMcpChild({
   portEnvKey: "LANTERN_MCP_OAUTH_PORT",
   enabled: process.env.LANTERN_MCP_OAUTH !== "false",
 });
+}
 
 // ── Trading ──
 // The autonomous Python trader (scripts/start-ai-trader.js → src/trading_agents,
@@ -645,7 +655,7 @@ startMcpChild({
 
 // ── Cloudflare Tunnel (optional, for public access) ──
 let cloudflaredProcess = null;
-const enableCloudflare = process.env.LANTERN_CLOUDFLARE_TUNNEL !== "false";
+const enableCloudflare = process.env.LANTERN_CLOUDFLARE_TUNNEL !== "false" && processRole.runsWeb();
 if (enableCloudflare) {
   setTunnelState({ enabled: true, status: "starting", startedAt: new Date().toISOString() });
   // Use tunnel run without explicit name to let cloudflared use ~/.cloudflared/config.yml
@@ -688,6 +698,9 @@ if (enableCloudflare) {
     }
   }, 3000);
   console.log(`[Cloudflare Tunnel] Starting (reading from ~/.cloudflared/config.yml)...`);
+} else if (!processRole.runsWeb()) {
+  setTunnelState({ enabled: false, status: "disabled" });
+  console.info("[Cloudflare Tunnel] Not started in the trader process: the web process owns it (#3523).");
 } else {
   setTunnelState({ enabled: false, status: "disabled" });
   console.log("[Cloudflare Tunnel] Disabled via LANTERN_CLOUDFLARE_TUNNEL=false (it is enabled by default; unset the var to re-enable).");
@@ -769,7 +782,7 @@ server.listen(port, host, () => {
   // existing account — email+password 401'd and Google minted fresh guest profiles),
   // MERGE it into the canonical root instead of just warning about it. One-time,
   // idempotent, fail-soft; legacy files are renamed *.migrated after the merge.
-  try { require('./lib/legacy-data-migrate').migrateLegacyData(); } catch (e) { console.warn(`[data-migrate] skipped: ${e.message}`); }
+  if (processRole.runsWeb()) try { require('./lib/legacy-data-migrate').migrateLegacyData(); } catch (e) { console.warn(`[data-migrate] skipped: ${e.message}`); }
 
   // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
   // beats stop). No-op unless UNISONA_DESKTOP=1.
@@ -792,7 +805,7 @@ server.listen(port, host, () => {
   // dispatched by maybeDispatchTraining() when promoted patterns clear
   // TRAINING_PROMOTE_THRESHOLD (default 20), so enabling the scheduler alone does
   // not force a training run without work to promote.
-  if (process.env.SIGMA0_IMPROVEMENT_SCHEDULER === "1") {
+  if (process.env.SIGMA0_IMPROVEMENT_SCHEDULER === "1" && processRole.runsWeb()) {
     try {
       const { startImprovementScheduler } = require("./lib/self-improvement-cron");
       startImprovementScheduler(repoRoot);
@@ -808,7 +821,7 @@ server.listen(port, host, () => {
   // orchestration dashboard's "In Progress" count (75 leaked closed-issue claims was
   // the trigger for this). Sweep closed/stale claims once at boot. Deferred off the
   // critical boot path so the `gh` open-issue lookup never blocks the listen.
-  setTimeout(() => {
+  if (processRole.runsWeb()) setTimeout(() => {
     try {
       const q = require("./routes/queue");
       const rr = require("path").resolve(__dirname, "../..");
@@ -828,7 +841,7 @@ server.listen(port, host, () => {
   // file is missing or stale (> RAG_HOUSE_MAX_AGE_H hours, default 24) so prod is never
   // silently empty. Deferred off the critical boot path and spawned detached so the ~seconds
   // of file-walking never blocks the listener. Set RAG_HOUSE_BOOT_REGEN=0 to disable.
-  if (process.env.RAG_HOUSE_BOOT_REGEN !== "0") {
+  if (process.env.RAG_HOUSE_BOOT_REGEN !== "0" && processRole.runsWeb()) {
     setTimeout(() => {
       try {
         const fsx = require("fs");
@@ -859,53 +872,67 @@ server.listen(port, host, () => {
   // launcher (docs/adr/0014) runs the Core purely for chat and sets
   // LANTERN_CHAT_ONLY=1 to skip them. Normal boots (4177/4178/cloud) leave the
   // flag unset, so their behaviour is unchanged.
+  // Split (#3523): the UI collectors run in the web process; the brake monitor, the Sigma
+  // schedule and the Kalshi stop-loss monitor are trading, so they run in the trader.
   const chatOnly = process.env.LANTERN_CHAT_ONLY === "1";
   if (chatOnly) {
     console.log("[chat-only] Market collectors + convergence loops skipped (LANTERN_CHAT_ONLY=1)");
   } else {
     // ── Kalshi Tight-Band Collector (6s polling) ──
-    const kalshiCollector = require("./lib/kalshi-collector");
-    kalshiCollector.start();
-    deps.kalshiCollector = kalshiCollector; // Make available to routes
+    if (processRole.runsWeb()) {
+      const kalshiCollector = require("./lib/kalshi-collector");
+      kalshiCollector.start();
+      deps.kalshiCollector = kalshiCollector; // Make available to routes
+    }
 
     // ── ADR-0028 streaming brake monitor (60s, PAPER ONLY — places nothing) ──
     // Intraday risk monitoring for the Phase-2 leverage overlay: vol targeting ×
     // 6-mo trend gate × drawdown taper, gross clamped [0, 2×]. Kill switch:
     // BRAKE_MONITOR=0. Status streams at GET /api/trading/brake/status.
-    const brakeMonitor = require("./lib/brake-monitor");
-    brakeMonitor.start();
-    deps.brakeMonitor = brakeMonitor;
+    if (processRole.runsTrader()) {
+      const brakeMonitor = require("./lib/brake-monitor");
+      brakeMonitor.start();
+      deps.brakeMonitor = brakeMonitor;
+    }
 
     // ── Sigma Trader schedule (ADR-0028) — the long-horizon allocation book on its
     // OWN account. Rebalances on drift + reacts to the brake's gross, market-hours
     // only. Off by default; opt in with SIGMA_SCHEDULE=1. Places nothing unless also
     // armed (SIGMA_ARM=1) with a dedicated Sigma account (SIGMA_ALPACA_*). Fully
     // independent of the day-trader — separate engine, separate account.
-    const sigmaScheduler = require("./lib/sigma-scheduler");
-    sigmaScheduler.start();
-    deps.sigmaScheduler = sigmaScheduler;
+    if (processRole.runsTrader()) {
+      const sigmaScheduler = require("./lib/sigma-scheduler");
+      sigmaScheduler.start();
+      deps.sigmaScheduler = sigmaScheduler;
+    }
 
     // ── Crypto Price & News Collector (30s polling) ──
-    const CryptoCollector = require("./lib/crypto-collector");
-    const cryptoCollector = new CryptoCollector();
-    cryptoCollector.start(10000); // 10s (#1697: tighter so 24/7 crypto price ticks are visible/flash)
-    deps.cryptoCollector = cryptoCollector; // Make available to routes
+    if (processRole.runsWeb()) {
+      const CryptoCollector = require("./lib/crypto-collector");
+      const cryptoCollector = new CryptoCollector();
+      cryptoCollector.start(10000); // 10s (#1697: tighter so 24/7 crypto price ticks are visible/flash)
+      deps.cryptoCollector = cryptoCollector; // Make available to routes
+    }
 
     // ── Market News Collector (10-min polling, watchlist + broad market RSS) ──
-    const NewsCollector = require("./lib/news-collector");
-    const newsCollector = new NewsCollector();
-    newsCollector.start(300000); // 5-min interval
-    deps.newsCollector = newsCollector; // Make available to routes
+    if (processRole.runsWeb()) {
+      const NewsCollector = require("./lib/news-collector");
+      const newsCollector = new NewsCollector();
+      newsCollector.start(300000); // 5-min interval
+      deps.newsCollector = newsCollector; // Make available to routes
+    }
 
     // ── Weekly Level-1 traction rollup (#2547) ──
     // Appends ONE weekly_rollup event per ISO week to data/traction/events.jsonl
     // (actives · paying · M1 retention, all MEASURED). Checks on boot + daily;
     // same-week re-runs no-op, so restarts can't double-append.
-    require("./lib/active-user-metric").startWeeklyRollupScheduler();
+    if (processRole.runsWeb()) require("./lib/active-user-metric").startWeeklyRollupScheduler();
 
     // ── Kalshi Position Monitor (10s polling) ──
-    const { startMonitoring } = require("./lib/kalshi-position-monitor");
-    startMonitoring();   // Start automated stop-loss monitoring
+    if (processRole.runsTrader()) {
+      const { startMonitoring } = require("./lib/kalshi-position-monitor");
+      startMonitoring();   // Start automated stop-loss monitoring
+    }
     // P0-5 (docs/TRADER-ANALYSIS-2026-07.md): the "convergence" trainer/enhancer/LoRA loops are
     // NOT booted. They were a self-referential mock — the LoRA predictor returned Math.random()
     // labeled "HIGH CONF", the enhancer's "web search" was a static dict, and the trainer's label
@@ -920,7 +947,7 @@ server.listen(port, host, () => {
   // shared paper-positions ledger (thousands of sim rows) which swamps real swipe
   // history and the Σ₀ council stats. So it is now OPT-IN: set KALSHI_CRYPTO_OBSERVER=1
   // to re-enable data collection; default OFF.
-  const enableCryptoObserver = process.env.KALSHI_CRYPTO_OBSERVER === "1"
+  const enableCryptoObserver = process.env.KALSHI_CRYPTO_OBSERVER === "1" && processRole.runsWeb()
     && !!(process.env.KALSHI_API_KEY_ID || process.env.KALSHI_PRIVATE_KEY || process.env.KALSHI_PRIVATE_KEY_PATH);
   const cryptoObserverScript = path.join(repoRoot, "experiments", "crypto_live_trader.py");
   if (enableCryptoObserver && fs.existsSync(cryptoObserverScript)) {
@@ -966,8 +993,8 @@ server.listen(port, host, () => {
     console.log("[CryptoObserver] Disabled (opt-in: set KALSHI_CRYPTO_OBSERVER=1 with Kalshi creds to collect paper data)");
   }
 
-  // Auto-register this node to the mesh
-  (async () => {
+  // Auto-register this node to the mesh (the web process's job when split, #3523)
+  if (processRole.runsWeb()) (async () => {
     try {
       const nodeId = process.env.LANTERN_NODE_ID || require("os").hostname();
       const nodeName = process.env.LANTERN_NODE_NAME || `Lantern (${require("os").hostname()})`;
@@ -1022,11 +1049,12 @@ server.listen(port, host, () => {
     }
   })();
 
-  Promise.resolve(refreshAllPcsf(repoRoot)).catch((e) => console.error("[PCSF] refresh failed:", e.message));
+  if (processRole.runsWeb()) Promise.resolve(refreshAllPcsf(repoRoot)).catch((e) => console.error("[PCSF] refresh failed:", e.message));
 
   // ── CSF Research Tesseract — auto-pack on startup ──────────────────────────
-  // Runs in background; skips if archive is less than 24 hours old.
-  (() => {
+  // Runs in background; skips if archive is less than 24 hours old. The web process's
+  // job when split (#3523).
+  if (processRole.runsWeb()) (() => {
     const { execFile } = require("child_process");
     const fs = require("fs");
     const path = require("path");

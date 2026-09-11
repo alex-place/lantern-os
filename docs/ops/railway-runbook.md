@@ -15,7 +15,7 @@ and publishing a GitHub Release don't move it.
 
 Build and start come from the repo:
 - `railway.json`:
-  - Nixpacks build, start `node apps/lantern-garage/server.js`.
+  - Nixpacks build, start `node apps/lantern-garage/start.js` (see *Website and trader as two processes* below).
   - Healthcheck `/api/status`, 120 s. It only gates a deploy going live; a running service that stops answering isn't restarted.
   - Restart on failure, 3 retries. After three crashes the service stays down until someone redeploys.
 - `nixpacks.toml`: Node only, `npm ci --ignore-scripts`. The `prepare` hook needs `.git`, which isn't uploaded.
@@ -36,6 +36,31 @@ The script:
 - Waits up to 15 minutes for `https://unisona.ai/api/version` to report that commit.
 
 It needs git, git-lfs, and the Railway CLI logged in to the project (`railway whoami`).
+
+## Website and trader as two processes (#3523)
+
+Set the Railway Variable **`LANTERN_SPLIT=1`** and `start.js` runs two processes inside the one
+service, under `lib/split-supervisor.js`:
+- **web** (`LANTERN_ROLE=web`) on the service's `PORT`: the site, the APIs, chat, the UI data
+  collectors, MCP and the job worker. No trading loops.
+- **trader** (`LANTERN_ROLE=trader`) on `127.0.0.1:4190` (`LANTERN_TRADER_PORT`): the autoscan and
+  fast-exit loops, the overnight sleeve, the Sigma schedule, the brake monitor and the Kalshi
+  stop-loss monitor.
+
+They share the service's disk, so users' broker links, trader modes and tradelists stay in one
+place. They don't share an event loop, so a slow chat request can't stall a scan, and one
+crashing doesn't take the other down. The supervisor restarts a child that exits, 1 s, 2 s, 4 s …
+up to 30 s apart. The few routes whose state lives in the trader (extended-hours switch, Kalshi
+monitor, brake and Sigma status) are forwarded to it by the web process (`lib/trader-forward.js`).
+
+Why not two Railway services: a volume attaches to one service only, and the trader needs the
+same files the website writes.
+
+Unset, `start.js` is exactly `node server.js` in one process, as it always was. A deploy still
+restarts both processes, so the market-hours rule for deploys still applies.
+
+Known limit: provider keys and the IBKR account/gateway saved through the settings API are
+applied to the web process's environment. The trader picks them up at its next restart.
 
 ## Configuration and secrets
 
