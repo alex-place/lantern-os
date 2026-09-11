@@ -149,6 +149,23 @@ test.describe('auth: role picker + session', () => {
     s = await page.context().request.get('/api/auth/session').then((r) => r.json());
     expect(s.authenticated).toBeFalsy();
   });
+
+  test('the Google test button emulates an SSO session (Free tier, provider google)', async ({ page }) => {
+    // The REAL Google button is hidden when GOOGLE_CLIENT_ID/SECRET are unset (#1877);
+    // the test panel's emulated one exercises the same session shape a first-time
+    // Google sign-in produces, with no OAuth round-trip.
+    await page.goto('/auth.html');
+    const [resp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/auth/test-login')),
+      page.locator('#test-provider-buttons button', { hasText: 'Google' }).click(),
+    ]);
+    expect(resp.status()).toBe(200);
+    const s = await page.context().request.get('/api/auth/session').then((r) => r.json());
+    expect(s.authenticated).toBe(true);
+    expect(s.role).toBe('supporter');
+    expect(s.provider).toBe('google');
+    expect(s.user.id).toBe('test-user');
+  });
 });
 
 test.describe('auth: seeded account email+password login', () => {
