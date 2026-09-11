@@ -254,6 +254,24 @@ const jpUsdShort = (n) => {
 const jpPct = (n) => (typeof n === 'number' && isFinite(n)) ? n.toFixed(1) + '%' : '—';
 const jpSign = (n) => (typeof n === 'number' && isFinite(n) && n !== 0) ? (n > 0 ? 'jp-pos' : 'jp-neg') : 'jp-dim';
 
+/* The record's disclosures are three counts, not a sentence -- String()ing the object put
+   a literal "[object Object]" at the foot of every journal (#3552), which is the exact
+   opposite of what the line exists for. The same three numbers are what trader_journal is
+   required to relay ("must be passed on, not hidden"), so the page owes the reader the
+   same words. Nothing to disclose prints nothing: a row of zeros is noise, not honesty. */
+function jpDisclosures(d) {
+  if (!d) return '';
+  if (typeof d === 'string') return d.trim();          // an older record may carry prose
+  const n = (v) => ((typeof v === 'number' && isFinite(v) && v > 0) ? v : 0);
+  const plural = (c, one, many) => c + ' ' + (c === 1 ? one : many);
+  const parts = [];
+  const dup = n(d.duplicateExitsCollapsed), bad = n(d.failedAttemptsExcluded), est = n(d.estimatedTrades);
+  if (dup) parts.push(plural(dup, 're-decision row', 're-decision rows') + ' collapsed into the trade it belongs to');
+  if (bad) parts.push(plural(bad, 'broker-rejected attempt', 'broker-rejected attempts') + ' excluded \u2014 they realized nothing');
+  if (est) parts.push(plural(est, 'external close', 'external closes') + ' valued at the last observed mark, not a broker fill');
+  return parts.length ? 'How these figures were counted: ' + parts.join('; ') + '.' : '';
+}
+
 async function jpFetch(demo) {
   const qs = demo ? '?demo=champion' : '';
   const amp = demo ? '&' : '?';
@@ -1289,9 +1307,8 @@ function jpRender(host, data) {
   jpLast = { s, book, daily, liveToday, acct };
   html += '<div class="jp-cards" id="jpCards"></div>';   // filled by jpPaintCards (#3543)
 
-  if (book.disclosures) {
-    html += '<p class="jp-note">' + jpEsc(String(book.disclosures)) + '</p>';
-  }
+  const disclosed = jpDisclosures(book.disclosures);
+  if (disclosed) html += '<p class="jp-note">' + jpEsc(disclosed) + '</p>';
   host.innerHTML = html;
   jpPaintCards();
 }
