@@ -3567,9 +3567,6 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
           + 'height:100%;font-family:var(--mono);font-size:11px;color:var(--text2);text-align:center'
           + '">' + (_noFeed
             ? 'No live feed for ' + _sym
-              + '<button type="button" onclick="reAddSlotSymbol(\'' + _sym + '\')" style="font:inherit;'
-              + 'padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);'
-              + 'color:var(--text);cursor:pointer">Re-add ' + _sym + ' to tradelist</button>'
             : 'Waiting for price data') + '</div>';
         if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
         return;
@@ -6682,13 +6679,26 @@ async function addWatchlistSymbol(sym){
   }catch(e){}
 }
 
-// #3514: the no-feed overlay's one-click repair for a chart slot the tradelist no
-// longer carries (slots persist in localStorage; the list lives server-side, so a
-// server-data reset strands the slot). Deliberately user-initiated — routed through
-// addWatchlistSymbol above so _tradelistEditGuard's warning still gates membership.
-async function reAddSlotSymbol(sym){
-  lastCardOrder = '';                                 // force a card rebuild once data flows
-  await addWatchlistSymbol(String(sym || '').toUpperCase());
+// #3514: chart slots persist in localStorage while the tradelist lives
+// server-side, so a slot can name a symbol the list no longer carries and its
+// card then charts nothing forever. The list is the source of truth ("why does
+// AAPL show if it's not on the watchlist") — once it's known, drop any slot it
+// doesn't carry and let the deck refill from real tradelist symbols. Runs once
+// per page load after the FIRST successful list fetch — never on later polls,
+// so it can't race the slot editor's add-then-POST flow (commitSlotSymbol), and
+// a failed list fetch prunes nothing. Charting a NEW symbol still goes through
+// the guarded editor path, so tradelist membership only changes on an explicit,
+// warned action.
+let _slotsPruned = false;
+function pruneStaleSlots(list){
+  if (_slotsPruned || !list) return;
+  _slotsPruned = true;
+  const kept = chartSlots.filter(t => t && list.has(String(t).toUpperCase()));
+  if (kept.length === chartSlots.length) return;
+  chartSlots = kept;
+  persistSlots();
+  lastCardOrder = '';
+  renderCards();
 }
 
 async function removeWatchlistTicker(ticker, evt){
@@ -7065,6 +7075,7 @@ async function _loadWatchlistPricesNow(){
     feedTickers = new Set((wlPrices||[]).map(t=>String(t.ticker).toUpperCase()));
     const _ml = await loadMyList();
     if(_ml) wlPrices = wlPrices.filter(t=>_ml.has(String(t.ticker).toUpperCase()));
+    pruneStaleSlots(_ml);   // #3514: the tradelist is the slots' source of truth
     _feedStatus(true);
     checkPriceAlerts();
     renderWatchlist();

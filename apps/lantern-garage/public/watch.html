@@ -1757,9 +1757,6 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
           + 'height:100%;font-family:var(--mono);font-size:11px;color:var(--text2);text-align:center'
           + '">' + (_noFeed
             ? 'No live feed for ' + _sym
-              + '<button type="button" onclick="reAddSlotSymbol(\'' + _sym + '\')" style="font:inherit;'
-              + 'padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);'
-              + 'color:var(--text);cursor:pointer">Re-add ' + _sym + ' to watchlist</button>'
             : 'Waiting for price data') + '</div>';
         if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
         return;
@@ -2271,16 +2268,24 @@ async function commitSlotSymbol(oldTicker, sym){
 }
 
 // #3514: chart slots persist in localStorage but the watchlist lives server-side,
-// so the two drift — a slot symbol the list no longer carries (server data reset,
-// or a slot set before commitSlotSymbol started POSTing) charts forever, because
-// the collector only polls listed symbols. The repair is the one-click button the
-// no-feed overlay renders, wired here. Deliberately USER-initiated, never a silent
-// boot mutation — server-side list membership only changes on an explicit action
-// (this page's watchlist is a plain watch list; the trader page applies the same
-// pattern to its guarded AI tradelist).
-async function reAddSlotSymbol(sym){
-  lastCardOrder = '';                                 // force a card rebuild once data flows
-  await addWatchlistSymbol(String(sym || '').toUpperCase());
+// so the two drift — a slot can name a symbol the list no longer carries (server
+// data reset, or the symbol was removed from the list) and its card then charts
+// nothing forever, because the collector only polls listed symbols. The list is
+// the source of truth ("why does AAPL show if it's not on the watchlist"): once
+// the list is known, drop any slot it doesn't carry and let the deck refill from
+// real watchlist symbols. Runs once per page load, after the FIRST successful
+// list fetch — never on later polls, so it can't race the slot editor's
+// add-then-POST flow (commitSlotSymbol), and a failed list fetch prunes nothing.
+let _slotsPruned = false;
+function pruneStaleSlots(list){
+  if (_slotsPruned || !list) return;
+  _slotsPruned = true;
+  const kept = chartSlots.filter(t => t && list.has(String(t).toUpperCase()));
+  if (kept.length === chartSlots.length) return;
+  chartSlots = kept;
+  persistSlots();
+  lastCardOrder = '';
+  renderCards();
 }
 
 // ── Symbol-search popup (#1692) — TradingView-style search over all Alpaca assets ──
@@ -3706,6 +3711,7 @@ async function _loadWatchlistPricesNow(){
     feedTickers = new Set((wlPrices||[]).map(t=>String(t.ticker).toUpperCase()));
     const _ml = await loadMyList();
     if(_ml) wlPrices = wlPrices.filter(t=>_ml.has(String(t.ticker).toUpperCase()));
+    pruneStaleSlots(_ml);   // #3514: the watchlist is the slots' source of truth
     _feedStatus(true);
     checkPriceAlerts();
     renderWatchlist();
