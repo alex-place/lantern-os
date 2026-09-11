@@ -15,7 +15,7 @@
     /* Match index.html: the rounded brand display face for headings + section labels. */
     :root { --head-font: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif; }
     .settings-shell { max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; display: grid; grid-template-columns: 220px 1fr; gap: 28px; align-items: start; }
-    .set-nav { position: sticky; top: 16px; }
+    .set-nav { position: sticky; top: 68px; }   /* clears the 52px sticky site nav, same 16px gap (#3504) */
     .set-nav h1 { font-family: var(--head-font); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 4px 0 10px 10px; font-weight: 700; }
     .set-nav a { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 9px; color: var(--text); text-decoration: none; font-size: 14px; font-weight: 500; cursor: pointer; }
     .set-nav a:hover { background: var(--surface); }

@@ -8,7 +8,14 @@
    site.css loads on all surfaces, so these defensive rules harden pages the audit
    can't individually reach (e.g. gated dashboards). They only cap oversized content;
    correctly-sized elements (icons, small images) are untouched. */
-html, body { max-width: 100%; overflow-x: hidden; }
+/* `clip`, not only `hidden` (#3504). With `hidden` on both html and body, body stops
+   handing its overflow to the viewport and becomes a scroll container of its own
+   (overflow-y computes to auto) -- one that never scrolls, because the document does.
+   Every position:sticky element on every page then stuck to body and scrolled away
+   with it: the guide's "On this page" rail. `clip` trims the same sideways overflow
+   without making a scroll container; `hidden` stays first as the fallback for a
+   browser that does not know `clip`. */
+html, body { max-width: 100%; overflow-x: hidden; overflow-x: clip; }
 img, svg, video, canvas, iframe { max-width: 100%; height: auto; }
 table { max-width: 100%; }
 pre, code, kbd { overflow-x: auto; }                 /* long code scrolls in place, not the page */
