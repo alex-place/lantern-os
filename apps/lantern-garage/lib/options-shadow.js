@@ -267,6 +267,14 @@ function _post(host, p, body, headers) {
 /** Place ONE paper option order (marketable limit). Returns {order_id}|{error}.
  *  Refuses anything but the paper trading host — this bridge never touches live. */
 async function placePaperOrder({ contract, side, qty, limit, tif }) {
+  // Options trading was removed (#3485, #3508). This is the one door every option
+  // order goes through -- the shadow's paper bridge (OPTIONS_PAPER) and the overnight
+  // book's options tier (OVERNIGHT_EXEC=options) alike -- so it refuses to OPEN a
+  // position whatever those switches say. A sell still goes through, so a leg opened
+  // before this shipped can be closed instead of stranded to expiry.
+  if (String(side || '').toLowerCase() !== 'sell') {
+    return { error: 'refused: options trading was removed (#3508) -- no new option positions' };
+  }
   const auth = _auth();
   if (!auth) return { error: 'no alpaca auth' };
   if (auth.env === 'live') return { error: 'refused: live auth — the options bridge is paper-only' };
