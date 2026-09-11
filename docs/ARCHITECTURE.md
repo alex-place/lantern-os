@@ -53,8 +53,8 @@ implementation of one loop stage.
 | Surface | Entrypoint | Bind | Notes |
 |---|---|---|---|
 | Local web server | [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js) | `127.0.0.1:4177` | Default; loopback only (`server.js:69-70`) |
-| **Production origin** (GCE) | [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js) | `0.0.0.0:8080` | VM `lantern-app`; `PORT`/`LANTERN_GARAGE_HOST` set by `lantern.service`, fronted by a Cloudflare tunnel → `unisona.ai`. **Manual deploy** (tag checkout) — see the [GCE runbook](ops/gce-cloud-deploy-runbook.md) |
-| Generic PaaS shim | [`apps/lantern-garage/cloud-server.js`](../apps/lantern-garage/cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim for a `PORT`-injecting host. **Not used by any current deployment** — production runs `server.js` directly (verified 2026-08-14: no Railway config exists in the repo) |
+| **Production origin** (Railway) | [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js) | `0.0.0.0:$PORT` | Railway project `unisona` (service `unisona`, environment `production`), started by `railway.json`. It runs whatever `railway up` last uploaded: ship with `node scripts/railway-deploy.mjs --yes`, per the [Railway runbook](ops/railway-runbook.md). The former GCE VM ([GCE runbook](ops/gce-cloud-deploy-runbook.md)) no longer serves `unisona.ai` |
+| Generic PaaS shim | [`apps/lantern-garage/cloud-server.js`](../apps/lantern-garage/cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim for a `PORT`-injecting host. **Not used**: Railway starts `server.js` directly (`railway.json`) |
 | Dev (hot-reload) | same server, port **4178** | `127.0.0.1:4178` | Dual-boot; current branch worktree |
 | Static UI | `gh-pages` branch (GitHub Actions) | — | Source in `apps/lantern-garage/public/` |
 | MCP server | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | `:8771` | Spawned by `server.js` (~`:617`) |
@@ -242,14 +242,12 @@ Each of these is a candidate ADR or follow-up issue spawned from this writeup.
 - **Patreon OAuth** optionally gates the whole site; currently the login *requirement* is behind a
   feature flag (`patreon_auth`) — guests browse, admin/trade stay gated. See
   [PATREON-OAUTH.md](PATREON-OAUTH.md) and the auth-flag memory.
-- **Production origin is a GCE VM** running `server.js`, reached through a **Cloudflare Tunnel**
-  (`cloudflared-unisona.service` on the VM, `tunnel run --token`, → `http://localhost:8080`) — not
-  edge-to-origin proxying. Verified 2026-08-14: the only firewall rule for `:8080`
-  (`lantern-app-8080`) permits a **single** source IP, so Cloudflare's edge cannot reach the origin
-  directly; `cloudflared` logs show it serving `unisona.ai` from Cloudflare edge IPs. Practical
-  consequence: the tunnel dials **outbound**, so moving hosts needs no DNS or origin change — see
-  [ADR-0018](adr/0018-web-tier-split-and-cloud-multi-tenancy.md) + the
-  [GCE deploy runbook](ops/gce-cloud-deploy-runbook.md). The legacy **Cloudflare tunnel → local
+- **Production origin is Railway** (verified 2026-09-11: `/api/status` reports `repoRoot: /app/apps`,
+  and every entry in `railway deployment list` is a CLI upload or a redeploy). Deploys go through
+  `scripts/railway-deploy.mjs`, which refuses during the US session and ships a known commit; see the
+  [Railway runbook](ops/railway-runbook.md). The GCE VM and its Cloudflare Tunnel
+  ([ADR-0018](adr/0018-web-tier-split-and-cloud-multi-tenancy.md), the
+  [GCE deploy runbook](ops/gce-cloud-deploy-runbook.md)) no longer serve `unisona.ai`. The legacy **Cloudflare tunnel → local
   4177** path ([CLOUDFLARE-TUNNEL-DEPLOYMENT.md](CLOUDFLARE-TUNNEL-DEPLOYMENT.md)) is
   **deprecated** — local dev / fallback only. Local-admin bypass must gate on proxy-header
   absence, not socket IP.
