@@ -46,6 +46,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.unisona.ai/library.html</loc>
+    <lastmod>2026-09-11</lastmod>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://www.unisona.ai/orchestration.html</loc>
     <lastmod>2026-08-18</lastmod>
     <priority>0.4</priority>

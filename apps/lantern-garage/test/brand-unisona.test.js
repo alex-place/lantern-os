@@ -10,12 +10,14 @@ const PUBLIC = path.join(__dirname, "..", "public");
 const BRAND = /\b(Keystone|Lantern)\w*/g;
 
 // Documented, legitimate exceptions for BODY copy (titles are still checked everywhere):
-//  - knowledgecenter.html: "Keystone" doc titles were swept to unisona.ai in the 2026-07
-//    rename, but cards still show real file paths/module names (LANTERN-*.md doc titles,
-//    keystone-context.js) — paths are ids, not brand copy.
+//  - library.html: "Keystone" doc titles were swept to unisona.ai in the 2026-07 rename,
+//    but the reference library's cards still show real file paths/module names
+//    (LANTERN-*.md doc titles, keystone-context.js) — paths are ids, not brand copy.
+//    The cards lived on knowledgecenter.html until the library got its own page (#3503);
+//    the guide itself is brand-clean, so it is no longer excepted.
 //  - three-doors-game.html has in-game CHARACTERS named "Lantern"/"Keystone" (hand-drawn
 //    reference art + dialogue) — fiction, not the product brand.
-const BODY_ALLOWLIST = new Set(["knowledgecenter.html"]);
+const BODY_ALLOWLIST = new Set(["library.html"]);
 
 const stripCode = (s) => s
   .replace(/<script[\s\S]*?<\/script>/gi, "")

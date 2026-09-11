@@ -28,6 +28,7 @@ const PUBLIC_PAGES = {
   // board); joining/start/stop are auth-gated server-side in routes/trading/champion.js.
   "/contest.html":        "contest.html",
   "/knowledgecenter.html":"knowledgecenter.html",
+  "/library.html":"library.html",     // reference library: the technical docs, moved off the guide (#3503)
   // The FAQ is a pre-signup help page — the Knowledge Center hero links it under
   // "no account or API key required", and it's exactly what a prospect reads before
   // deciding to sign up. Gating it 302'd guests to /auth.html, contradicting that
