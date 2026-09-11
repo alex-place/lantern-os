@@ -195,9 +195,8 @@
       <div class="jp-sub" id="jpRange">Realized results, day by day.</div>
     </div>
     <div class="jp-controls">
-      <button type="button" class="jp-chip on" id="jpViewConfirmed" onclick="jpSetView('confirmed')">Confirmed</button>
-      <button type="button" class="jp-chip" id="jpViewSkips" onclick="jpSetView('skips')">Declined</button>
-      <button type="button" class="jp-chip" onclick="jpLoad(true)" title="Reload from the broker record">Refresh</button>
+      <span class="jp-dim" id="jpLoadedAt" title="This page never reloads itself — this is when it last read the broker record"></span>
+      <button type="button" class="jp-chip" onclick="jpLoad(true)" title="Read the broker record again">Refresh</button>
     </div>
   </div>
 
@@ -207,10 +206,15 @@
 <script>
 /* ── Journal page ──────────────────────────────────────────────────────────────
    Reads the same endpoints the bottom-panel journal read -- /track-record for the
-   realized book, /scorecard for the breakdown slice, /skips for declined trades --
-   and lays them out with room to breathe. No new server surface. */
-const JP_LABELS = { reason:'Exit reason', symbol:'Symbol', hour:'Hour' };
-let jpView = 'confirmed', jpSlice = 'reason', jpBusy = false, jpMonth = null, jpData = null;
+   realized book, /scorecard for the breakdown slice -- and lays them out with room to
+   breathe. No new server surface.
+
+   Exit reason is gone as a slice (#3542): the engine's own names for why it closed a
+   position (zone r, max hold) describe machinery the reader has no view of. Declined went
+   with it -- it said "nothing was declined" on every real account, for the price of a
+   fetch and a panel. */
+const JP_LABELS = { symbol:'Symbol', hour:'Hour' };
+let jpSlice = 'symbol', jpBusy = false, jpMonth = null, jpData = null, jpLast = null;
 
 const jpEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const jpUsd = (n) => (typeof n !== 'number' || !isFinite(n)) ? '—'
@@ -235,10 +239,9 @@ async function jpFetch(demo) {
     if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
     return r.json();
   });
-  const [rec, slice, skips, equity, live] = await Promise.all([
+  const [rec, slice, equity, live] = await Promise.all([
     get('/api/trading/track-record' + qs),
     get('/api/trading/scorecard' + qs + amp + 'by=' + jpSlice),
-    get('/api/trading/skips' + qs).catch(() => null),
     // The broker's OWN equity series -- a different question from the ledger. The
     // ledger answers "what did the autopilot do"; this answers "what is the money
     // doing", so it includes manual trades, deposits, and everything from before the
@@ -253,7 +256,7 @@ async function jpFetch(demo) {
     demo ? Promise.resolve(null)
          : get('/api/trading/positions').then(j => (j && j.account) || null).catch(() => null),
   ]);
-  return { rec, slice, skips, equity, live, demo };
+  return { rec, slice, equity, live, demo };
 }
 
 async function jpLoad(force) {
@@ -274,6 +277,7 @@ async function jpLoad(force) {
     }
     jpData = data;
     jpRender(host, data);
+    jpStampLoaded();
   } catch (e) {
     const network = !(e && e.status);
     host.innerHTML = '<div class="jp-empty">'
@@ -283,14 +287,42 @@ async function jpLoad(force) {
   } finally { jpBusy = false; }
 }
 
-function jpSetView(v) {
-  if (jpView === v) return;
-  jpView = v;
-  document.getElementById('jpViewConfirmed').classList.toggle('on', v === 'confirmed');
-  document.getElementById('jpViewSkips').classList.toggle('on', v === 'skips');
-  if (jpData) jpRender(document.getElementById('jpBody'), jpData);
+/* Switching the breakdown used to call jpLoad(true): every endpoint fetched again and the
+   whole page repainted, scroll position and all, to change one table (#3541). Now it asks
+   for that one slice, and only the first visit to a slice costs a request. */
+const jpSliceCache = {};
+async function jpSetSlice(k) {
+  if (jpSlice === k || !JP_LABELS[k]) return;
+  jpSlice = k;
+  const card = document.getElementById('jpBreakdownCard');
+  if (!card) return;
+  if (jpSliceCache[k] === undefined) {
+    card.setAttribute('aria-busy', 'true');
+    const demo = !!(jpData && jpData.demo);
+    const url = '/api/trading/scorecard' + (demo ? '?demo=champion&' : '?') + 'by=' + encodeURIComponent(k);
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      jpSliceCache[k] = r.ok ? await r.json() : null;
+    } catch (_e) { jpSliceCache[k] = null; }
+    card.removeAttribute('aria-busy');
+    if (jpSlice !== k) return;          // clicked away while it was in flight
+  }
+  if (jpData) jpData.slice = jpSliceCache[k];
+  card.innerHTML = jpBreakdown(jpSliceCache[k]);
 }
-function jpSetSlice(k) { if (jpSlice === k) return; jpSlice = k; jpLoad(true); }
+
+/* The calendar's measure and its month arrows repaint the calendar card and the two tiles
+   that read the same series. Nothing else on the page moves (#3541). */
+function jpPaintCalendar() {
+  if (!jpLast) return;
+  const card = document.getElementById('jpCalCard');
+  if (card) card.innerHTML = jpCalendarCard(jpLast.daily, jpLast.liveToday, jpLast.acct);
+  const tiles = document.getElementById('jpKpis');
+  if (tiles) {
+    const dsr = jpDaySeries(jpLast.daily, jpLast.liveToday, jpLast.acct);
+    tiles.innerHTML = jpKpis(jpLast.s, jpLast.book, Object.assign(jpDayStats(dsr.days), { mode: dsr.mode }));
+  }
+}
 
 /* The calendar's measure (#3517): 'account' -- the account's change each session, the
    default -- or 'booked', what closed that day. Remembered per browser; a private window
@@ -304,7 +336,7 @@ function jpSetCalMode(m) {
   if (jpCalMode === m) return;
   jpCalMode = m;
   try { localStorage.setItem('jp-cal-mode', m); } catch (_e) { /* not remembered, still switches */ }
-  if (jpData) jpRender(document.getElementById('jpBody'), jpData);
+  jpPaintCalendar();
 }
 
 /* Derived from `daily`, not invented: a day counts as a win when its realized P&L is
@@ -525,7 +557,7 @@ function jpShiftMonth(n) {
   const next = months[i + n];
   if (!next) return;
   jpMonth = next;
-  jpRender(document.getElementById('jpBody'), jpData);
+  jpPaintCalendar();
 }
 
 function jpBreakdown(slice) {
@@ -535,7 +567,7 @@ function jpBreakdown(slice) {
      for every slice, which looked like "no data" rather than like a bug.
      Supported slices come from the API itself: symbol, hour, reason, skip. `weekday` is
      not one of them -- offering it returned unknown_breakdown. */
-  const SLICES = ['reason', 'symbol', 'hour'];
+  const SLICES = ['symbol', 'hour'];
   const chips = SLICES.map(k =>
     '<button type="button" class="jp-chip' + (jpSlice === k ? ' on' : '') + '" onclick="jpSetSlice(\'' + k + '\')">'
     + jpEsc(JP_LABELS[k] || k) + '</button>').join('');
@@ -554,21 +586,10 @@ function jpBreakdown(slice) {
       + '<td class="num">' + jpPct(r.winRate) + '</td>'
       + '<td class="num ' + jpSign(r.totalRealized) + '">' + jpUsd(r.totalRealized) + '</td></tr>').join('')
     + '</tbody></table></div>'
-    + '<p class="jp-note">Broker-accepted fills only. Exit reasons are the engine\'s own names for why a position closed.</p>';
+    + '<p class="jp-note">Broker-accepted fills only.</p>';
 }
 /* signal_exit -> "signal exit". The engine's keys are snake_case internally. */
 function jpLabelValue(k) { return String(k == null ? '—' : k).replace(/_/g, ' '); }
-
-function jpSkips(sk) {
-  const rows = (sk && (sk.rows || sk.skips)) || [];
-  if (!rows.length) return '<h2>Declined</h2><div class="jp-empty">Nothing was declined in this window. Every candidate that reached the gate was taken.</div>';
-  return '<h2>Declined <span class="jp-dim" style="text-transform:none;letter-spacing:0">' + rows.length + ' passed over</span></h2>'
-    + '<div class="jp-scroll"><table class="jp-table"><thead><tr><th>When</th><th>Symbol</th><th>Why</th></tr></thead><tbody>'
-    + rows.slice(0, 200).map(r => '<tr><td class="jp-dim">' + jpEsc(String(r.ts || r.date || '').slice(0, 16).replace('T', ' ')) + '</td>'
-      + '<td><b>' + jpEsc(r.symbol || '') + '</b></td>'
-      + '<td>' + jpEsc(r.reason || r.why || '') + '</td></tr>').join('')
-    + '</tbody></table></div>';
-}
 
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
@@ -898,13 +919,6 @@ function jpRender(host, data) {
       + (liveToday ? ' Today so far: ' + (liveToday.pnl > 0 ? '+' : '') + jpUsd(liveToday.pnl) + ', live.' : '');
   }
 
-  if (jpView === 'skips') {
-    html += '<div class="jp-card">' + jpSkips(data.skips) + '</div>';
-    host.innerHTML = html;
-  jpBindPlots();
-    return;
-  }
-
   if (!s.trades) {
     html += '<div class="jp-empty">No confirmed trades yet. As soon as a position closes with a broker-accepted fill, '
       + 'this page fills in: realized P&amp;L by day, the equity curve with its drawdown, where the exits happened, '
@@ -917,11 +931,12 @@ function jpRender(host, data) {
 
   const dsr = jpDaySeries(daily, liveToday, acct);   // the calendar's measure (#3538)
   const ds = Object.assign(jpDayStats(dsr.days), { mode: dsr.mode });
-  html += jpKpis(s, book, ds);
+  jpLast = { s, book, daily, liveToday, acct };
+  html += '<div id="jpKpis">' + jpKpis(s, book, ds) + '</div>';
   html += '<div class="jp-grid">'
     + '<div class="jp-col">'
-      + '<div class="jp-card">' + jpCalendarCard(daily, liveToday, acct) + '</div>'
-      + '<div class="jp-card">' + jpBreakdown(data.slice) + '</div>'
+      + '<div class="jp-card" id="jpCalCard">' + jpCalendarCard(daily, liveToday, acct) + '</div>'
+      + '<div class="jp-card" id="jpBreakdownCard">' + jpBreakdown(data.slice) + '</div>'
     + '</div>'
     + '<div class="jp-col">'
       + (function () {
@@ -932,7 +947,6 @@ function jpRender(host, data) {
         + jpPlot(daily.map(d => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
             aria: 'Realized profit and loss for each exchange day' })
         + '</div>'
-      + '<div class="jp-card">' + jpSkips(data.skips) + '</div>'
     + '</div>'
   + '</div>';
   html += jpPlacements();
@@ -945,35 +959,21 @@ function jpRender(host, data) {
 }
 
 /* ── Staying current ──────────────────────────────────────────────────────────
-   This page used to call jpLoad() exactly once, on DOMContentLoaded, and never again.
-   No interval, no refresh on focus. A tab left open showed whatever was true when it
-   was opened -- so a session could close, the ledger could gain a day, and the journal
-   would still be reporting yesterday with no sign anything was stale.
-
-   Refreshing on FOCUS rather than on a timer, because that is how a review surface is
-   actually used: you glance at it, go somewhere else, and come back wanting the number
-   to be right. A hidden tab costs nothing, which a fixed interval cannot say -- the
-   trader page runs seven of those, and it is a live surface that earns them.
-
-   The slow poll underneath is a floor, not the mechanism: it only fires while the page
-   is VISIBLE, so a forgotten tab in the background is not quietly hammering the broker
-   all night. STALE_MS is deliberately larger than the poll so a refresh triggered by
-   coming back to the tab does not re-fetch something fetched seconds ago. */
-const JP_POLL_MS = 120000;   // visible-only background refresh
-const JP_STALE_MS = 45000;   // don't re-fetch on focus if we just did
-let _jpLastLoad = 0;
-
-async function jpRefresh(reason) {
-  if (document.visibilityState !== 'visible') return;
-  if (Date.now() - _jpLastLoad < JP_STALE_MS) return;
-  _jpLastLoad = Date.now();
-  try { await jpLoad(true); } catch (_e) { /* the error card already explains itself */ }
+   The page reads the broker record when it opens, and when you press Refresh. Nothing
+   else moves it (#3541). It used to refetch on focus, on visibilitychange and on a
+   two-minute timer, so switching tabs and coming back repainted the page under you --
+   scroll position included -- and any control did the same. A review surface that shifts
+   while you are reading it is worse than one a few minutes old, so the header carries the
+   time it last read the record instead. */
+function jpStampLoaded(at) {
+  const el = document.getElementById('jpLoadedAt');
+  if (!el) return;
+  let t = '';
+  try { t = (at || new Date()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (_e) { t = ''; }
+  el.textContent = t ? 'Loaded ' + t : '';
 }
 
-document.addEventListener('DOMContentLoaded', () => { _jpLastLoad = Date.now(); jpLoad(); });
-document.addEventListener('visibilitychange', () => jpRefresh('visible'));
-window.addEventListener('focus', () => jpRefresh('focus'));
-setInterval(() => jpRefresh('poll'), JP_POLL_MS);
+document.addEventListener('DOMContentLoaded', () => jpLoad());
 </script>
 
 <script src="/js/theme-toggle.js" defer></script>
