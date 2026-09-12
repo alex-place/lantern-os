@@ -101,6 +101,10 @@
   .jp-res:hover::after,.jp-res.on::after{background:var(--accent)}
   .jp-res-x{top:10px;bottom:10px;right:-8px;width:16px;cursor:col-resize}
   .jp-res-x::after{left:6px;top:50%;transform:translateY(-50%);width:4px;height:36px}
+  /* A divider runs the height of the card it splits, so it reads as a boundary
+     between two things rather than a corner grip on one of them. */
+  .jp-res-split{cursor:col-resize}
+  .jp-res-split::after{top:12px;bottom:12px;height:auto;transform:none}
   .jp-res-y{left:10px;right:10px;bottom:-8px;height:16px;cursor:row-resize}
   .jp-res-y::after{top:6px;left:50%;transform:translateX(-50%);height:4px;width:36px}
   /* Where the card will land. An insertion LINE rather than a highlighted target,
@@ -1931,14 +1935,48 @@ function jpTray() {
     + '<button type="button" class="jp-chip" data-act="reset" style="margin-left:auto">Reset</button></div>';
 }
 
+/**
+ * Which cards end up on the same row, worked out the way the grid itself will: fill left
+ * to right until the next span will not fit, then wrap. Knowing this BEFORE painting is
+ * what lets the handle between two cards behave as a divider -- the pointer code would
+ * otherwise have to measure the page and guess.
+ */
+function jpRowsOf(shown) {
+  const rows = [];
+  let row = [], used = 0;
+  for (const id of shown) {
+    const span = jpSpanOf(jpLayout, id);
+    if (used + span > JP_COLS && row.length) { rows.push(row); row = []; used = 0; }
+    row.push(id);
+    used += span;
+    if (used >= JP_COLS) { rows.push(row); row = []; used = 0; }
+  }
+  if (row.length) rows.push(row);
+  return rows;
+}
+
+/* id -> the card immediately to its right on the same row, if any. */
+function jpSplitPartners(shown) {
+  const partner = {};
+  for (const row of jpRowsOf(shown)) {
+    for (let i = 0; i < row.length - 1; i++) partner[row[i]] = row[i + 1];
+  }
+  return partner;
+}
+
 /* Repaints the cards from data already in hand -- arranging the page never refetches. */
 function jpPaintCards() {
   const host = document.getElementById('jpCards');
   if (!host || !jpData || !jpLast) return;
   const visible = jpLayout.order.filter((id) => !jpLayout.hidden.includes(id));
-  host.innerHTML = visible.map((id) => {
-    const body = jpCardBody(id, jpData);
-    if (!body) return '';
+  // Built once: a card with nothing to show is not rendered, so it is not on a row
+  // either, and the split partners have to be worked out from what is actually drawn.
+  const bodies = new Map();
+  for (const id of visible) { const b = jpCardBody(id, jpData); if (b) bodies.set(id, b); }
+  const shown = [...bodies.keys()];
+  const partner = jpSplitPartners(shown);
+  host.innerHTML = shown.map((id) => {
+    const body = bodies.get(id);
     const span = jpSpanOf(jpLayout, id);
     const h = jpHeightOf(jpLayout, id);
     return '<section class="jp-card' + (id === 'kpis' ? ' bare' : '') + '"'
@@ -1949,7 +1987,9 @@ function jpPaintCards() {
       + ' data-card="' + id + '" style="grid-column:span ' + span + (h ? ';align-self:start' : '') + '">'
       + jpCardBar(id, span)
       + '<div class="jp-cbody"' + (h ? ' style="height:' + h + 'px;overflow:auto"' : '') + '>' + body + '</div>'
-      + (jpEdit ? '<span class="jp-res jp-res-x" data-res="x" title="Drag to set width"></span>'
+      + (jpEdit ? '<span class="jp-res jp-res-x' + (partner[id] ? ' jp-res-split' : '') + '" data-res="x"'
+        + (partner[id] ? ' data-split="' + jpEsc(partner[id]) + '"' : '')
+        + ' title="' + (partner[id] ? 'Drag to change the split with the card beside it' : 'Drag to set width') + '"></span>'
         + '<span class="jp-res jp-res-y" data-res="y" title="Drag to set height, double-click to fit"></span>' : '')
       + '</section>';
   }).join('') + jpTray();
@@ -2003,8 +2043,18 @@ function jpBindLayout(root) {
     const id = grip.getAttribute('data-grip');
     const span = jpSpanOf(jpLayout, id);
     let next = null;
-    if (e.key === 'ArrowLeft') next = e.shiftKey ? jpLayoutSpan(jpLayout, id, span - 1) : jpLayoutMove(jpLayout, id, -1);
-    else if (e.key === 'ArrowRight') next = e.shiftKey ? jpLayoutSpan(jpLayout, id, span + 1) : jpLayoutMove(jpLayout, id, 1);
+    // Shift+arrows resize. Same rule as the divider: where there is a card beside it,
+    // the width comes from that card rather than from the row's capacity.
+    const resize = (by) => {
+      const shown = [...root.querySelectorAll('[data-card]')].map((c) => c.getAttribute('data-card'));
+      const mate = jpSplitPartners(shown)[id];
+      if (!mate) return jpLayoutSpan(jpLayout, id, span + by);
+      const total = span + jpSpanOf(jpLayout, mate);
+      const mine = jpClamp(span + by, JP_SPAN_MIN, total - JP_SPAN_MIN);
+      return jpLayoutSpan(jpLayoutSpan(jpLayout, id, mine), mate, total - mine);
+    };
+    if (e.key === 'ArrowLeft') next = e.shiftKey ? resize(-1) : jpLayoutMove(jpLayout, id, -1);
+    else if (e.key === 'ArrowRight') next = e.shiftKey ? resize(1) : jpLayoutMove(jpLayout, id, 1);
     else if (e.key === 'Delete' || e.key === 'Backspace') next = jpLayoutHide(jpLayout, id);
     if (!next || next === jpLayout) return;
     e.preventDefault();
@@ -2056,6 +2106,12 @@ function jpBindLayout(root) {
     if (!res && !grip) return;
     const id = card.getAttribute('data-card');
     const body = card.querySelector('.jp-cbody');
+    /* The handle sits BETWEEN two cards, so when there is a card beside it that is
+       what it adjusts: the pair keeps its combined width and the boundary moves.
+       Sizing them independently meant a 60/40 split took two drags with a state in
+       between where they no longer fit -- and a card that does not fit wraps. */
+    const splitId = res ? res.getAttribute('data-split') : null;
+    const splitEl = splitId ? card.parentNode.querySelector('[data-card="' + splitId + '"]') : null;
     drag = {
       id, card, body,
       mode: res ? res.getAttribute('data-res') : 'move',
@@ -2063,7 +2119,8 @@ function jpBindLayout(root) {
       span: jpSpanOf(jpLayout, id),
       h: body ? Math.round(body.getBoundingClientRect().height) : 0,
       handle: res || grip,
-      index: null, live: null, moved: false,
+      pair: splitEl ? { id: splitId, el: splitEl, span: jpSpanOf(jpLayout, splitId) } : null,
+      index: null, live: null, pairLive: null, moved: false,
     };
     if (res) res.classList.add('on');
     try { drag.handle.setPointerCapture(e.pointerId); } catch (_e) { /* mouse without capture */ }
@@ -2088,12 +2145,25 @@ function jpBindLayout(root) {
       // One column is a twelfth of the grid, gaps included -- so the card follows the
       // pointer rather than drifting away from it as the row fills up.
       const r = host.getBoundingClientRect();
-      const gap = 12;
-      const col = (r.width + gap) / JP_COLS;
-      drag.live = jpClamp(drag.span + Math.round((e.clientX - drag.x) / col), JP_SPAN_MIN, JP_COLS);
-      drag.card.style.gridColumn = 'span ' + drag.live;
-      const readout = drag.card.querySelector('.jp-span');
-      if (readout) readout.textContent = drag.live + '/' + JP_COLS;
+      const col = (r.width + 12) / JP_COLS;
+      const step = Math.round((e.clientX - drag.x) / col);
+      const show = (el, span) => {
+        el.style.gridColumn = 'span ' + span;
+        const out = el.querySelector('.jp-span');
+        if (out) out.textContent = span + '/' + JP_COLS;
+      };
+      if (drag.pair) {
+        // The pair's combined width is fixed, so neither can be pushed off the row.
+        const total = drag.span + drag.pair.span;
+        drag.live = jpClamp(drag.span + step, JP_SPAN_MIN, total - JP_SPAN_MIN);
+        drag.pairLive = total - drag.live;
+        show(drag.card, drag.live);
+        show(drag.pair.el, drag.pairLive);
+        return;
+      }
+      // Last card on its row: nothing to take from, so it just grows or shrinks.
+      drag.live = jpClamp(drag.span + step, JP_SPAN_MIN, JP_COLS);
+      show(drag.card, drag.live);
       return;
     }
     if (drag.mode === 'y' && drag.body) {
@@ -2112,7 +2182,11 @@ function jpBindLayout(root) {
     clearDrop();
     if (!d.moved) return;                       // a click on a handle is not a drag
     if (d.mode === 'move' && d.index != null) jpApplyLayout(jpLayoutInsert(jpLayout, d.id, d.index));
-    else if (d.mode === 'x' && d.live != null) jpApplyLayout(jpLayoutSpan(jpLayout, d.id, d.live));
+    else if (d.mode === 'x' && d.live != null) {
+      let next = jpLayoutSpan(jpLayout, d.id, d.live);
+      if (d.pair && d.pairLive != null) next = jpLayoutSpan(next, d.pair.id, d.pairLive);
+      jpApplyLayout(next);
+    }
     else if (d.mode === 'y' && d.live != null) jpApplyLayout(jpLayoutHeight(jpLayout, d.id, d.live));
   }
   root.addEventListener('pointerup', endDrag);
