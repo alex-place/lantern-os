@@ -23,7 +23,8 @@ const route = require('../routes/journal-layout');
 
 after(() => { try { fs.rmSync(DIR, { recursive: true, force: true }); } catch (_e) { /* gone */ } });
 
-const LAYOUT = { v: 1, order: ['kpis', 'calendar', 'balance'], hidden: ['balance'], width: { calendar: 2 } };
+const LAYOUT = { v: 2, order: ['kpis', 'calendar', 'balance'], hidden: ['balance'],
+  span: { calendar: 12, kpis: 4 }, h: { calendar: 320 } };
 
 test('a good layout survives the round trip', () => {
   assert.deepStrictEqual(store.set('u-1', LAYOUT), LAYOUT);
@@ -34,15 +35,43 @@ test('normalize keeps what it understands and drops the rest', () => {
   const dirty = {
     order: ['kpis', 'kpis', 'calendar', 'Bad Id', '', 42, 'placements'],
     hidden: ['placements', 'placements', 'never-added'],
-    width: { calendar: 2, kpis: 7, ghost: 2 },
+    span: { calendar: 8, kpis: 99, ghost: 6, placements: 1 },
+    h: { calendar: 300, kpis: 5, placements: 99999 },
     somethingElse: 'ignored',
   };
   assert.deepStrictEqual(store.normalize(dirty), {
-    v: 1,
+    v: 2,
     order: ['kpis', 'calendar', 'placements'],   // duplicates and junk ids gone, order kept
     hidden: ['placements'],                       // hiding a card that isn't in the order is meaningless
-    width: { calendar: 2 },                       // 1 or 2 only, and only for cards in the order
+    span: { calendar: 8 },                        // 3..12, and only for cards in the order
+    h: { calendar: 300 },                         // a height a scroll box could actually be
   });
+});
+
+test('a layout stored before spans existed is READ, not discarded (#3565)', () => {
+  // v1 offered half or full. Someone arranged their journal with it; changing our schema
+  // is not a reason to hand them back the default.
+  const v1 = { v: 1, order: ['kpis', 'calendar', 'balance'], hidden: ['balance'], width: { kpis: 2, calendar: 1 } };
+  assert.deepStrictEqual(store.normalize(v1), {
+    v: 2,
+    order: ['kpis', 'calendar', 'balance'],
+    hidden: ['balance'],
+    span: { kpis: 12, calendar: 6 },              // full became twelve twelfths, half became six
+    h: {},
+  });
+});
+
+test('where both shapes are present, the newer one wins', () => {
+  const mixed = { order: ['kpis'], span: { kpis: 5 }, width: { kpis: 2 } };
+  assert.strictEqual(store.normalize(mixed).span.kpis, 5);
+});
+
+test('a span below a quarter of the page is refused, not clamped silently', () => {
+  // Clamping would store something the reader never chose; dropping it leaves the card
+  // at its own default, which is a shape that is known to work.
+  assert.deepStrictEqual(store.normalize({ order: ['kpis'], span: { kpis: 2 } }).span, {});
+  assert.deepStrictEqual(store.normalize({ order: ['kpis'], span: { kpis: 3 } }).span, { kpis: 3 });
+  assert.deepStrictEqual(store.normalize({ order: ['kpis'], span: { kpis: 6.5 } }).span, {}, 'and half a column is not a column');
 });
 
 test('a layout with nothing in it, or absurdly many cards, is refused', () => {

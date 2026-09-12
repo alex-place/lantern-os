@@ -12,10 +12,17 @@
  * A guest has no file: their arrangement lives in their browser and nowhere else.
  *
  * Shape (validated on the way in AND on the way out, because a file on disk is input):
- *   { v: 1, order: ['kpis', ...], hidden: ['placements'], width: { balance: 2 } }
- * Width is 1 (half) or 2 (full). Ids the page doesn't know are dropped when it renders,
- * and cards the layout never heard of are appended — so adding a card doesn't strand
- * anyone on a layout that hides it by omission.
+ *   { v: 2, order: ['kpis', ...], hidden: ['placements'],
+ *     span: { balance: 4 },        // width in twelfths, 3..12
+ *     h:    { balance: 320 } }     // pixel height of the card body, or absent for auto
+ *
+ * v1 stored `width` as 1 (half) or 2 (full) — two choices dressed as customisation
+ * (#3565). A v1 file still reads: its widths become spans, because a reader who
+ * arranged their journal should not have it reset by our schema changing under them.
+ *
+ * Ids the page doesn't know are dropped when it renders, and cards the layout never
+ * heard of are appended — so adding a card doesn't strand anyone on a layout that
+ * hides it by omission.
  */
 
 const fs = require('fs');
@@ -30,6 +37,11 @@ const DIR = process.env.JOURNAL_LAYOUT_DIR
 
 const ID = /^[a-z][a-z0-9-]{0,31}$/;
 const MAX_CARDS = 40;
+const COLS = 12;
+// Below a quarter of the page a card is a column of single characters, and above the
+// full width it is not a layout any more. Heights bound what a scroll box can be.
+const SPAN_MIN = 3;
+const H_MIN = 120, H_MAX = 1200;
 
 function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId)) + '.json'); }
 
@@ -51,11 +63,19 @@ function normalize(raw) {
   for (const id of Array.isArray(raw.hidden) ? raw.hidden : []) {
     if (typeof id === 'string' && seen.has(id) && !hidden.includes(id)) hidden.push(id);
   }
-  const width = {};
-  for (const [id, w] of Object.entries(raw.width && typeof raw.width === 'object' ? raw.width : {})) {
-    if (seen.has(id) && (w === 1 || w === 2)) width[id] = w;
+  const span = {};
+  for (const [id, n] of Object.entries(raw.span && typeof raw.span === 'object' ? raw.span : {})) {
+    if (seen.has(id) && Number.isInteger(n) && n >= SPAN_MIN && n <= COLS) span[id] = n;
   }
-  return { v: 1, order, hidden, width };
+  // v1: 1 was a half, 2 was the full width. Only where v2 has not already spoken.
+  for (const [id, w] of Object.entries(raw.width && typeof raw.width === 'object' ? raw.width : {})) {
+    if (seen.has(id) && !(id in span) && (w === 1 || w === 2)) span[id] = w === 2 ? COLS : COLS / 2;
+  }
+  const h = {};
+  for (const [id, n] of Object.entries(raw.h && typeof raw.h === 'object' ? raw.h : {})) {
+    if (seen.has(id) && Number.isFinite(n) && n >= H_MIN && n <= H_MAX) h[id] = Math.round(n);
+  }
+  return { v: 2, order, hidden, span, h };
 }
 
 /** The user's stored arrangement, or null when there is none (or none we trust). */
@@ -80,4 +100,4 @@ function clear(userId) {
   try { fs.unlinkSync(_file(userId)); return true; } catch (_e) { return false; }
 }
 
-module.exports = { DIR, MAX_CARDS, normalize, get, set, clear };
+module.exports = { DIR, MAX_CARDS, COLS, SPAN_MIN, H_MIN, H_MAX, normalize, get, set, clear };
