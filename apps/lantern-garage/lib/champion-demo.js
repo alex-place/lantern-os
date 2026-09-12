@@ -251,13 +251,17 @@ function journalRows(days = 28) {
       const risk = 35 + rand() * 120;
       const pnl = round2(win ? risk * 1.5 : -risk);
       const entry = round2(h.price * (0.95 + rand() * 0.08));
-      const pnlPct = round2((pnl / (entry * 40)) * 100); // vs a ~40-share notional
+      // The demo has always traded a 40-share notional -- it priced the exit and the
+      // percentage off it -- but never wrote the size down, so the trade log (#3558)
+      // showed a guest an empty Qty on every row. Named once, used everywhere.
+      const qty = 40;
+      const pnlPct = round2((pnl / (entry * qty)) * 100);
       const reason = win
         ? DEMO_EXIT_WINS[Math.floor(rand() * DEMO_EXIT_WINS.length)]
         : DEMO_EXIT_LOSSES[Math.floor(rand() * DEMO_EXIT_LOSSES.length)];
       const ts = new Date(day.setUTCHours(14 + k * 2, 30, 0, 0)).toISOString();
       exits.push({
-        ts, event: 'exit', symbol: h.symbol, entry, exit: round2(entry + pnl / 40),
+        ts, event: 'exit', symbol: h.symbol, qty, entry, exit: round2(entry + pnl / qty),
         pnl, pnl_pct: pnlPct, reason, status: 'filled', source: 'champion-demo',
         mfe_pct: round2(Math.abs(pnlPct) * (win ? 1 + rand() * 0.4 : rand() * 0.8)),
         mae_pct: round2(-(win ? rand() * 0.9 : Math.abs(pnlPct) * (1 + rand() * 0.3))),

@@ -99,6 +99,10 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
       // MFE/MAE (#3241) — from the excursion snapshot the engine passes through
       // entryFor(); null when the run wasn't observed (e.g. pre-restart fills).
       ...excursionFields(entryPx, info.peak, info.trough, info.stopDistPct),
+      // When the position was opened (#3558), so the trade log can say how long it
+      // was held. Null on a fill this process never saw opened — an absent hold is
+      // honest, a zero one would read as a trade closed the instant it opened.
+      opened_at: info.openedAt || null,
     });
   }
   return out;
