@@ -233,6 +233,8 @@
   /* A finger is not a mouse: give the plot room so the readout is not under the thumb. */
   @media (max-width:560px){ .jp-chart .jp-read{font-size:11px;padding:3px 7px} }
   .jp-empty{color:var(--text2);padding:16px 2px;max-width:66ch;line-height:1.6}
+  .jp-import{padding:0 2px 8px;max-width:66ch}
+  .jp-import .jp-note{margin-top:8px}
   .jp-loading{color:var(--text2);padding:16px 2px}
   .jp-banner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--bg1);border:1px solid var(--border);
     border-left:3px solid var(--blue);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px}
@@ -252,6 +254,8 @@
     <div class="jp-controls">
       <span class="jp-dim" id="jpLoadedAt" title="This page never reloads itself — this is when it last read the broker record"></span>
       <button type="button" class="jp-chip" id="jpEditBtn" onclick="jpSetEdit(!jpEdit)" title="Arrange the cards: drag them, set half or full width, hide what you do not read">Edit layout</button>
+      <button type="button" class="jp-chip" id="jpImportBtn" hidden onclick="jpRunImport()"
+        title="Read your own trades from the broker you have connected and put them in this journal">Import trades</button>
       <button type="button" class="jp-chip" onclick="jpLoad(true)" title="Read the broker record again">Refresh</button>
     </div>
   </div>
@@ -1083,6 +1087,82 @@ async function jpEnsureRDist() {
   if (card) card.innerHTML = jpRDist(jpSliceCache.r);
 }
 
+/* Bringing the reader's own trades in (#3557).
+   The journal reads one ledger. The autopilot writes to it; nothing else did, so a manual
+   trader's journal was empty no matter how much they traded. This asks the server to read
+   their connected broker's fill history, reconstruct the round trips, and write them into
+   that same ledger -- after which every card on this page works on them unchanged. */
+let jpImportState = null;
+
+async function jpImportCheck() {
+  try {
+    const r = await fetch('/api/trading/import', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return;
+    jpImportState = await r.json();
+  } catch (_e) { return; }           // offline: the button simply stays hidden
+  const btn = document.getElementById('jpImportBtn');
+  if (btn) btn.hidden = !(jpImportState && jpImportState.available);
+  jpPaintImportOffer();
+}
+
+/* Only drawn in the empty state, where the reader is looking at nothing and needs to know
+   why. With trades on the page the header chip is enough. */
+function jpPaintImportOffer() {
+  const host = document.getElementById('jpImport');
+  if (!host) return;
+  const st = jpImportState;
+  if (!st) { host.innerHTML = ''; return; }
+  if (!st.available) {
+    host.innerHTML = '<p class="jp-note">' + (st.reason === 'not_signed_in'
+      ? 'Sign in to bring in trades from a connected broker.'
+      : 'Connect a broker in Settings and your own trades will appear here.') + '</p>';
+    return;
+  }
+  host.innerHTML = '<button type="button" class="jp-chip on" onclick="jpRunImport()">Import my trades</button>'
+    + '<p class="jp-note">Reads the fill history from the broker you have connected and writes the finished '
+    + 'trades into this journal. Running it twice changes nothing.</p>';
+}
+
+async function jpRunImport() {
+  const host = document.getElementById('jpImport');
+  const btn = document.getElementById('jpImportBtn');
+  const say = (msg) => {
+    if (host) host.innerHTML = '<p class="jp-note">' + jpEsc(msg) + '</p>';
+    if (btn) btn.textContent = msg;
+  };
+  if (btn) { btn.disabled = true; btn.textContent = 'Importing\u2026'; }
+  if (host) host.innerHTML = '<p class="jp-note" aria-busy="true">Reading your broker history\u2026</p>';
+  let out = null;
+  try {
+    const r = await fetch('/api/trading/import', { method: 'POST', credentials: 'same-origin' });
+    out = await r.json();
+  } catch (_e) { out = { ok: false, error: 'offline' }; }
+  if (btn) btn.disabled = false;
+  if (!out || !out.ok) {
+    say(out && out.error === 'no_broker'
+      ? 'No broker connected yet \u2014 connect one in Settings.'
+      : 'The import could not finish. Nothing was changed.');
+    if (btn) btn.textContent = 'Import trades';
+    return;
+  }
+  const open = (out.stillOpen || []).length;
+  if (!out.imported) {
+    // Not a failure, and worth distinguishing: nothing NEW is different from nothing AT ALL.
+    say(out.closedTrades
+      ? 'Already up to date \u2014 all ' + out.closedTrades + ' finished trades were on record.'
+      : (open ? 'Nothing finished to import yet: ' + open + ' position' + (open === 1 ? ' is' : 's are') + ' still open.'
+              : 'No trades found at your broker.'));
+    if (btn) btn.textContent = 'Import trades';
+    return;
+  }
+  if (btn) btn.textContent = 'Import trades';
+  // The record genuinely changed, so this is the one case where re-reading it is right.
+  await jpLoad(true);
+  const el = document.getElementById('jpImport');
+  if (el) el.innerHTML = '<p class="jp-note">Imported ' + out.imported + ' trade'
+    + (out.imported === 1 ? '' : 's') + '.</p>';
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -1644,9 +1724,15 @@ function jpRender(host, data) {
   }
 
   if (!s.trades) {
-    html += '<div class="jp-empty">No confirmed trades yet. As soon as a position closes with a broker-accepted fill, '
-      + 'this page fills in: realized P&amp;L by day, the equity curve with its drawdown, where the exits happened, '
-      + 'and every candidate the autopilot passed over.</div>';
+    /* This used to say the page would fill in "as soon as a position closes" -- which
+       is true only for the autopilot, and the autopilot is the $200 tier. For everyone
+       who trades by hand it promised something nothing would ever keep: their fills
+       were never written to this ledger at all (#3557). Say what is actually true, and
+       offer the thing that fixes it. */
+    html += '<div class="jp-empty">No trades on record yet. This journal fills in from two places: '
+      + 'trades you place yourself through a connected broker, and — on the Pilot plan — the autopilot\'s own. '
+      + 'If you have already been trading, bring that history in:</div>'
+      + '<div id="jpImport" class="jp-import"></div>';
     html += jpPlacements();          // things you DID still belong here
     host.innerHTML = html;
   jpBindPlots();
@@ -1681,6 +1767,7 @@ document.addEventListener('DOMContentLoaded', () => {
   jpBindLayout(document.getElementById('jpBody'));
   jpLoad();
   jpLayoutSync();            // the copy that follows the reader between devices (#3543)
+  jpImportCheck();           // can this reader bring in their own broker trades? (#3557)
 });
 </script>
 
