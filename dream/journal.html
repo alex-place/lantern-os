@@ -1942,7 +1942,11 @@ function jpPaintCards() {
     const span = jpSpanOf(jpLayout, id);
     const h = jpHeightOf(jpLayout, id);
     return '<section class="jp-card' + (id === 'kpis' ? ' bare' : '') + '"'
-      + ' data-card="' + id + '" style="grid-column:span ' + span + '">'
+      // A card the reader has SIZED opts out of the row stretch (#3567). Stretching is
+      // what keeps un-sized cards lined up, but it also means the row decides the box
+      // height -- so dragging the bottom edge shrank the contents inside a box that could
+      // not move, which is not resizing anything.
+      + ' data-card="' + id + '" style="grid-column:span ' + span + (h ? ';align-self:start' : '') + '">'
       + jpCardBar(id, span)
       + '<div class="jp-cbody"' + (h ? ' style="height:' + h + 'px;overflow:auto"' : '') + '>' + body + '</div>'
       + (jpEdit ? '<span class="jp-res jp-res-x" data-res="x" title="Drag to set width"></span>'
