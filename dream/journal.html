@@ -186,6 +186,18 @@
   .jp-linkish:hover{color:var(--blue);border-bottom-color:var(--blue)}
   .jp-linkish:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
   .jp-table tr.on td{background:color-mix(in srgb, var(--blue) 9%, transparent)}
+  /* The grid wants square-ish cells and a readable figure in each one; the row
+     header stays put so a wide week can scroll without losing which day it is. */
+  /* .jp-table is width:100%, which turned a two-column week into two 380px slabs.
+     A grid sizes to its cells and scrolls when the week is wider than the card. */
+  .jp-heat{width:auto;min-width:0}
+  .jp-heat td, .jp-heat th{text-align:center;padding:6px 4px;font-variant-numeric:tabular-nums}
+  .jp-heat th[scope=row]{position:sticky;left:0;background:var(--bg1);text-align:left;
+    font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);font-weight:600}
+  .jp-heat td{font-size:11px;min-width:58px;width:58px}
+  /* Faded enough to read as unreliable, not so faded the figure stops being legible. */
+  .jp-heat td.few{opacity:.62}
+  .jp-heat td.jp-heat-0{background:transparent}
 
   .jp-curve svg{display:block;width:100%;height:auto}
   /* A chart you cannot read a value off is decoration. The readout replaces the
@@ -863,6 +875,117 @@ function jpGotoMonth(m) {
   if (cal) { try { cal.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_e) { cal.scrollIntoView(); } }
 }
 
+/* Weekday x hour (#3549) -- when the trader is strong.
+   TradeZella's most-cited feature is its day/time analysis, and for a discretionary
+   trader it is a discipline tool: stop trading after 3pm. Here it is something better --
+   evidence about the trader's own behaviour that the reader cannot get any other way,
+   because they never see the strategy. If it is systematically worse in the last hour on
+   Mondays, that is a fact about our product they are entitled to see, and one we would
+   want to act on.
+
+   Weekday AND hour together, because neither alone can show it: a trader can be fine at
+   10am overall and lose only at 10am on Mondays. That is why this needed a new bucketing
+   key (by=weekday-hour) rather than another reading of by=hour.
+
+   Colour is decoration. Every cell also carries its figure, because a grid whose meaning
+   lives only in hue is unreadable to a chunk of the people looking at it. */
+const JP_WEEK_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/* Pure: the bucket object as a grid. Only the weekdays and hours that actually traded get
+   a row or a column -- an empty 7x24 grid of blanks says nothing and hides the shape. */
+function jpHeatGrid(slice) {
+  const bucket = (slice && slice.confirmed) || {};
+  const cells = {};
+  const days = new Set(), hours = new Set();
+  for (const key of Object.keys(bucket)) {
+    const i = key.indexOf(' ');
+    if (i < 1) continue;
+    const day = key.slice(0, i);
+    const hour = key.slice(i + 1, i + 3);
+    if (JP_WEEK_ORDER.indexOf(day) < 0 || !/^\d\d$/.test(hour)) continue;
+    days.add(day);
+    hours.add(hour);
+    cells[day + hour] = bucket[key];
+  }
+  const weekdays = JP_WEEK_ORDER.filter((d) => days.has(d));
+  const hourList = [...hours].sort();
+  let max = 0;
+  for (const k of Object.keys(cells)) {
+    const e = cells[k] && cells[k].expectancy;
+    if (typeof e === 'number' && isFinite(e)) max = Math.max(max, Math.abs(e));
+  }
+  return { weekdays, hours: hourList, cells, max };
+}
+
+function jpHeatmap(slice) {
+  const head = '<h2>Weekday &times; hour</h2>';
+  if (slice === undefined) return head + '<div class="jp-empty" aria-busy="true">Loading\u2026</div>';
+  /* A request that failed is NOT a book with no trades. A server that does not know
+     this slice yet -- an older box, a trader running behind the site -- would otherwise
+     tell someone who has traded all week that they have never traded. */
+  if (slice === null) {
+    return head + '<div class="jp-empty">The week could not be loaded. Every other figure on this page is unaffected.</div>';
+  }
+  const g = jpHeatGrid(slice);
+  if (!g.weekdays.length) return head + '<div class="jp-empty">No closed trades to place on a week yet.</div>';
+  let cellsWithTrades = 0, thinCells = 0;
+  const cell = (day, hour) => {
+    const s = g.cells[day + hour];
+    if (!s || !s.trades) return '<td class="jp-heat-0"><span class="jp-dim" aria-hidden="true">\u00b7</span>'
+      + '<span class="visually-hidden">no trades</span></td>';
+    const e = (typeof s.expectancy === 'number' && isFinite(s.expectancy)) ? s.expectancy : 0;
+    const few = s.trades < JP_THIN_TRADES;
+    cellsWithTrades++;
+    if (few) thinCells++;
+    // 12% at the faintest so a real cell never reads as an empty one, 52% at the strongest.
+    const strength = g.max > 0 ? Math.round(12 + 40 * (Math.abs(e) / g.max)) : 12;
+    const tint = e >= 0 ? 'var(--green)' : 'var(--red)';
+    const label = day + ' ' + hour + ':00 ET \u2014 ' + s.trades + ' trade' + (s.trades === 1 ? '' : 's')
+      + ', ' + jpPct(s.winRate) + ' win, ' + jpUsd(e) + ' per trade, ' + jpUsd(s.totalRealized) + ' in total'
+      + (few ? ' (too few to measure)' : '');
+    return '<td class="jp-heat-c' + (few ? ' few' : '') + '"'
+      + ' style="background:color-mix(in srgb, ' + tint + ' ' + strength + '%, transparent)"'
+      + ' title="' + jpEsc(label) + '"><span class="' + jpSign(e) + '">'
+      + jpEsc((e > 0 ? '+' : '') + (jpUsdShort(e) || '$0')) + '</span>'
+      + '<span class="visually-hidden">' + jpEsc(label) + '</span></td>';
+  };
+  const body = g.weekdays.map((d) => '<tr><th scope="row">' + jpEsc(d) + '</th>'
+    + g.hours.map((h) => cell(d, h)).join('') + '</tr>').join('');
+  return head
+    + '<div class="jp-scroll"><table class="jp-table jp-heat">'
+    + '<thead><tr><th><span class="visually-hidden">Weekday</span></th>'
+    + g.hours.map((h) => '<th scope="col">' + jpEsc(h) + '</th>').join('')
+    + '</tr></thead><tbody>' + body + '</tbody></table></div>'
+    + '<p class="jp-note">Each cell is what one trade entered in that hour returned on average \u2014 expectancy, '
+    + 'not the total, so a single big winner cannot light up an hour it only traded once. Hours are ET, '
+    + 'broker-accepted fills only.'
+    + jpHeatCaveat(cellsWithTrades, thinCells) + '</p>';
+}
+
+/* A grid where EVERY cell is thin is not a grid with some faded cells in it -- naming
+   "faded cells" there points at a contrast the reader cannot see, and quietly suggests
+   the rest is solid. Say which of the two it is. */
+function jpHeatCaveat(cells, thinCells) {
+  if (!thinCells) return '';
+  if (thinCells === cells) {
+    return ' Every cell here has fewer than ' + JP_THIN_TRADES + ' trades — this is the shape so far, not a measurement.';
+  }
+  return ' Faded cells have fewer than ' + JP_THIN_TRADES + ' trades: shape, not measurement.';
+}
+
+/* One fetch, the first time this card is on the page, then cached like every other slice. */
+async function jpEnsureHeatmap() {
+  if (jpSliceCache['weekday-hour'] !== undefined) return;
+  if (!document.getElementById('jpHeatCard')) return;
+  const demo = !!(jpData && jpData.demo);
+  try {
+    const r = await fetch('/api/trading/scorecard' + (demo ? '?demo=champion&' : '?') + 'by=weekday-hour', { cache: 'no-store' });
+    jpSliceCache['weekday-hour'] = r.ok ? await r.json() : null;
+  } catch (_e) { jpSliceCache['weekday-hour'] = null; }
+  const card = document.getElementById('jpHeatCard');
+  if (card) card.innerHTML = jpHeatmap(jpSliceCache['weekday-hour']);
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -1186,6 +1309,7 @@ const JP_WIDGETS = [
   { id: 'breakdown', name: 'Breakdown', w: 1 },
   { id: 'symbols', name: 'Symbol statistics', w: 2 },
   { id: 'monthly', name: 'Monthly report', w: 2 },
+  { id: 'heatmap', name: 'Weekday × hour', w: 2 },
   { id: 'placements', name: 'Placement notes', w: 2 },
 ];
 const JP_WIDGET = {};
@@ -1295,6 +1419,7 @@ function jpCardBody(id, data) {
           aria: 'Realized profit and loss for each exchange day' });
   }
   if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
+  if (id === 'heatmap') return '<div id="jpHeatCard">' + jpHeatmap(jpSliceCache['weekday-hour']) + '</div>';
   if (id === 'monthly') {
     return '<div id="jpMonthlyCard">' + jpMonthly(jpDaySeries(L.daily, L.liveToday, L.acct)) + '</div>';
   }
@@ -1340,6 +1465,7 @@ function jpPaintCards() {
   }).join('') + jpTray();
   jpBindPlots();
   jpEnsureSymbols();
+  jpEnsureHeatmap();
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every
