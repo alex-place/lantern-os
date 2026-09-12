@@ -44,6 +44,9 @@ const P = new Function([
   'let jpTradeQ = { limit: 25, offset: 0, sort: "ts", dir: "desc", symbol: "", result: "all" };',
   'const jpTradeOpen = new Set();',
   grabFn('jpHeld'), grabFn('jpTradeWhen'), grabFn('jpLabelValue'),
+  // The expanded row carries the note editor since #3559, so the harness needs it too.
+  grabDecl('JP_FEELINGS'), 'let jpNotes = {}; let jpNoteTags = []; let jpData = { demo: false };',
+  grabDecl('jpNoteOf'), grabFn('jpNoteEditor'),
   grabFn('jpTradeDetail'), grabFn('jpTradeRNote'), grabFn('jpTradeControls'), grabFn('jpTrades'),
 ].join('\n') + '\nreturn { jpHeld, jpTrades, jpTradeDetail, jpTradeRNote, open: jpTradeOpen };')();
 
