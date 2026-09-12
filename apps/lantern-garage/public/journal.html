@@ -263,6 +263,27 @@
   .jp-detail .k{color:var(--text2);margin-right:7px}
   .jp-detail .v{color:var(--text1)}
   .jp-pager{display:flex;align-items:center;gap:10px;padding-top:9px;font-size:10.5px}
+  /* The editor sits inside the expanded row, so it has to read as part of the trade
+     rather than as a form bolted under it. */
+  /* The editor lives in a cell of a table that scrolls sideways, so it inherited the
+     TABLE's width -- 485px inside a 375px screen, which meant scrolling right to type.
+     The scroll box is the container, so 100cqi is the width actually on screen, and
+     sticky-left keeps the editor there while the columns scroll behind it. */
+  .jp-trades-scroll{container-type:inline-size}
+  .jp-note-edit{padding:2px 8px 12px;background:color-mix(in srgb, var(--blue) 5%, transparent);
+    position:sticky;left:0;width:100cqi;box-sizing:border-box}
+  .jp-note-text{width:100%;box-sizing:border-box;background:var(--bg0);color:var(--text1);
+    border:1px solid var(--border);border-radius:7px;padding:7px 9px;font:inherit;font-size:11.5px;resize:vertical}
+  .jp-note-text:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+  .jp-note-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:7px}
+  .jp-note-row .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-right:3px}
+  .jp-tag{font-size:10.5px;padding:3px 8px;border-radius:999px;cursor:pointer;font-family:inherit;
+    border:1px solid color-mix(in srgb, var(--blue) 45%, var(--border));
+    background:color-mix(in srgb, var(--blue) 12%, transparent);color:var(--text1)}
+  .jp-tag:hover{border-color:var(--red);color:var(--red)}
+  .jp-tag-in{font-size:10.5px;padding:3px 9px;border-radius:999px;border:1px dashed var(--border);
+    background:transparent;color:var(--text1);font-family:inherit;width:110px}
+  .jp-tag-in:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
   /* The list is the point of this card, so it gets room the small tables do not need.
      Still bounded: a page of 25 with rows expanded must not push every later card off
      the screen. */
@@ -1280,7 +1301,7 @@ function jpTradeDetail(t) {
     + bit('R', t.r != null ? jpR(t.r) : '<span class="jp-dim">no stop recorded to measure against</span>')
     + bit('Source', src)
     + (t.estimated ? bit('Note', '<span class="jp-dim">priced off the last observed mark, not a broker fill</span>') : '')
-    + '</div></td></tr>';
+    + '</div>' + jpNoteEditor(t) + '</td></tr>';
 }
 
 function jpTrades(data) {
@@ -1408,6 +1429,159 @@ async function jpEnsureTrades() {
     return;
   }
   await jpTradeLoad();
+}
+
+/* Notes, tags and feeling (#3559).
+   Scoped out of the journal once, on the reasoning that competitors need notes because
+   their users type in their own trades while ours do not. That was wrong: the autonomous
+   trader is minPlan "pilot", so everyone below $200/mo trades by hand -- and for them
+   this is not a competitor's crutch, it is the point of keeping a journal.
+
+   Tagging is data entry until it pays something back, so the tag table is part of the
+   same change rather than a follow-up: win rate and expectancy per tag is what turns
+   "I tagged that one chased" into "every trade I tag chased loses money". */
+const JP_FEELINGS = ['calm', 'confident', 'unsure', 'anxious', 'frustrated'];
+let jpNotes = null;          // id -> { note, tags, feel } ; null until loaded
+let jpNoteTags = [];         // tags this reader has used, most-used first
+let jpTagStats = null;
+
+const jpNoteOf = (id) => (jpNotes && jpNotes[id]) || { note: '', tags: [], feel: null };
+
+/* The editor lives in the expanded row, because that is where the trade actually is.
+   Nothing here is a separate page to remember to visit. */
+function jpNoteEditor(t) {
+  /* The demo book is simulated and regenerates, so a note written on it would attach
+     to a trade that is not the reader's and will not be there tomorrow. Say what the
+     editor is for instead of offering one that quietly goes nowhere. */
+  if (jpData && jpData.demo) {
+    return '<div class="jp-note-edit"><span class="jp-dim">Notes, tags and how a trade felt '
+      + 'go on your own trades — this is the simulated demo book.</span></div>';
+  }
+  const n = jpNoteOf(t.id);
+  const id = jpEsc(t.id);
+  const tags = n.tags.map((tag) => '<button type="button" class="jp-tag" title="Remove"'
+    + ' onclick="jpNoteTag(\'' + id + '\', \'' + jpEsc(tag) + '\', false)">' + jpEsc(tag) + ' \u00d7</button>').join('');
+  const feels = JP_FEELINGS.map((f) => '<button type="button" class="jp-chip' + (n.feel === f ? ' on' : '') + '"'
+    + ' onclick="jpNoteFeel(\'' + id + '\', \'' + f + '\')">' + f + '</button>').join('');
+  return '<div class="jp-note-edit">'
+    + '<label class="visually-hidden" for="jpn-' + id + '">What happened, in your words</label>'
+    + '<textarea id="jpn-' + id + '" class="jp-note-text" rows="2" placeholder="What happened, in your words\u2026"'
+    + ' onblur="jpNoteText(\'' + id + '\', this.value)">' + jpEsc(n.note) + '</textarea>'
+    + '<div class="jp-note-row"><span class="k">Tags</span>' + tags
+    + '<input class="jp-tag-in" list="jpTagList" placeholder="add a tag" aria-label="Add a tag"'
+    + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();jpNoteTag(\'' + id + '\', this.value, true);}"></div>'
+    + '<div class="jp-note-row"><span class="k">Felt</span>' + feels
+    + (n.feel ? '<button type="button" class="jp-chip" onclick="jpNoteFeel(\'' + id + '\', null)">clear</button>' : '')
+    + '</div></div>'
+    + '<datalist id="jpTagList">' + jpNoteTags.map((x) => '<option value="' + jpEsc(x.tag) + '">').join('') + '</datalist>';
+}
+
+/* One card repaints, and the tag table with it -- a tag that changes changes what the
+   table says, and two views of the same fact must not disagree on screen. */
+function jpNotePaint(focusTagFor) {
+  const card = document.getElementById('jpTradesCard');
+  if (card && jpTradeData) card.innerHTML = jpTrades(jpTradeData);
+  jpTagStats = null;
+  jpTagsLoad();
+  if (focusTagFor) {
+    const box = document.querySelector('[data-card="trades"] .jp-trade-detail .jp-tag-in');
+    if (box) box.focus();
+  }
+}
+
+async function jpNoteSave(id, patch) {
+  const cur = jpNoteOf(id);
+  const body = Object.assign({ id, note: cur.note, tags: cur.tags, feel: cur.feel }, patch);
+  // Written locally first so the page never sits still waiting for a round trip.
+  if (jpNotes) {
+    if (body.note || (body.tags && body.tags.length) || body.feel) jpNotes[id] = { note: body.note, tags: body.tags, feel: body.feel };
+    else delete jpNotes[id];
+  }
+  try {
+    const r = await fetch('/api/journal/notes', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j = r.ok ? await r.json() : null;
+    if (j && jpNotes) {
+      // The server normalises -- lower-cased tags, dropped duplicates -- so what the page
+      // shows after a save is what is actually stored, not what was typed.
+      if (j.saved) jpNotes[id] = j.saved; else delete jpNotes[id];
+      if (Array.isArray(j.tags)) jpNoteTags = j.tags;
+    }
+  } catch (_e) { /* offline: the page keeps what it has and the next save will carry it */ }
+}
+
+async function jpNoteText(id, value) {
+  if (jpNoteOf(id).note === String(value || '').trim()) return;   // a blur that changed nothing
+  await jpNoteSave(id, { note: String(value || '') });
+  jpNotePaint();
+}
+async function jpNoteTag(id, tag, add) {
+  const clean = String(tag || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (add && !clean) return;
+  const cur = jpNoteOf(id).tags;
+  const tags = add ? (cur.includes(clean) ? cur : cur.concat(clean)) : cur.filter((x) => x !== clean);
+  await jpNoteSave(id, { tags });
+  jpNotePaint(add);
+}
+async function jpNoteFeel(id, feel) {
+  await jpNoteSave(id, { feel: jpNoteOf(id).feel === feel ? null : feel });
+  jpNotePaint();
+}
+
+async function jpEnsureNotes() {
+  if (jpNotes !== null) return;
+  jpNotes = {};
+  if (jpData && jpData.demo) return;          // nothing of the reader's to annotate
+  try {
+    const r = await fetch('/api/journal/notes', { credentials: 'same-origin', cache: 'no-store' });
+    const j = r.ok ? await r.json() : null;
+    if (j) { jpNotes = j.notes || {}; jpNoteTags = Array.isArray(j.tags) ? j.tags : []; }
+  } catch (_e) { /* a guest, or offline: nothing written and nothing to show */ }
+  const card = document.getElementById('jpTradesCard');
+  if (card && jpTradeData) card.innerHTML = jpTrades(jpTradeData);
+}
+
+/* ── the tag table ──────────────────────────────────────────────────────────── */
+function jpTags(stats) {
+  const head = '<h2>By your tags</h2>';
+  if (!stats || (!stats.tags.length && !stats.feelings.length)) return '';   // nothing tagged: no card
+  const table = (rows, label) => {
+    if (!rows.length) return '';
+    return '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
+      + '<th>' + label + '</th><th class="num">Trades</th><th class="num">Win %</th>'
+      + '<th class="num">Net</th><th class="num">Per trade</th></tr></thead><tbody>'
+      + rows.map((r) => '<tr><td>' + jpEsc(r.key) + '</td>'
+        + '<td class="num">' + r.trades + '</td>'
+        + '<td class="num">' + jpPct(r.winRate) + '</td>'
+        + '<td class="num ' + jpSign(r.totalRealized) + '">' + jpUsd(r.totalRealized) + '</td>'
+        + '<td class="num ' + jpSign(r.expectancy) + '">' + jpUsd(r.expectancy) + '</td></tr>').join('')
+      + '</tbody></table></div>';
+  };
+  const thin = stats.annotated < 10;
+  return head + table(stats.tags, 'Tag') + table(stats.feelings, 'Felt')
+    + '<p class="jp-note">Your own words, priced the same way every other figure here is. '
+    + 'Written about ' + stats.annotated + ' of ' + stats.trades + ' closed trades'
+    + (thin ? ' \u2014 too few yet to read as a finding, but it is a start.' : '.') + '</p>';
+}
+
+async function jpTagsLoad() {
+  if (jpData && jpData.demo) { jpTagStats = null; return; }
+  const card = document.getElementById('jpTagsCard');
+  if (!card && jpTagStats !== null) return;
+  try {
+    const r = await fetch('/api/journal/notes?stats=1', { credentials: 'same-origin', cache: 'no-store' });
+    jpTagStats = r.ok ? await r.json() : null;
+  } catch (_e) { jpTagStats = null; }
+  // The card only exists once something is tagged, so a first tag has to bring it in.
+  if (jpTagStats && !card) { jpPaintCards(); return; }
+  if (card) card.innerHTML = jpTags(jpTagStats);
+}
+
+async function jpEnsureTags() {
+  if (jpTagStats !== null) return;
+  await jpTagsLoad();
 }
 
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
@@ -1735,6 +1909,7 @@ const JP_WIDGETS = [
   // paired: a 6 followed by a 12 leaves half a row of nothing, which is what made the
   // old default look unfinished. Every row here fills its twelve.
   { id: 'trades', name: 'Trade log', w: 12 },
+  { id: 'tags', name: 'By your tags', w: 12 },
   { id: 'pnlday', name: 'Net P&L per day', w: 6 },
   { id: 'breakdown', name: 'Breakdown', w: 6 },
   { id: 'symbols', name: 'Symbol statistics', w: 12 },
@@ -1910,6 +2085,7 @@ function jpCardBody(id, data) {
           aria: 'Realized profit and loss for each exchange day' });
   }
   if (id === 'trades') return '<div id="jpTradesCard">' + jpTrades(jpTradeData === null ? undefined : jpTradeData) + '</div>';
+  if (id === 'tags') return jpTags(jpTagStats) ? '<div id="jpTagsCard">' + jpTags(jpTagStats) + '</div>' : '';
   if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
   if (id === 'heatmap') return '<div id="jpHeatCard">' + jpHeatmap(jpSliceCache['weekday-hour']) + '</div>';
   if (id === 'rdist') return '<div id="jpRCard">' + jpRDist(jpSliceCache.r) + '</div>';
@@ -2010,6 +2186,8 @@ function jpPaintCards() {
   jpEnsureHeatmap();
   jpEnsureRDist();
   jpEnsureTrades();
+  jpEnsureNotes();
+  jpEnsureTags();
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every
