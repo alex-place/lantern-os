@@ -71,15 +71,45 @@
   @media (max-width:1080px){ .jp-grid{grid-template-columns:1fr} }
   .jp-col{display:flex;flex-direction:column;gap:12px;min-width:0}
   /* The reader's own arrangement (#3543): one grid, each card one column or both. */
-  .jp-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
-  @media (max-width:1080px){ .jp-cards{grid-template-columns:1fr} }
-  .jp-cards > .jp-card.w2{grid-column:1/-1}
+  /* Twelve columns, not two (#3565). Half-or-full was two choices dressed as
+     customisation: a reader who wants a wide calendar beside a narrow balance could
+     not have one, and every card was forced to the same two shapes. */
+  /* Cards in a row stretch to the same height. Ragged box bottoms were the other half
+     of the awkwardness -- a short card beside a tall one left the row looking broken
+     rather than deliberate. A reader who wants a card shorter drags its bottom edge. */
+  .jp-cards{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;
+    align-items:stretch;position:relative}
+  /* One column on a narrow screen: spans are a desktop idea, and a 3/12 card on a
+     phone is a column of single characters. */
+  @media (max-width:1080px){
+    .jp-cards{grid-template-columns:1fr}
+    .jp-cards > .jp-card{grid-column:1/-1 !important}
+    .jp-editing .jp-res{display:none !important}
+  }
   .jp-cards > .jp-card.bare{background:none;border:0;padding:0}
   .jp-bar{display:none;align-items:center;gap:6px;margin:0 0 10px}
   .jp-editing .jp-bar{display:flex}
   .jp-editing .jp-cards > .jp-card{outline:1px dashed color-mix(in srgb,var(--accent) 45%,var(--border))}
-  .jp-editing .jp-cards > .jp-card.drag{opacity:.45}
-  .jp-editing .jp-cards > .jp-card.over{outline:2px solid var(--accent)}
+  .jp-editing .jp-cards > .jp-card.grabbing{opacity:.4}
+  /* The card body is what a height applies to, so the bar and handles stay put. */
+  .jp-cbody{min-width:0}
+  .jp-editing .jp-card{position:relative}
+  .jp-res{display:none;position:absolute;z-index:3;touch-action:none}
+  .jp-editing .jp-res{display:block}
+  .jp-res::after{content:'';position:absolute;border-radius:3px;
+    background:color-mix(in srgb,var(--accent) 50%,transparent)}
+  .jp-res:hover::after,.jp-res.on::after{background:var(--accent)}
+  .jp-res-x{top:10px;bottom:10px;right:-8px;width:16px;cursor:col-resize}
+  .jp-res-x::after{left:6px;top:50%;transform:translateY(-50%);width:4px;height:36px}
+  .jp-res-y{left:10px;right:10px;bottom:-8px;height:16px;cursor:row-resize}
+  .jp-res-y::after{top:6px;left:50%;transform:translateX(-50%);height:4px;width:36px}
+  /* Where the card will land. An insertion LINE rather than a highlighted target,
+     because 'before or after this one' is the question a drop actually answers. */
+  .jp-drop{position:absolute;width:3px;border-radius:2px;background:var(--accent);
+    pointer-events:none;z-index:6;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .jp-bar .grip{all:unset;cursor:grab;padding:1px 4px;border-radius:4px;color:var(--text2);touch-action:none}
+  .jp-bar .grip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .jp-bar .jp-span{font-size:9.5px;color:var(--text2);font-variant-numeric:tabular-nums}
   .jp-bar .grip{cursor:grab;color:var(--muted);letter-spacing:-2px}
   .jp-bar .name{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:auto}
   .jp-bar .jp-chip{padding:2px 8px;font-size:11px}
@@ -1691,26 +1721,38 @@ function jpBalanceChart(h, daily, liveToday) {
    browser alone. A layout that names a card this page no longer has loses that card, and
    a card the layout never heard of is appended -- so a new card appears for everyone
    instead of being hidden by omission. */
+/* `w` is the card's default span in twelfths (#3565) — 12 is the full width, 6 a half,
+   3 the narrowest a card stays readable at. A reader can set any of them by dragging. */
 const JP_WIDGETS = [
-  { id: 'kpis', name: 'Key figures', w: 2 },
-  { id: 'calendar', name: 'P&L calendar', w: 1 },
-  { id: 'balance', name: 'Account balance', w: 1 },
-  { id: 'pnlday', name: 'Net P&L per day', w: 1 },
-  { id: 'trades', name: 'Trade log', w: 2 },
-  { id: 'breakdown', name: 'Breakdown', w: 1 },
-  { id: 'symbols', name: 'Symbol statistics', w: 2 },
-  { id: 'monthly', name: 'Monthly report', w: 2 },
-  { id: 'heatmap', name: 'Weekday × hour', w: 2 },
-  { id: 'rdist', name: 'R multiples', w: 2 },
-  { id: 'placements', name: 'Placement notes', w: 2 },
+  { id: 'kpis', name: 'Key figures', w: 12 },
+  { id: 'calendar', name: 'P&L calendar', w: 6 },
+  { id: 'balance', name: 'Account balance', w: 6 },
+  // Paired deliberately: a 6 followed by a 12 leaves half a row of nothing, which is
+  // what made the old default look unfinished. Every row here fills its twelve.
+  { id: 'pnlday', name: 'Net P&L per day', w: 6 },
+  { id: 'breakdown', name: 'Breakdown', w: 6 },
+  { id: 'trades', name: 'Trade log', w: 12 },
+  { id: 'symbols', name: 'Symbol statistics', w: 12 },
+  { id: 'monthly', name: 'Monthly report', w: 12 },
+  { id: 'heatmap', name: 'Weekday × hour', w: 6 },
+  { id: 'rdist', name: 'R multiples', w: 6 },
+  { id: 'placements', name: 'Placement notes', w: 12 },
 ];
 const JP_WIDGET = {};
 JP_WIDGETS.forEach((w) => { JP_WIDGET[w.id] = w; });
-const JP_LAYOUT_KEY = 'jp-layout-v1';
+const JP_LAYOUT_KEY = 'jp-layout-v2';
+const JP_COLS = 12;
+const JP_SPAN_MIN = 3;
+const JP_H_MIN = 120, JP_H_MAX = 1200;
 let jpEdit = false;
 
+const jpSpanOk = (n) => Number.isInteger(n) && n >= JP_SPAN_MIN && n <= JP_COLS;
+const jpHeightOk = (n) => Number.isFinite(n) && n >= JP_H_MIN && n <= JP_H_MAX;
+const jpClamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const _l2 = (l, over) => Object.assign({ v: 2, order: l.order, hidden: l.hidden, span: l.span, h: l.h }, over);
+
 function jpLayoutDefault() {
-  return { v: 1, order: JP_WIDGETS.map((w) => w.id), hidden: [], width: {} };
+  return { v: 2, order: JP_WIDGETS.map((w) => w.id), hidden: [], span: {}, h: {} };
 }
 function jpLayoutMerge(stored) {
   const base = jpLayoutDefault();
@@ -1721,34 +1763,75 @@ function jpLayoutMerge(stored) {
   for (const id of base.order) if (!order.includes(id)) order.push(id);
   const hidden = [];
   for (const id of (Array.isArray(stored.hidden) ? stored.hidden : [])) if (known.has(id) && !hidden.includes(id)) hidden.push(id);
-  const width = {};
+  const span = {};
+  const s = (stored.span && typeof stored.span === 'object') ? stored.span : {};
+  for (const id of Object.keys(s)) if (known.has(id) && jpSpanOk(s[id])) span[id] = s[id];
+  /* A layout stored before this page had real widths said 1 (half) or 2 (full). Reading
+     those as spans keeps an arrangement somebody already made, instead of quietly
+     resetting every reader who had one the day this shipped. */
   const w = (stored.width && typeof stored.width === 'object') ? stored.width : {};
-  for (const id of Object.keys(w)) if (known.has(id) && (w[id] === 1 || w[id] === 2)) width[id] = w[id];
-  return { v: 1, order, hidden, width };
+  for (const id of Object.keys(w)) {
+    if (known.has(id) && !(id in span) && (w[id] === 1 || w[id] === 2)) span[id] = w[id] === 2 ? JP_COLS : JP_COLS / 2;
+  }
+  const h = {};
+  const hh = (stored.h && typeof stored.h === 'object') ? stored.h : {};
+  for (const id of Object.keys(hh)) if (known.has(id) && jpHeightOk(hh[id])) h[id] = Math.round(hh[id]);
+  return { v: 2, order, hidden, span, h };
 }
-const jpWidthOf = (l, id) => l.width[id] || (JP_WIDGET[id] ? JP_WIDGET[id].w : 1);
+const jpSpanOf = (l, id) => l.span[id] || (JP_WIDGET[id] ? JP_WIDGET[id].w : JP_COLS / 2);
+const jpHeightOf = (l, id) => l.h[id] || null;
+
 function jpLayoutMove(l, id, delta) {
   const order = l.order.slice();
   const i = order.indexOf(id), j = i + delta;
   if (i < 0 || j < 0 || j >= order.length) return l;
   order.splice(j, 0, order.splice(i, 1)[0]);
-  return { v: 1, order, hidden: l.hidden, width: l.width };
+  return _l2(l, { order });
 }
-function jpLayoutPlace(l, id, beforeId) {
-  if (id === beforeId || !l.order.includes(id)) return l;
-  const order = l.order.filter((x) => x !== id);
-  const at = order.indexOf(beforeId);
-  order.splice(at < 0 ? order.length : at, 0, id);
-  return { v: 1, order, hidden: l.hidden, width: l.width };
+
+/**
+ * Move a card to a slot BETWEEN visible cards -- index 0 is before the first, and
+ * `visible.length` is after the last.
+ *
+ * The old drop meant "before the card you released on", which is right going one way and
+ * off by one going the other, and made the final position unreachable: dropping on the
+ * last card put you second-to-last, every time. An index between cards has no direction
+ * in it, so both ways behave the same and the end is a place you can actually drop.
+ */
+function jpLayoutInsert(l, id, index) {
+  if (!l.order.includes(id) || l.hidden.includes(id)) return l;
+  const vis = l.order.filter((x) => !l.hidden.includes(x));
+  const from = vis.indexOf(id);
+  const to = jpClamp(Math.round(index), 0, vis.length);
+  if (from < 0 || to === from || to === from + 1) return l;      // already there
+  const moved = vis.slice();
+  moved.splice(from, 1);
+  moved.splice(to > from ? to - 1 : to, 0, id);
+  // Rebuild the full order, leaving hidden cards in their own slots so restoring one
+  // puts it back where it was rather than at the end.
+  const order = [];
+  let vi = 0;
+  for (const x of l.order) order.push(l.hidden.includes(x) ? x : moved[vi++]);
+  return _l2(l, { order });
 }
-function jpLayoutWidth(l, id, w) {
-  const width = Object.assign({}, l.width);
-  width[id] = w === 2 ? 2 : 1;
-  return { v: 1, order: l.order, hidden: l.hidden, width };
+
+function jpLayoutSpan(l, id, span) {
+  if (!l.order.includes(id)) return l;
+  const next = Object.assign({}, l.span);
+  next[id] = jpClamp(Math.round(span), JP_SPAN_MIN, JP_COLS);
+  return _l2(l, { span: next });
+}
+function jpLayoutHeight(l, id, h) {
+  if (!l.order.includes(id)) return l;
+  const next = Object.assign({}, l.h);
+  // Null clears it: a card goes back to sizing itself to its contents.
+  if (h == null) delete next[id];
+  else next[id] = jpClamp(Math.round(h), JP_H_MIN, JP_H_MAX);
+  return _l2(l, { h: next });
 }
 const jpLayoutHide = (l, id) => (l.hidden.includes(id) || !l.order.includes(id)
-  ? l : { v: 1, order: l.order, hidden: l.hidden.concat(id), width: l.width });
-const jpLayoutShow = (l, id) => ({ v: 1, order: l.order, hidden: l.hidden.filter((x) => x !== id), width: l.width });
+  ? l : _l2(l, { hidden: l.hidden.concat(id) }));
+const jpLayoutShow = (l, id) => _l2(l, { hidden: l.hidden.filter((x) => x !== id) });
 
 function jpLayoutRead() {
   try { return JSON.parse(localStorage.getItem(JP_LAYOUT_KEY) || 'null'); } catch (_e) { return null; }
@@ -1821,15 +1904,18 @@ function jpCardBody(id, data) {
   return '';
 }
 
-function jpCardBar(id, w) {
+/* The two arrow chips were a poor substitute for dragging and took the space that says
+   what the card is. The grip does both jobs now: drag it with a pointer, or focus it and
+   use the arrow keys -- which is more than the chips could do, since they could not
+   resize at all. */
+function jpCardBar(id, span) {
   if (!jpEdit) return '';
   const name = (JP_WIDGET[id] || {}).name || id;
-  return '<div class="jp-bar"><span class="grip" aria-hidden="true">⠿⠿</span>'
+  return '<div class="jp-bar">'
+    + '<button type="button" class="grip" data-grip="' + jpEsc(id) + '" aria-label="Move or resize ' + jpEsc(name)
+    + '. Arrow keys move it, shift and arrow keys resize it, Delete hides it.">\u283f</button>'
     + '<span class="name">' + jpEsc(name) + '</span>'
-    + '<button type="button" class="jp-chip" data-act="left" aria-label="Move ' + jpEsc(name) + ' earlier">◀</button>'
-    + '<button type="button" class="jp-chip" data-act="right" aria-label="Move ' + jpEsc(name) + ' later">▶</button>'
-    + '<button type="button" class="jp-chip' + (w === 2 ? ' on' : '') + '" data-act="width" aria-label="Width of ' + jpEsc(name) + '">'
-    + (w === 2 ? 'Full' : 'Half') + '</button>'
+    + '<span class="jp-span" aria-hidden="true">' + span + '/' + JP_COLS + '</span>'
     + '<button type="button" class="jp-chip" data-act="hide" aria-label="Hide ' + jpEsc(name) + '">Hide</button></div>';
 }
 
@@ -1840,7 +1926,7 @@ function jpTray() {
     + (hidden.length
       ? '<span class="jp-dim">Hidden:</span>' + hidden.map((id) => '<button type="button" class="jp-chip" data-act="show" data-id="'
         + id + '">+ ' + jpEsc((JP_WIDGET[id] || {}).name || id) + '</button>').join('')
-      : '<span class="jp-dim">Drag a card to move it, or use ◀ ▶. Hide what you do not read.</span>')
+      : '<span class="jp-dim">Drag ⠿ to move a card, drag an edge to resize it. Hide what you do not read.</span>')
     + '<button type="button" class="jp-chip" data-act="reset" style="margin-left:auto">Reset</button></div>';
 }
 
@@ -1852,10 +1938,15 @@ function jpPaintCards() {
   host.innerHTML = visible.map((id) => {
     const body = jpCardBody(id, jpData);
     if (!body) return '';
-    const w = jpWidthOf(jpLayout, id);
-    return '<section class="jp-card' + (w === 2 ? ' w2' : '') + (id === 'kpis' ? ' bare' : '') + '"'
-      + ' data-card="' + id + '"' + (jpEdit ? ' draggable="true"' : '') + '>'
-      + jpCardBar(id, w) + body + '</section>';
+    const span = jpSpanOf(jpLayout, id);
+    const h = jpHeightOf(jpLayout, id);
+    return '<section class="jp-card' + (id === 'kpis' ? ' bare' : '') + '"'
+      + ' data-card="' + id + '" style="grid-column:span ' + span + '">'
+      + jpCardBar(id, span)
+      + '<div class="jp-cbody"' + (h ? ' style="height:' + h + 'px;overflow:auto"' : '') + '>' + body + '</div>'
+      + (jpEdit ? '<span class="jp-res jp-res-x" data-res="x" title="Drag to set width"></span>'
+        + '<span class="jp-res jp-res-y" data-res="y" title="Drag to set height, double-click to fit"></span>' : '')
+      + '</section>';
   }).join('') + jpTray();
   jpBindPlots();
   jpEnsureSymbols();
@@ -1865,10 +1956,17 @@ function jpPaintCards() {
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every
-   arrangement. Dragging is for a mouse; the arrows do the same thing from a keyboard. */
+   arrangement.
+
+   HTML5 drag-and-drop is gone (#3565). It could only express "you dropped on this card",
+   which the layout then had to read as "before it" -- correct going up, off by one going
+   down, and leaving the last position unreachable no matter which way you came at it.
+   Pointer events give a POSITION, which is what a drop actually means, so the same code
+   handles both directions and the end of the list is just another slot.
+   The same mechanism does resizing, which drag-and-drop could not do at all. */
 function jpBindLayout(root) {
   if (!root) return;
-  let dragId = null;
+
   root.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
@@ -1877,41 +1975,145 @@ function jpBindLayout(root) {
     const card = btn.closest('[data-card]');
     const id = btn.getAttribute('data-id') || (card && card.getAttribute('data-card'));
     if (!id) return;
-    if (act === 'left') jpApplyLayout(jpLayoutMove(jpLayout, id, -1));
-    else if (act === 'right') jpApplyLayout(jpLayoutMove(jpLayout, id, 1));
-    else if (act === 'width') jpApplyLayout(jpLayoutWidth(jpLayout, id, jpWidthOf(jpLayout, id) === 2 ? 1 : 2));
-    else if (act === 'hide') jpApplyLayout(jpLayoutHide(jpLayout, id));
+    if (act === 'hide') jpApplyLayout(jpLayoutHide(jpLayout, id));
     else if (act === 'show') jpApplyLayout(jpLayoutShow(jpLayout, id));
   });
-  root.addEventListener('dragstart', (e) => {
-    const c = e.target.closest && e.target.closest('[data-card]');
-    if (!jpEdit || !c) return;
-    dragId = c.getAttribute('data-card');
-    c.classList.add('drag');
-    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', dragId); } catch (_e) { /* older browsers */ } }
-  });
-  root.addEventListener('dragend', () => {
-    dragId = null;
-    root.querySelectorAll('.drag, .over').forEach((x) => x.classList.remove('drag', 'over'));
-  });
-  root.addEventListener('dragover', (e) => {
-    const c = e.target.closest && e.target.closest('[data-card]');
-    if (!jpEdit || !dragId || !c || c.getAttribute('data-card') === dragId) return;
+
+  /* A height the reader set is a height they can give back: double-click the bottom edge
+     and the card sizes to its contents again. Without this, shrinking a card once means
+     never seeing the rest of it. */
+  root.addEventListener('dblclick', (e) => {
+    const res = e.target.closest && e.target.closest('[data-res="y"]');
+    const card = res && res.closest('[data-card]');
+    if (!card) return;
     e.preventDefault();
-    c.classList.add('over');
+    jpApplyLayout(jpLayoutHeight(jpLayout, card.getAttribute('data-card'), null));
   });
-  root.addEventListener('dragleave', (e) => {
-    const c = e.target.closest && e.target.closest('[data-card]');
-    if (c) c.classList.remove('over');
-  });
-  root.addEventListener('drop', (e) => {
-    const c = e.target.closest && e.target.closest('[data-card]');
-    if (!jpEdit || !dragId || !c) return;
+
+  /* Everything the pointer can do, the keyboard can do -- which was not true of the
+     arrow chips this replaced, since they could not resize. */
+  root.addEventListener('keydown', (e) => {
+    const grip = e.target.closest && e.target.closest('[data-grip]');
+    if (!grip || !jpEdit) return;
+    const id = grip.getAttribute('data-grip');
+    const span = jpSpanOf(jpLayout, id);
+    let next = null;
+    if (e.key === 'ArrowLeft') next = e.shiftKey ? jpLayoutSpan(jpLayout, id, span - 1) : jpLayoutMove(jpLayout, id, -1);
+    else if (e.key === 'ArrowRight') next = e.shiftKey ? jpLayoutSpan(jpLayout, id, span + 1) : jpLayoutMove(jpLayout, id, 1);
+    else if (e.key === 'Delete' || e.key === 'Backspace') next = jpLayoutHide(jpLayout, id);
+    if (!next || next === jpLayout) return;
     e.preventDefault();
-    const moved = dragId;
-    dragId = null;
-    jpApplyLayout(jpLayoutPlace(jpLayout, moved, c.getAttribute('data-card')));
+    jpApplyLayout(next);
+    // The card moved; the focus follows it, or the next key press goes nowhere.
+    const again = document.querySelector('[data-grip="' + id + '"]');
+    if (again) again.focus();
   });
+
+  let drag = null;
+
+  /* Which SLOT the pointer is nearest: 0 is before the first card, cards.length is after
+     the last. Measured against each card's leading edge, plus the trailing edge of the
+     last one -- so "after everything" is a real answer rather than a missing case. */
+  function jpDropIndex(host, x, y, cards) {
+    let best = 0, bestD = Infinity;
+    cards.forEach((c, idx) => {
+      const r = c.getBoundingClientRect();
+      const d = Math.hypot(x - r.left, y - (r.top + r.height / 2));
+      if (d < bestD) { bestD = d; best = idx; }
+    });
+    if (cards.length) {
+      const r = cards[cards.length - 1].getBoundingClientRect();
+      if (Math.hypot(x - r.right, y - (r.top + r.height / 2)) < bestD) best = cards.length;
+    }
+    return best;
+  }
+
+  function jpShowDrop(host, cards, index) {
+    let bar = host.querySelector('.jp-drop');
+    if (!bar) { bar = document.createElement('div'); bar.className = 'jp-drop'; host.appendChild(bar); }
+    const hostR = host.getBoundingClientRect();
+    const at = Math.min(index, cards.length - 1);
+    const r = cards[at].getBoundingClientRect();
+    const after = index >= cards.length;
+    bar.style.left = ((after ? r.right + 4 : r.left - 7) - hostR.left) + 'px';
+    bar.style.top = (r.top - hostR.top) + 'px';
+    bar.style.height = r.height + 'px';
+  }
+
+  const clearDrop = () => { const b = root.querySelector('.jp-drop'); if (b) b.remove(); };
+
+  root.addEventListener('pointerdown', (e) => {
+    if (!jpEdit || e.button !== 0) return;
+    const card = e.target.closest && e.target.closest('[data-card]');
+    if (!card) return;
+    const res = e.target.closest('[data-res]');
+    const grip = e.target.closest('[data-grip]');
+    if (!res && !grip) return;
+    const id = card.getAttribute('data-card');
+    const body = card.querySelector('.jp-cbody');
+    drag = {
+      id, card, body,
+      mode: res ? res.getAttribute('data-res') : 'move',
+      x: e.clientX, y: e.clientY,
+      span: jpSpanOf(jpLayout, id),
+      h: body ? Math.round(body.getBoundingClientRect().height) : 0,
+      handle: res || grip,
+      index: null, live: null, moved: false,
+    };
+    if (res) res.classList.add('on');
+    try { drag.handle.setPointerCapture(e.pointerId); } catch (_e) { /* mouse without capture */ }
+    e.preventDefault();
+  });
+
+  root.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const host = document.getElementById('jpCards');
+    if (!host) return;
+    if (!drag.moved && Math.abs(e.clientX - drag.x) < 3 && Math.abs(e.clientY - drag.y) < 3) return;
+    drag.moved = true;
+
+    if (drag.mode === 'move') {
+      drag.card.classList.add('grabbing');
+      const cards = [...host.querySelectorAll('[data-card]')];
+      drag.index = jpDropIndex(host, e.clientX, e.clientY, cards);
+      jpShowDrop(host, cards, drag.index);
+      return;
+    }
+    if (drag.mode === 'x') {
+      // One column is a twelfth of the grid, gaps included -- so the card follows the
+      // pointer rather than drifting away from it as the row fills up.
+      const r = host.getBoundingClientRect();
+      const gap = 12;
+      const col = (r.width + gap) / JP_COLS;
+      drag.live = jpClamp(drag.span + Math.round((e.clientX - drag.x) / col), JP_SPAN_MIN, JP_COLS);
+      drag.card.style.gridColumn = 'span ' + drag.live;
+      const readout = drag.card.querySelector('.jp-span');
+      if (readout) readout.textContent = drag.live + '/' + JP_COLS;
+      return;
+    }
+    if (drag.mode === 'y' && drag.body) {
+      drag.live = jpClamp(drag.h + (e.clientY - drag.y), JP_H_MIN, JP_H_MAX);
+      drag.body.style.height = drag.live + 'px';
+      drag.body.style.overflow = 'auto';
+    }
+  });
+
+  function endDrag() {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (d.handle) d.handle.classList.remove('on');
+    d.card.classList.remove('grabbing');
+    clearDrop();
+    if (!d.moved) return;                       // a click on a handle is not a drag
+    if (d.mode === 'move' && d.index != null) jpApplyLayout(jpLayoutInsert(jpLayout, d.id, d.index));
+    else if (d.mode === 'x' && d.live != null) jpApplyLayout(jpLayoutSpan(jpLayout, d.id, d.live));
+    else if (d.mode === 'y' && d.live != null) jpApplyLayout(jpLayoutHeight(jpLayout, d.id, d.live));
+  }
+  root.addEventListener('pointerup', endDrag);
+  // A cancelled pointer (a right-click, a system gesture) must not leave the page in a
+  // half-dragged state with an indicator stuck to it.
+  root.addEventListener('pointercancel', endDrag);
 }
 
 function jpRender(host, data) {
