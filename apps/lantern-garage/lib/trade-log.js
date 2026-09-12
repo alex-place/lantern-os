@@ -21,7 +21,7 @@
  * renders null as "not recorded" rather than as a value.
  */
 
-const { readExits, preparedRows, rOf, CONFIRMED } = require('./trader-scorecard');
+const { readExits, preparedRows, rOf, CONFIRMED, computeScorecard, slimStats } = require('./trader-scorecard');
 
 const SORTS = new Set(['ts', 'pnl', 'pnl_pct', 'r', 'symbol', 'qty']);
 const RESULTS = new Set(['all', 'win', 'loss', 'flat']);
@@ -160,4 +160,52 @@ function tradeLog(logPath, userId, opts = {}) {
   return buildLog(readExits(logPath, userId), opts);
 }
 
-module.exports = { tradeLog, buildLog, toTrade, SORTS, RESULTS, MAX_LIMIT };
+/**
+ * The reader's own tags, priced (#3559).
+ *
+ * Tagging is data entry until it pays something back, and this is the payback: win rate
+ * and expectancy per tag, which is what turns "I tagged that one chased" into "every
+ * trade I tag chased loses money".
+ *
+ * Runs the SAME pipeline and the SAME `computeScorecard` as every other figure on the
+ * page, so a tag's numbers reconcile with the headline ones rather than being a second
+ * arithmetic that happens to agree.
+ */
+function taggedStats(rows, notes, opts = {}) {
+  const view = opts.view === 'all' ? 'all' : 'confirmed';
+  const prepared = preparedRows(
+    view === 'confirmed'
+      ? (rows || []).filter((r) => CONFIRMED.has(String(r.status || '').toLowerCase()))
+      : (rows || [])
+  );
+  const book = (notes && typeof notes === 'object') ? notes : {};
+  const byTag = new Map();
+  const byFeel = new Map();
+  let annotated = 0;
+  for (const row of prepared) {
+    const entry = book[toTrade(row).id];
+    if (!entry) continue;
+    annotated += 1;
+    for (const tag of (entry.tags || [])) {
+      if (!byTag.has(tag)) byTag.set(tag, []);
+      byTag.get(tag).push(row);
+    }
+    if (entry.feel) {
+      if (!byFeel.has(entry.feel)) byFeel.set(entry.feel, []);
+      byFeel.get(entry.feel).push(row);
+    }
+  }
+  const priced = (m) => [...m.entries()]
+    .map(([key, rs]) => Object.assign({ key }, slimStats(computeScorecard(rs))))
+    .sort((a, b) => b.trades - a.trades || String(a.key).localeCompare(String(b.key)));
+  return {
+    trades: prepared.length,
+    // How much of the book has been written about -- a tag table drawn from four of two
+    // hundred trades is a note to self, not a finding.
+    annotated,
+    tags: priced(byTag),
+    feelings: priced(byFeel),
+  };
+}
+
+module.exports = { tradeLog, buildLog, toTrade, taggedStats, SORTS, RESULTS, MAX_LIMIT };
