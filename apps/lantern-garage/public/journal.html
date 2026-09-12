@@ -216,6 +216,25 @@
   .jp-rcol.zero{border-left:1px solid var(--border);margin-left:-1px}
   .jp-rcol .x{font-size:9.5px;color:var(--text2);padding-top:5px;font-variant-numeric:tabular-nums}
 
+  /* Trade log (#3558). */
+  .jp-bar-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px}
+  .jp-select{font-size:10.5px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);
+    background:transparent;color:var(--text2);font-family:inherit;cursor:pointer}
+  .jp-trade{cursor:pointer}
+  .jp-trade:hover td{background:color-mix(in srgb, var(--text0) 4%, transparent)}
+  .jp-trade.on td{background:color-mix(in srgb, var(--blue) 8%, transparent)}
+  .jp-trade-detail td{padding:0}
+  .jp-detail{display:flex;flex-wrap:wrap;gap:6px 24px;padding:9px 8px 11px;
+    background:color-mix(in srgb, var(--blue) 5%, transparent);font-size:11px}
+  .jp-detail .k{color:var(--text2);margin-right:7px}
+  .jp-detail .v{color:var(--text1)}
+  .jp-pager{display:flex;align-items:center;gap:10px;padding-top:9px;font-size:10.5px}
+  /* The list is the point of this card, so it gets room the small tables do not need.
+     Still bounded: a page of 25 with rows expanded must not push every later card off
+     the screen. */
+  .jp-trades-scroll{max-height:560px}
+  .jp-pager .jp-chip[disabled]{opacity:.4;cursor:default}
+
   .jp-curve svg{display:block;width:100%;height:auto}
   /* A chart you cannot read a value off is decoration. The readout replaces the
      crosshair: it follows the pointer and names the point, without drawing the two
@@ -1163,6 +1182,200 @@ async function jpRunImport() {
     + (out.imported === 1 ? '' : 's') + '.</p>';
 }
 
+/* The trade log (#3558) -- the trades themselves.
+   Every other card on this page is a statistic drawn from these rows, and until now there
+   was nowhere to see the rows. RocketSheets opens with a Trade Log and TradeZella's core
+   view is the list; we built the aggregates first and skipped the thing they aggregate.
+
+   Sorting, filtering and paging happen on the SERVER, because sorting the page rather
+   than the set would order whichever rows happen to be visible -- which looks like
+   sorting and is not. Each change is one request that repaints one card: the #3541 rule
+   is that the page never reloads to change how it looks, not that it never asks. */
+const JP_TRADE_COLS = [
+  { key: 'ts', label: 'Closed', sortable: true },
+  { key: 'symbol', label: 'Symbol', sortable: true },
+  { key: 'qty', label: 'Qty', num: true, sortable: true },
+  { key: 'entry', label: 'Entry', num: true },
+  { key: 'exit', label: 'Exit', num: true },
+  { key: 'heldMs', label: 'Held', num: true },
+  { key: 'pnl', label: 'P&L', num: true, sortable: true },
+  { key: 'pnl_pct', label: '%', num: true, sortable: true },
+  { key: 'r', label: 'R', num: true, sortable: true },
+];
+let jpTradeQ = { limit: 25, offset: 0, sort: 'ts', dir: 'desc', symbol: '', result: 'all' };
+let jpTradeData = null;
+const jpTradeOpen = new Set();
+
+/* 3.5 hours reads better than 12,600,000. Days once a position has been held overnight,
+   because at that point the minutes are noise. */
+function jpHeld(ms) {
+  if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '\u2014';
+  const m = Math.round(ms / 60000);
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
+  const d = Math.floor(h / 24);
+  return d + 'd' + (h % 24 ? ' ' + (h % 24) + 'h' : '');
+}
+
+function jpTradeWhen(ts) {
+  if (!ts) return '\u2014';
+  const d = new Date(ts);
+  if (!isFinite(d.getTime())) return String(ts).slice(0, 10);
+  try {
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (_e) { return String(ts).slice(0, 16).replace('T', ' '); }
+}
+
+/* What the row has that the table has no column for -- and, as importantly, what it does
+   NOT have. An imported manual trade has no engine reason and no excursions; saying so is
+   the difference between an honest record and one that looks like a zero. */
+function jpTradeDetail(t) {
+  const bit = (k, v) => '<div><span class="k">' + k + '</span><span class="v">' + v + '</span></div>';
+  const pct = (n) => (typeof n === 'number' && isFinite(n) ? (n > 0 ? '+' : '') + n.toFixed(2) + '%' : '\u2014');
+  const src = t.source === 'broker-import' ? 'imported from your broker'
+    : (t.source ? 'the autopilot (' + jpEsc(t.source) + ')' : 'the autopilot');
+  const excursion = (t.mfe_pct == null && t.mae_pct == null)
+    ? '<span class="jp-dim">not recorded for this trade</span>'
+    : pct(t.mfe_pct) + ' best \u00b7 ' + pct(t.mae_pct) + ' worst';
+  return '<tr class="jp-trade-detail"><td colspan="' + JP_TRADE_COLS.length + '"><div class="jp-detail">'
+    + bit('Side', t.side === 'short' ? 'Short' : 'Long')
+    + bit('Opened', t.openedAt ? jpTradeWhen(t.openedAt) : '<span class="jp-dim">not recorded</span>')
+    + bit('Exit reason', t.reason ? jpEsc(jpLabelValue(t.reason)) : '<span class="jp-dim">not recorded</span>')
+    + bit('While open', excursion)
+    + bit('R', t.r != null ? jpR(t.r) : '<span class="jp-dim">no stop recorded to measure against</span>')
+    + bit('Source', src)
+    + (t.estimated ? bit('Note', '<span class="jp-dim">priced off the last observed mark, not a broker fill</span>') : '')
+    + '</div></td></tr>';
+}
+
+function jpTrades(data) {
+  const head = '<h2>Trade log</h2>';
+  if (data === undefined) return head + '<div class="jp-empty" aria-busy="true">Loading\u2026</div>';
+  if (data === null) return head + '<div class="jp-empty">The trade log could not be loaded. Every other figure on this page is unaffected.</div>';
+  const tot = data.totals || {};
+  const filtered = (data.filter && (data.filter.symbol || data.filter.result !== 'all'));
+  if (!data.total) {
+    return head + jpTradeControls(data)
+      + '<div class="jp-empty">' + (filtered ? 'No trades match that filter.' : 'No closed trades yet.') + '</div>';
+  }
+  const arrow = (c) => (data.sort === c.key ? (data.dir === 'asc' ? ' \u25b2' : ' \u25bc') : '');
+  const th = JP_TRADE_COLS.map((c) => '<th' + (c.num ? ' class="num"' : '')
+    + (data.sort === c.key ? ' aria-sort="' + (data.dir === 'asc' ? 'ascending' : 'descending') + '"' : '') + '>'
+    + (c.sortable
+      ? '<button type="button" class="jp-sort" onclick="jpTradeSort(\'' + c.key + '\')">' + jpEsc(c.label) + arrow(c) + '</button>'
+      : jpEsc(c.label)) + '</th>').join('');
+  const rows = data.trades.map((t) => {
+    const open = jpTradeOpen.has(t.id);
+    const cell = (cls, v) => '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</td>';
+    return '<tr class="jp-trade' + (open ? ' on' : '') + '" onclick="jpTradeToggle(\'' + jpEsc(t.id).replace(/'/g, '') + '\')">'
+      + cell('', '<span class="jp-dim" aria-hidden="true">' + (open ? '\u25be' : '\u25b8') + '</span> ' + jpEsc(jpTradeWhen(t.ts)))
+      + cell('', jpEsc(t.symbol) + (t.side === 'short' ? ' <span class="jp-dim">S</span>' : ''))
+      + cell('num', t.qty != null ? t.qty : '\u2014')
+      + cell('num', t.entry != null ? jpUsd(t.entry) : '\u2014')
+      + cell('num', t.exit != null ? jpUsd(t.exit) : '\u2014')
+      + cell('num', jpHeld(t.heldMs))
+      + cell('num ' + jpSign(t.pnl), jpUsd(t.pnl))
+      + cell('num ' + jpSign(t.pnl_pct), jpPct(t.pnl_pct))
+      + cell('num ' + (t.r != null ? jpSign(t.r) : 'jp-dim'), t.r != null ? jpR(t.r) : '\u2014')
+      + '</tr>' + (open ? jpTradeDetail(t) : '');
+  }).join('');
+  const from = data.offset + 1, to = Math.min(data.offset + data.limit, data.total);
+  const pager = data.total > data.limit
+    ? '<div class="jp-pager">'
+      + '<button type="button" class="jp-chip" onclick="jpTradePage(-1)"' + (data.offset <= 0 ? ' disabled' : '') + '>\u2039 Newer</button>'
+      + '<span class="jp-dim">' + from + '\u2013' + to + ' of ' + data.total + '</span>'
+      + '<button type="button" class="jp-chip" onclick="jpTradePage(1)"' + (to >= data.total ? ' disabled' : '') + '>Older \u203a</button>'
+      + '</div>'
+    : '';
+  return head + jpTradeControls(data)
+    + '<div class="jp-scroll jp-trades-scroll"><table class="jp-table"><thead><tr>' + th + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + pager
+    + '<p class="jp-note">' + tot.trades + ' trade' + (tot.trades === 1 ? '' : 's')
+    + ' \u00b7 ' + tot.wins + 'W / ' + tot.losses + 'L \u00b7 net <span class="' + jpSign(tot.net) + '">' + jpUsd(tot.net) + '</span>'
+    + (filtered ? ' (this filter)' : '')
+    + '. Broker-accepted fills only. A row opens to what else was recorded about it'
+    + jpTradeRNote(tot)
+    + '</p>';
+}
+
+/* "R is shown for the 0 opened with a recorded stop" is not a sentence, and none-of-them
+   is a different fact from some-of-them: one says the column is empty for a reason, the
+   other says which rows to trust it on. */
+function jpTradeRNote(tot) {
+  if (!tot || tot.withR >= tot.trades) return '.';
+  if (!tot.withR) return '. None of these recorded the stop they were opened with, so R cannot be measured for them.';
+  return ' \u2014 R is shown for the ' + tot.withR + ' of them opened with a recorded stop.';
+}
+
+function jpTradeControls(data) {
+  const syms = (data.symbols || []);
+  const opt = (v, label, sel) => '<option value="' + jpEsc(v) + '"' + (sel ? ' selected' : '') + '>' + jpEsc(label) + '</option>';
+  const f = data.filter || {};
+  const chip = (v, label) => '<button type="button" class="jp-chip' + ((f.result || 'all') === v ? ' on' : '')
+    + '" onclick="jpTradeFilter({ result: \'' + v + '\' })">' + label + '</button>';
+  return '<div class="jp-bar-filters">'
+    + '<label class="visually-hidden" for="jpTradeSym">Filter by symbol</label>'
+    + '<select id="jpTradeSym" class="jp-select" onchange="jpTradeFilter({ symbol: this.value })">'
+    + opt('', 'All symbols', !f.symbol) + syms.map((s) => opt(s, s, f.symbol === s)).join('') + '</select>'
+    + chip('all', 'All') + chip('win', 'Winners') + chip('loss', 'Losers')
+    + '</div>';
+}
+
+/* One request, one card. Nothing else on the page moves. */
+async function jpTradeLoad() {
+  const card = document.getElementById('jpTradesCard');
+  if (!card) return;
+  card.setAttribute('aria-busy', 'true');
+  const demo = !!(jpData && jpData.demo);
+  const q = new URLSearchParams();
+  if (demo) q.set('demo', 'champion');
+  for (const [k, v] of Object.entries(jpTradeQ)) if (v !== '' && v != null) q.set(k, String(v));
+  try {
+    const r = await fetch('/api/trading/trades?' + q.toString(), { cache: 'no-store', credentials: 'same-origin' });
+    jpTradeData = r.ok ? await r.json() : null;
+  } catch (_e) { jpTradeData = null; }
+  card.removeAttribute('aria-busy');
+  card.innerHTML = jpTrades(jpTradeData);
+}
+
+function jpTradeSort(key) {
+  const col = JP_TRADE_COLS.find((c) => c.key === key);
+  if (!col || !col.sortable) return;
+  // Same key flips direction; a new one starts the way that column is usually read.
+  if (jpTradeQ.sort === key) jpTradeQ.dir = jpTradeQ.dir === 'asc' ? 'desc' : 'asc';
+  else { jpTradeQ.sort = key; jpTradeQ.dir = key === 'symbol' ? 'asc' : 'desc'; }
+  jpTradeQ.offset = 0;                 // a re-sort starts at the top, not mid-list
+  jpTradeLoad();
+}
+
+function jpTradeFilter(patch) {
+  Object.assign(jpTradeQ, patch, { offset: 0 });
+  jpTradeLoad();
+}
+
+function jpTradePage(dir) {
+  const next = jpTradeQ.offset + dir * jpTradeQ.limit;
+  if (next < 0 || (jpTradeData && next >= jpTradeData.total)) return;
+  jpTradeQ.offset = next;
+  jpTradeLoad();
+}
+
+/* Expanding costs nothing: the row is already in hand. */
+function jpTradeToggle(id) {
+  if (jpTradeOpen.has(id)) jpTradeOpen.delete(id); else jpTradeOpen.add(id);
+  const card = document.getElementById('jpTradesCard');
+  if (card && jpTradeData) card.innerHTML = jpTrades(jpTradeData);
+}
+
+async function jpEnsureTrades() {
+  if (jpTradeData !== null || !document.getElementById('jpTradesCard')) {
+    if (jpTradeData === null && document.getElementById('jpTradesCard')) await jpTradeLoad();
+    return;
+  }
+  await jpTradeLoad();
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -1483,6 +1696,7 @@ const JP_WIDGETS = [
   { id: 'calendar', name: 'P&L calendar', w: 1 },
   { id: 'balance', name: 'Account balance', w: 1 },
   { id: 'pnlday', name: 'Net P&L per day', w: 1 },
+  { id: 'trades', name: 'Trade log', w: 2 },
   { id: 'breakdown', name: 'Breakdown', w: 1 },
   { id: 'symbols', name: 'Symbol statistics', w: 2 },
   { id: 'monthly', name: 'Monthly report', w: 2 },
@@ -1596,6 +1810,7 @@ function jpCardBody(id, data) {
       + jpPlot((L.daily || []).map((d) => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
           aria: 'Realized profit and loss for each exchange day' });
   }
+  if (id === 'trades') return '<div id="jpTradesCard">' + jpTrades(jpTradeData === null ? undefined : jpTradeData) + '</div>';
   if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
   if (id === 'heatmap') return '<div id="jpHeatCard">' + jpHeatmap(jpSliceCache['weekday-hour']) + '</div>';
   if (id === 'rdist') return '<div id="jpRCard">' + jpRDist(jpSliceCache.r) + '</div>';
@@ -1646,6 +1861,7 @@ function jpPaintCards() {
   jpEnsureSymbols();
   jpEnsureHeatmap();
   jpEnsureRDist();
+  jpEnsureTrades();
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every
