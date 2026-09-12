@@ -196,6 +196,18 @@ test('the page saves on change and asks the server for the reader\'s own on load
   assert.match(grabFn('jpLayoutReset'), /method: 'DELETE'/);
 });
 
+test('a card the reader has sized is sized by its contents, not by its row (#3567)', () => {
+  /* Rows stretch so un-sized cards line up. But a stretched grid item's height comes from
+     its ROW, so setting a height on the body could not move the box around it: the card
+     grew a scrollbar and its outline never budged. Measured before the fix — body 230 to
+     120, card 380 to 380. A card with an explicit height has to leave the stretch. */
+  const paint = grabFn('jpPaintCards');
+  assert.match(paint, /align-self:start/, 'a sized card opts out of the row stretch');
+  assert.match(paint, /h \? ';align-self:start' : ''/, 'and only when a height was actually set');
+  const grid = src.slice(src.indexOf('.jp-cards{'), src.indexOf('.jp-cards{') + 200);
+  assert.match(grid, /align-items:stretch/, 'while everything else still lines up across the row');
+});
+
 test('the editing surface is drag-first, with the keyboard able to do the same things', () => {
   const bind = grabFn('jpBindLayout');
   assert.match(bind, /pointerdown/, 'dragging is pointer-based');
