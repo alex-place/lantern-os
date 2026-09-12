@@ -226,12 +226,19 @@ const ET_FMT = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/New_York', hourCycle: 'h23',
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
 });
+/* Weekday names are fixed, not localized: they are a bucket KEY that a client parses,
+   so a server running under a different locale must not rename Monday. Derived from
+   the ET calendar date via UTC arithmetic -- once the date is settled in New York,
+   which day of the week it is has no timezone left in it. */
+const ET_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function etParts(ts) {
   const d = new Date(ts);
   if (!Number.isFinite(d.getTime())) return null;
   const p = {};
   for (const part of ET_FMT.formatToParts(d)) p[part.type] = part.value;
-  return { date: `${p.year}-${p.month}-${p.day}`, hour: p.hour === '24' ? '00' : p.hour };
+  const date = `${p.year}-${p.month}-${p.day}`;
+  const wd = ET_WEEKDAYS[new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay()];
+  return { date, hour: p.hour === '24' ? '00' : p.hour, weekday: wd };
 }
 
 /**
@@ -259,10 +266,10 @@ function slimStats(full) {
   };
 }
 
-const BREAKDOWN_KEYS = ['symbol', 'hour', 'reason', 'skip'];
+const BREAKDOWN_KEYS = ['symbol', 'hour', 'weekday-hour', 'reason', 'skip'];
 
 /**
- * Slice the ledger by symbol / ET hour / exit-reason family — each slice carrying
+ * Slice the ledger by symbol / ET hour / ET weekday+hour / exit-reason family — each slice carrying
  * the same honesty split as the headline scorecard (confirmed = broker-accepted
  * fills; all = every exit decision). `by=skip` slices the skip log instead: every
  * declined opportunity grouped by its (number-normalized) decline reason.
@@ -285,6 +292,11 @@ function breakdownFromRows(by, exits, skips) {
   const groupOf = (e) => {
     if (by === 'symbol') return String(e.symbol || '?').toUpperCase();
     if (by === 'hour') { const p = etParts(e.ts); return p ? `${p.hour}:00 ET` : '?'; }
+    // 'Mon 10:00 ET' -- the hour label with its weekday in front, so one split on the
+    // first space recovers both halves. Which weekday AND which hour is a different
+    // question from either alone: a trader can be fine at 10am and only lose at 10am
+    // on Mondays, and neither single slice can show that.
+    if (by === 'weekday-hour') { const p = etParts(e.ts); return p ? `${p.weekday} ${p.hour}:00 ET` : '?'; }
     return reasonFamily(e.reason);
   };
   const views = {
