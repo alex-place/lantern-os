@@ -78,6 +78,39 @@ check('by=hour: buckets are ET hours (14:30Z → 10:00 ET)', () => {
   assert.ok(r.confirmed['15:00 ET'], 'expected a 15:00 ET bucket');
 });
 
+// #3549 — weekday AND hour together. A trader can be fine at 10am and only lose at 10am
+// on Mondays; neither single slice can show that, so the grid needs its own bucketing.
+check('by=weekday-hour: buckets name the ET weekday and the ET hour', () => {
+  const r = breakdown('weekday-hour', FIXTURE);
+  // 2026-08-03 is a Monday; 14:30Z is 10:30 ET (EDT).
+  assert.ok(r.confirmed['Mon 10:00 ET'], 'expected Mon 10:00 ET, got ' + Object.keys(r.confirmed).join(','));
+  assert.ok(r.confirmed['Mon 15:00 ET'], 'expected Mon 15:00 ET');
+  // 2026-08-05 is a Wednesday.
+  assert.ok(r.confirmed['Wed 10:00 ET'], 'expected Wed 10:00 ET');
+});
+
+check('by=weekday-hour: the key splits cleanly back into its two halves', () => {
+  const r = breakdown('weekday-hour', FIXTURE);
+  for (const k of Object.keys(r.confirmed)) {
+    const i = k.indexOf(' ');
+    assert.ok(i > 0, 'no separator in ' + k);
+    assert.ok(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(k.slice(0, i)), 'bad weekday in ' + k);
+    assert.match(k.slice(i + 1), /^\d\d:00 ET$/, 'bad hour in ' + k);
+  }
+});
+
+check('by=weekday-hour: the same honesty pipeline as every other slice', () => {
+  const r = breakdown('weekday-hour', FIXTURE);
+  // The rejected SPY row realized nothing; the dry_run TNA row is strategy-only.
+  const confirmedTrades = Object.values(r.confirmed).reduce((n, g) => n + g.trades, 0);
+  const allTrades = Object.values(r.all).reduce((n, g) => n + g.trades, 0);
+  assert.strictEqual(confirmedTrades, 4, 'SPY x2, QQQ, IWM (the duplicate pair collapsed)');
+  assert.strictEqual(allTrades, 5, 'plus the dry_run, and never the rejected one');
+  // Same window as by=hour, just cut finer: both must agree on the total.
+  const byHour = breakdown('hour', FIXTURE);
+  assert.strictEqual(Object.values(byHour.confirmed).reduce((n, g) => n + g.trades, 0), confirmedTrades);
+});
+
 check('by=skip: numeric noise normalizes, counts + distinct symbols + total are right', () => {
   const r = breakdown('skip', FIXTURE);
   assert.strictEqual(r.totalSkips, 3);
