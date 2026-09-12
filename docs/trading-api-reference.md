@@ -12,6 +12,11 @@ Kalshi endpoints that require credentials are gated behind API key presence; una
 > (`lib/signal-engine/`) — there is no Python trading service anymore. The former
 > Alpaca AI-trader microservice and its `alpaca-trade-api` dependency have been removed;
 > the `/api/trading/ai-trader/*` routes below are legacy compatibility shims.
+>
+> **Correction (#3557): Alpaca is not gone.** What was removed was the Alpaca *AI-trader
+> microservice* and its `alpaca-trade-api` dependency. `lib/alpaca-adapter.js` is live and
+> current — it holds per-user OAuth credentials, places orders, and serves the fill history
+> that `/api/trading/import` reconstructs into journal trades. Both brokers are supported.
 
 ---
 
@@ -25,6 +30,8 @@ Kalshi endpoints that require credentials are gated behind API key presence; una
 | `GET` | `/api/trading/market-status` | Market open/closed, session info |
 | `GET` | `/api/trading/zones` | Support/resistance zones for watchlist tickers |
 | `GET` | `/api/trading/positions` | Open positions across all brokers |
+| `GET` | `/api/trading/import` | Can this reader import broker trades, and what has been imported already (#3557) |
+| `POST` | `/api/trading/import` | Read the reader's own broker fill history, reconstruct round trips, write them to the journal ledger. Idempotent on the closing order id — running it twice changes nothing |
 | `GET` | `/api/trading/watchlist` | Current watchlist tickers |
 | `POST` | `/api/trading/watchlist` | Replace watchlist |
 | `GET` | `/api/trading/watchlist-prices` | Live prices for all watchlist tickers |

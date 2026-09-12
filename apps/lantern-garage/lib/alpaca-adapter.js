@@ -399,14 +399,21 @@ async function getAllOrders(userId, limit = 200) {
  * working-vs-history split keeps them on the history tab, and carry order_id so
  * nothing here ever looks cancelable.
  */
-async function getFillActivities(userId, pageSize = 100) {
+/* pageToken continues a listing (#3557): one page is 100 fills, and a backfill that
+   silently stopped at the hundredth most recent one would look like a whole history.
+   Alpaca pages activities by the id of the last row returned. */
+async function getFillActivities(userId, pageSize = 100, pageToken = null) {
   const auth = _authFor(userId);
   if (!auth) return [];
   const n = Math.min(100, Math.max(1, Number(pageSize) || 100));
-  const r = await _req(auth, 'GET', `/v2/account/activities?activity_types=FILL&direction=desc&page_size=${n}`);
+  const cursor = pageToken ? `&page_token=${encodeURIComponent(String(pageToken))}` : '';
+  const r = await _req(auth, 'GET', `/v2/account/activities?activity_types=FILL&direction=desc&page_size=${n}${cursor}`);
   if (!r.ok || !Array.isArray(r.json)) return [];
   return r.json.map((a) => ({
     id: a.order_id || a.id, symbol: a.symbol, side: String(a.side || '').toLowerCase(),
+    // The activity's OWN id, which is what continues the listing -- `id` above is the
+    // order id, and every partial fill of one order shares it, so it cannot page.
+    activityId: a.id,
     qty: Number(a.qty) || Number(a.cum_qty) || 0,
     type: 'market',
     limit_price: null,
