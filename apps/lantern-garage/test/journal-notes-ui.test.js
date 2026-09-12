@@ -96,10 +96,15 @@ test('the demo book gets an explanation, not an editor that goes nowhere', () =>
 });
 
 test('a hostile tag or note cannot smuggle markup into the row', () => {
-  P.setNotes({ o1: { note: '<img src=x onerror=alert(1)>', tags: ['<script>'], feel: null } });
+  /* Asserted case-insensitively and without the closing bracket, because `/<script>/`
+     would pass while `<SCRIPT>` or `<script >` sailed through — the test would then be
+     agreeing with a half-done escape rather than checking one. The positive assertion is
+     the real contract: the text has to come back ESCAPED, not merely absent. */
+  P.setNotes({ o1: { note: '<img src=x onerror=alert(1)>', tags: ['<script>', '<SCRIPT >'], feel: null } });
   const html = P.jpNoteEditor(trade);
-  assert.doesNotMatch(html, /<img/);
-  assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(html, /<img/i);
+  assert.doesNotMatch(html, /<script/i);
+  assert.match(html, /&lt;img/, 'the note is escaped, not dropped');
 });
 
 test('the tag table does not exist until something is tagged', () => {
