@@ -50,9 +50,13 @@ const CODE = [
   grabDecl('jpSpanOf'), grabDecl('jpHeightOf'),
   grabFn('jpLayoutMove'), grabFn('jpLayoutInsert'), grabFn('jpLayoutSpan'), grabFn('jpLayoutHeight'),
   grabDecl('jpLayoutHide'), grabDecl('jpLayoutShow'),
+  // jpRowsOf reads the current layout for its spans, so the harness needs one to set.
+  'let jpLayout = jpLayoutDefault();',
+  grabFn('jpRowsOf'), grabFn('jpSplitPartners'),
 ].join('\n');
 const P = new Function(CODE + '\nreturn { JP_WIDGETS, JP_COLS, jpLayoutDefault, jpLayoutMerge, jpSpanOf, jpHeightOf,'
-  + ' jpLayoutMove, jpLayoutInsert, jpLayoutSpan, jpLayoutHeight, jpLayoutHide, jpLayoutShow };')();
+  + ' jpLayoutMove, jpLayoutInsert, jpLayoutSpan, jpLayoutHeight, jpLayoutHide, jpLayoutShow,'
+  + ' jpRowsOf, jpSplitPartners, setLayout: (l) => { jpLayout = l; } };')();
 const ids = P.JP_WIDGETS.map((w) => w.id);
 
 test('the registry is sound, and its ids are ones the store will accept', () => {
@@ -194,6 +198,44 @@ test('the page saves on change and asks the server for the reader\'s own on load
   assert.doesNotMatch(apply, /jpLoad\(/, 'arranging the page never refetches the record');
   assert.match(grabFn('jpLayoutSync'), /\/api\/journal\/layout/);
   assert.match(grabFn('jpLayoutReset'), /method: 'DELETE'/);
+});
+
+test('rows are packed the way the grid will pack them (#3569)', () => {
+  const l = P.jpLayoutDefault();
+  P.setLayout(l);
+  // Greedy left to right, wrapping when the next span will not fit.
+  assert.deepStrictEqual(P.jpRowsOf(['kpis', 'calendar', 'balance']), [['kpis'], ['calendar', 'balance']],
+    'a full-width card takes its own row');
+  P.setLayout(P.jpLayoutSpan(P.jpLayoutSpan(l, 'calendar', 7), 'balance', 5));
+  assert.deepStrictEqual(P.jpRowsOf(['calendar', 'balance']), [['calendar', 'balance']], '7 and 5 make twelve');
+  P.setLayout(P.jpLayoutSpan(P.jpLayoutSpan(l, 'calendar', 7), 'balance', 6));
+  assert.deepStrictEqual(P.jpRowsOf(['calendar', 'balance']), [['calendar'], ['balance']], '7 and 6 do not');
+  P.setLayout(l);
+});
+
+test('the handle between two cards knows which card it splits (#3569)', () => {
+  const l = P.jpLayoutDefault();
+  P.setLayout(l);
+  const partner = P.jpSplitPartners(['kpis', 'calendar', 'balance', 'pnlday', 'breakdown']);
+  assert.strictEqual(partner.calendar, 'balance', 'the left of a pair splits with the right');
+  assert.strictEqual(partner.pnlday, 'breakdown');
+  assert.strictEqual(partner.kpis, undefined, 'a card alone on its row splits with nothing');
+  assert.strictEqual(partner.balance, undefined, 'and neither does the last card on a row');
+});
+
+test('a pair keeps its combined width, so neither can be pushed off the row (#3569)', () => {
+  /* The reported bug: spans were independent, so making one card bigger pushed the other
+     onto the next row and a 60/40 split needed two drags with a broken state between
+     them. The handle sits BETWEEN two cards, so it moves the boundary. */
+  const bind = grabFn('jpBindLayout');
+  assert.match(bind, /const total = drag\.span \+ drag\.pair\.span/, 'the pair total is fixed');
+  assert.match(bind, /drag\.pairLive = total - drag\.live/, 'so what one gains the other gives');
+  assert.match(bind, /total - JP_SPAN_MIN/, 'and neither is squeezed below the minimum');
+  assert.match(bind, /data-split/, 'the handle carries its partner');
+  // The commit has to write BOTH, or the page and the stored layout disagree.
+  assert.match(bind, /jpLayoutSpan\(next, d\.pair\.id, d\.pairLive\)/);
+  // The keyboard follows the same rule.
+  assert.match(bind, /const mate = jpSplitPartners\(shown\)\[id\]/);
 });
 
 test('a card the reader has sized is sized by its contents, not by its row (#3567)', () => {
