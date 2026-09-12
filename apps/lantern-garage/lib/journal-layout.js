@@ -41,7 +41,10 @@ const COLS = 12;
 // Below a quarter of the page a card is a column of single characters, and above the
 // full width it is not a layout any more. Heights bound what a scroll box can be.
 const SPAN_MIN = 3;
-const H_MIN = 120, H_MAX = 1200;
+// Heights move in rows the way widths move in columns (#3571), so a stored height is
+// a whole number of them. The bounds are 3 rows to 30.
+const ROW = 40;
+const H_MIN = ROW * 3, H_MAX = ROW * 30;
 
 function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId)) + '.json'); }
 
@@ -73,7 +76,12 @@ function normalize(raw) {
   }
   const h = {};
   for (const [id, n] of Object.entries(raw.h && typeof raw.h === 'object' ? raw.h : {})) {
-    if (seen.has(id) && Number.isFinite(n) && n >= H_MIN && n <= H_MAX) h[id] = Math.round(n);
+    if (!seen.has(id) || !Number.isFinite(n) || n < H_MIN || n > H_MAX) continue;
+    /* SNAPPED, where an out-of-range span is dropped. The two are different kinds of
+       wrong: a span of 99 is meaningless, but a height of 137 is a real height that
+       simply is not on the grid -- so the honest reading is the nearest row, which is
+       what the reader would have got by dragging to that spot. */
+    h[id] = Math.round(n / ROW) * ROW;
   }
   return { v: 2, order, hidden, span, h };
 }
@@ -100,4 +108,4 @@ function clear(userId) {
   try { fs.unlinkSync(_file(userId)); return true; } catch (_e) { return false; }
 }
 
-module.exports = { DIR, MAX_CARDS, COLS, SPAN_MIN, H_MIN, H_MAX, normalize, get, set, clear };
+module.exports = { DIR, MAX_CARDS, COLS, SPAN_MIN, ROW, H_MIN, H_MAX, normalize, get, set, clear };

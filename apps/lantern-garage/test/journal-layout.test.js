@@ -44,7 +44,7 @@ test('normalize keeps what it understands and drops the rest', () => {
     order: ['kpis', 'calendar', 'placements'],   // duplicates and junk ids gone, order kept
     hidden: ['placements'],                       // hiding a card that isn't in the order is meaningless
     span: { calendar: 8 },                        // 3..12, and only for cards in the order
-    h: { calendar: 300 },                         // a height a scroll box could actually be
+    h: { calendar: 320 },                         // snapped to the row grid: 300 is not on it
   });
 });
 
