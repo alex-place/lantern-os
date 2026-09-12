@@ -1,11 +1,14 @@
 'use strict';
 /**
- * test/journal-layout-ui.test.js — #3543.
+ * test/journal-layout-ui.test.js — #3543, reworked for real editing in #3565.
  *
- * The rules the reader's arrangement follows, driven as the page's own functions:
- * reorder, resize, hide, restore — and what happens to a stored layout when the page
- * gains or loses a card, which is the case that quietly strands people on a layout that
- * hides the new thing by omission.
+ * The rules the reader's arrangement follows, driven as the page's own functions.
+ *
+ * The bug that prompted the rework is pinned here as its own case: a drop used to mean
+ * "before the card you released on", which is right going one way, off by one going the
+ * other, and left the final position unreachable. The model now takes a SLOT, which has
+ * no direction in it.
+ *
  * Run: node --test apps/lantern-garage/test/journal-layout-ui.test.js
  */
 const { test } = require('node:test');
@@ -39,18 +42,17 @@ const grabDecl = (name) => {
 };
 
 const CODE = [
+  'const JP_COLS = 12, JP_SPAN_MIN = 3, JP_H_MIN = 120, JP_H_MAX = 1200;',
   grabDecl('JP_WIDGETS'),
   'const JP_WIDGET = {}; JP_WIDGETS.forEach((w) => { JP_WIDGET[w.id] = w; });',
-  grabFn('jpLayoutDefault'),
-  grabFn('jpLayoutMerge'),
-  grabDecl('jpWidthOf'),
-  grabFn('jpLayoutMove'),
-  grabFn('jpLayoutPlace'),
-  grabFn('jpLayoutWidth'),
-  grabDecl('jpLayoutHide'),
-  grabDecl('jpLayoutShow'),
+  grabDecl('jpSpanOk'), grabDecl('jpHeightOk'), grabDecl('jpClamp'), grabDecl('_l2'),
+  grabFn('jpLayoutDefault'), grabFn('jpLayoutMerge'),
+  grabDecl('jpSpanOf'), grabDecl('jpHeightOf'),
+  grabFn('jpLayoutMove'), grabFn('jpLayoutInsert'), grabFn('jpLayoutSpan'), grabFn('jpLayoutHeight'),
+  grabDecl('jpLayoutHide'), grabDecl('jpLayoutShow'),
 ].join('\n');
-const P = new Function(CODE + '\nreturn { JP_WIDGETS, jpLayoutDefault, jpLayoutMerge, jpWidthOf, jpLayoutMove, jpLayoutPlace, jpLayoutWidth, jpLayoutHide, jpLayoutShow };')();
+const P = new Function(CODE + '\nreturn { JP_WIDGETS, JP_COLS, jpLayoutDefault, jpLayoutMerge, jpSpanOf, jpHeightOf,'
+  + ' jpLayoutMove, jpLayoutInsert, jpLayoutSpan, jpLayoutHeight, jpLayoutHide, jpLayoutShow };')();
 const ids = P.JP_WIDGETS.map((w) => w.id);
 
 test('the registry is sound, and its ids are ones the store will accept', () => {
@@ -59,13 +61,13 @@ test('the registry is sound, and its ids are ones the store will accept', () => 
   for (const w of P.JP_WIDGETS) {
     assert.match(w.id, /^[a-z][a-z0-9-]{0,31}$/, w.id);
     assert.ok(w.name && w.name.length > 2, w.id + ' has a name for the reader');
-    assert.ok(w.w === 1 || w.w === 2, w.id + ' is half or full width');
+    assert.ok(Number.isInteger(w.w) && w.w >= 3 && w.w <= 12, w.id + ' has a default span in twelfths');
   }
   assert.ok(store.normalize(P.jpLayoutDefault()), 'the default layout is storable as-is');
 });
 
-test('the default shows everything, in the registry order', () => {
-  assert.deepStrictEqual(P.jpLayoutDefault(), { v: 1, order: ids, hidden: [], width: {} });
+test('the default shows everything, in the registry order, at no explicit size', () => {
+  assert.deepStrictEqual(P.jpLayoutDefault(), { v: 2, order: ids, hidden: [], span: {}, h: {} });
 });
 
 test('a missing or unusable stored layout falls back to the default', () => {
@@ -75,41 +77,91 @@ test('a missing or unusable stored layout falls back to the default', () => {
 });
 
 test('a card the page no longer has is dropped; a card the layout never knew is appended', () => {
-  const stored = { v: 1, order: ['breakdown', 'gone-card', ids[0]], hidden: ['gone-card'], width: { 'gone-card': 2 } };
+  const stored = { v: 2, order: ['breakdown', 'gone-card', ids[0]], hidden: ['gone-card'], span: { 'gone-card': 6 }, h: {} };
   const merged = P.jpLayoutMerge(stored);
   assert.strictEqual(merged.order.includes('gone-card'), false, 'a card that no longer exists disappears');
   assert.deepStrictEqual(merged.order.slice(0, 2), ['breakdown', ids[0]], 'the reader\'s order is kept');
   assert.deepStrictEqual(merged.order.slice().sort(), ids.slice().sort(), 'every current card is present');
   assert.deepStrictEqual(merged.hidden, [], 'hiding a card that is gone means nothing');
-  assert.deepStrictEqual(merged.width, {}, 'and neither does its width');
+  assert.deepStrictEqual(merged.span, {}, 'and neither does its width');
+});
+
+test('a layout saved under the old half-or-full model still opens (#3565)', () => {
+  const v1 = { v: 1, order: ids.slice(), hidden: ['placements'], width: { calendar: 2, breakdown: 1 } };
+  const merged = P.jpLayoutMerge(v1);
+  assert.strictEqual(P.jpSpanOf(merged, 'calendar'), 12, 'full became the full width');
+  assert.strictEqual(P.jpSpanOf(merged, 'breakdown'), 6, 'half became six twelfths');
+  assert.deepStrictEqual(merged.hidden, ['placements'], 'and what they hid stays hidden');
 });
 
 test('moving a card: neighbours swap, and the ends hold', () => {
   const l = P.jpLayoutDefault();
   assert.deepStrictEqual(P.jpLayoutMove(l, ids[0], -1).order, ids, 'the first card cannot move earlier');
   assert.deepStrictEqual(P.jpLayoutMove(l, ids[ids.length - 1], 1).order, ids, 'the last cannot move later');
-  const moved = P.jpLayoutMove(l, ids[0], 1).order;
-  assert.deepStrictEqual(moved.slice(0, 2), [ids[1], ids[0]]);
+  assert.deepStrictEqual(P.jpLayoutMove(l, ids[0], 1).order.slice(0, 2), [ids[1], ids[0]]);
   assert.deepStrictEqual(l.order, ids, 'the original layout is untouched');
 });
 
-test('dropping a card puts it where it was dropped', () => {
+test('dropping into a slot works the same in BOTH directions (#3565)', () => {
+  // The old model could only say "before the card you dropped on". Going up that is what
+  // you meant; going down it is one short of it.
   const l = P.jpLayoutDefault();
-  const dropped = P.jpLayoutPlace(l, ids[3], ids[1]).order;
-  assert.deepStrictEqual(dropped.slice(0, 3), [ids[0], ids[3], ids[1]], 'it lands before the card it was dropped on');
-  assert.strictEqual(dropped.length, ids.length, 'nothing is lost or duplicated');
-  assert.deepStrictEqual(P.jpLayoutPlace(l, ids[2], ids[2]).order, ids, 'dropping a card on itself changes nothing');
-  assert.deepStrictEqual(P.jpLayoutPlace(l, 'not-a-card', ids[1]).order, ids, 'and an unknown card changes nothing');
+  const down = P.jpLayoutInsert(l, ids[0], 3).order;
+  assert.deepStrictEqual(down.slice(0, 3), [ids[1], ids[2], ids[0]], 'moved down into the third slot');
+  const up = P.jpLayoutInsert(l, ids[3], 1).order;
+  assert.deepStrictEqual(up.slice(0, 4), [ids[0], ids[3], ids[1], ids[2]], 'and up into the first');
+  assert.strictEqual(down.length, ids.length, 'nothing lost or duplicated either way');
+  assert.strictEqual(new Set(down).size, ids.length);
 });
 
-test('width is half or full, and falls back to what the card was built for', () => {
+test('a card CAN be dropped at the very end — the position the old drag could not reach', () => {
   const l = P.jpLayoutDefault();
-  assert.strictEqual(P.jpWidthOf(l, 'calendar'), 1);
-  assert.strictEqual(P.jpWidthOf(l, 'kpis'), 2, 'the tiles span the page by default');
-  const wide = P.jpLayoutWidth(l, 'calendar', 2);
-  assert.strictEqual(P.jpWidthOf(wide, 'calendar'), 2);
-  assert.strictEqual(P.jpWidthOf(P.jpLayoutWidth(wide, 'calendar', 1), 'calendar'), 1);
-  assert.strictEqual(P.jpWidthOf(P.jpLayoutWidth(l, 'calendar', 9), 'calendar'), 1, 'anything else means half');
+  const moved = P.jpLayoutInsert(l, ids[0], ids.length).order;
+  assert.strictEqual(moved[moved.length - 1], ids[0], 'it lands last, not second to last');
+  assert.strictEqual(moved.length, ids.length);
+});
+
+test('dropping a card back where it already is changes nothing', () => {
+  const l = P.jpLayoutDefault();
+  assert.strictEqual(P.jpLayoutInsert(l, ids[2], 2), l, 'the slot before it');
+  assert.strictEqual(P.jpLayoutInsert(l, ids[2], 3), l, 'and the slot after it');
+  assert.strictEqual(P.jpLayoutInsert(l, 'not-a-card', 1), l);
+});
+
+test('an out-of-range slot lands at the nearest end rather than corrupting the order', () => {
+  const l = P.jpLayoutDefault();
+  assert.strictEqual(P.jpLayoutInsert(l, ids[5], -99).order[0], ids[5]);
+  assert.strictEqual(P.jpLayoutInsert(l, ids[0], 9999).order.slice(-1)[0], ids[0]);
+});
+
+test('slots are counted among VISIBLE cards, and hidden ones keep their place', () => {
+  let l = P.jpLayoutHide(P.jpLayoutDefault(), ids[1]);
+  const visible = l.order.filter((x) => !l.hidden.includes(x));
+  l = P.jpLayoutInsert(l, visible[0], 2);
+  const after = l.order.filter((x) => !l.hidden.includes(x));
+  assert.strictEqual(after[1], visible[0], 'it moved to the second visible slot');
+  assert.ok(l.order.includes(ids[1]), 'and the hidden card was not dropped on the way');
+  assert.deepStrictEqual(l.hidden, [ids[1]]);
+});
+
+test('width is any span from a quarter to the full page', () => {
+  const l = P.jpLayoutDefault();
+  assert.strictEqual(P.jpSpanOf(l, 'calendar'), 6, 'defaults come from the registry');
+  assert.strictEqual(P.jpSpanOf(l, 'kpis'), 12);
+  for (const [asked, got] of [[3, 3], [7, 7], [12, 12], [1, 3], [99, 12], [6.4, 6]]) {
+    assert.strictEqual(P.jpSpanOf(P.jpLayoutSpan(l, 'calendar', asked), 'calendar'), got, 'span ' + asked);
+  }
+  assert.deepStrictEqual(l.span, {}, 'the original layout is untouched');
+});
+
+test('height is the reader\'s, and can be given back', () => {
+  const l = P.jpLayoutDefault();
+  assert.strictEqual(P.jpHeightOf(l, 'calendar'), null, 'a card sizes to its contents until told otherwise');
+  const tall = P.jpLayoutHeight(l, 'calendar', 400);
+  assert.strictEqual(P.jpHeightOf(tall, 'calendar'), 400);
+  assert.strictEqual(P.jpHeightOf(P.jpLayoutHeight(tall, 'calendar', 10), 'calendar'), 120, 'clamped, not unreadable');
+  assert.strictEqual(P.jpHeightOf(P.jpLayoutHeight(tall, 'calendar', 99999), 'calendar'), 1200);
+  assert.strictEqual(P.jpHeightOf(P.jpLayoutHeight(tall, 'calendar', null), 'calendar'), null, 'and back to auto');
 });
 
 test('hiding and restoring', () => {
@@ -125,11 +177,13 @@ test('hiding and restoring', () => {
 test('every arrangement the page can make is one the store will keep', () => {
   let l = P.jpLayoutDefault();
   l = P.jpLayoutMove(l, 'breakdown', -1);
-  l = P.jpLayoutWidth(l, 'calendar', 2);
+  l = P.jpLayoutSpan(l, 'calendar', 7);
+  l = P.jpLayoutSpan(l, 'balance', 5);
+  l = P.jpLayoutHeight(l, 'balance', 340);
   l = P.jpLayoutHide(l, 'placements');
-  l = P.jpLayoutPlace(l, 'pnlday', 'kpis');
+  l = P.jpLayoutInsert(l, 'pnlday', 0);
   const kept = store.normalize(l);
-  assert.deepStrictEqual(kept, { v: 1, order: l.order, hidden: l.hidden, width: l.width });
+  assert.deepStrictEqual(kept, { v: 2, order: l.order, hidden: l.hidden, span: l.span, h: l.h });
 });
 
 test('the page saves on change and asks the server for the reader\'s own on load', () => {
@@ -140,4 +194,18 @@ test('the page saves on change and asks the server for the reader\'s own on load
   assert.doesNotMatch(apply, /jpLoad\(/, 'arranging the page never refetches the record');
   assert.match(grabFn('jpLayoutSync'), /\/api\/journal\/layout/);
   assert.match(grabFn('jpLayoutReset'), /method: 'DELETE'/);
+});
+
+test('the editing surface is drag-first, with the keyboard able to do the same things', () => {
+  const bind = grabFn('jpBindLayout');
+  assert.match(bind, /pointerdown/, 'dragging is pointer-based');
+  assert.match(bind, /pointercancel/, 'and a cancelled gesture cannot strand the page mid-drag');
+  assert.doesNotMatch(bind, /dragstart|dataTransfer/, 'HTML5 drag-and-drop is gone with its off-by-one');
+  assert.match(bind, /jpLayoutInsert/, 'a drop is a slot');
+  assert.match(bind, /jpLayoutSpan/, 'an edge drag is a width');
+  assert.match(bind, /jpLayoutHeight/, 'and a bottom drag is a height');
+  assert.match(bind, /shiftKey/, 'the keyboard resizes too, which the old arrows could not');
+  const bar = grabFn('jpCardBar');
+  assert.doesNotMatch(bar, /◀|▶/, 'the arrow chips are gone');
+  assert.match(bar, /data-grip=/, 'replaced by a grip that drags and takes focus');
 });
