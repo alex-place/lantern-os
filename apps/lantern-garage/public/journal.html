@@ -199,6 +199,23 @@
   .jp-heat td.few{opacity:.62}
   .jp-heat td.jp-heat-0{background:transparent}
 
+  /* R distribution (#3550). A histogram, so the bars carry the shape and the four
+     figures above carry what the shape means. */
+  .jp-rstats{display:flex;flex-wrap:wrap;gap:10px 22px;margin:2px 0 14px}
+  .jp-rstat .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)}
+  .jp-rstat .v{font-size:17px;font-weight:600;color:var(--text0);font-variant-numeric:tabular-nums;line-height:1.3}
+  .jp-rstat .v.jp-pos{color:var(--green)} .jp-rstat .v.jp-neg{color:var(--red)}
+  .jp-rstat .s{font-size:10px;color:var(--text2)}
+  .jp-rhist{display:flex;align-items:flex-end;gap:3px;padding-top:2px}
+  .jp-rcol{width:46px;flex:0 0 46px;text-align:center}
+  .jp-rplot{height:120px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+  .jp-rcol .n{font-size:9.5px;color:var(--text2);font-variant-numeric:tabular-nums;line-height:1.4}
+  .jp-rcol .b{width:100%;border-radius:3px 3px 0 0;display:block}
+  .jp-rcol.win .b{background:var(--green)} .jp-rcol.loss .b{background:var(--red)}
+  /* Zero is always a bucket edge, so the line between losing and winning is real. */
+  .jp-rcol.zero{border-left:1px solid var(--border);margin-left:-1px}
+  .jp-rcol .x{font-size:9.5px;color:var(--text2);padding-top:5px;font-variant-numeric:tabular-nums}
+
   .jp-curve svg{display:block;width:100%;height:auto}
   /* A chart you cannot read a value off is decoration. The readout replaces the
      crosshair: it follows the pointer and names the point, without drawing the two
@@ -986,6 +1003,86 @@ async function jpEnsureHeatmap() {
   if (card) card.innerHTML = jpHeatmap(jpSliceCache['weekday-hour']);
 }
 
+/* R multiples (#3550) -- the shape of the outcomes, not their average.
+   A reader looking at "+$3,000" cannot tell many small wins from one lucky one. This can.
+   TradeZella reports R throughout and RocketSheets computes Kelly from the same idea, but
+   it matters more here than for either: this strategy's edge was measured to live in the
+   exits rather than the entries, and the exit asymmetry IS this picture.
+
+   R is the result divided by the risk taken AT ENTRY -- +1R is a winner the size of the
+   stop. Dividing by anything else is not an R multiple: against a stop ratcheted to
+   break-even, a full winner reads as infinite R and a scratch as a disaster. */
+function jpRStat(k, v, cls, sub) {
+  return '<div class="jp-rstat"><div class="k">' + k + '</div>'
+    + '<div class="v ' + (cls || '') + '">' + v + '</div>'
+    + '<div class="s">' + (sub || '&nbsp;') + '</div></div>';
+}
+const jpR = (n) => ((typeof n === 'number' && isFinite(n)) ? (n > 0 ? '+' : '') + n.toFixed(2) + 'R' : '\u2014');
+
+function jpRDist(slice) {
+  const head = '<h2>R multiples</h2>';
+  if (slice === undefined) return head + '<div class="jp-empty" aria-busy="true">Loading\u2026</div>';
+  if (slice === null) {
+    return head + '<div class="jp-empty">The distribution could not be loaded. Every other figure on this page is unaffected.</div>';
+  }
+  const d = (slice && slice.confirmed) || {};
+  if (!d.withR) {
+    /* Not "no trades": the trades are there, their risk was never written down. Saying
+       so points at the actual reason, which is also the thing that fixes itself. */
+    return head + '<div class="jp-empty">'
+      + (d.n ? 'None of the ' + d.n + ' closed trades recorded the stop distance they were opened with, '
+             + 'so there is nothing to measure them against yet. Trades from here on do record it.'
+             : 'No closed trades yet.')
+      + '</div>';
+  }
+  const max = d.buckets.reduce((m, b) => Math.max(m, b.count), 0) || 1;
+  const bars = d.buckets.map((b) => {
+    const win = b.from >= 0;
+    const pct = Math.round((b.count / max) * 100);
+    const label = jpR(b.from) + ' to ' + jpR(b.to) + ' \u2014 ' + b.count + ' trade' + (b.count === 1 ? '' : 's');
+    return '<div class="jp-rcol' + (win ? ' win' : ' loss') + (b.from === 0 ? ' zero' : '') + '" title="' + jpEsc(label) + '">'
+      + '<div class="jp-rplot"><span class="n">' + (b.count || '') + '</span>'
+      + '<span class="b" style="height:' + (b.count ? Math.max(pct, 2) : 0) + '%"></span></div>'
+      + '<div class="x">' + jpEsc(b.from.toFixed(Math.abs(d.width) < 0.1 ? 2 : 1)) + '</div>'
+      + '<span class="visually-hidden">' + jpEsc(label) + '</span></div>';
+  }).join('');
+  const payoffSub = (d.avgWinR != null && d.avgLossR != null)
+    ? jpR(d.avgWinR) + ' win \u00b7 ' + jpR(d.avgLossR) + ' loss' : 'win \u00f7 loss';
+  const stats = '<div class="jp-rstats">'
+    + jpRStat('Average', jpR(d.mean), jpSign(d.mean), 'per trade')
+    + jpRStat('Median', jpR(d.median), jpSign(d.median), 'the middle trade')
+    // Above 1.00 means the average winner outruns the average loser, measured in risk.
+    + jpRStat('Payoff', (d.payoff != null ? d.payoff.toFixed(2) : '\u2014'),
+              (d.payoff != null ? jpSign(d.payoff - 1) : ''), payoffSub)
+    + jpRStat('Range', jpR(d.worst) + ' \u2192 ' + jpR(d.best), '', d.wins + 'W / ' + d.losses + 'L')
+    + '</div>';
+  const covered = d.withR < d.n;
+  return head + stats
+    + '<div class="jp-scroll"><div class="jp-rhist" role="img" aria-label="'
+    + jpEsc('Distribution of ' + d.withR + ' trades by R multiple, from ' + jpR(d.worst) + ' to ' + jpR(d.best)) + '">'
+    + bars + '</div></div>'
+    + '<p class="jp-note">R is what a trade returned divided by the risk it was opened with, '
+    + 'so +1R is a winner the size of its stop. Bars are counts; the axis is the low edge of each '
+    + Math.abs(d.width).toFixed(2) + 'R bucket. Broker-accepted fills only.'
+    + (covered
+        ? ' Measured on ' + d.withR + ' of ' + d.n + ' closed trades (' + d.coverage + '%) \u2014 the rest were '
+          + 'opened before the stop distance was recorded, so they cannot be placed on this axis at all.'
+        : '')
+    + '</p>';
+}
+
+async function jpEnsureRDist() {
+  if (jpSliceCache.r !== undefined) return;
+  if (!document.getElementById('jpRCard')) return;
+  const demo = !!(jpData && jpData.demo);
+  try {
+    const r = await fetch('/api/trading/scorecard' + (demo ? '?demo=champion&' : '?') + 'by=r', { cache: 'no-store' });
+    jpSliceCache.r = r.ok ? await r.json() : null;
+  } catch (_e) { jpSliceCache.r = null; }
+  const card = document.getElementById('jpRCard');
+  if (card) card.innerHTML = jpRDist(jpSliceCache.r);
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -1310,6 +1407,7 @@ const JP_WIDGETS = [
   { id: 'symbols', name: 'Symbol statistics', w: 2 },
   { id: 'monthly', name: 'Monthly report', w: 2 },
   { id: 'heatmap', name: 'Weekday × hour', w: 2 },
+  { id: 'rdist', name: 'R multiples', w: 2 },
   { id: 'placements', name: 'Placement notes', w: 2 },
 ];
 const JP_WIDGET = {};
@@ -1420,6 +1518,7 @@ function jpCardBody(id, data) {
   }
   if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
   if (id === 'heatmap') return '<div id="jpHeatCard">' + jpHeatmap(jpSliceCache['weekday-hour']) + '</div>';
+  if (id === 'rdist') return '<div id="jpRCard">' + jpRDist(jpSliceCache.r) + '</div>';
   if (id === 'monthly') {
     return '<div id="jpMonthlyCard">' + jpMonthly(jpDaySeries(L.daily, L.liveToday, L.acct)) + '</div>';
   }
@@ -1466,6 +1565,7 @@ function jpPaintCards() {
   jpBindPlots();
   jpEnsureSymbols();
   jpEnsureHeatmap();
+  jpEnsureRDist();
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every

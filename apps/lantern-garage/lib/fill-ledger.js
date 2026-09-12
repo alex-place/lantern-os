@@ -128,9 +128,17 @@ function idsToRemember(orders) {
  * the protective-stop distance is known. Nulls (never zeros) when the peak /
  * trough was not observed: an invented excursion is worse than an absent one.
  * Long-only book, so favorable = peak above entry, adverse = trough below.
+ *
+ * stop_dist_pct is the DENOMINATOR itself (#3550). It was already the argument
+ * here and was being thrown away after dividing, so every later reader had to
+ * recover it as mfe_pct/mfe_r — which only works when an excursion happened to be
+ * observed, and was true of 9% of the ledger. It is the stop distance frozen at
+ * entry (auto-trader sets it once, when the protective stop is placed, and the
+ * break-even ratchet keeps its own state), so an R computed against it is measured
+ * against the risk actually taken rather than whatever the stop was moved to.
  */
 function excursionFields(entryPx, peak, trough, stopDistPct) {
-  const out = { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null };
+  const out = { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null, stop_dist_pct: null };
   if (!(entryPx > 0)) return out;
   if (Number.isFinite(peak) && peak > 0) {
     out.mfe_pct = +(((Math.max(peak, entryPx) - entryPx) / entryPx) * 100).toFixed(4);
@@ -140,6 +148,7 @@ function excursionFields(entryPx, peak, trough, stopDistPct) {
   }
   const sd = Number(stopDistPct);
   if (sd > 0) {
+    out.stop_dist_pct = +sd.toFixed(4);
     if (out.mfe_pct != null) out.mfe_r = +(out.mfe_pct / sd).toFixed(3);
     if (out.mae_pct != null) out.mae_r = +(out.mae_pct / sd).toFixed(3);
   }

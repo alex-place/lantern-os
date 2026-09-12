@@ -12,6 +12,7 @@
  *   GET /api/trading/scorecard?by=symbol      → per-symbol slices (same honesty split)
  *   GET /api/trading/scorecard?by=hour        → per-ET-hour slices
  *   GET /api/trading/scorecard?by=weekday-hour → per ET weekday AND hour ('Mon 10:00 ET')
+ *   GET /api/trading/scorecard?by=r           → the R-multiple distribution (#3550)
  *   GET /api/trading/scorecard?by=reason      → per-exit-reason slices (profitOnly flagged)
  *   GET /api/trading/scorecard?by=skip        → the skip log grouped by decline reason (#3243 v1)
  */

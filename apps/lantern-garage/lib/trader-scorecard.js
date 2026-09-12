@@ -266,7 +266,117 @@ function slimStats(full) {
   };
 }
 
-const BREAKDOWN_KEYS = ['symbol', 'hour', 'weekday-hour', 'reason', 'skip'];
+
+// ── R multiples (#3550) ───────────────────────────────────────────────────────
+
+/**
+ * The denominator for one exit: the protective-stop distance at ENTRY, as % of entry.
+ *
+ * An R multiple divided by anything else is not an R multiple. If a trade's stop was
+ * ratcheted to break-even and the result is divided by THAT, a full winner reads as
+ * infinite R and a scratch reads as a disaster. The engine freezes this at entry and
+ * never rewrites it, so it is the risk actually taken.
+ *
+ * Recorded directly since #3550. Older rows only carry it implicitly, through the
+ * excursion fields that were divided by it — recoverable, but only when an excursion
+ * was observed, which is 9% of the historical ledger. Hence `withR` in the summary:
+ * a distribution drawn from a fraction of the record has to say so.
+ */
+function rBasisOf(row) {
+  if (!row) return null;
+  const direct = Number(row.stop_dist_pct);
+  if (direct > 0) return direct;
+  const back = (pct, r) => ((typeof pct === 'number' && typeof r === 'number' && r !== 0) ? pct / r : null);
+  const viaMfe = back(row.mfe_pct, row.mfe_r);
+  if (viaMfe > 0) return viaMfe;
+  const viaMae = back(row.mae_pct, row.mae_r);      // a trade that only ever went against us
+  if (viaMae > 0) return viaMae;
+  return null;
+}
+
+/** One trade in R, or null when its risk was never recorded. */
+function rOf(row) {
+  const basis = rBasisOf(row);
+  if (!(basis > 0)) return null;
+  // Number(null) is 0, and the ledger writes pnl_pct: null whenever the entry price was
+  // unknown -- so a coerced check turns every unpriceable trade into a real 0R outcome
+  // sitting in the middle of the histogram. Demand an actual number.
+  const pct = row.pnl_pct;
+  if (typeof pct !== 'number' || !Number.isFinite(pct)) return null;
+  return +(pct / basis).toFixed(4);
+}
+
+/* A bucket width a reader can hold in their head, wide enough that the histogram is a
+   shape rather than a comb. Aiming for ~11 bars over the observed range: fixed buckets
+   would be comparable between traders but this strategy's outcomes live inside ±1R,
+   where a 1R-wide bucket renders the whole record as two bars. */
+const R_NICE_WIDTHS = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10];
+function rHistogram(values) {
+  if (!values.length) return { width: 0, buckets: [] };
+  const lo = Math.min(...values), hi = Math.max(...values);
+  const raw = Math.max(hi - lo, 0.001) / 11;
+  const width = R_NICE_WIDTHS.find((w) => w >= raw) || 20;
+  const from = _round(Math.floor(lo / width) * width);
+  const n = Math.max(1, Math.round((_round(Math.ceil(hi / width) * width) - from) / width));
+  const buckets = [];
+  for (let i = 0; i < n; i++) {
+    buckets.push({ from: _round(from + i * width), to: _round(from + (i + 1) * width), count: 0, wins: 0 });
+  }
+  for (const v of values) {
+    let i = Math.floor((v - from) / width);
+    if (i < 0) i = 0;
+    if (i >= n) i = n - 1;                 // the top edge belongs to the last bucket, not to nothing
+    buckets[i].count += 1;
+    if (v > 0) buckets[i].wins += 1;
+  }
+  return { width, buckets };
+}
+
+/**
+ * The shape of the outcomes, not their average. A reader looking at "+$3,000" cannot
+ * tell many small wins from one lucky one; this can. It matters more here than for the
+ * products that popularised it: this strategy's edge is in the exits, and the exit
+ * asymmetry IS this picture.
+ */
+function rDistribution(rows) {
+  const priced = preparedRows(rows);
+  const values = [];
+  for (const row of priced) {
+    const r = rOf(row);
+    if (r != null) values.push(r);
+  }
+  const n = priced.length;
+  const out = {
+    n,
+    withR: values.length,
+    coverage: n ? +((values.length / n) * 100).toFixed(1) : 0,
+    width: 0, buckets: [],
+    mean: null, median: null, best: null, worst: null,
+    wins: 0, losses: 0, avgWinR: null, avgLossR: null, payoff: null,
+  };
+  if (!values.length) return out;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const wins = sorted.filter((v) => v > 0), losses = sorted.filter((v) => v < 0);
+  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  Object.assign(out, rHistogram(values), {
+    mean: _round(avg(sorted)),
+    median: _round(sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2),
+    best: _round(sorted[sorted.length - 1]),
+    worst: _round(sorted[0]),
+    wins: wins.length,
+    losses: losses.length,
+    avgWinR: wins.length ? _round(avg(wins)) : null,
+    avgLossR: losses.length ? _round(avg(losses)) : null,
+  });
+  // How much a winner returns per unit a loser costs. The headline of the whole card.
+  if (out.avgWinR != null && out.avgLossR != null && Math.abs(out.avgLossR) > 0) {
+    out.payoff = _round(out.avgWinR / Math.abs(out.avgLossR));
+  }
+  return out;
+}
+
+const BREAKDOWN_KEYS = ['symbol', 'hour', 'weekday-hour', 'reason', 'r', 'skip'];
 
 /**
  * Slice the ledger by symbol / ET hour / ET weekday+hour / exit-reason family — each slice carrying
@@ -288,6 +398,21 @@ function breakdownFromRows(by, exits, skips) {
     return { error: 'unknown_breakdown', by, supported: BREAKDOWN_KEYS };
   }
   if (by === 'skip') return skipBreakdownFromRows(skips || []);
+  /* Not a bucketing of trades into named groups like the others, so it carries its
+     own shape -- as by=skip already does -- rather than pretending to be one. */
+  if (by === 'r') {
+    const ex = exits || [];
+    return {
+      by: 'r',
+      generatedAt: new Date().toISOString(),
+      basis: 'protective-stop distance at entry',
+      confirmed: rDistribution(ex.filter((e) => CONFIRMED.has(String(e.status || '').toLowerCase()))),
+      all: rDistribution(ex),
+      note: 'R is the trade result divided by the risk taken at entry: +1R is a winner the size of the stop. '
+        + 'Trades whose stop distance was never recorded are counted in n but not in withR -- a distribution '
+        + 'drawn from part of the record says which part.',
+    };
+  }
   exits = exits || [];
   const groupOf = (e) => {
     if (by === 'symbol') return String(e.symbol || '?').toUpperCase();
@@ -358,4 +483,5 @@ module.exports = {
   computeScorecard, readExits, readEvents, scorecard, breakdown, breakdownFromRows,
   reasonFamily, preparedRows, etParts, slimStats, forUser, rowUser,
   CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG, HOUSE_USER,
+  rBasisOf, rOf, rHistogram, rDistribution,
 };
