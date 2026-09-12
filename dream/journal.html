@@ -284,6 +284,21 @@
   .jp-tag-in{font-size:10.5px;padding:3px 9px;border-radius:999px;border:1px dashed var(--border);
     background:transparent;color:var(--text1);font-family:inherit;width:110px}
   .jp-tag-in:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+  /* The coach (#3560). The sentence leads; the figures sit under it, because a claim
+     about someone's money should arrive with its receipts rather than ask for trust. */
+  .jp-coach-text{font-size:14.5px;line-height:1.65;color:var(--text0);margin:2px 0 14px;max-width:72ch}
+  .jp-finds{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .jp-find{border-left:2px solid var(--border);padding:1px 0 1px 11px}
+  .jp-find p{margin:0;font-size:12px;color:var(--text1);line-height:1.55}
+  .jp-find-tag{border-left-color:var(--blue)}
+  .jp-find-structure{border-left-color:var(--accent)}
+  .jp-evs{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px}
+  .jp-ev{display:flex;gap:5px;align-items:baseline;font-size:10px}
+  .jp-ev .k{color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+  .jp-ev .v{color:var(--text1);font-variant-numeric:tabular-nums}
+  .jp-coach-locked p{font-size:12.5px;color:var(--text1);line-height:1.6;max-width:66ch;margin:2px 0 11px}
+  .jp-coach-locked a{text-decoration:none;display:inline-block}
   /* The list is the point of this card, so it gets room the small tables do not need.
      Still bounded: a page of 25 with rows expanded must not push every later card off
      the screen. */
@@ -1584,6 +1599,75 @@ async function jpEnsureTags() {
   await jpTagsLoad();
 }
 
+/* What your record says (#3560) — Pro.
+   Every claim is computed server-side from figures already on this page and arrives with
+   the evidence it came from; a model may have reworded it, but anything it said
+   containing a figure nobody computed was thrown away before it got here. So this card
+   renders the evidence next to the sentence rather than asking the reader to trust it. */
+let jpCoach = null;          // null until asked; { findings, text, source, ... } or a state
+
+function jpCoachLine(f) {
+  const ev = f.evidence.map((e) => '<span class="jp-ev"><span class="k">' + jpEsc(e.label) + '</span>'
+    + '<span class="v">' + jpEsc(e.value) + '</span></span>').join('');
+  return '<li class="jp-find jp-find-' + jpEsc(f.kind) + '"><p>' + jpEsc(f.claim) + '</p>'
+    + '<div class="jp-evs">' + ev + '</div></li>';
+}
+
+function jpCoachCard(state) {
+  const head = '<h2>What your record says</h2>';
+  if (state === null || state === undefined) return head + '<div class="jp-empty" aria-busy="true">Reading\u2026</div>';
+
+  /* Not a broken card for a reader who has not bought it -- say what it is and what it
+     costs, once, without nagging. */
+  if (state.locked) {
+    return head + '<div class="jp-coach-locked"><p>Your journal is yours on every plan. '
+      + 'Having it read back to you \u2014 what your tags cost you, when you trade worst, '
+      + 'where you are right and still not paid \u2014 is part of Pro.</p>'
+      + '<a class="jp-chip on" href="/pricing.html">See Pro \u2192</a></div>';
+  }
+  if (state.failed) {
+    return head + '<div class="jp-empty">This could not be read just now. Every other figure on this page is unaffected.</div>';
+  }
+
+  const list = state.findings || [];
+  if (!list.length) return head + '<div class="jp-empty">Nothing in your record stands out yet. That is not a complaint.</div>';
+  const refusing = list.length === 1 && list[0].kind === 'refusal';
+  if (refusing) return head + '<div class="jp-empty">' + jpEsc(list[0].claim) + '</div>';
+
+  /* Where the words came from. A reader is entitled to know whether a sentence was
+     written by the arithmetic or reworded by a model, and neither answer is a boast. */
+  const provenance = state.source === 'model'
+    ? 'Written up by ' + jpEsc(state.model || 'a model') + ' from the figures below, which it was not able to change.'
+    : 'Read straight off the figures below.';
+  const rejected = (state.rejected && state.rejected.length)
+    ? ' A draft was discarded for quoting ' + jpEsc(state.rejected.slice(0, 3).join(', ')) + ', which is not in your record.'
+    : '';
+
+  return head
+    + '<p class="jp-coach-text">' + jpEsc(state.text || '') + '</p>'
+    + '<ul class="jp-finds">' + list.map(jpCoachLine).join('') + '</ul>'
+    + '<p class="jp-note">' + provenance + rejected
+    + ' Nothing here is advice \u2014 it is what already happened in your own record.</p>';
+}
+
+async function jpEnsureCoach() {
+  if (jpCoach !== null) return;
+  jpCoach = {};                                   // claim the slot so this runs once
+  if (jpData && jpData.demo) { jpCoach = { locked: true }; jpCoachPaint(); return; }
+  try {
+    const r = await fetch('/api/journal/coach', { credentials: 'same-origin', cache: 'no-store' });
+    if (r.status === 403 || r.status === 401) jpCoach = { locked: true };
+    else if (!r.ok) jpCoach = { failed: true };
+    else jpCoach = await r.json();
+  } catch (_e) { jpCoach = { failed: true }; }
+  jpCoachPaint();
+}
+
+function jpCoachPaint() {
+  const card = document.getElementById('jpCoachCard');
+  if (card) card.innerHTML = jpCoachCard(jpCoach);
+}
+
 /* Placement notes. journalLog() on the trader page has captured a snapshot on every
    order since #2446 -- signal, pattern, RVOL, session -- into localStorage, and until
    now nothing read them back. They are device-local and they are NOT P&L: these are
@@ -1903,6 +1987,7 @@ function jpBalanceChart(h, daily, liveToday) {
    3 the narrowest a card stays readable at. A reader can set any of them by dragging. */
 const JP_WIDGETS = [
   { id: 'kpis', name: 'Key figures', w: 12 },
+  { id: 'coach', name: 'What your record says', w: 12 },
   { id: 'calendar', name: 'P&L calendar', w: 6 },
   { id: 'balance', name: 'Account balance', w: 6 },
   // The list stays above the statistics drawn from it (#3558), and the halves are
@@ -2084,6 +2169,7 @@ function jpCardBody(id, data) {
       + jpPlot((L.daily || []).map((d) => ({ d: d.date, v: d.pnl })), { type: 'bar', height: 150,
           aria: 'Realized profit and loss for each exchange day' });
   }
+  if (id === 'coach') return '<div id="jpCoachCard">' + jpCoachCard(jpCoach && Object.keys(jpCoach).length ? jpCoach : null) + '</div>';
   if (id === 'trades') return '<div id="jpTradesCard">' + jpTrades(jpTradeData === null ? undefined : jpTradeData) + '</div>';
   if (id === 'tags') return jpTags(jpTagStats) ? '<div id="jpTagsCard">' + jpTags(jpTagStats) + '</div>' : '';
   if (id === 'symbols') return '<div id="jpSymbolsCard">' + jpSymbols(jpSliceCache.symbol) + '</div>';
@@ -2188,6 +2274,7 @@ function jpPaintCards() {
   jpEnsureTrades();
   jpEnsureNotes();
   jpEnsureTags();
+  jpEnsureCoach();
 }
 
 /* Bound once, on the body host, because the cards themselves are replaced on every
