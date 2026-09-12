@@ -25,10 +25,20 @@ check('excursionFields: happy path — % of entry, R from stop distance', () => 
 });
 
 check('excursionFields: unobserved run → null, never zero', () => {
+  // The stop distance is NOT an excursion. It is known at entry whether or not the run
+  // was ever observed, and since #3550 it is recorded rather than only divided by — which
+  // is what makes an R computable for exactly these trades, the ones that used to be
+  // uncountable because they had no MFE to back-derive the denominator from.
   const f = excursionFields(100, undefined, undefined, 2);
-  assert.deepStrictEqual(f, { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null });
-  const g = excursionFields(0, 106, 98, 2);   // no entry price → nothing computable
-  assert.deepStrictEqual(g, { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null });
+  assert.deepStrictEqual(f, { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null, stop_dist_pct: 2 });
+  const g = excursionFields(0, 106, 98, 2);   // no entry price → nothing computable, denominator included
+  assert.deepStrictEqual(g, { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null, stop_dist_pct: null });
+});
+
+check('excursionFields: the recorded stop distance is the one that was passed in', () => {
+  assert.strictEqual(excursionFields(100, 106, 98, 3).stop_dist_pct, 3);
+  assert.strictEqual(excursionFields(100, 106, 98, 0).stop_dist_pct, null, 'a zero stop is not a denominator');
+  assert.strictEqual(excursionFields(100, 106, 98, undefined).stop_dist_pct, null);
 });
 
 check('excursionFields: peak below entry / trough above entry clamp to 0, not negative-favorable', () => {
