@@ -191,7 +191,11 @@ function tradeApiGuard(req, res, url) {
        // Journal demo-mode (#3242): the guest Journal tab reads a SIMULATED
        // book (lib/champion-demo.journalRows) through these two — the routes
        // switch to demo data on this param and never read the real ledger.
-       url.pathname === "/api/trading/track-record" || url.pathname === "/api/trading/scorecard") &&
+       url.pathname === "/api/trading/track-record" || url.pathname === "/api/trading/scorecard" ||
+       // The trade log (#3558) is drawn from the same simulated rows as the
+       // statistics above it, so a guest sees a filled list rather than the one
+       // empty card on an otherwise populated demo journal.
+       url.pathname === "/api/trading/trades") &&
       url.searchParams.get("demo") === "champion") return false;
   // Watchlist add/remove is available to everyone incl. read-only guests — it is
   // "which symbols to chart", not a trade, so it isn't behind the trade gate.

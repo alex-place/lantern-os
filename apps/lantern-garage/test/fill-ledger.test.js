@@ -137,3 +137,20 @@ test('orderTimeMs handles seconds, milliseconds and ISO strings', () => {
   assert.strictEqual(orderTimeMs({}), null);
   assert.strictEqual(orderTimeMs({ time: 'not-a-date' }), null);
 });
+
+test('the row records when the position was OPENED, so a hold can be measured (#3558)', () => {
+  // The engine has always known this -- it drives the min-hold and maturity gates -- and
+  // threw it away at the exit, so nothing downstream could say how long a trade was held.
+  const orders = [{ orderId: '9', symbol: 'SPY', side: 'SELL', filledQty: 10, avgPrice: 110, status: 'Filled' }];
+  const rows = newExitRows(orders, new Set(), entryFor({
+    SPY: { avg_entry_price: 100, reason: 'signal_exit', openedAt: '2026-09-01T14:30:00.000Z' },
+  }));
+  assert.strictEqual(rows[0].opened_at, '2026-09-01T14:30:00.000Z');
+});
+
+test('a fill this process never saw opened has NO hold, rather than a zero one (#3558)', () => {
+  // A zero would read as a trade closed the instant it opened. Absent is the truth.
+  const orders = [{ orderId: '10', symbol: 'QQQ', side: 'SELL', filledQty: 5, avgPrice: 50, status: 'Filled' }];
+  const rows = newExitRows(orders, new Set(), entryFor({ QQQ: { avg_entry_price: 48 } }));
+  assert.strictEqual(rows[0].opened_at, null);
+});

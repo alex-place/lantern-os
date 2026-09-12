@@ -972,7 +972,8 @@ function _reconcileFills(orders) {
       // Excursions (#3241): the placement snapshot when this exit came from
       // closeLong (which clears the live maps), else the live maps — a protective
       // STP fills without ever passing through closeLong.
-      const ex = _excursion.get(sym) || { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null };
+      const ex = _excursion.get(sym) || { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null,
+        stopDistPct: _stopDistPct.get(sym) ?? null, openedAt: _entryAt.get(sym) ?? null };
       return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), ...ex };
     }, _PROCESS_START);
     for (const row of rows) {
@@ -1310,7 +1311,12 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   // Freeze the excursion run BEFORE clearing per-symbol state — the fill row that
   // needs it is only written later, at broker reconcile (#3241).
-  _excursion.set(sym, { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null });
+  _excursion.set(sym, { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null,
+    // When the position was opened (#3558). Known all along -- it drives the min-hold
+    // and maturity gates -- and thrown away at the exit, so nothing downstream could
+    // say how long a trade was held. Snapshotted here for the same reason the
+    // excursions are: closeLong clears the live maps before the fill reconciles.
+    openedAt: _entryAt.get(sym) ?? null });
   _entryAt.delete(sym); _holdClockAt.delete(sym); _peak.delete(sym); _trough.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   _exitIntent.set(sym, reason);
