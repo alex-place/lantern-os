@@ -1748,12 +1748,19 @@ JP_WIDGETS.forEach((w) => { JP_WIDGET[w.id] = w; });
 const JP_LAYOUT_KEY = 'jp-layout-v2';
 const JP_COLS = 12;
 const JP_SPAN_MIN = 3;
-const JP_H_MIN = 120, JP_H_MAX = 1200;
+/* Height moves in rows, the way width moves in columns (#3571). 40px is fine enough
+   to land where you meant and coarse enough that two cards dragged to "about the
+   same" actually match. The bounds are whole rows: 3 of them to 30. */
+const JP_ROW = 40;
+const JP_H_MIN = JP_ROW * 3, JP_H_MAX = JP_ROW * 30;
+
 let jpEdit = false;
 
 const jpSpanOk = (n) => Number.isInteger(n) && n >= JP_SPAN_MIN && n <= JP_COLS;
 const jpHeightOk = (n) => Number.isFinite(n) && n >= JP_H_MIN && n <= JP_H_MAX;
 const jpClamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const jpRowsToPx = (r) => jpClamp(Math.round(r), JP_H_MIN / JP_ROW, JP_H_MAX / JP_ROW) * JP_ROW;
+const jpPxToRows = (px) => Math.round(px / JP_ROW);
 const _l2 = (l, over) => Object.assign({ v: 2, order: l.order, hidden: l.hidden, span: l.span, h: l.h }, over);
 
 function jpLayoutDefault() {
@@ -1780,7 +1787,9 @@ function jpLayoutMerge(stored) {
   }
   const h = {};
   const hh = (stored.h && typeof stored.h === 'object') ? stored.h : {};
-  for (const id of Object.keys(hh)) if (known.has(id) && jpHeightOk(hh[id])) h[id] = Math.round(hh[id]);
+  // Snapped on the way in too: a browser copy written before heights moved in rows
+  // would otherwise sit off the grid for as long as nobody touched that card.
+  for (const id of Object.keys(hh)) if (known.has(id) && jpHeightOk(hh[id])) h[id] = jpRowsToPx(jpPxToRows(hh[id]));
   return { v: 2, order, hidden, span, h };
 }
 const jpSpanOf = (l, id) => l.span[id] || (JP_WIDGET[id] ? JP_WIDGET[id].w : JP_COLS / 2);
@@ -1831,7 +1840,9 @@ function jpLayoutHeight(l, id, h) {
   const next = Object.assign({}, l.h);
   // Null clears it: a card goes back to sizing itself to its contents.
   if (h == null) delete next[id];
-  else next[id] = jpClamp(Math.round(h), JP_H_MIN, JP_H_MAX);
+  // Snapped, not just clamped: an off-grid height is a height nobody could have
+  // dragged to, and the card beside it would never quite line up with it.
+  else next[id] = jpRowsToPx(jpPxToRows(h));
   return _l2(l, { h: next });
 }
 const jpLayoutHide = (l, id) => (l.hidden.includes(id) || !l.order.includes(id)
@@ -1913,14 +1924,15 @@ function jpCardBody(id, data) {
    what the card is. The grip does both jobs now: drag it with a pointer, or focus it and
    use the arrow keys -- which is more than the chips could do, since they could not
    resize at all. */
-function jpCardBar(id, span) {
+function jpCardBar(id, span, h) {
   if (!jpEdit) return '';
   const name = (JP_WIDGET[id] || {}).name || id;
   return '<div class="jp-bar">'
     + '<button type="button" class="grip" data-grip="' + jpEsc(id) + '" aria-label="Move or resize ' + jpEsc(name)
     + '. Arrow keys move it, shift and arrow keys resize it, Delete hides it.">\u283f</button>'
     + '<span class="name">' + jpEsc(name) + '</span>'
-    + '<span class="jp-span" aria-hidden="true">' + span + '/' + JP_COLS + '</span>'
+    + '<span class="jp-span" aria-hidden="true">' + span + '/' + JP_COLS
+    + (h ? ' \u00b7 ' + (h / JP_ROW) + 'r' : '') + '</span>'
     + '<button type="button" class="jp-chip" data-act="hide" aria-label="Hide ' + jpEsc(name) + '">Hide</button></div>';
 }
 
@@ -1985,7 +1997,7 @@ function jpPaintCards() {
       // height -- so dragging the bottom edge shrank the contents inside a box that could
       // not move, which is not resizing anything.
       + ' data-card="' + id + '" style="grid-column:span ' + span + (h ? ';align-self:start' : '') + '">'
-      + jpCardBar(id, span)
+      + jpCardBar(id, span, h)
       + '<div class="jp-cbody"' + (h ? ' style="height:' + h + 'px;overflow:auto"' : '') + '>' + body + '</div>'
       + (jpEdit ? '<span class="jp-res jp-res-x' + (partner[id] ? ' jp-res-split' : '') + '" data-res="x"'
         + (partner[id] ? ' data-split="' + jpEsc(partner[id]) + '"' : '')
@@ -2167,9 +2179,15 @@ function jpBindLayout(root) {
       return;
     }
     if (drag.mode === 'y' && drag.body) {
-      drag.live = jpClamp(drag.h + (e.clientY - drag.y), JP_H_MIN, JP_H_MAX);
+      // Whole rows from where the drag started, exactly as the width handle takes
+      // whole columns -- so the card lands on the grid rather than wherever the
+      // pointer happened to stop.
+      const step = Math.round((e.clientY - drag.y) / JP_ROW);
+      drag.live = jpRowsToPx(jpPxToRows(drag.h) + step);
       drag.body.style.height = drag.live + 'px';
       drag.body.style.overflow = 'auto';
+      const out = drag.card.querySelector('.jp-span');
+      if (out) out.textContent = jpSpanOf(jpLayout, drag.id) + '/' + JP_COLS + ' \u00b7 ' + (drag.live / JP_ROW) + 'r';
     }
   });
 

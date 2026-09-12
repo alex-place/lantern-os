@@ -42,10 +42,11 @@ const grabDecl = (name) => {
 };
 
 const CODE = [
-  'const JP_COLS = 12, JP_SPAN_MIN = 3, JP_H_MIN = 120, JP_H_MAX = 1200;',
+  'const JP_COLS = 12, JP_SPAN_MIN = 3, JP_ROW = 40, JP_H_MIN = 120, JP_H_MAX = 1200;',
   grabDecl('JP_WIDGETS'),
   'const JP_WIDGET = {}; JP_WIDGETS.forEach((w) => { JP_WIDGET[w.id] = w; });',
-  grabDecl('jpSpanOk'), grabDecl('jpHeightOk'), grabDecl('jpClamp'), grabDecl('_l2'),
+  grabDecl('jpSpanOk'), grabDecl('jpHeightOk'), grabDecl('jpClamp'),
+  grabDecl('jpRowsToPx'), grabDecl('jpPxToRows'), grabDecl('_l2'),
   grabFn('jpLayoutDefault'), grabFn('jpLayoutMerge'),
   grabDecl('jpSpanOf'), grabDecl('jpHeightOf'),
   grabFn('jpLayoutMove'), grabFn('jpLayoutInsert'), grabFn('jpLayoutSpan'), grabFn('jpLayoutHeight'),
@@ -56,7 +57,7 @@ const CODE = [
 ].join('\n');
 const P = new Function(CODE + '\nreturn { JP_WIDGETS, JP_COLS, jpLayoutDefault, jpLayoutMerge, jpSpanOf, jpHeightOf,'
   + ' jpLayoutMove, jpLayoutInsert, jpLayoutSpan, jpLayoutHeight, jpLayoutHide, jpLayoutShow,'
-  + ' jpRowsOf, jpSplitPartners, setLayout: (l) => { jpLayout = l; } };')();
+  + ' jpRowsOf, jpSplitPartners, jpRowsToPx, jpPxToRows, JP_ROW, setLayout: (l) => { jpLayout = l; } };')();
 const ids = P.JP_WIDGETS.map((w) => w.id);
 
 test('the registry is sound, and its ids are ones the store will accept', () => {
@@ -198,6 +199,43 @@ test('the page saves on change and asks the server for the reader\'s own on load
   assert.doesNotMatch(apply, /jpLoad\(/, 'arranging the page never refetches the record');
   assert.match(grabFn('jpLayoutSync'), /\/api\/journal\/layout/);
   assert.match(grabFn('jpLayoutReset'), /method: 'DELETE'/);
+});
+
+test('height moves in whole rows, the way width moves in whole columns (#3571)', () => {
+  /* Width snapped to twelfths and height took raw pixels, so the two handles on the same
+     card behaved like different tools. The point of the snap is the last assertion: two
+     cards dragged to "about the same" have to actually match. */
+  const l = P.jpLayoutDefault();
+  assert.strictEqual(P.JP_ROW, 40);
+  for (const [asked, got] of [[137, 120], [159, 160], [160, 160], [161, 160], [320, 320], [1199, 1200]]) {
+    assert.strictEqual(P.jpHeightOf(P.jpLayoutHeight(l, 'calendar', asked), 'calendar'), got, 'height ' + asked);
+  }
+  const sloppyA = P.jpLayoutHeight(l, 'calendar', 329);
+  const sloppyB = P.jpLayoutHeight(l, 'balance', 313);
+  assert.strictEqual(P.jpHeightOf(sloppyA, 'calendar'), P.jpHeightOf(sloppyB, 'balance'),
+    'two cards dragged to roughly the same height end up exactly the same height');
+});
+
+test('the row bounds are whole rows, not arbitrary pixels (#3571)', () => {
+  const l = P.jpLayoutDefault();
+  const px = (v) => P.jpHeightOf(P.jpLayoutHeight(l, 'calendar', v), 'calendar');
+  assert.strictEqual(px(-500) / P.JP_ROW, 3, 'three rows is the floor');
+  assert.strictEqual(px(99999) / P.JP_ROW, 30, 'thirty is the ceiling');
+  assert.strictEqual(px(500) % P.JP_ROW, 0, 'and everything between lands on the grid');
+  assert.strictEqual(P.jpHeightOf(P.jpLayoutHeight(l, 'calendar', null), 'calendar'), null, 'null still means auto');
+});
+
+test('a height stored off the grid is snapped rather than kept (#3571)', () => {
+  // A browser copy written before heights moved in rows would otherwise sit off the grid
+  // for as long as nobody touched that card.
+  const stored = { v: 2, order: ids.slice(), hidden: [], span: {}, h: { calendar: 137, balance: 313 } };
+  const merged = P.jpLayoutMerge(stored);
+  assert.strictEqual(merged.h.calendar, 120);
+  assert.strictEqual(merged.h.balance, 320);
+  assert.ok(Object.values(merged.h).every((v) => v % P.JP_ROW === 0));
+  // And the store agrees, so the page and the file cannot disagree about a card's height.
+  assert.strictEqual(store.normalize(stored).h.calendar, 120);
+  assert.strictEqual(store.normalize(stored).h.balance, 320);
 });
 
 test('rows are packed the way the grid will pack them (#3569)', () => {
