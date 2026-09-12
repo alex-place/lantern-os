@@ -1727,11 +1727,12 @@ const JP_WIDGETS = [
   { id: 'kpis', name: 'Key figures', w: 12 },
   { id: 'calendar', name: 'P&L calendar', w: 6 },
   { id: 'balance', name: 'Account balance', w: 6 },
-  // Paired deliberately: a 6 followed by a 12 leaves half a row of nothing, which is
-  // what made the old default look unfinished. Every row here fills its twelve.
+  // The list stays above the statistics drawn from it (#3558), and the halves are
+  // paired: a 6 followed by a 12 leaves half a row of nothing, which is what made the
+  // old default look unfinished. Every row here fills its twelve.
+  { id: 'trades', name: 'Trade log', w: 12 },
   { id: 'pnlday', name: 'Net P&L per day', w: 6 },
   { id: 'breakdown', name: 'Breakdown', w: 6 },
-  { id: 'trades', name: 'Trade log', w: 12 },
   { id: 'symbols', name: 'Symbol statistics', w: 12 },
   { id: 'monthly', name: 'Monthly report', w: 12 },
   { id: 'heatmap', name: 'Weekday × hour', w: 6 },
