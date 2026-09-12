@@ -460,6 +460,7 @@ const brakeRoutes = require('./trading/brake');
 const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
 const importRoutes = require('./trading/import');   // broker fill import (#3557)
+const tradesRoutes = require('./trading/trades');   // the trade log (#3558)
 const trackRecordRoutes = require('./trading/track-record');
 const alertsRoutes = require('./trading/alerts');
 const championRoutes = require('./trading/champion');
@@ -519,6 +520,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await demoRoutes(req, res, url, ctx)) return true;
   if (await scorecardRoutes(req, res, url, ctx)) return true;
   if (await importRoutes(req, res, url, ctx)) return true;
+  if (await tradesRoutes(req, res, url, ctx)) return true;
   if (await trackRecordRoutes(req, res, url, ctx)) return true;
   if (await alertsRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
