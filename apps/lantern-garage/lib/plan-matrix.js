@@ -66,6 +66,11 @@ const CAPABILITIES = {
   options_manual:     { minPlan: "pro", label: "Manual paper options orders" },
   byok_keys:          { minPlan: "pro", label: "Bring-your-own AI keys (#2505)" },
   price_alerts:       { minPlan: "pro", label: "Price alerts + auto trade journal" },
+  // The JOURNAL is for everyone — every tier keeps a record and reads their own
+  // statistics. What Pro buys is having it read back to them (#3560). The autonomous
+  // trader stays Pilot, below.
+  journal_coach:      { minPlan: "pro", label: "Journal coaching — your record read back to you",
+                        entitlement: "journal_coach" },
   creator_suite:      { minPlan: "pro", label: "Creator Suite (video → shorts)" },
   wide_research:      { minPlan: "pro", label: "Wide multi-model research + persistent memory" },
   // ── Pilot / Business adds ($200) ────────────────────────────────────────────
