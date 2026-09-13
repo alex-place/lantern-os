@@ -237,6 +237,9 @@
   .jp-navb{background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:6px;
     width:24px;height:24px;cursor:pointer;font:inherit;font-size:12px;line-height:1;display:grid;place-items:center}
   .jp-navb:hover:not(:disabled){background:var(--bg3);color:var(--text0)}
+  /* Every other control on this page draws its own ring; this one was falling back to
+     whatever the browser does. */
+  .jp-navb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .jp-navb:disabled{opacity:.35;cursor:default}
 
   /* .jp-kpi .v declares color:var(--text0) at (0,2,0); .jp-neg alone is (0,1,0) and
@@ -802,8 +805,8 @@ function jpBreakdown(slice) {
     .sort((a, b) => (b.totalRealized || 0) - (a.totalRealized || 0));
   return head
     + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
-    + '<th>' + jpEsc(JP_LABELS[jpSlice] || jpSlice) + '</th><th class="num">Trades</th>'
-    + '<th class="num">Win %</th><th class="num">Realized</th></tr></thead><tbody>'
+    + '<th scope="col">' + jpEsc(JP_LABELS[jpSlice] || jpSlice) + '</th><th scope="col" class="num">Trades</th>'
+    + '<th scope="col" class="num">Win %</th><th scope="col" class="num">Realized</th></tr></thead><tbody>'
     + rows.map(r => '<tr><td>' + jpEsc(jpLabelValue(r.key)) + '</td>'
       + '<td class="num">' + (r.trades != null ? r.trades : '—') + '</td>'
       + '<td class="num">' + jpPct(r.winRate) + '</td>'
@@ -880,7 +883,7 @@ function jpSymbols(slice) {
   const thin = rows.some((r) => (r.trades || 0) < JP_THIN_TRADES);
   const arrow = (c) => (jpSymSort.key === c.key ? (jpSymSort.dir === 1 ? ' \u25b2' : ' \u25bc') : '');
   const th = JP_SYM_COLS.map((c) =>
-    '<th' + (c.num ? ' class="num"' : '')
+    '<th scope="col"' + (c.num ? ' class="num"' : '')
     + (jpSymSort.key === c.key ? ' aria-sort="' + (jpSymSort.dir === 1 ? 'ascending' : 'descending') + '"' : '')
     + '><button type="button" class="jp-sort" onclick="jpSetSymSort(\'' + c.key + '\')">'
     + jpEsc(c.label) + arrow(c) + '</button></th>').join('');
@@ -1019,9 +1022,10 @@ function jpMonthly(ds) {
   const acct = ds && ds.mode === 'account';
   return head
     + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
-    + '<th>Month</th><th class="num">' + (acct ? 'Sessions' : 'Trading days') + '</th>'
-    + '<th class="num">Day win %</th><th class="num">P&amp;L</th>'
-    + '<th class="num">Best day</th><th class="num">Worst day</th><th class="num">Drawdown</th>'
+    + '<th scope="col">Month</th><th scope="col" class="num">' + (acct ? 'Sessions' : 'Trading days') + '</th>'
+    + '<th scope="col" class="num">Day win %</th><th scope="col" class="num">P&amp;L</th>'
+    + '<th scope="col" class="num">Best day</th><th scope="col" class="num">Worst day</th>'
+    + '<th scope="col" class="num">Drawdown</th>'
     + '</tr></thead><tbody>' + body + '</tbody></table></div>'
     + '<p class="jp-note">'
     + (acct ? 'Every session the account reported, today included.' : 'What closed each day \u2014 a trade held across days books on the day it closes.')
@@ -1122,7 +1126,7 @@ function jpHeatmap(slice) {
     + g.hours.map((h) => cell(d, h)).join('') + '</tr>').join('');
   return head
     + '<div class="jp-scroll"><table class="jp-table jp-heat">'
-    + '<thead><tr><th><span class="visually-hidden">Weekday</span></th>'
+    + '<thead><tr><th scope="col"><span class="visually-hidden">Weekday</span></th>'
     + g.hours.map((h) => '<th scope="col">' + jpEsc(h) + '</th>').join('')
     + '</tr></thead><tbody>' + body + '</tbody></table></div>'
     + '<p class="jp-note">Each cell is what one trade entered in that hour returned on average \u2014 expectancy, '
@@ -1389,7 +1393,7 @@ function jpTrades(data) {
       + '<div class="jp-empty">' + (filtered ? 'No trades match that filter.' : 'No closed trades yet.') + '</div>';
   }
   const arrow = (c) => (data.sort === c.key ? (data.dir === 'asc' ? ' \u25b2' : ' \u25bc') : '');
-  const th = JP_TRADE_COLS.map((c) => '<th' + (c.num ? ' class="num"' : '')
+  const th = JP_TRADE_COLS.map((c) => '<th scope="col"' + (c.num ? ' class="num"' : '')
     + (data.sort === c.key ? ' aria-sort="' + (data.dir === 'asc' ? 'ascending' : 'descending') + '"' : '') + '>'
     + (c.sortable
       ? '<button type="button" class="jp-sort" onclick="jpTradeSort(\'' + c.key + '\')">' + jpEsc(c.label) + arrow(c) + '</button>'
@@ -1624,8 +1628,9 @@ function jpTags(stats) {
   const table = (rows, label) => {
     if (!rows.length) return '';
     return '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
-      + '<th>' + label + '</th><th class="num">Trades</th><th class="num">Win %</th>'
-      + '<th class="num">Net</th><th class="num">Per trade</th></tr></thead><tbody>'
+      + '<th scope="col">' + label + '</th><th scope="col" class="num">Trades</th>'
+      + '<th scope="col" class="num">Win %</th>'
+      + '<th scope="col" class="num">Net</th><th scope="col" class="num">Per trade</th></tr></thead><tbody>'
       + rows.map((r) => '<tr><td>' + jpEsc(r.key) + '</td>'
         + '<td class="num">' + r.trades + '</td>'
         + '<td class="num">' + jpPct(r.winRate) + '</td>'
@@ -1742,8 +1747,10 @@ function jpPlacements(opts) {
     + '<p class="jp-note">What the screen said at the moment each order went in. Captured locally, never uploaded, '
     + 'newest first, capped at 500. Not profit and loss — these are intentions, not outcomes.</p>'
     + '<div class="jp-scroll"><table class="jp-table"><thead><tr>'
-    + '<th>When</th><th>Symbol</th><th>Side</th><th class="num">Qty</th><th class="num">Price</th>'
-    + '<th>Signal</th><th>Pattern</th><th class="num">RVOL</th><th>Session</th></tr></thead><tbody>'
+    + '<th scope="col">When</th><th scope="col">Symbol</th><th scope="col">Side</th>'
+    + '<th scope="col" class="num">Qty</th><th scope="col" class="num">Price</th>'
+    + '<th scope="col">Signal</th><th scope="col">Pattern</th>'
+    + '<th scope="col" class="num">RVOL</th><th scope="col">Session</th></tr></thead><tbody>'
     + rows.slice(0, 100).map(r => '<tr><td class="jp-dim">' + jpEsc(when(r.ts)) + '</td>'
       + '<td><b>' + jpEsc(r.symbol || '') + '</b></td>'
       + '<td class="' + (String(r.side).toLowerCase() === 'buy' ? 'jp-pos' : 'jp-neg') + '">' + jpEsc(String(r.side || '').toUpperCase()) + '</td>'
@@ -2321,7 +2328,13 @@ function jpPaintCards() {
     const body = bodies.get(id);
     const span = jpSpanOf(jpLayout, id);
     const h = jpHeightOf(jpLayout, id);
+    /* NAMED, because an unnamed <section> is not a region at all -- twelve of them left
+       a screen reader with one unnamed <nav> as the only thing on the page it could
+       jump to. The registry name is used rather than the card's own heading: it is
+       there for every card, including the two that print no heading. */
+    const label = (JP_WIDGET[id] || {}).name || id;
     return '<section class="jp-card' + (id === 'kpis' ? ' bare' : '') + '"'
+      + ' aria-label="' + jpEsc(label) + '"'
       // A card the reader has SIZED opts out of the row stretch (#3567). Stretching is
       // what keeps un-sized cards lined up, but it also means the row decides the box
       // height -- so dragging the bottom edge shrank the contents inside a box that could
