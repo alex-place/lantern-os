@@ -480,9 +480,13 @@ test('the session carries the setup, and the page listens rather than fetching a
 });
 
 test('an adopted setup is filtered and capped, and an equal one is a no-op', () => {
+  // The filter and the cap moved into _indDedupe, which both the device copy and the
+  // account copy go through -- one instance per id as well (operator, 2026-09-13).
   const fn = TRADER.slice(TRADER.indexOf('function adoptIndicators'));
-  assert.match(fn, /IND_DEFS\[x\.id\]/, 'an indicator we no longer ship would reach the chart');
-  assert.match(fn, /slice\(0, 12\)/, 'a hand-edited profile could put a thousand series on the chart');
+  assert.match(fn, /const clean = _indDedupe\(list\);/, 'the account copy bypasses the dedupe');
+  const dd = TRADER.slice(TRADER.indexOf('function _indDedupe(list){'), TRADER.indexOf('let chartIndicators = '));
+  assert.match(dd, /IND_DEFS\[x\.id\]/, 'an indicator we no longer ship would reach the chart');
+  assert.match(dd, /slice\(0, 12\)/, 'a hand-edited profile could put a thousand series on the chart');
   assert.match(fn, /JSON\.stringify\(clean\) === JSON\.stringify\(chartIndicators\)/,
     'every page load would redraw the chart for nothing');
 });

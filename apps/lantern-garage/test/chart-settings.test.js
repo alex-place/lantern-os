@@ -327,4 +327,42 @@ test('the session hours and the display zone are different things', () => {
   assert.match(PAGE, /function _etTime\(d\)\{ return d\.toLocaleTimeString\('en-US',\{timeZone:_tz\(\)/);
   assert.match(PAGE, /ctx\.fillText\(_tzTag\(\), w-2, h-2\);/, 'the corner tag still says ET whatever the zone');
 });
+// ── the indicator dialog, second look (operator, 2026-09-13) ─────────────────
+
+test('a click that re-renders its own dialog is not an outside click', () => {
+  /* The Style tab closed the dialog. Its onclick rebuilt the dialog's innerHTML, so by
+     the time the click reached the document listener its target was detached,
+     `contains()` said no, and the outside-click rule fired. The same shape sits under
+     the drawing flyout and both toolbar menus, so the rule now lives in one helper that
+     treats a target with no place in the document as inside. */
+  assert.match(PAGE, /function _clickInside\(el, e\)\{\s*return !!el && \(el\.contains\(e\.target\) \|\| !e\.target\.isConnected\);/);
+  assert.match(PAGE, /_clickInside\(_indStyleEl, e\)/, 'the indicator dialog still uses bare containment');
+  assert.match(PAGE, /_clickInside\(_styleEl, ev\)/, 'the drawing flyout still uses bare containment');
+  assert.strictEqual((PAGE.match(/_clickInside\(m, e\)/g) || []).length, 2, 'both toolbar menus');
+  assert.doesNotMatch(PAGE, /_indStyleEl\.contains\(e\.target\)/);
+  assert.doesNotMatch(PAGE, /_styleEl\.contains\(ev\.target\)/);
+  assert.doesNotMatch(PAGE, /\bm\.contains\(e\.target\)/);
+});
+
+test('one instance of an indicator, and no door for a second', () => {
+  // The + that made "EMA 42" out of "EMA 21" is gone, the add list already hides what is
+  // on the chart, and anything RESTORED is deduplicated by id before it is drawn.
+  assert.doesNotMatch(PAGE, /indDuplicate/);
+  assert.doesNotMatch(PAGE, /Add another/);
+  assert.match(PAGE, /function _indDedupe\(list\)\{/);
+  assert.match(PAGE, /let chartIndicators = \(\(\)=>\{\s*try\{ return _indDedupe\(/, 'the device copy is not deduplicated');
+  assert.match(PAGE, /const clean = _indDedupe\(list\);/, 'the account copy is not deduplicated');
+  assert.match(PAGE, /if\(chartIndicators\.some\(c=>c\.id===id\)\)\{\s*openIndicatorSettings/, 'adding twice does not open the existing one');
+});
+
+test('_indDedupe keeps the first of each id and drops what the registry does not know', () => {
+  // Evaluated on its own: the function is pure over a registry lookup.
+  const src = PAGE.slice(PAGE.indexOf('function _indDedupe(list){'), PAGE.indexOf('let chartIndicators = '));
+  const fn = new Function('IND_DEFS', src + '; return _indDedupe;')({ ema: {}, rsi: {} });
+  const out = fn([{ id: 'ema', params: { p: 21 } }, { id: 'ema', params: { p: 42 } }, { id: 'nope' }, null, { id: 'rsi' }, { id: 'rsi' }]);
+  assert.deepStrictEqual(out.map((x) => x.id), ['ema', 'rsi']);
+  assert.strictEqual(out[0].params.p, 21, 'the first copy is the one that stays');
+  assert.deepStrictEqual(fn('not a list'), []);
+  assert.strictEqual(fn(Array.from({ length: 40 }, (_, i) => ({ id: i % 2 ? 'ema' : 'rsi' }))).length, 2);
+});
 
