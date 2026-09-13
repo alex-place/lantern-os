@@ -17,7 +17,9 @@ Build and start come from the repo:
 - `railway.json`:
   - Nixpacks build, start `node apps/lantern-garage/start.js` (see *Website and trader as two processes* below).
   - Healthcheck `/api/status`, 120 s. It only gates a deploy going live; a running service that stops answering isn't restarted.
-  - Restart on failure, 3 retries. After three crashes the service stays down until someone redeploys.
+  - Restart ALWAYS, since #3525. It was on-failure with 3 retries, which left the service DOWN
+    after the third crash — for a trader, the worst of both worlds. This is the outer net, for
+    the supervisor itself; the trader's own restarts never reach it. See *Stall watchdog* below.
 - `nixpacks.toml`: Node only, `npm ci --ignore-scripts`. The `prepare` hook needs `.git`, which isn't uploaded.
 - `.railwayignore`: keeps `.git`, `node_modules`, `data/*`, models and the desktop app out of the upload.
 
@@ -61,6 +63,64 @@ restarts both processes, so the market-hours rule for deploys still applies.
 
 Known limit: provider keys and the IBKR account/gateway saved through the settings API are
 applied to the web process's environment. The trader picks them up at its next restart.
+
+## Stall watchdog (#3525)
+
+The scan loop is a self-rescheduling `setTimeout` chain: each tick queues the next one only after
+the previous finishes. If a tick never finishes, the chain stops. There is no crash, no exit code
+and no log line — the process stays up, `/api/status` answers 200, and nothing trades. Railway's
+healthcheck cannot see this: it gates a deploy going live, not a running service, and this service
+answers fine.
+
+`lib/trader-heartbeat.js` watches for that from inside the trader process. A heartbeat is a
+**completed scan cycle**, not a tick, because a wedged broker session leaves the loop ticking on
+schedule while every scan throws. Stale in session → it logs, mails, and exits non-zero; the split
+supervisor restarts that child in about a second.
+
+**It is off unless you set it.** It can end the process, and the operator's armed local boxes run
+this same code.
+
+```bash
+railway variable set TRADER_HEARTBEAT=1 --service unisona --environment production
+railway variable set TRADER_HEARTBEAT_EMAIL=you@example.com --service unisona --environment production
+```
+
+| Variable | Default | What it does |
+|---|---|---|
+| `TRADER_HEARTBEAT` | unset (off) | `alert` = log + mail · `1` = log + mail + `exit(1)` |
+| `TRADER_HEARTBEAT_EMAIL` | unset | Where alerts go. Unset = logged, not mailed. |
+| `TRADER_HEARTBEAT_STALE_MS` | 300000 | Floor is 2x `TRADER_AUTOSCAN_MS`. |
+| `TRADER_HEARTBEAT_MAX_RESTARTS` | 3 | Per rolling hour, then it only alerts. |
+| `TRADER_HEARTBEAT_COOLDOWN_MS` | 900000 | Minimum gap between alert mails for one stall. |
+| `TRADER_HEARTBEAT_CHECK_MS` | 60000 | How often it looks. |
+
+Five minutes and not the two the issue asked for: the cadence is 60 s and a scan takes 45-60 s, so
+a **healthy** loop is normally silent for about two minutes between completions. Two times the
+cadence would page on a working trader.
+
+Use `alert` where nothing catches the exit — that is the unsplit `all` role, which is what the
+local boxes and the desktop app run. Under `LANTERN_SPLIT=1` the supervisor is the parent and
+`1` is safe.
+
+Outside market hours it is silent, and it never restarts more than `MAX_RESTARTS` times an hour:
+a loop broken by a bad deploy would otherwise restart forever, and each restart drops whatever
+in-memory state the trader had mid-session. The count lives in `data/trading/heartbeat.json`
+precisely so it survives the exit it caused.
+
+`railway.json` says `restartPolicyType: ALWAYS` for the same reason. It was `ON_FAILURE` with
+three retries, which left the whole service **down** after the third crash. That is the outer net,
+for the supervisor itself — the trader's own restarts never reach it.
+
+Read it back on the trader's loopback port, or on `/api/status` in the unsplit role:
+
+```bash
+curl -s http://127.0.0.1:4190/api/status | jq .trader_heartbeat
+```
+
+`mode: "off"` with `scans: 0` on the **web** half is correct, not a fault: that process runs no
+loop. `applyRoleEnv()` sets `TRADER_AUTOSCAN=0` for it, and the watchdog starts inside the block
+that switch turns off — otherwise it would find a permanently stale heartbeat and restart the
+website every five minutes.
 
 ## Configuration and secrets
 

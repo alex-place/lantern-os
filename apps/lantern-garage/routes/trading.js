@@ -73,6 +73,7 @@ const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stag
 const accountLock = require('../lib/account-lock');       // one account, one managing process
 const processRole = require('../lib/process-role');     // which half of the app this process runs (#3523)
 const traderForward = require('../lib/trader-forward');
+const traderHeartbeat = require('../lib/trader-heartbeat');  // the loop watching itself (#3525)
 const _lockNoticed = new Set();                          // accounts we've already logged a stand-down for
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
@@ -260,14 +261,33 @@ async function _autoscanTick() {
         try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
         await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld, protectiveOnly: extManageNow });
       }
+      // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
+      // the only point that means a scan CYCLE COMPLETED. A wedged broker session leaves
+      // the loop ticking happily while every scan throws into the catch below, and a
+      // watchdog counting ticks would call that healthy.
+      traderHeartbeat.scanned();
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }
   }
+  traderHeartbeat.ticked();                                 // liveness, for diagnosis only
   if (!_autoscanStopped) setTimeout(_autoscanTick, (marketHours || extNow || extManageNow) ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
+
+  // ── STALL WATCHDOG (#3525) ──────────────────────────────────────────────────
+  // Off unless TRADER_HEARTBEAT is set, because it can end the process and the armed
+  // local boxes run this same file. `inSession` is passed in rather than reimplemented:
+  // the two predicates above are the one definition of when this loop is SUPPOSED to be
+  // scanning, and a second copy inside the watchdog would be a second thing to keep
+  // right. Extended hours count only when a toggle has the loop running in them — a
+  // stall at 17:00 with extended exits armed is a real stall, and at 17:00 without them
+  // there is nothing to be late for.
+  traderHeartbeat.start({
+    inSession: () => _isUsMarketHours()
+      || (_isUsExtendedHours() && (_extendedTrading || _extendedExitsOnly())),
+  });
 
   // ── FAST EXIT LOOP (#3165): price-only exit checks between full scans ──────────
   // The 60s scan cadence made exits blind for a minute at a time — a near-miss of R1
