@@ -58,7 +58,8 @@
   check('candles.body', true);   color('candles.bodyUp');   color('candles.bodyDown');
   check('candles.border', false); color('candles.borderUp'); color('candles.borderDown');
   check('candles.wick', true);   color('candles.wickUp');   color('candles.wickDown');
-  color('line.color'); number('line.width', 2, 1, 5, 0.5); check('line.area', true);
+  // Off since the Area chart type exists: Line is the unfilled one, as on TradingView.
+  color('line.color'); number('line.width', 2, 1, 5, 0.5); check('line.area', false);
   // Regular hours by default, as TradingView's RTH: the range densities are built on the
   // regular session (1D at 1m is 390 candles). Extended hours are the RTH/ETH toggle on
   // the strip under the charts, and here.

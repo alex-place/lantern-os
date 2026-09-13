@@ -161,6 +161,13 @@ module.exports = async function authRoutes(req, res, url, deps) {
            every key against its own table before drawing anything with it. */
         const chart = prof && prof.preferences && prof.preferences.chart;
         if (chart && typeof chart === "object" && !Array.isArray(chart)) info.chart = chart;
+        /* The toolbar favourites -- which intervals and chart types sit inline. Two short
+           lists of ids; the page validates them against its own tables. */
+        const hf = prof && prof.preferences && prof.preferences.headerFavs;
+        if (hf && typeof hf === "object" && !Array.isArray(hf)) {
+          const ids = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 12) : undefined);
+          info.headerFavs = { tf: ids(hf.tf), type: ids(hf.type) };
+        }
       }
     } catch (_e) { /* no profile store, or no profile yet: the device's own choice stands */ }
     // Test-auth: expose the role picker to the auth page ONLY on a direct, un-proxied

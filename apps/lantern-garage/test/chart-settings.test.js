@@ -73,6 +73,8 @@ test('the defaults ARE the chart as it draws today', () => {
   assert.strictEqual(CS.DEFAULTS['canvas.marginRight'], 25);
   assert.strictEqual(CS.DEFAULTS['trading.buySell'], true);
   assert.strictEqual(CS.DEFAULTS['scales.lastPrice'], true);
+  // Off since the Area chart type exists: Line is the unfilled one, as on TradingView.
+  assert.strictEqual(CS.DEFAULTS['line.area'], false);
   for (const k of ['canvas.watermark', 'scales.prevClose', 'scales.highLow', 'scales.countdown', 'scales.indLabels',
     'scales.prePost', 'events.sessionBreaks', 'alerts.lines', 'trading.executionMarks', 'status.ohlc']) {
     assert.strictEqual(CS.DEFAULTS[k], false, k + ' would appear on every chart uninvited');
@@ -335,12 +337,14 @@ test('a click that re-renders its own dialog is not an outside click', () => {
   /* The Style tab closed the dialog. Its onclick rebuilt the dialog's innerHTML, so by
      the time the click reached the document listener its target was detached,
      `contains()` said no, and the outside-click rule fired. The same shape sits under
-     the drawing flyout and both toolbar menus, so the rule now lives in one helper that
+     the drawing flyout and the toolbar menus, so the rule now lives in one helper that
      treats a target with no place in the document as inside. */
   assert.match(PAGE, /function _clickInside\(el, e\)\{\s*return !!el && \(el\.contains\(e\.target\) \|\| !e\.target\.isConnected\);/);
   assert.match(PAGE, /_clickInside\(_indStyleEl, e\)/, 'the indicator dialog still uses bare containment');
   assert.match(PAGE, /_clickInside\(_styleEl, ev\)/, 'the drawing flyout still uses bare containment');
-  assert.strictEqual((PAGE.match(/_clickInside\(m, e\)/g) || []).length, 2, 'both toolbar menus');
+  // The indicators menu, and the one builder behind the interval and chart-type pickers
+  // (the header's Draw flyout went with the Draw button; the rail's flyout is above).
+  assert.strictEqual((PAGE.match(/_clickInside\(m, e\)/g) || []).length, 2, 'the indicators menu and the pickers');
   assert.doesNotMatch(PAGE, /_indStyleEl\.contains\(e\.target\)/);
   assert.doesNotMatch(PAGE, /_styleEl\.contains\(ev\.target\)/);
   assert.doesNotMatch(PAGE, /\bm\.contains\(e\.target\)/);
