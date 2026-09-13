@@ -527,6 +527,21 @@
   .hgroup .chart-ctrl{border:none;background:transparent;border-radius:5px}
   .hgroup .chart-ctrl:hover{background:var(--bg2)}
   .hgroup-sep{width:1px;height:16px;background:var(--border);flex:0 0 auto}
+  /* Interval and chart-type pickers (TradingView's toolbar): favourites inline, the
+     current one lit, the rest under ▾ with a star to promote them. */
+  .picker{display:inline-flex;align-items:center;gap:1px}
+  .picker-favs{display:inline-flex;align-items:center;gap:1px}
+  .hgroup .tf-chip{padding:0 7px;min-width:28px;justify-content:center}
+  .hgroup .type-chip{padding:0 6px}
+  .hgroup .tf-chip.on,.hgroup .type-chip.on{background:var(--bg3);color:var(--text0);font-weight:600}
+  .type-chip svg,.pick-row svg{width:16px;height:14px;display:block;flex:0 0 auto}
+  .hgroup .picker-more{padding:0 6px;font-size:10px}
+  .pick-menu{min-width:230px}
+  .pick-row{justify-content:space-between}
+  .pick-row.on .pick-name{color:var(--accent);font-weight:600}
+  .pick-name{display:inline-flex;align-items:center;gap:8px;flex:1;min-width:0}
+  .fav-star{flex:0 0 auto;background:none;border:0;padding:0 2px;color:var(--text2);font-size:15px;line-height:1;cursor:pointer}
+  .fav-star:hover,.fav-star.on{color:var(--gold)}
   /* ── Hamburger (sandwich) menu: on narrow screens the chart controls + secondary
      actions collapse into a  dropdown instead of a long sideways-scrolling row.
      The SAME elements move into the panel (JS), so ids/handlers/state survive. ── */
@@ -828,7 +843,6 @@
      card stops advertising grab/pan affordances that no longer respond. */
   body.drawing-armed .zone-ladder, body.drawing-armed .chart-canvas{cursor:crosshair}
   body.drawing-armed .card{cursor:crosshair}
-  body.drawing-armed .chart-ctrl.on{box-shadow:0 0 0 1px var(--accent)}
   .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:14px;line-height:1;user-select:none;padding:0 2px}
   .drag-handle:active{cursor:grabbing}
   .card.dragging{opacity:.45}
@@ -1466,30 +1480,27 @@
     <option value="6">6 charts</option>
     <option value="10">10 charts</option>
   </select>
-  <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)" title="Draw charts as a line or as candlesticks">
-    <option value="line">Line</option>
-    <option value="candle">Candles</option>
-  </select>
+  <span class="hgroup-sep" aria-hidden="true"></span>
+  <!-- The interval and the chart type the way TradingView's toolbar has them: the
+       favourites inline, the current one lit, and everything else under the ▾ with a
+       star to promote it. Both lists are built from tables below (INTERVALS, CHART_TYPES);
+       the favourites are the reader's and follow the account. The Draw button that used
+       to sit here is gone: the drawing tools live on the rail to the left. -->
+  <div class="picker" id="tfPicker" role="group" aria-label="Candle interval">
+    <span class="picker-favs" id="tfFavs"></span>
+    <button id="tfMore" class="chart-ctrl picker-more" type="button" aria-haspopup="menu" aria-expanded="false"
+      onclick="togglePickMenu('tf', this)" title="All intervals — star the ones you want on the toolbar">▾</button>
+  </div>
+  <span class="hgroup-sep" aria-hidden="true"></span>
+  <div class="picker" id="typePicker" role="group" aria-label="Chart type">
+    <span class="picker-favs" id="typeFavs"></span>
+    <button id="typeMore" class="chart-ctrl picker-more" type="button" aria-haspopup="menu" aria-expanded="false"
+      onclick="togglePickMenu('type', this)" title="All chart types — star the ones you want on the toolbar">▾</button>
+  </div>
+  <span class="hgroup-sep" aria-hidden="true"></span>
   <button id="indicatorsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="toggleIndicatorMenu(this)"
     title="Add technical indicators — moving averages and bands on the price, RSI/MACD/ATR and friends in their own strip below it. Each one's periods and colour are yours and are remembered.">∿ Indicators ▾</button>
-  <span class="hgroup-sep" aria-hidden="true"></span>
-  <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)" title="Bar interval — how much time each candle covers">
-    <option value="1m">1m</option>
-    <option value="5m" selected>5m</option>
-    <option value="15m">15m</option>
-    <option value="30m">30m</option>
-    <option value="1h">1h</option>
-    <option value="2h">2h</option>
-    <option value="4h">4h</option>
-    <option value="1d">1d</option>
-    <option value="1w">1W</option>
-    <option value="1mo">1Mo</option>
-  </select>
-  <span class="hgroup-sep" aria-hidden="true"></span>
-  <button id="drawToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
-    onclick="toggleDrawMenu(this)"
-    title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">Draw ▾</button>
   <span class="hgroup-sep" aria-hidden="true"></span>
   <button id="chartSettingsBtn" class="chart-ctrl" type="button" aria-haspopup="dialog"
     onclick="openChartSettings()"
@@ -1726,14 +1737,20 @@
       <span class="fs-ticker" id="fsTicker">—</span>
       <span class="fs-price" id="fsPrice">—</span>
       <select id="fsChartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)">
-        <option value="line">Line</option>
+        <option value="bar">Bars</option>
         <option value="candle">Candles</option>
+        <option value="hollow">Hollow candles</option>
+        <option value="line">Line</option>
+        <option value="area">Area</option>
+        <option value="heikin">Heikin Ashi</option>
       </select>
       <select id="fsChartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
         <option value="15m">15m</option>
+        <option value="30m">30m</option>
         <option value="1h">1h</option>
+        <option value="2h">2h</option>
         <option value="4h">4h</option>
         <option value="1d">1d</option>
         <option value="1w">1W</option>
@@ -1890,6 +1907,8 @@ let activeTicker   = null;
 let barsData       = {};
 // Persisted chart type. Candles are the default the first time a user visits.
 let chartType      = (()=>{ try{ return localStorage.getItem('trader.chartType') || 'candle'; }catch(e){ return 'candle'; } })();
+// Validated once the type table exists (it is defined further down); an unknown saved
+// value draws as candles rather than as nothing.
 // Escape text before interpolating it into an innerHTML string. Anything that
 // originates outside this code (stored prefs, a <select> value) must go through
 // this on its way into markup — CodeQL js/xss-through-dom flagged the chart
@@ -3410,37 +3429,59 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         ctx.fillText('VWAP', 3, y(cpv/cv)-3);
       }
     }
-    if(type==='candle'){
+    // Bars, candles, hollow candles and Heikin Ashi share the candle code: a per-bar
+    // open/high/low/close with a body and a wick. Line and area share the line code.
+    const _ohlcType = (type==='candle' || type==='hollow' || type==='bar' || type==='heikin');
+    if(_ohlcType){
       // Symbol › candles (#3602): each part of a candle has its own switch and its own
       // up/down pair, the way TradingView's Symbol tab has them. A null colour is the
       // reader's gain/loss palette, so nothing changes until someone asks.
       const _byPrev = _cs('candles.byPrevClose') === true;
+      // Heikin Ashi is the same drawing over averaged bars.
+      const _src = type==='heikin' ? _heikinAshi(bars) : bars;
       const _drawBody = _cs('candles.body') !== false, _drawWick = _cs('candles.wick') !== false, _drawBorder = _cs('candles.border') === true;
       const _cUp = { body: _cs('candles.bodyUp') || CHART_CANDLE_UP(), wick: _cs('candles.wickUp') || CHART_CANDLE_UP(), border: _cs('candles.borderUp') || CHART_CANDLE_UP() };
       const _cDn = { body: _cs('candles.bodyDown') || CHART_CANDLE_DOWN(), wick: _cs('candles.wickDown') || CHART_CANDLE_DOWN(), border: _cs('candles.borderDown') || CHART_CANDLE_DOWN() };
       for(let i=0;i<n;i++){
-        const b = bars[i];
+        const b = _src[i];
         const x = i*slotW + slotW/2;
         // "Colour bars based on previous close": up when the close beats the previous
         // bar's close, not its own open.
-        const up = (_byPrev && i > 0) ? b.close >= bars[i-1].close : b.close >= b.open;
+        const up = (_byPrev && i > 0) ? b.close >= _src[i-1].close : b.close >= b.open;
         const c = up ? _cUp : _cDn;
         const sw = saneHiLo(b);                     // per-side glitch clamp (v2)
         const wHi = sw.hi, wLo = sw.lo;
         ctx.lineWidth = 1;
-        if(_drawWick){
-          ctx.strokeStyle = c.wick;
-          ctx.beginPath(); ctx.moveTo(x, y(wHi)); ctx.lineTo(x, y(wLo)); ctx.stroke();
-        }
         const bodyTop = y(Math.max(b.open,b.close));
         const bodyBot = y(Math.min(b.open,b.close));
         // Cap the body width so a window with few visible bars doesn't render giant
         // candles (slotW*0.6 is unbounded when zoomed in) — TradingView-style max. #trader-candles
         const bw = Math.max(1, Math.min(slotW*0.6, 14));
         const bh = Math.max(1, bodyBot-bodyTop);
-        if(_drawBody){ ctx.fillStyle = c.body; ctx.fillRect(x-bw/2, bodyTop, bw, bh); }
+        if(type==='bar'){
+          // An OHLC bar: the range as a line, the open as a tick to the left, the close
+          // as a tick to the right.
+          const t = Math.max(1, bw/2);
+          ctx.strokeStyle = c.wick;
+          ctx.beginPath(); ctx.moveTo(x, y(wHi)); ctx.lineTo(x, y(wLo));
+          ctx.moveTo(x - t, y(b.open)); ctx.lineTo(x, y(b.open));
+          ctx.moveTo(x, y(b.close)); ctx.lineTo(x + t, y(b.close));
+          ctx.stroke();
+          continue;
+        }
+        if(_drawWick){
+          ctx.strokeStyle = c.wick;
+          ctx.beginPath(); ctx.moveTo(x, y(wHi)); ctx.lineTo(x, y(wLo)); ctx.stroke();
+        }
+        // Hollow candles: an up candle is outlined and a down candle filled -- TradingView's
+        // convention, so the outline itself says which way the bar went. An up candle is
+        // never filled, whatever the width: at a density where the body is a pixel or two
+        // the outline collapses to a thin line, which still reads against the filled downs.
+        const _hollowUp = type==='hollow' && up;
+        if(_drawBody && !_hollowUp){ ctx.fillStyle = c.body; ctx.fillRect(x-bw/2, bodyTop, bw, bh); }
+        if(_hollowUp){ ctx.strokeStyle = c.border; ctx.strokeRect(Math.round(x-bw/2)+0.5, Math.round(bodyTop)+0.5, Math.max(0, Math.round(bw)-1), Math.max(1, Math.round(bh)-1)); }
         // Borders on their own make a hollow candle; too thin a body has no room for one.
-        if(_drawBorder && bw >= 3){ ctx.strokeStyle = c.border; ctx.strokeRect(Math.round(x-bw/2)+0.5, Math.round(bodyTop)+0.5, Math.round(bw)-1, Math.max(1, Math.round(bh)-1)); }
+        else if(_drawBorder && bw >= 3){ ctx.strokeStyle = c.border; ctx.strokeRect(Math.round(x-bw/2)+0.5, Math.round(bodyTop)+0.5, Math.round(bw)-1, Math.max(1, Math.round(bh)-1)); }
       }
     }else{
       const pts = bars.map((b,i)=>[i*slotW + slotW/2, y(b.close)]);
@@ -3449,7 +3490,8 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       // Symbol › line chart: a chosen colour, width, and whether the area is shaded.
       const up = bars[n-1].close >= bars[0].close;
       const lc = _cs('line.color') || (up ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN());
-      if(_cs('line.area') !== false){
+      // Area is the line with the space under it shaded; Line shades only when asked.
+      if(type==='area' || _cs('line.area') === true){
         const grad = ctx.createLinearGradient(0, 0, 0, priceH);
         grad.addColorStop(0, _chartRgba(lc, .26));
         grad.addColorStop(1, _chartRgba(lc, 0));
@@ -3475,7 +3517,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     {
       const last = bars[n-1];
       const lx = (n-1)*slotW + slotW/2, ly = y(last.close);
-      const dc = (last.close >= (type==='candle' ? last.open : bars[0].close)) ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
+      const dc = (last.close >= (_ohlcType ? last.open : bars[0].close)) ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
       const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 9);
       glow.addColorStop(0, _chartRgba(dc, .45));
       glow.addColorStop(1, _chartRgba(dc, 0));
@@ -5474,16 +5516,9 @@ function setDrawTool(v) {
     v = '';
   }
   _drawTool = v; _drawPending = null; _penDrag = null;
-  _setDrawBtn();
-  if (typeof _closeDrawMenu === 'function') _closeDrawMenu();
+  // The rail is the picker (renderDrawRail lights the armed tool); the toolbar's Draw
+  // button and its flyout are gone since the tools live on the left.
   document.body.classList.toggle('drawing-armed', !!v);
-}
-function _setDrawBtn() {
-  const b = document.getElementById('drawToggle');
-  if (!b) return;
-  const d = DRAW_TOOLS[_drawTool];
-  b.textContent = d ? (d.name + ' ▾') : 'Draw ▾';
-  b.classList.toggle('on', !!_drawTool);
 }
 function _canvasTicker(canvas) { return canvas.id === 'chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/, ''); }
 
@@ -7975,11 +8010,199 @@ async function loadBars(){
   finally{ barsLoading = false; }
 }
 
+/* ── The toolbar's interval and chart-type pickers ───────────────────────────
+   TradingView's arrangement: the FAVOURITES sit inline with the current one lit, and the
+   ▾ opens the whole list, grouped, with a star on every row to promote or demote it.
+   Both lists come from a table, so a new interval or chart type is one row here.
+   The favourites are the reader's -- kept on the device and on the account, like the
+   palette and the indicators (#3592, #3594). */
+const INTERVALS = [
+  { id:'1m',  label:'1m',  name:'1 minute',   group:'Minutes' },
+  { id:'5m',  label:'5m',  name:'5 minutes',  group:'Minutes' },
+  { id:'15m', label:'15m', name:'15 minutes', group:'Minutes' },
+  { id:'30m', label:'30m', name:'30 minutes', group:'Minutes' },
+  { id:'1h',  label:'1h',  name:'1 hour',     group:'Hours' },
+  { id:'2h',  label:'2h',  name:'2 hours',    group:'Hours' },
+  { id:'4h',  label:'4h',  name:'4 hours',    group:'Hours' },
+  { id:'1d',  label:'D',   name:'1 day',      group:'Days' },
+  { id:'1w',  label:'W',   name:'1 week',     group:'Days' },
+  { id:'1mo', label:'M',   name:'1 month',    group:'Days' },
+];
+const _ico = (inner) => '<svg viewBox="0 0 16 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+/* Only what the renderer actually draws. Bars, hollow candles, area and Heikin Ashi are
+   new; each is a few lines in renderChart, and nothing here is a type the chart cannot
+   honestly paint. */
+const CHART_TYPES = [
+  { id:'bar',    name:'Bars',           hint:'Open and close as ticks on the range.',
+    icon:_ico('<path d="M4 1.5v11M2 5h2M4 9h2M12 1.5v11M10 8h2M12 4h2"/>') },
+  { id:'candle', name:'Candles',        hint:'The body is open to close; the wick is the range.',
+    icon:_ico('<path d="M4.5 1v2.5M4.5 10v3M11.5 1.5v2M11.5 9.5v3"/><rect x="2.5" y="3.5" width="4" height="6.5" fill="currentColor"/><rect x="9.5" y="3.5" width="4" height="6" fill="currentColor"/>') },
+  { id:'hollow', name:'Hollow candles', hint:'Up candles outlined, down candles filled.',
+    icon:_ico('<path d="M4.5 1v2.5M4.5 10v3M11.5 1.5v2M11.5 9.5v3"/><rect x="2.5" y="3.5" width="4" height="6.5"/><rect x="9.5" y="3.5" width="4" height="6" fill="currentColor"/>') },
+  { id:'line',   name:'Line',           hint:'The closes, joined.',
+    icon:_ico('<path d="M1.5 11l4-4.5 3 3 3-6 3.5 4"/>') },
+  { id:'area',   name:'Area',           hint:'The line, with the space under it shaded.',
+    icon:_ico('<path d="M1.5 11l4-4.5 3 3 3-6 3.5 4v4.5h-13.5z" fill="currentColor" stroke="none" opacity=".35"/><path d="M1.5 11l4-4.5 3 3 3-6 3.5 4"/>') },
+  { id:'heikin', name:'Heikin Ashi',    hint:'Averaged candles that smooth the noise and show the trend.',
+    icon:_ico('<path d="M4.5 1v2M4.5 11v2M11.5 1v2M11.5 11v2"/><rect x="2.5" y="3" width="4" height="8" rx="1" fill="currentColor"/><rect x="9.5" y="3" width="4" height="8" rx="1"/>') },
+];
+const DEFAULT_TF_FAVS = ['1m','5m','15m','1h','4h','1d','1w'];
+const DEFAULT_TYPE_FAVS = ['candle','line'];
+const CHART_TYPE_IDS = CHART_TYPES.map(t=>t.id);
+function normalizeType(t){ return CHART_TYPE_IDS.indexOf(String(t)) !== -1 ? String(t) : 'candle'; }
+
+/* Favourites: a list of ids, validated against the table so a stale or hand-edited copy
+   cannot put a chip on the toolbar that nothing behind it understands. */
+function _loadFavs(key, def, allowed){
+  try{
+    const raw = JSON.parse(localStorage.getItem(key) || 'null');
+    if(Array.isArray(raw)) return raw.filter(x=> allowed.indexOf(x) !== -1);
+  }catch(_e){}
+  return def.slice();
+}
+let tfFavs = _loadFavs('trader.tfFavs', DEFAULT_TF_FAVS, TF_ALLOWED);
+let typeFavs = _loadFavs('trader.typeFavs', DEFAULT_TYPE_FAVS, CHART_TYPE_IDS);
+let _favSaveT = null;
+function _saveFavs(){
+  try{ localStorage.setItem('trader.tfFavs', JSON.stringify(tfFavs)); localStorage.setItem('trader.typeFavs', JSON.stringify(typeFavs)); }catch(_e){}
+  // The account too, debounced, the way the indicators are saved (#3594). A failed save
+  // leaves the device's copy alone.
+  clearTimeout(_favSaveT);
+  _favSaveT = setTimeout(()=>{
+    fetch('/api/profiles/me', { credentials:'same-origin' })
+      .then(r=> r.ok ? r.json() : null)
+      .then(p=>{
+        const prof = p && (p.profile || p);
+        if(!prof || !prof.id) return;
+        const merged = Object.assign({}, prof.preferences || {}, { headerFavs: { tf: tfFavs, type: typeFavs } });
+        return fetch('/api/profiles/me', { method:'PUT', credentials:'same-origin',
+          headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ preferences: merged }) });
+      })
+      .catch(()=>{});
+  }, 800);
+}
+/* The account's favourites arriving with the session: local paints first, the account
+   corrects, an equal copy is a no-op. */
+function adoptHeaderFavs(obj){
+  if(!obj || typeof obj !== 'object') return false;
+  const tf = Array.isArray(obj.tf) ? obj.tf.filter(x=> TF_ALLOWED.indexOf(x) !== -1) : null;
+  const ty = Array.isArray(obj.type) ? obj.type.filter(x=> CHART_TYPE_IDS.indexOf(x) !== -1) : null;
+  const changed = (tf && JSON.stringify(tf) !== JSON.stringify(tfFavs)) || (ty && JSON.stringify(ty) !== JSON.stringify(typeFavs));
+  if(!changed) return false;
+  if(tf) tfFavs = tf;
+  if(ty) typeFavs = ty;
+  try{ localStorage.setItem('trader.tfFavs', JSON.stringify(tfFavs)); localStorage.setItem('trader.typeFavs', JSON.stringify(typeFavs)); }catch(_e){}
+  renderTfPicker(); renderTypePicker();
+  return true;
+}
+window.addEventListener('lantern:session', (e)=>{ try{ adoptHeaderFavs(e.detail && e.detail.headerFavs); }catch(_e){} });
+function toggleTfFav(id){
+  if(TF_ALLOWED.indexOf(id) === -1) return;
+  tfFavs = tfFavs.indexOf(id) !== -1 ? tfFavs.filter(x=> x !== id) : tfFavs.concat([id]);
+  _saveFavs(); renderTfPicker(); _refreshPickMenu('tf');
+}
+function toggleTypeFav(id){
+  if(CHART_TYPE_IDS.indexOf(id) === -1) return;
+  typeFavs = typeFavs.indexOf(id) !== -1 ? typeFavs.filter(x=> x !== id) : typeFavs.concat([id]);
+  _saveFavs(); renderTypePicker(); _refreshPickMenu('type');
+}
+/* The chips: the favourites in table order, plus the current one if it is not a
+   favourite -- what the chart is on is always visible, as on TradingView. */
+function renderTfPicker(){
+  const host = document.getElementById('tfFavs'); if(!host) return;
+  host.innerHTML = INTERVALS.filter(i=> tfFavs.indexOf(i.id) !== -1 || i.id === chartTimeframe).map(i=>{
+    const on = i.id === chartTimeframe;
+    return '<button type="button" class="chart-ctrl tf-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" title="' + _esc(i.name) + '" onclick="changeTimeframe(\'' + i.id + '\')">' + _esc(i.label) + '</button>';
+  }).join('');
+}
+function renderTypePicker(){
+  const host = document.getElementById('typeFavs'); if(!host) return;
+  host.innerHTML = CHART_TYPES.filter(t=> typeFavs.indexOf(t.id) !== -1 || t.id === chartType).map(t=>{
+    const on = t.id === chartType;
+    return '<button type="button" class="chart-ctrl type-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" aria-label="' + _esc(t.name) + '" title="' + _esc(t.name) + ' — ' + _esc(t.hint) + '" onclick="changeChartType(\'' + t.id + '\')">' + t.icon + '</button>';
+  }).join('');
+}
+/* The ▾ menus: one builder for both, the .pat-menu chrome the toolbar's other menus use. */
+const _pickMenus = {};
+function _pickMenuHtml(kind){
+  const star = (fav, name, fn, id) => '<button type="button" class="fav-star' + (fav ? ' on' : '') + '" aria-pressed="' + fav + '"'
+    + ' aria-label="' + (fav ? 'Take ' : 'Keep ') + _esc(name) + (fav ? ' off the toolbar' : ' on the toolbar') + '"'
+    + ' title="' + (fav ? 'On the toolbar — click to remove' : 'Add to the toolbar') + '" onclick="event.stopPropagation();' + fn + '(\'' + id + '\')">' + (fav ? '&#9733;' : '&#9734;') + '</button>';
+  let h = '';
+  if(kind === 'tf'){
+    let grp = null;
+    for(const it of INTERVALS){
+      if(it.group !== grp){ grp = it.group; h += '<div class="pat-menu-group">' + _esc(grp) + '</div>'; }
+      const on = it.id === chartTimeframe;
+      h += '<div class="pat-menu-item pick-row' + (on ? ' on' : '') + '" role="menuitem" onclick="changeTimeframe(\'' + it.id + '\');_closePickMenu(\'tf\')">'
+        + '<span class="pick-name">' + _esc(it.name) + '</span>' + star(tfFavs.indexOf(it.id) !== -1, it.name, 'toggleTfFav', it.id) + '</div>';
+    }
+  } else {
+    h += '<div class="pat-menu-group">Chart type</div>';
+    for(const t of CHART_TYPES){
+      const on = t.id === chartType;
+      h += '<div class="pat-menu-item pick-row' + (on ? ' on' : '') + '" role="menuitem" title="' + _esc(t.hint) + '" onclick="changeChartType(\'' + t.id + '\');_closePickMenu(\'type\')">'
+        + '<span class="pick-name">' + t.icon + _esc(t.name) + '</span>' + star(typeFavs.indexOf(t.id) !== -1, t.name, 'toggleTypeFav', t.id) + '</div>';
+    }
+  }
+  return h;
+}
+function _buildPickMenu(kind){
+  if(_pickMenus[kind]) return _pickMenus[kind];
+  const m = document.createElement('div');
+  m.className = 'pat-menu pick-menu'; m.id = kind + 'PickMenu'; m.hidden = true;
+  m.setAttribute('role','menu'); m.setAttribute('aria-label', kind === 'tf' ? 'Candle intervals' : 'Chart types');
+  document.body.appendChild(m);
+  document.addEventListener('click', (e)=>{
+    if(m.hidden) return;
+    if(_clickInside(m, e)) return;                 // a star re-renders the row it lives in (#3604)
+    if(e.target.closest && e.target.closest('#' + kind + 'More')) return;
+    _closePickMenu(kind);
+  });
+  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && !m.hidden) _closePickMenu(kind); });
+  _pickMenus[kind] = m; return m;
+}
+function _closePickMenu(kind){
+  const m = _pickMenus[kind]; if(m) m.hidden = true;
+  const b = document.getElementById(kind + 'More'); if(b) b.setAttribute('aria-expanded','false');
+}
+function _refreshPickMenu(kind){ const m = _pickMenus[kind]; if(m && !m.hidden) m.innerHTML = _pickMenuHtml(kind); }
+function togglePickMenu(kind, btn){
+  const m = _buildPickMenu(kind);
+  if(!m.hidden){ _closePickMenu(kind); return; }
+  m.innerHTML = _pickMenuHtml(kind);
+  m.hidden = false;
+  const r = btn.getBoundingClientRect();
+  m.style.visibility = 'hidden';
+  const mw = m.offsetWidth || 230, mh = m.offsetHeight || 0;
+  let left = Math.min(r.left, window.innerWidth - mw - 8);
+  let top = r.bottom + 4;
+  if(top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  m.style.left = Math.max(8, left) + 'px'; m.style.top = top + 'px'; m.style.visibility = 'visible';
+  btn.setAttribute('aria-expanded','true');
+}
+
+/* Heikin Ashi: averaged bars. Close is the mean of the bar's four prices, open the
+   midpoint of the previous averaged bar, high and low the extremes of both. The standard
+   definition; the renderer then draws them as candles. */
+function _heikinAshi(bars){
+  const out = new Array(bars.length);
+  let po = null, pc = null;
+  for(let i=0;i<bars.length;i++){
+    const b = bars[i];
+    const c = (b.open + b.high + b.low + b.close) / 4;
+    const o = (po == null) ? (b.open + b.close) / 2 : (po + pc) / 2;
+    out[i] = Object.assign({}, b, { open:o, close:c, high:Math.max(b.high, o, c), low:Math.min(b.low, o, c) });
+    po = o; pc = c;
+  }
+  return out;
+}
+
 function changeChartType(type){
-  chartType = type;
-  try{ localStorage.setItem('trader.chartType', type); }catch(e){}   // remember for next visit
-  _setSelectValue('chartTypeSelect', type);
-  _setSelectValue('fsChartTypeSelect', type);
+  chartType = normalizeType(type);
+  try{ localStorage.setItem('trader.chartType', chartType); }catch(e){}   // remember for next visit
+  renderTypePicker();
+  _setSelectValue('fsChartTypeSelect', chartType);
   wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
   renderFullscreenChart();
 }
@@ -8309,67 +8532,6 @@ function toggleIndicatorMenu(btn){
   const r=btn.getBoundingClientRect();
   m.style.visibility='hidden';
   const mw=m.offsetWidth||230, mh=m.offsetHeight||0;
-  let left=Math.min(r.left, window.innerWidth-mw-8);
-  let top=r.bottom+4;
-  if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-4);
-  m.style.left=Math.max(8,left)+'px'; m.style.top=top+'px'; m.style.visibility='visible';
-  btn.setAttribute('aria-expanded','true');
-}
-
-/* -- Drawing-tool picker -----------------------------------------------------
-   Same .pat-menu chrome as Patterns and Indicators so the toolbar has one menu
-   language. Sections come from DRAW_TOOLS[].group, so a new tool appears here
-   with no UI work. */
-let _drawMenuEl = null;
-function _buildDrawMenu(){
-  if(_drawMenuEl) return _drawMenuEl;
-  const m=document.createElement('div');
-  m.className='pat-menu'; m.id='drawMenu'; m.hidden=true;
-  m.setAttribute('role','dialog'); m.setAttribute('aria-label','Drawing tools');
-  document.body.appendChild(m);
-  document.addEventListener('click',(e)=>{
-    if(m.hidden) return;
-    if(_clickInside(m, e)) return;
-    if(e.target.closest && e.target.closest('#drawToggle')) return;
-    _closeDrawMenu();
-  });
-  _drawMenuEl=m; return m;
-}
-function _closeDrawMenu(){
-  if(_drawMenuEl) _drawMenuEl.hidden=true;
-  const b=document.getElementById('drawToggle'); if(b) b.setAttribute('aria-expanded','false');
-}
-function _drawMenuHtml(){
-  const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const tk = fullscreenTicker || activeTicker;
-  const nOn = (tk && _drawings[tk] && _drawings[tk].length) || 0;
-  const groups={};
-  for(const [id,d] of Object.entries(DRAW_TOOLS)) (groups[d.group]=groups[d.group]||[]).push([id,d]);
-  let h='';
-  for(const g of Object.keys(groups)){
-    h+='<div class="pat-menu-note">'+esc(g)+'</div>';
-    for(const [id,d] of groups[g]){
-      const on = _drawTool===id;
-      h+='<div class="pat-menu-item draw-pick'+(on?' on':'')+'" data-tool="'+id+'" onclick="setDrawTool(\''+id+'\')">'
-        +'<span style="flex:1">'+esc(d.name)+'</span>'
-        +'<span class="pat-count" style="background:none;color:var(--text2)">'+(d.drag?'drag':(d.pts+' click'+(d.pts>1?'s':'')))+'</span></div>';
-    }
-  }
-  h+='<div class="pat-menu-note" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">'
-    +(nOn? nOn+' drawing'+(nOn>1?'s':'')+' on '+esc(tk||'') : 'Nothing drawn yet')
-    +' · alt-click one to delete</div>';
-  h+='<div class="pat-menu-foot"><button type="button" onclick="setDrawTool(\'\')">Stop drawing</button>'
-    +(nOn?'<button type="button" onclick="setDrawTool(\'clear\')">Clear symbol</button>':'')+'</div>';
-  return h;
-}
-function toggleDrawMenu(btn){
-  const m=_buildDrawMenu();
-  if(!m.hidden){ _closeDrawMenu(); return; }
-  m.innerHTML=_drawMenuHtml();
-  m.hidden=false;
-  const r=btn.getBoundingClientRect();
-  m.style.visibility='hidden';
-  const mw=m.offsetWidth||220, mh=m.offsetHeight||0;
   let left=Math.min(r.left, window.innerWidth-mw-8);
   let top=r.bottom+4;
   if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-4);
@@ -8747,7 +8909,7 @@ function changeTimeframe(tf, span){
   tf = normalizeTf(tf);   // the <select> value is caller-controlled text (#466)
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
-  _setSelectValue('chartTfSelect', tf);
+  renderTfPicker();
   _setSelectValue('fsChartTfSelect', tf);
   // Every chart, once: the window becomes the span asked for (a range button) or the
   // interval's own, measured from the bars at render; the price scale refits. Nothing is
@@ -9911,7 +10073,9 @@ function startDashboard(){
   _restoreBarsCache();          // preload cached bars so the first chart render paints instantly
   // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
   // from localStorage at init).
-  ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
+  chartType = normalizeType(chartType);
+  renderTfPicker(); renderTypePicker();
+  _setSelectValue('fsChartTfSelect', chartTimeframe);
   _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   _setIndicatorsBtn();          // …and the remembered indicator count (#3333)
   initFooterResize();
@@ -9945,8 +10109,8 @@ function startDashboard(){
   // Reflect the saved chart preferences (type / timeframe / range) in the controls so the
   // toolbar matches what the charts render. The values themselves are restored above from
   // localStorage (chartType/chartTimeframe); this just syncs the <select>s and builds the range row.
-  ['chartTypeSelect','fsChartTypeSelect'].forEach(id=> _setSelectValue(id, chartType));
-  ['chartTfSelect','fsChartTfSelect'].forEach(id=> _setSelectValue(id, chartTimeframe));
+  _setSelectValue('fsChartTypeSelect', chartType);
+  renderTfPicker(); renderTypePicker();
   renderRangeRow();
   applyGridCols();
   // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids
@@ -10141,9 +10305,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     // Chart type, patterns, and draw live INLINE in the toolbar on desktop
     // (operator, 2026-08-01) and collapse into the ☰ only when the toolbar is
     // too tight; layout + timeframe + range stay inline at every width.
-    {sel:'#chartTypeSelect',           narrowOnly:true},
     {sel:'#patternsToggle',            narrowOnly:true},
-    {sel:'#drawToggle',                narrowOnly:true},
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
@@ -10179,9 +10341,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // layout/type/timeframe are usually adjusted together.
   menu.addEventListener('click', e=>{
     // Chart controls keep the menu open (adjusted together): the .hgroup cluster on
-    // narrow screens AND the always-in-menu type/patterns/draw controls — closing
+    // narrow screens AND the always-in-menu patterns/indicators controls — closing
     // here hid the Patterns popup's anchor, so it opened at 0x0 (operator report).
-    if(e.target.closest('.hgroup, #chartTypeSelect, #patternsToggle, #drawToggle, #indicatorsToggle')) return;
+    if(e.target.closest('.hgroup, #patternsToggle, #indicatorsToggle')) return;
     if(e.target.closest('a,button')) close();
   });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
