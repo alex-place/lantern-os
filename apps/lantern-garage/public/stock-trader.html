@@ -2816,11 +2816,20 @@ function indLabel(cfg){
 // EMA 200 is the whole point). Persisted per browser profile alongside the other
 // chart preferences. A stored entry naming an indicator we no longer ship is
 // dropped on load rather than blanking the chart.
+/* ONE instance per indicator. Whatever is restored -- the device's copy, the account's,
+   a hand-edited profile -- keeps the first of any id and drops the rest, so a duplicate
+   cannot come back through a side door once the menu stops offering one. */
+function _indDedupe(list){
+  const seen = new Set(), out = [];
+  for(const x of (Array.isArray(list) ? list : [])){
+    if(!x || !IND_DEFS[x.id] || seen.has(x.id)) continue;
+    seen.add(x.id); out.push(x);
+  }
+  return out.slice(0, 12);
+}
 let chartIndicators = (()=>{
-  try{
-    const raw=JSON.parse(localStorage.getItem('trader.indicators')||'[]');
-    return Array.isArray(raw) ? raw.filter(x=>x && IND_DEFS[x.id]).slice(0,12) : [];
-  }catch(_e){ return []; }
+  try{ return _indDedupe(JSON.parse(localStorage.getItem('trader.indicators')||'[]')); }
+  catch(_e){ return []; }
 })();
 /* Saved to BOTH (#3594): the device so the chart redraws instantly and an offline
    session still works, and the account so a reader who tuned eight indicators does not
@@ -2850,7 +2859,7 @@ function saveIndicators(){
    setup is a no-op rather than a redraw. */
 function adoptIndicators(list){
   if(!Array.isArray(list)) return false;
-  const clean = list.filter(x=> x && IND_DEFS[x.id]).slice(0, 12);
+  const clean = _indDedupe(list);
   if(JSON.stringify(clean) === JSON.stringify(chartIndicators)) return false;
   chartIndicators = clean;
   try{ localStorage.setItem('trader.indicators', JSON.stringify(chartIndicators)); }catch(_e){}
@@ -5805,6 +5814,16 @@ function fibColorOf(d, lv) {
   return (k && d.style && d.style[k]) || FIB_COLORS[lv] || (d.style && d.style.color) || '#a78bfa';
 }
 
+/* Was this click inside `el`?  Plain containment is wrong for one case that every flyout
+   here has: a control INSIDE the dialog that re-renders the dialog -- a tab, Select all,
+   adding an indicator. By the time the click bubbles to document its target has been
+   replaced, `contains()` says no, and the dialog closes itself on the click that was
+   meant to change it. That was the Style tab of the indicator dialog (#3602 follow-up).
+   A target with no place in the document any more can only have been detached by the
+   click's own handler, so it is treated as inside. */
+function _clickInside(el, e){
+  return !!el && (el.contains(e.target) || !e.target.isConnected);
+}
 let _styleEl = null, _setTab = 'Inputs', _setTabExplicit = false;
 function openDrawingStyle(tk, i, atX, atY) { openDrawingSettings(tk, i, atX, atY); }
 function openDrawingSettings(tk, i, atX, atY) {
@@ -5814,7 +5833,7 @@ function openDrawingSettings(tk, i, atX, atY) {
     _styleEl.className = 'dr-flyout dr-settings'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
     document.body.appendChild(_styleEl);
     document.addEventListener('click', (ev) => {
-      if (!_styleEl || _styleEl.hidden || _styleEl.contains(ev.target)) return;
+      if (!_styleEl || _styleEl.hidden || _clickInside(_styleEl, ev)) return;
       if (ev.target.closest && ev.target.closest('.dsel-bar')) return;
       _styleEl.hidden = true;
     });
@@ -7989,7 +8008,7 @@ function _buildIndMenu(){
   document.body.appendChild(m);
   document.addEventListener('click',(e)=>{
     if(m.hidden) return;
-    if(m.contains(e.target)) return;
+    if(_clickInside(m, e)) return;
     if(e.target.closest && e.target.closest('#indicatorsToggle')) return;
     _closeIndMenu();
   });
@@ -8023,12 +8042,9 @@ function _indMenuHtml(){
       +'<span style="flex:1;min-width:0">'+esc(indLabel(cfg))+'</span>'
       +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
       +'title="Inputs and style" aria-label="Settings for '+esc(indLabel(cfg))+'" onclick="event.stopPropagation();openIndicatorSettings('+idx+',event)">⚙</button>'
-      // Duplicate lives HERE, on the active row, not by clicking the same add-list entry
-      // twice: EMA 9 + EMA 21 + EMA 200 is a real want, but a second identical click
-      // produced a clone drawing exactly on top of its twin, which nobody meant.
-      +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
-      +'title="Add another '+esc(d.name)+' with its own settings" '
-      +'aria-label="Add another '+esc(d.name)+'" onclick="event.stopPropagation();indDuplicate('+idx+')">+</button>'
+      // No second copy of an indicator (operator, 2026-09-13): the + that used to sit
+      // here made "EMA 42" out of "EMA 21", and a chart with two of the same line on it
+      // is the thing the operator did not want. One of each; its settings are a click away.
       +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
       +'aria-label="Remove '+esc(indLabel(cfg))+'" onclick="event.stopPropagation();indRemove('+idx+')">✕</button></div>';
   });
@@ -8039,7 +8055,7 @@ function _indMenuHtml(){
   const addable = Object.entries(IND_DEFS).filter(([id])=>!onChart.has(id));
   h+='<div class="pat-menu-note" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">Add an indicator</div>';
   if(!addable.length){
-    h+='<div class="pat-menu-note">All '+Object.keys(IND_DEFS).length+' are on the chart. Press + on one above for a second copy.</div>';
+    h+='<div class="pat-menu-note">All '+Object.keys(IND_DEFS).length+' are on the chart.</div>';
   }
   for(const [id,d] of addable){
     h+='<div class="pat-menu-item ind-add" data-add="'+id+'" onclick="indAdd(\''+id+'\')">'
@@ -8090,23 +8106,6 @@ function indAdd(id){
   chartIndicators.push({ id, params:{}, color:IND_DEFS[id].color });
   _indRefresh();
 }
-/* A deliberate second copy, seeded from the row you pressed + on and nudged so the
-   new line is visibly its own rather than an identical overlay. */
-function indDuplicate(i){
-  const src=chartIndicators[i]; if(!src) return;
-  if(chartIndicators.length>=12) return;
-  const d=IND_DEFS[src.id];
-  const clone={ id:src.id, color:src.color||d.color, params:Object.assign({}, src.params) };
-  const first=d.params[0];
-  if(first){
-    const step=first.step||1;
-    const cur=Number(clone.params[first.k]!=null?clone.params[first.k]:first.def);
-    const next=Number.isFinite(cur)?cur*2:Number(first.def)+step;
-    clone.params[first.k]=Math.min(first.max, Math.max(first.min, Math.round(next/step)*step));
-  }
-  chartIndicators.splice(i+1,0,clone);
-  _indRefresh();
-}
 function indRemove(i){ chartIndicators.splice(i,1); _closeIndSettings(); _indRefresh(); }
 function indClear(){ chartIndicators=[]; _closeIndSettings(); _indRefresh(); }
 function indSetParam(i,k,v){
@@ -8148,7 +8147,7 @@ function openIndicatorSettings(idx, ev, atX, atY){
     _indStyleEl.setAttribute('role','dialog'); _indStyleEl.setAttribute('aria-label','Indicator settings');
     document.body.appendChild(_indStyleEl);
     document.addEventListener('click', (e)=>{
-      if(!_indStyleEl || _indStyleEl.hidden || _indStyleEl.contains(e.target)) return;
+      if(!_indStyleEl || _indStyleEl.hidden || _clickInside(_indStyleEl, e)) return;
       if(e.target.closest && (e.target.closest('#indMenu') || e.target.closest('#indicatorsToggle'))) return;
       _closeIndSettings();
     });
@@ -8243,7 +8242,7 @@ function _buildDrawMenu(){
   document.body.appendChild(m);
   document.addEventListener('click',(e)=>{
     if(m.hidden) return;
-    if(m.contains(e.target)) return;
+    if(_clickInside(m, e)) return;
     if(e.target.closest && e.target.closest('#drawToggle')) return;
     _closeDrawMenu();
   });
