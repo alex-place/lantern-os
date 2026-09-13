@@ -45,15 +45,16 @@ test('the toolbar no longer carries the range select or the clock; the strip doe
   assert.strictEqual((PAGE.match(/id="mktClock"/g) || []).length, 1);
 });
 
-test('the buttons come from the RANGES table and the lit one is activeRange', () => {
+test('the buttons come from the RANGES table, and none of them is a mode', () => {
+  /* A range button is one click -- interval, window and price refit on every chart -- and
+     nothing stays lit or saved, the way TradingView's work (2026-09-13). */
   assert.match(PAGE, /function renderRangeRow\(\)\{/);
   assert.match(PAGE, /row\.innerHTML = Object\.keys\(RANGES\)\.map\(k =>/);
-  assert.match(PAGE, /class="range-btn' \+ \(k === activeRange \? ' active' : ''\)/);
-  assert.match(PAGE, /aria-pressed="' \+ \(k === activeRange \? 'true' : 'false'\)/, 'the lit state is colour-only');
-  // syncRangeButtons (called on every timeframe change) rebuilds the row; init builds it too.
-  const sync = PAGE.slice(PAGE.indexOf('function syncRangeButtons(tf){'), PAGE.indexOf('function renderRangeRow(){'));
-  assert.match(sync, /renderRangeRow\(\);/);
+  assert.ok(!PAGE.includes('activeRange'), 'a button still tracks being lit');
+  assert.ok(!PAGE.includes('function syncRangeButtons'), 'a lit state is still being synced');
   assert.ok(!PAGE.includes("['chartRangeSelect','fsChartRangeSelect']"), 'something still syncs the removed selects');
+  // Init builds the row once; a click needs no rebuild because nothing on it changes.
+  assert.ok(PAGE.includes('  renderRangeRow();'), 'init does not build the row');
 });
 
 test('on phones the strip belongs to the Chart view', () => {

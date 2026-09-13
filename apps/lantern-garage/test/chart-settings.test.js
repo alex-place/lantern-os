@@ -65,10 +65,12 @@ test('the defaults ARE the chart as it draws today', () => {
   assert.strictEqual(CS.DEFAULTS['candles.body'], true);
   assert.strictEqual(CS.DEFAULTS['candles.wick'], true);
   assert.strictEqual(CS.DEFAULTS['candles.border'], false);
-  assert.strictEqual(CS.DEFAULTS['data.session'], 'extended');
+  // Regular hours by default since the range buttons took TradingView's densities (2026-09-13).
+  assert.strictEqual(CS.DEFAULTS['data.session'], 'regular');
   assert.strictEqual(CS.DEFAULTS['data.timezone'], 'exchange');
   assert.strictEqual(CS.DEFAULTS['canvas.bgMode'], 'theme');
-  assert.strictEqual(CS.DEFAULTS['canvas.marginRight'], 0);
+  // The one deliberate exception: the right margin is on, TradingView's way (2026-09-13).
+  assert.strictEqual(CS.DEFAULTS['canvas.marginRight'], 25);
   assert.strictEqual(CS.DEFAULTS['trading.buySell'], true);
   assert.strictEqual(CS.DEFAULTS['scales.lastPrice'], true);
   for (const k of ['canvas.watermark', 'scales.prevClose', 'scales.highLow', 'scales.countdown', 'scales.indLabels',
@@ -127,7 +129,7 @@ test('only the difference from the defaults is stored', () => {
   CS.set('candles.byPrevClose', true);
   const raw = JSON.parse(store.get(CS.STORAGE_KEY));
   assert.deepStrictEqual(raw, { 'canvas.marginRight': 5, 'candles.byPrevClose': true });
-  CS.set('canvas.marginRight', 0);
+  CS.set('canvas.marginRight', 25);   // back to the default
   assert.deepStrictEqual(JSON.parse(store.get(CS.STORAGE_KEY)), { 'candles.byPrevClose': true });
   CS.set('candles.byPrevClose', false);
   assert.strictEqual(store.has(CS.STORAGE_KEY), false, 'all-default should leave nothing behind');
@@ -277,7 +279,7 @@ test('bars meet pixels in one place, and the right margin is part of it', () => 
   // any one of them left behind would have put the crosshair or a drawing on the wrong bar.
   assert.doesNotMatch(PAGE, /slotW = pw\s*\/\s*n;/, 'a bar-to-pixel mapping bypasses _slotsFor');
   assert.doesNotMatch(PAGE, /slotW = drag\.pw\/drag\.visibleBars;/, 'the pan mapping bypasses _slotsFor');
-  assert.match(PAGE, /function _slotsFor\(n\)\{ const r = Number\(_cs\('canvas\.marginRight'\)\)/);
+  assert.match(PAGE, /function _slotsFor\(n\)\{ const r = _cs\('canvas\.marginRight'\); const m = r == null \? 25 : Number\(r\) \|\| 0;/);
 });
 
 test('the overlay maps prices onto the PRICE pane, not the whole plot', () => {

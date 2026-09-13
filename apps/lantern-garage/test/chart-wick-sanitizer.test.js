@@ -37,7 +37,7 @@ const path = require('node:path');
 const PAGE = path.join(__dirname, '..', 'public', 'stock-trader.html');
 const HTML = fs.readFileSync(PAGE, 'utf8');
 
-const INTRADAY = ['1m', '5m', '15m', '1h', '4h'];
+const INTRADAY = ['1m', '5m', '15m', '30m', '1h', '2h', '4h'];   // 30m and 2h joined with the range buttons (2026-09-13)
 
 /**
  * Pull the `saneHiLo` arrow out of renderChart and make it callable.
@@ -88,19 +88,18 @@ test('sanitizing is INTRADAY-ONLY, identically in both paths (#trader-candles v2
   // Both sanitizers must be gated on an intraday check. (A third guard with the
   // same list drives the "ET" timescale label — a different concern that shares
   // the definition, so it is not required to be a sanitizer.)
-  assert.match(HTML, /const _sanitizing = \[[^\]]+\]\.indexOf\(timeframe\)\s*!==\s*-1/,
+  assert.match(HTML, /const _sanitizing = _INTRADAY\.indexOf\(timeframe\)\s*!==\s*-1/,
     'renderChart sanitizing is no longer gated on an intraday check');
-  assert.match(HTML, /const _saneTf = \[[^\]]+\]\.indexOf\(chartTimeframe\)\s*!==\s*-1/,
+  assert.match(HTML, /const _saneTf = _INTRADAY\.indexOf\(chartTimeframe\)\s*!==\s*-1/,
     'renderZoneLadder sanitizing is no longer gated on an intraday check');
 
-  // Every copy of the list must be byte-identical. Divergence is the bug: one path
-  // would sanitize a timeframe another renders raw, and the range would be set
-  // from an extreme the candles never show.
-  const lists = [...HTML.matchAll(/\[((?:'[0-9a-z]+',?)+)\]\.indexOf\((?:timeframe|chartTimeframe)\)\s*!==\s*-1/g)]
-    .map((m) => m[1]);
-  assert.ok(lists.length >= 2, 'expected at least the two sanitizer intraday guards');
-  assert.strictEqual(new Set(lists).size, 1,
-    `intraday timeframe lists have diverged across render paths: ${[...new Set(lists)].join('  VS  ')}`);
+  // Both paths read ONE definition, _INTRADAY, so they cannot diverge: a divergence was
+  // the bug -- one path would sanitize a timeframe another renders raw, and the range
+  // would be set from an extreme the candles never show. No inline list may come back.
+  const lists = [...HTML.matchAll(/const _INTRADAY = \[((?:'[0-9a-z]+',?)+)\];/g)].map((m) => m[1]);
+  assert.strictEqual(lists.length, 1, 'expected exactly one _INTRADAY definition');
+  assert.strictEqual((HTML.match(/\[(?:'[0-9a-z]+',?)+\]\.indexOf\((?:timeframe|chartTimeframe)\)/g) || []).length, 0,
+    'an inline intraday list is back -- it must read _INTRADAY');
 
   // And the shared definition must still exclude daily+.
   const tfs = lists[0].split(',').map((s) => s.replace(/'/g, ''));
