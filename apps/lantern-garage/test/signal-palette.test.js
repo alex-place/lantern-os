@@ -486,3 +486,50 @@ test('an adopted setup is filtered and capped, and an equal one is a no-op', () 
   assert.match(fn, /JSON\.stringify\(clean\) === JSON\.stringify\(chartIndicators\)/,
     'every page load would redraw the chart for nothing');
 });
+
+// ── every page that shows money carries the palette (#3596) ──────────────────
+
+test('a page showing gains and losses loads the palette', () => {
+  /* Found by audit rather than by report: contest.html and explore.html both draw the
+     reader's money and neither carried it, so a colour-blind reader got the default
+     green and red on exactly the two pages nobody thought to check.
+
+     The leaderboard is included ON PURPOSE. A palette is about the READER'S EYES, not
+     about whose money is on screen -- someone who cannot tell green from red needs the
+     distinction on a scoreboard as much as in their own journal. What must not happen is
+     a SHARER's palette reaching a viewer, and that is the shared-card case (#3562), which
+     deliberately ships the default palette to whoever opens it. */
+  for (const page of ['journal.html', 'stock-trader.html', 'watch.html', 'kalshi-terminal.html',
+    'settings.html', 'contest.html', 'explore.html']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'public', page), 'utf8');
+    const tag = src.indexOf('/js/signal-palette.js');
+    assert.ok(tag > 0, page + ' shows money and does not load the palette');
+    assert.ok(tag < src.indexOf('</head>'), page + ' loads it after </head>, which will flash');
+  }
+});
+
+test('a shared card does NOT follow the viewer\'s palette', () => {
+  // It is someone else's published result; it ships the colours it was published with.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'shared.html'), 'utf8');
+  assert.ok(src.indexOf('/js/signal-palette.js') < 0, 'a shared card picked up the viewer\'s palette');
+});
+
+test('explore.html draws a loss with the loss colour, not the destructive one', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'explore.html'), 'utf8');
+  assert.match(src, /--loss: var\(--red\)/, 'a loss is painted with --danger');
+  assert.match(src, /\.wl-remove:hover \{ color: var\(--danger\)/,
+    'the remove button follows the money colour');
+});
+
+test('a page with no data-theme is read from what it actually paints', () => {
+  /* contest.html has no theme script at all: it renders light and never sets the
+     attribute. "Absent means dark" put a dark-tuned palette on a white page -- the exact
+     fault this module exists to prevent, introduced by wiring the module into that page. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'signal-palette.js'), 'utf8');
+  assert.match(src, /function currentTheme\(el\)/);
+  assert.match(src, /luminance\(\[\+m\[1\], \+m\[2\], \+m\[3\]\]\) > 0\.18/,
+    'the fallback does not measure the page background');
+  assert.match(src, /if \(!theme\) theme = currentTheme\(el\);/, 'apply() still guesses');
+  // A see-through background is not an answer; keep walking rather than call it dark.
+  assert.match(src, /Number\(m\[4\]\) < 0\.9\) continue/);
+});

@@ -267,10 +267,44 @@
     } catch (e) { /* private window: the choice lasts for this page and no longer */ }
   }
 
+  /**
+   * Which theme is this page ACTUALLY painting?
+   *
+   * data-theme when it is set, which is every page carrying the inline head script. But
+   * contest.html has no theme script at all and renders light with no attribute, so
+   * "absent means dark" put a dark-tuned palette on a white page -- the exact fault this
+   * module exists to prevent, introduced by the module itself.
+   *
+   * So when the attribute is missing, ask the PAGE rather than guess: an opaque background
+   * light enough to read dark text on is a light page. The OS preference is the last
+   * resort, since a page can ignore it (contest.html does).
+   */
+  function currentTheme(el) {
+    let attr = el.getAttribute('data-theme');
+    if (attr === 'light' || attr === 'dark') return attr;
+    try {
+      for (let node of [el, document.body]) {
+        if (!node) continue;
+        let c = getComputedStyle(node).backgroundColor || '';
+        // String.match, not the RegExp method that shares its name with a shell call --
+        // the pre-commit scanner reads this file for that name and cannot tell them apart.
+        let m = c.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,/\s]+([\d.]+))?/);
+        if (!m) continue;
+        if (m[4] != null && Number(m[4]) < 0.9) continue;      // see-through: keep looking
+        if (luminance([+m[1], +m[2], +m[3]]) > 0.18) return 'light';
+        return 'dark';
+      }
+    } catch (e) { /* no layout yet: fall through */ }
+    try {
+      if (window.matchMedia && !window.matchMedia('(prefers-color-scheme: dark)').matches) return 'light';
+    } catch (e) { /* no matchMedia */ }
+    return 'dark';
+  }
+
   function apply(choice, theme) {
     if (typeof document === 'undefined') return null;
     let el = document.documentElement;
-    if (!theme) theme = el.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    if (!theme) theme = currentTheme(el);
     let r = resolve(choice, theme);
     let vars = cssVars(r);
     // Classic is what the stylesheets already say, so it REMOVES the overrides rather

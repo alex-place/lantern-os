@@ -169,3 +169,42 @@ test('shared chrome does not dim text that is already the dim colour', () => {
       'muted text dimmed to ' + (op && op[1]) + ': ' + rule.replace(/\s+/g, ' ').slice(0, 70));
   }
 });
+
+// ── the money pair, and the asymmetry that kept biting (#3596) ───────────────
+
+test('site.css defines BOTH money tokens, in both themes', () => {
+  /* --green was present and --red simply absent, which is a trap rather than an omission:
+     a rule reaching for the obvious partner of --green gets a property that does not
+     exist, and `color: var(--red)` with --red unset is invalid at computed-value time, so
+     it silently inherits. That bit three times -- settings.html's delete button,
+     contest.html's losing returns, explore.html's losses -- each rendering as ordinary
+     body text with nobody noticing, because nothing errors. */
+  for (const [name, T] of [['light', LIGHT], ['dark', DARK]]) {
+    assert.ok(T['--green'], name + ' has no --green');
+    assert.ok(T['--red'], name + ' has no --red');
+  }
+});
+
+test('the money loss colour is not the destructive colour', () => {
+  // --danger paints the delete button and the offline dot. A losing position is neither.
+  for (const [name, T] of [['light', LIGHT], ['dark', DARK]]) {
+    assert.notStrictEqual(T['--red'], T['--danger'], name + ': a loss and a delete share a colour');
+  }
+});
+
+test('both money tokens clear AA on every surface site.css paints', () => {
+  /* --green was #10b981: 8.21:1 on the dark surfaces and 2.28:1 on white. It paints the
+     healthy mandala icon and the online dot as well as being the token two pages read for
+     money, so it was a hard-to-see status mark either way. */
+  const fails = [];
+  for (const [name, T] of [['light', LIGHT], ['dark', DARK]]) {
+    for (const tok of ['--green', '--red']) {
+      for (const surf of ['--bg', '--surface', '--surface2']) {
+        if (!T[surf]) continue;
+        const r = ratio(rgb(T[tok]), rgb(T[surf]));
+        if (r < 4.5) fails.push(name + ' ' + tok + ' ' + T[tok] + ' on ' + surf + ' = ' + r.toFixed(2));
+      }
+    }
+  }
+  assert.deepStrictEqual(fails, []);
+});
