@@ -227,6 +227,12 @@
       try {
         if (session && window.SignalPalette) window.SignalPalette.adopt(session.signals);
       } catch (_e) { /* a palette that cannot load must never take the nav down with it */ }
+      /* And hand the whole session to whatever else on the page wants it (#3594).
+         auth-gate already paid for this request; a page needing one more account-level
+         preference should listen rather than fetch /api/auth/session a second time. */
+      try {
+        window.dispatchEvent(new CustomEvent('lantern:session', { detail: session }));
+      } catch (_e) { /* older engine, or a listener that threw: neither is the nav's problem */ }
       updateNav(session);
       wireLogout();
       applyAdminControls(session);
