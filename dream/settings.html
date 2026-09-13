@@ -9,6 +9,7 @@
   <script>
     (function () { try { var s = localStorage.getItem('lantern-theme'); var d = window.matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();
   </script>
+<script src="/js/signal-palette.js"></script>
   <link rel="stylesheet" href="/css/site.css">
   <title>Settings — Unisona</title>
   <style>
@@ -41,8 +42,8 @@
     .btn:hover { border-color: var(--accent); }
     .btn.primary { background: var(--accent-strong); border: none; color: #fff; }
     .btn.primary:hover { background: var(--accent-strong-hover); }
-    .btn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
-    .btn.danger:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
+    .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+    .btn.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
     .btn:disabled { opacity: .5; cursor: default; }
     .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: var(--accent-dim); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
     .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
@@ -73,7 +74,7 @@
     .modal-box label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 5px; }
     .modal-box input { width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
     .modal-box input:focus { outline: none; border-color: var(--accent); }
-    .modal-box .m-err { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 0; }
+    .modal-box .m-err { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 0; }
     .modal-box .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
     /* Broker picker (#3530): a TradingView-style grid, one tile per broker, a Connect modal per tile. */
     .brokers { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
@@ -213,7 +214,9 @@
           <button data-t="system" class="${theme === "system" ? "on" : ""}">🖥 System</button>
           <button data-t="light" class="${theme === "light" ? "on" : ""}">☀ Light</button>
           <button data-t="dark" class="${theme === "dark" ? "on" : ""}">🌙 Dark</button>
-        </div></div></div>`;
+        </div></div></div>
+      <div class="row" style="align-items:flex-start;flex-wrap:wrap"><div class="rl" style="flex:1 1 190px"><div class="k">Gains and losses</div><div class="v">The colours money is written in, across the journal and the trader. Not the rest of the interface.</div></div>
+        <div class="rc" style="flex:1 1 300px;flex-direction:column;align-items:stretch;gap:9px;min-width:0" id="g-signals"></div></div>`;
     $("g-name-save").onclick = async (e) => {
       e.target.disabled = true;
       const out = await api("/api/profiles/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("g-name").value.trim() }) });
@@ -244,7 +247,81 @@
       if (t === "system") { localStorage.removeItem("lantern-theme"); const d = window.matchMedia("(prefers-color-scheme: dark)").matches; document.documentElement.setAttribute("data-theme", d ? "dark" : "light"); }
       else { localStorage.setItem("lantern-theme", t); document.documentElement.setAttribute("data-theme", t); }
       $("g-theme").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.t === t));
+      // The readable lightness is decided per theme, so switching themes re-derives the
+      // palette -- and the preview below has to follow it.
+      renderSignals();
     });
+    renderSignals();
+  }
+
+  /* ── Gain / loss colours (#3589) ────────────────────────────────────────────────
+     Green-up/red-down is a convention, and the one pairing red-green colour blindness
+     takes away -- so it is a choice, not a fact about the product.
+
+     THE PREVIEW IS THE RESOLVED PALETTE, not the raw pick. A chosen colour keeps its hue
+     and has its lightness walked until it clears 4.5:1 on every surface it can land on,
+     so the swatch a reader approves is the colour the page will actually paint. When a
+     pick had to move, the row says so and by how much -- silently substituting a
+     different colour would make the picker a lie. */
+  function renderSignals() {
+    const host = $("g-signals");
+    if (!host || !window.SignalPalette) return;
+    const SP = window.SignalPalette;
+    const choice = SP.read();
+    const r = SP.resolve(choice, document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+    const custom = choice.id === "custom";
+
+    const chips = SP.PRESETS.concat([{ id: "custom", name: "Custom" }]).map((p) =>
+      `<button class="btn${(choice.id || "classic") === p.id ? " primary" : ""}" data-sig="${p.id}" style="font-size:11.5px;padding:4px 10px">${esc(p.name)}</button>`).join("");
+
+    const preset = SP.PRESETS.filter((p) => p.id === (choice.id || "classic"))[0];
+    const moved = [];
+    if (r.adjusted.gain) moved.push("the gain");
+    if (r.adjusted.loss) moved.push("the loss");
+
+    host.innerHTML =
+      `<div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>`
+      + (custom
+        ? `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+             <label style="display:flex;align-items:center;gap:7px;font-size:12px">Gain
+               <input type="color" id="sig-gain" value="${esc(r.asked.gain)}" style="width:38px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer"></label>
+             <label style="display:flex;align-items:center;gap:7px;font-size:12px">Loss
+               <input type="color" id="sig-loss" value="${esc(r.asked.loss)}" style="width:38px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer"></label>
+           </div>`
+        : `<div class="v" style="font-size:11.5px;line-height:1.5;overflow-wrap:anywhere">${esc((preset && preset.note) || "")}</div>`)
+      + `<div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:var(--bg1, var(--surface));font-variant-numeric:tabular-nums">
+           <span style="color:${esc(r.gain)};font-weight:650">+$1,240.50</span>
+           <span style="color:${esc(r.loss)};font-weight:650">-$318.20</span>
+           <span style="color:${esc(r.gain)};font-size:11.5px">▲ 2.4%</span>
+           <span style="color:${esc(r.loss)};font-size:11.5px">▼ 0.9%</span>
+         </div>`
+      + `<div class="v" style="font-size:11px;line-height:1.55;overflow-wrap:anywhere">`
+        + (moved.length
+          ? `We darkened ${moved.join(" and ")} to keep ${moved.length > 1 ? "them" : "it"} readable on this theme — same colour, enough contrast.`
+          : `Readable on every surface in this theme.`)
+        + (r.distinct && r.distinct.ok === false
+          ? ` <span style="color:var(--gold, #f59e0b)">These two are close enough to be hard to tell apart.</span>`
+          : "")
+        + (r.distinct && r.distinct.mono
+          ? ` Losses keep their minus sign, so the page still reads without colour.`
+          : "")
+      + `</div>`;
+
+    host.querySelectorAll("[data-sig]").forEach((b) => b.onclick = () => {
+      const id = b.dataset.sig;
+      if (id === "custom") {
+        const now = SP.resolve(SP.read(), document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+        SP.write({ id: "custom", gain: now.asked.gain, loss: now.asked.loss });
+      } else SP.write({ id });
+      SP.applyStored();
+      renderSignals();
+    });
+    const onPick = () => {
+      SP.write({ id: "custom", gain: $("sig-gain").value, loss: $("sig-loss").value });
+      SP.applyStored();
+      renderSignals();
+    };
+    if ($("sig-gain")) { $("sig-gain").oninput = onPick; $("sig-loss").oninput = onPick; }
   }
 
   // ── ACCOUNT ──────────────────────────────────────────────────────────────
@@ -288,7 +365,7 @@
       <div class="group-label">Sign-in methods</div>${provRows}
       <div class="group-label">Session</div>
       <div class="row"><div class="rl"><div class="k">Sign out</div><div class="v">End your session on this device.</div></div><div class="rc"><button class="btn" id="a-logout">Sign out</button></div></div>
-      <div class="row"><div class="rl"><div class="k" style="color:var(--red)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>
+      <div class="row"><div class="rl"><div class="k" style="color:var(--danger)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>
       ${staffToolsHtml(sessionRole)}`;
     const r = $("a-resend"); if (r) r.onclick = async (e) => { e.preventDefault(); await api("/api/profiles/me/resend-verification", { method: "POST" }); e.target.textContent = "Sent ✓"; };
     $("a-email").onclick = () => openModal({
@@ -359,7 +436,7 @@
         <div class="row"><div class="rl"><div class="k">Payment method</div><div class="v" id="b-card">Loading…</div></div><div class="rc"><button class="btn" id="b-update">Update</button></div></div>
         <div class="group-label">Invoices</div>
         <div id="b-invoices" class="muted-note" style="margin-top:0">Loading…</div>
-        <div class="group-label" style="color:var(--red)">Cancellation</div>
+        <div class="group-label" style="color:var(--danger)">Cancellation</div>
         <div class="row"><div class="rl"><div class="k">Cancel plan</div><div class="v">You keep access until the end of the current billing period.</div></div><div class="rc"><button class="btn danger" id="b-cancel">Cancel</button></div></div>` : ""}
       <p class="muted-note">Payments are handled securely by Stripe — card details go straight to Stripe, we never see or store them. The Free plan needs no billing.</p>`;
     // Inline checkout: buy right here. On any snag (billing not configured, tier has
