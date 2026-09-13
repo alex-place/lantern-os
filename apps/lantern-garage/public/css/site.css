@@ -71,7 +71,18 @@ p, li, dd, dt, td, th, blockquote, figcaption { overflow-wrap: break-word; }
   --on-tint-green:  #00745d;
   --on-tint-gold:   #905a01;
   --on-tint-muted:  #5f6778;
-  --green: #10b981;
+  /* #10b981 measured 2.28:1 on white -- tuned for the dark theme and never re-checked,
+     the same fault as #3583/#3587/#3594. It paints the healthy mandala icon and the online
+     dot, so it was a hard-to-see status mark as well as the token two pages read for money.
+     #00735c is what the palette resolves Classic light to, so the two now agree. */
+  --green: #00735c;
+  /* --red has been ABSENT since site.css was written while --green was present, and an
+     asymmetry like that is a trap: a rule reaching for the obvious partner of --green got
+     a property that does not exist, which computes to `inherit`. That bit three times --
+     settings.html's delete button, contest.html's losing returns, explore.html's losses --
+     each rendering as ordinary text with nobody noticing. It is the money LOSS colour;
+     --danger stays the destructive-action one (#3592). */
+  --red: #cf0012;
   --gold: #f59e0b;
   --danger: #ef4444;
   --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
@@ -99,6 +110,7 @@ p, li, dd, dt, td, th, blockquote, figcaption { overflow-wrap: break-word; }
   --on-tint-gold:   #fbbf24;
   --on-tint-muted:  #9ca3af;
   --green: #34d399;
+  --red: #ff5f6d;
   --gold: #fbbf24;
   --danger: #ef4444;
   --shadow: 0 2px 8px rgba(0,0,0,0.3);

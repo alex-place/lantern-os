@@ -20,6 +20,7 @@
       }
     })();
   </script>
+<script src="/js/signal-palette.js"></script>
   <link rel="stylesheet" href="/css/site.css">
   <title>Dashboard — unisona.ai</title>
   <style>
@@ -28,7 +29,11 @@
        header + equity chart + holdings. Right column: buying power, the user's
        watchlist, then market news. Loop stage: Remember (surfaces your state).
        ───────────────────────────────────────────────────────────────────────── */
-    :root { --gain: var(--green); --loss: var(--danger); }
+    /* --loss was var(--danger), which in site.css means DESTRUCTIVE: it paints the
+       delete button and the offline dot. A losing position is not a destructive action,
+       and the conflation meant a loss could not follow the reader's palette while the
+       watchlist's remove button could. --red is the money loss colour (#3596). */
+    :root { --gain: var(--green); --loss: var(--red); }
 
     .dash {
       display: grid;
@@ -211,7 +216,9 @@
       display: inline-flex; align-items: center; justify-content: center;
     }
     .wl-row:hover .wl-remove { opacity: 1; }
-    .wl-remove:hover { color: var(--loss); background: var(--surface2); }
+    /* Removing a symbol is destructive, not a loss, so it keeps --danger while the
+       money above follows the reader. */
+    .wl-remove:hover { color: var(--danger); background: var(--surface2); }
 
     /* ── News ── */
     .news-row {
