@@ -65,6 +65,11 @@ const EXTENSION = {
   // + flag rather than claiming a loop stage.
   "budget.html":                   ["budget", "BUDGET_ENABLED"],
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
+  // One card a reader chose to publish (#3562). An EXTENSION rather than part of the
+  // journal: it serves no loop stage of ours -- it is a page for someone who is not our
+  // user, reading one snapshot with no way back to anything else. Gated with the
+  // trading cluster, so turning trading off takes the shared pages down with it.
+  "shared.html":                   ["trading", "TRADING_ENABLED"],
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
