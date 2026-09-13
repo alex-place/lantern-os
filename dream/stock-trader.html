@@ -16,6 +16,7 @@
   } catch(e){ document.documentElement.setAttribute('data-theme','dark'); } })();
 </script>
 <script src="/js/signal-palette.js"></script>
+<script src="/js/chart-settings.js"></script>
 <!-- Shared global header styling (#1579). Loaded BEFORE the trader <style> so the
      trader's own rules still win on any conflict. -->
 <link rel="stylesheet" href="/css/site.css">
@@ -86,7 +87,7 @@
   /* #3357: order pills sit ON the chart, top-left, so the card stops spending a
      footer row on them. pointer-events are explicit: the pills take clicks, the
      wrapper does not, so an armed drawing tool still owns the rest of the plot. */
-  .chart-order-pills{position:absolute;top:6px;left:6px;display:flex;gap:4px;z-index:3;pointer-events:none}
+  .chart-order-pills{position:absolute;top:4px;left:36px;display:flex;gap:4px;z-index:3;pointer-events:none}
   .chart-order-pills button{pointer-events:auto;font-family:var(--mono);font-size:10.5px;font-weight:700;
     letter-spacing:.04em;padding:3px 9px;border-radius:5px;border:1px solid var(--border);cursor:pointer;
     background:color-mix(in srgb, var(--bg0,#0b0d12) 72%, transparent);backdrop-filter:blur(3px);
@@ -866,7 +867,7 @@
   .pnl-pos{background:color-mix(in srgb, var(--tint-pos) 15%, transparent);color:var(--green)}
   .pnl-neg{background:color-mix(in srgb, var(--tint-neg) 15%, transparent);color:var(--red)}
   /* Zone ladder */
-  .zone-ladder{position:relative;flex:1 1 auto;min-height:80px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
+  .zone-ladder{position:relative;flex:1 1 auto;min-height:80px;background:var(--chart-bg,var(--bg0));margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
   /* Order ticket trigger row */
   .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
   .order-ticket button{flex:1;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
@@ -927,8 +928,8 @@
   .ladder-overlay{position:absolute;left:0;right:52px;top:0;bottom:16px}
   /* TradingView-style crosshair: dashed lines + price(right)/time(bottom) labels. */
   .xh-v,.xh-h{position:absolute;pointer-events:none;z-index:7;display:none}
-  .xh-v{width:0;top:0;bottom:16px;border-left:1px dashed var(--tv-text-secondary,#8892a0)}
-  .xh-h{height:0;left:0;right:52px;border-top:1px dashed var(--tv-text-secondary,#8892a0)}
+  .xh-v{width:0;top:0;bottom:16px;border-left:1px var(--xh-style,dashed) var(--xh-color,var(--tv-text-secondary,#8892a0))}
+  .xh-h{height:0;left:0;right:52px;border-top:1px var(--xh-style,dashed) var(--xh-color,var(--tv-text-secondary,#8892a0))}
   .xh-lbl{position:absolute;pointer-events:none;z-index:8;display:none;font-family:var(--mono);font-size:11px;line-height:1;padding:2px 4px;border-radius:2px;background:var(--bg3,#2a2e39);color:var(--text0,#e8eaed);white-space:nowrap}
   .xh-price{right:0;transform:translateY(-50%)}
   .xh-time{bottom:0;transform:translateX(-50%)}
@@ -952,6 +953,90 @@
   #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
   .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);box-shadow:var(--pop-sh-sm);padding:6px}
   .pat-menu[hidden]{display:none}
+  /* ── Chart settings (⚙): TradingView's dialog -- a tab rail on the left, one pane on the
+     right, every change applied as it is made, Cancel to put it all back. The controls
+     themselves are built from /js/chart-settings.js; this is only their clothing. */
+  .cs-bg{position:fixed;inset:0;z-index:1650;display:flex;align-items:center;justify-content:center;
+    background:var(--pop-scrim);backdrop-filter:blur(3px)}
+  .cs-bg[hidden]{display:none}
+  .cs-modal{width:min(840px,94vw);height:min(660px,90vh);display:flex;flex-direction:column;overflow:hidden;
+    background:color-mix(in srgb, var(--bg1) 82%, var(--bg0));
+    border:1px solid color-mix(in srgb, var(--border) 70%, var(--text2));
+    border-radius:var(--pop-r);box-shadow:var(--pop-sh)}
+  .cs-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .cs-head h2{margin:0;font-family:var(--sans);font-size:17px;font-weight:600;color:var(--text0)}
+  .cs-x{width:30px;height:30px;background:none;border:0;border-radius:6px;color:var(--text2);font-size:15px;cursor:pointer}
+  .cs-x:hover{background:var(--bg3);color:var(--text0)}
+  .cs-body{display:flex;flex:1 1 auto;min-height:0}
+  .cs-tabs{display:flex;flex-direction:column;gap:2px;width:196px;flex:0 0 auto;padding:12px 10px;border-right:1px solid var(--border)}
+  .cs-tabs [role=tab]{text-align:left;background:none;border:0;border-radius:8px;padding:9px 12px;font:inherit;font-size:13px;color:var(--text1);cursor:pointer}
+  .cs-tabs [role=tab]:hover{background:var(--bg2);color:var(--text0)}
+  .cs-tabs [role=tab].on{background:var(--bg3);color:var(--text0);font-weight:600}
+  .cs-tabs [role=tab]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .cs-pane{flex:1 1 auto;min-width:0;overflow-y:auto;padding:4px 22px 18px}
+  .cs-pane:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .cs-section h3{margin:18px 0 4px;font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);
+    text-transform:uppercase;font-weight:600;color:var(--hdr-fg)}
+  .cs-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:7px 0;font-size:13px;color:var(--text0)}
+  .cs-row input[type=checkbox]{width:16px;height:16px;margin:0;flex:0 0 auto;accent-color:var(--accent);cursor:pointer}
+  .cs-label{flex:1 1 200px;min-width:0}
+  .cs-ctl{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
+  .cs-hint{flex-basis:100%;margin:-3px 0 0 28px;font-size:11.5px;line-height:1.35;color:var(--text2)}
+  .cs-color .cs-hint,.cs-select .cs-hint,.cs-number .cs-hint,.cs-colorstyle .cs-hint,.cs-bgmode .cs-hint{margin-left:0}
+  /* A swatch is the real <input type=color>, invisible, over a painted chip -- the native
+     picker without the native chrome. ↺ appears only once a colour has been overridden. */
+  .cs-sw{position:relative;display:inline-flex;align-items:center;gap:4px}
+  .cs-sw[hidden]{display:none}
+  .cs-sw input[type=color]{position:absolute;left:0;top:0;width:34px;height:26px;opacity:0;cursor:pointer}
+  .cs-sw i{display:block;width:34px;height:26px;border-radius:6px;border:1px solid var(--border);box-shadow:inset 0 0 0 2px var(--bg1)}
+  .cs-sw-undo{position:relative;z-index:1;width:24px;height:24px;background:none;border:1px solid var(--border);border-radius:6px;
+    color:var(--text2);font-size:13px;line-height:1;cursor:pointer}
+  .cs-sw-undo:hover{color:var(--text0);background:var(--bg3)}
+  .cs-sw-undo[hidden]{display:none}
+  .cs-ctl select,.cs-num input{height:28px;background:color-mix(in srgb, var(--bg2) 70%, var(--bg1));
+    border:1px solid color-mix(in srgb, var(--border) 85%, transparent);border-radius:var(--pop-r-item);
+    color:var(--text0);padding:0 8px;font:inherit;font-size:12.5px}
+  .cs-ctl select{appearance:none;-webkit-appearance:none;min-width:150px;padding-right:26px;cursor:pointer;
+    background-image:url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23828a99' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+  .cs-num{display:inline-flex;align-items:center;gap:6px}
+  .cs-num input{width:72px;text-align:right}
+  .cs-unit{font-size:11.5px;color:var(--text2)}
+  .cs-ctl input[type=range]{width:140px;accent-color:var(--accent)}
+  .cs-foot{display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
+  .cs-sp{flex:1}
+  .cs-foot > button,.cs-tpl > button{height:32px;padding:0 14px;border-radius:8px;border:1px solid var(--border);
+    background:var(--bg2);color:var(--text0);font:inherit;font-size:13px;cursor:pointer}
+  .cs-foot > button:hover,.cs-tpl > button:hover{background:var(--bg3)}
+  .cs-foot .cs-ok{background:var(--text0);color:var(--bg0);border-color:var(--text0)}
+  .cs-foot .cs-ok:hover{background:var(--text1)}
+  .cs-tpl{position:relative}
+  .cs-tpl-menu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:250px;z-index:2;padding:6px;
+    background:var(--bg1);border:1px solid var(--border);border-radius:var(--pop-r-sm);box-shadow:var(--pop-sh-sm)}
+  .cs-tpl-menu[hidden]{display:none}
+  .cs-tpl-h{padding:6px 8px 2px;font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg)}
+  .cs-tpl-row{display:flex;gap:2px}
+  .cs-tpl-row button{flex:1;height:30px;text-align:left;border:0;background:none;border-radius:var(--pop-r-item);padding:0 8px;
+    color:var(--text0);font:inherit;font-size:12.5px;cursor:pointer}
+  .cs-tpl-row button:hover{background:var(--bg2)}
+  .cs-tpl-row .cs-tpl-del{flex:0 0 30px;text-align:center;color:var(--text2)}
+  .cs-tpl-save{display:flex;gap:6px;margin-top:4px;padding:6px 6px 4px;border-top:1px solid var(--border)}
+  .cs-tpl-save input{flex:1;min-width:0;height:28px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--pop-r-item);
+    color:var(--text0);padding:0 8px;font:inherit;font-size:12.5px}
+  .cs-tpl-save input.bad{border-color:var(--red)}
+  .cs-tpl-save button,.cs-tpl-def{height:28px;padding:0 10px;border:1px solid var(--border);background:var(--bg2);
+    border-radius:var(--pop-r-item);color:var(--text0);font:inherit;font-size:12.5px;cursor:pointer}
+  .cs-tpl-def{width:100%;margin-top:6px;text-align:left;background:none}
+  .cs-tpl-def:hover,.cs-tpl-save button:hover{background:var(--bg3)}
+  @media (max-width:640px){
+    .cs-modal{width:100vw;height:100vh;max-height:100vh;border-radius:0}
+    .cs-body{flex-direction:column}
+    .cs-tabs{flex-direction:row;overflow-x:auto;width:auto;padding:8px;border-right:0;border-bottom:1px solid var(--border)}
+    .cs-tabs [role=tab]{white-space:nowrap}
+    .cs-ctl{margin-left:28px}
+  }
+  /* Trading › Buy/sell buttons, off. */
+  body.cs-no-pills .chart-order-pills{display:none}
   .pat-menu-group{font-family:var(--mono);font-size:var(--hdr-size);letter-spacing:var(--hdr-track);text-transform:uppercase;color:var(--hdr-fg);padding:8px 9px 4px}
   .pat-menu-item{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--pop-r-item);cursor:pointer;font-family:var(--sans);font-size:var(--pop-fs);color:var(--text0);user-select:none}
   .pat-menu-item:hover{background:var(--bg2)}
@@ -1396,6 +1481,10 @@
   <button id="drawToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="toggleDrawMenu(this)"
     title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">Draw ▾</button>
+  <span class="hgroup-sep" aria-hidden="true"></span>
+  <button id="chartSettingsBtn" class="chart-ctrl" type="button" aria-haspopup="dialog"
+    onclick="openChartSettings()"
+    title="Chart settings — candles and their colours, the status line, scales, grid and background, trading overlays, alert lines, sessions. Saved to your account.">⚙ Settings</button>
   </div><!-- /hgroup -->
   <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
@@ -1899,6 +1988,7 @@ function _chartRgba(hex, a){
 // map cursor position to a price without recomputing the auto range.
 const chartView = {};
 const _crossData = {};   // canvas.id -> { bars, rMin, rMax } for the crosshair readout
+const _legendRows = {};  // canvas.id -> [{x,y,h,i}] where each overlay's legend line was painted
 function getChartView(key){
   if(!chartView[key]) chartView[key] = { barOffset:0, visibleBars:null, yMin:null, yMax:null, lastRMin:null, lastRMax:null };
   return chartView[key];
@@ -2072,7 +2162,7 @@ function getCurrentPrice(ticker){
 function zlLine(topPct, color, label, textColor){
   return `<div style="position:absolute;left:0;right:64px;top:${topPct};height:1px;
     background:repeating-linear-gradient(90deg,${color} 0,${color} 5px,transparent 5px,transparent 9px);"></div>
-    <div style="position:absolute;left:4px;top:${topPct};transform:translateY(-100%);
+    <div style="position:absolute;${_lblCss()};top:${topPct};transform:translateY(-100%);
     font-family:var(--mono);font-size:10px;color:${textColor};
     background:rgba(10,12,15,.8);padding:1px 3px;border-radius:2px;white-space:nowrap;">${label}</div>`;
 }
@@ -2127,11 +2217,27 @@ const _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','No
 // US market timezone for all chart time labels — the axis reads in Eastern clock time,
 // 12-hour (AM/PM), regardless of the viewer's own timezone or locale. #trader-timescale
 const _ET = 'America/New_York';
-function _etTime(d){ return d.toLocaleTimeString('en-US',{timeZone:_ET,hour:'numeric',minute:'2-digit',hour12:true}); } // "9:30 AM"
-function _etDayNum(d){ return d.toLocaleDateString('en-US',{timeZone:_ET,day:'numeric'}); }                            // "28"
+/* Data › Timezone (#3602): the zone the axis and crosshair READ in. The exchange session
+   itself (regular hours, session breaks, pre/post shading) is always measured in _ET --
+   a Tokyo reader still wants the New York open marked where New York opens. */
+function _tz(){ const z = (typeof _cs === 'function') ? _cs('data.timezone') : 'exchange'; return (!z || z === 'exchange') ? _ET : (z === 'local' ? undefined : z); }
+const _h12 = ()=> (typeof _cs === 'function') ? _cs('scales.timeFormat') !== '24h' : true;
+function _tzTag(){
+  const z = (typeof _cs === 'function') ? _cs('data.timezone') : 'exchange';
+  if(!z || z === 'exchange') return 'ET';
+  try{ return new Date().toLocaleTimeString('en-US', { timeZone:_tz(), timeZoneName:'short' }).split(' ').pop(); }catch(_e){ return z; }
+}
+function _etTime(d){ return d.toLocaleTimeString('en-US',{timeZone:_tz(),hour:'numeric',minute:'2-digit',hour12:_h12()}); } // "9:30 AM"
+function _etDayNum(d){
+  // Scales › day of week on labels: "Mon 28" rather than "28".
+  // Composed by hand: Intl's own {weekday, day} order for en-US is "13 Thu", and the
+  // axis reads the way TradingView's does, "Thu 13".
+  if(typeof _cs === 'function' && _cs('scales.dayOfWeek') === true) return d.toLocaleDateString('en-US',{timeZone:_tz(),weekday:'short'}) + ' ' + d.toLocaleDateString('en-US',{timeZone:_tz(),day:'numeric'});
+  return d.toLocaleDateString('en-US',{timeZone:_tz(),day:'numeric'});                                                  // "28"
+}
 function _fmtTick(d, kind, showDate){
-  if(kind === 'year')  return d.toLocaleDateString('en-US',{timeZone:_ET,year:'numeric'});
-  if(kind === 'month'){ const m=d.toLocaleDateString('en-US',{timeZone:_ET,month:'short'}); const isJan=d.toLocaleDateString('en-US',{timeZone:_ET,month:'numeric'})==='1'; return m + (isJan ? " '"+d.toLocaleDateString('en-US',{timeZone:_ET,year:'2-digit'}) : ''); }
+  if(kind === 'year')  return d.toLocaleDateString('en-US',{timeZone:_tz(),year:'numeric'});
+  if(kind === 'month'){ const m=d.toLocaleDateString('en-US',{timeZone:_tz(),month:'short'}); const isJan=d.toLocaleDateString('en-US',{timeZone:_tz(),month:'numeric'})==='1'; return m + (isJan ? " '"+d.toLocaleDateString('en-US',{timeZone:_tz(),year:'2-digit'}) : ''); }
   if(kind === 'day')   return _etDayNum(d);                   // #1698: day number only (28, not 6/28)
   const hhmm = _etTime(d);
   return showDate ? _etDayNum(d)+' '+hhmm : hhmm;            // month is carried by the 'month' tick
@@ -2634,7 +2740,7 @@ function indLineColour(hex){
 }
 
 /** Compute one configured indicator → { series:[{values,color,width,dash}], hist?, band?, guides? } */
-function indCompute(cfg, bars){
+function indCompute(cfg, bars){   // wrapped below: per-instance dash / second colour
   const d = IND_DEFS[cfg.id]; if(!d) return null;
   const P = (k) => Number(cfg.params && cfg.params[k] != null ? cfg.params[k] : (d.params.find(x=>x.k===k)||{}).def);
   // Every one of the 33 resolves its colour here, so the correction has one home.
@@ -2687,6 +2793,17 @@ function indCompute(cfg, bars){
   }
   return null;
 }
+/* The per-instance STYLE, applied over whatever the registry case built: a dashed main
+   line, and a colour of its own for the second plot where there is one (MACD's signal,
+   the stochastic's %D, DMI's -DI). Done here rather than in 33 cases so the settings
+   dialog has one contract to keep. */
+const _indComputeRaw = indCompute;
+indCompute = function(cfg, bars){
+  const out = _indComputeRaw(cfg, bars); if(!out) return out;
+  if(cfg.dash && out.series[0]) out.series[0] = Object.assign({}, out.series[0], { dash:[5,4] });
+  if(cfg.color2 && out.series[1]) out.series[1] = Object.assign({}, out.series[1], { color: indLineColour(cfg.color2) });
+  return out;
+};
 /** Short label for the legend, e.g. "EMA 21" or "MACD 12/26/9". */
 function indLabel(cfg){
   const d=IND_DEFS[cfg.id]; if(!d) return cfg.id;
@@ -2744,6 +2861,257 @@ function adoptIndicators(list){
 window.addEventListener('lantern:session', (e)=>{
   try{ adoptIndicators(e.detail && e.detail.indicators); }catch(_e){}
 });
+/* ── Chart settings (⚙) ──────────────────────────────────────────────────────
+   The table and the dialog live in /js/chart-settings.js. This is the page's half: what
+   a null colour resolves to HERE (the palette, the theme), the two overlay layers
+   TradingView keeps under Trading, the CSS-side settings, and the redraw.
+
+   _cs() reads one key. Every hook in the renderer compares a boolean against its
+   NON-default value on purpose ("!== false" for a default-true switch, "=== true" for a
+   default-false one), so a page whose module failed to load draws exactly as it did
+   before the dialog existed rather than flipping every switch to off. */
+const _CS = (typeof ChartSettings !== 'undefined') ? ChartSettings : null;
+const _cs = (k)=> _CS ? _CS.get(k) : undefined;
+function _chartDefaultColour(k){
+  const up = CHART_CANDLE_UP(), dn = CHART_CANDLE_DOWN();
+  const m = {
+    'candles.bodyUp': up, 'candles.wickUp': up, 'candles.borderUp': up, 'line.color': up,
+    'candles.bodyDown': dn, 'candles.wickDown': dn, 'candles.borderDown': dn,
+    'canvas.gridColor': CHART_GRID_COLOR(), 'canvas.paneSepColor': CHART_GRID_COLOR(),
+    'canvas.crosshairColor': chartVar('--tv-text-secondary', '#8892a0'),
+    'canvas.axisTextColor': CHART_AXIS_COLOR(),
+    'canvas.bgColor': chartVar('--bg0', '#0b0d12'), 'canvas.bgColor2': chartVar('--bg1', '#111318'),
+    'scales.prevCloseColor': chartVar('--text2', '#828a99'),
+    'alerts.lineColor': chartVar('--gold', '#f5a623'),
+    'events.sessionBreakColor': CHART_AXIS_COLOR(),
+  };
+  return m[k] || null;
+}
+function openChartSettings(tab){
+  if(!_CS) return;
+  _CS.open({
+    tab: tab || undefined,
+    externals: {
+      levels: { get: ()=> !!patternPrefs.levels, set: (v)=> setPatternPref('levels', v) },
+      zones:  { get: ()=> !!patternPrefs.zones,  set: (v)=> setPatternPref('zones', v) },
+    },
+    resolveDefault: _chartDefaultColour,
+  });
+}
+/* The settings that are CSS rather than canvas -- the plot background, the crosshair, the
+   order pills -- become custom properties on <html>, so every card and the fullscreen
+   chart follow together. Unset, each falls through to what it always was. */
+function applyChartCss(){
+  const r = document.documentElement.style;
+  const mode = _cs('canvas.bgMode');
+  const c1 = _cs('canvas.bgColor') || _chartDefaultColour('canvas.bgColor');
+  const c2 = _cs('canvas.bgColor2') || _chartDefaultColour('canvas.bgColor2');
+  if(mode === 'solid') r.setProperty('--chart-bg', c1);
+  else if(mode === 'gradient') r.setProperty('--chart-bg', 'linear-gradient(180deg, ' + c1 + ', ' + c2 + ')');
+  else r.removeProperty('--chart-bg');
+  const xc = _cs('canvas.crosshairColor'); if(xc) r.setProperty('--xh-color', xc); else r.removeProperty('--xh-color');
+  const xs = _cs('canvas.crosshairStyle'); if(xs && xs !== 'dashed') r.setProperty('--xh-style', xs); else r.removeProperty('--xh-style');
+  if(document.body) document.body.classList.toggle('cs-no-pills', _cs('trading.buySell') === false);
+}
+/* Saved to BOTH, like the palette and the indicators (#3592, #3594): the device so the
+   chart redraws now, the account so the setup follows the reader. Debounced, because a
+   colour drag is one change per pixel. Adopting the account's copy must not write it
+   straight back, so that path is flagged. */
+let _csSaveT = null, _csAdopting = false;
+function saveChartSettings(){
+  if(!_CS || _csAdopting) return;
+  clearTimeout(_csSaveT);
+  _csSaveT = setTimeout(()=>{
+    fetch('/api/profiles/me', { credentials:'same-origin' })
+      .then(r=> r.ok ? r.json() : null)
+      .then(p=>{
+        const prof = p && (p.profile || p);
+        if(!prof || !prof.id) return;            // signed out: the device's copy is all there is
+        const merged = Object.assign({}, prof.preferences || {}, { chart: _CS.diff(_CS.state()) });
+        return fetch('/api/profiles/me', { method:'PUT', credentials:'same-origin',
+          headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ preferences: merged }) });
+      })
+      .catch(()=>{});                            // the chart is already right; the sync can miss
+  }, 800);
+}
+/* One repaint per frame however many keys a drag changes: a colour input fires per
+   pixel, and there can be ten charts. */
+let _csRaf = 0;
+if(_CS){
+  _CS.onChange((keys)=>{
+    applyChartCss();
+    saveChartSettings();
+    if(keys.indexOf('trading.pnl') !== -1){
+      (wlPrices||[]).forEach(t=>{ const d = zonesData[t.ticker]; if(d) updateCardMeta(t.ticker, d); });
+    }
+    if(_csRaf) return;
+    _csRaf = requestAnimationFrame(()=>{ _csRaf = 0; _indRerender(); });
+  });
+  window.addEventListener('lantern:session', (e)=>{
+    _csAdopting = true;
+    try{ _CS.adopt(e.detail && e.detail.chart); }catch(_e){}
+    _csAdopting = false;
+  });
+  if(document.body) applyChartCss(); else document.addEventListener('DOMContentLoaded', applyChartCss);
+}
+/* Readers of the settings, used by the renderer. Each answers "as the chart always
+   drew it" when the key is at its default, which is what makes the defaults invisible. */
+const _gridColour = ()=> _cs('canvas.gridColor') || CHART_GRID_COLOR();
+const _axisColour = ()=> _cs('canvas.axisTextColor') || CHART_AXIS_COLOR();
+const _axisFont   = ()=> (Number(_cs('canvas.axisFontSize')) || 11) + 'px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+function _gridDash(ctx){ const st = _cs('canvas.gridStyle'); ctx.setLineDash(st === 'dashed' ? [4,4] : st === 'dotted' ? [1,3] : []); }
+/* Bars-to-pixels has ONE definition. The right margin is empty slots after the last bar,
+   so the slot width shrinks with it; the renderer, the crosshair, the drawing hit-tests
+   and the pan all come through here and cannot disagree about where a bar is. */
+function _slotsFor(n){ const r = Number(_cs('canvas.marginRight')) || 0; return n + Math.max(0, Math.min(30, Math.round(r))); }
+/* Data › Precision: a fixed number of decimals for the price scale, or the chart's own. */
+function _priceDec(fallback){ const p = _cs('data.precision'); return (p && p !== 'default') ? Number(p) : fallback; }
+/* Trading › label side: every price label the overlay draws sits on the same side. */
+const _lblCss = ()=> _cs('trading.labelSide') === 'right' ? 'right:68px' : 'left:4px';
+/* Exchange minutes-of-day for a bar, memoised: Intl is slow and there are 500 bars a chart. */
+const _etMinCache = new Map(), _etDayCache = new Map();
+function _etHM(d){ const t = d.toLocaleTimeString('en-US',{timeZone:_ET,hour12:false,hour:'2-digit',minute:'2-digit'}); const m = t.match(/(\d+):(\d+)/); return m ? {h:(+m[1])%24, m:+m[2]} : {h:0,m:0}; }
+function _etMinutes(ts){
+  let v = _etMinCache.get(ts);
+  if(v === undefined){
+    const d = new Date(String(ts).replace(' ','T'));
+    if(isNaN(d)) v = null; else { const p = _etHM(d); v = p.h*60 + p.m; }
+    if(_etMinCache.size > 20000) _etMinCache.clear();
+    _etMinCache.set(ts, v);
+  }
+  return v;
+}
+function _etDayKey(ts){
+  let v = _etDayCache.get(ts);
+  if(v === undefined){
+    const d = new Date(String(ts).replace(' ','T'));
+    v = isNaN(d) ? null : d.toLocaleDateString('en-US',{timeZone:_ET});
+    if(_etDayCache.size > 20000) _etDayCache.clear();
+    _etDayCache.set(ts, v);
+  }
+  return v;
+}
+const _INTRADAY = ['1m','5m','15m','1h','4h'];
+/* Data › Session: regular hours only drops the pre/after-hours bars before the visible
+   window is cut, so "78 bars" is still a session. Memoised per ticker on the array's own
+   identity, because the ladder's render memo compares bars by identity too. */
+const _sessCache = {};
+function _sessionBars(ticker, bars, tf){
+  if(_cs('data.session') !== 'regular' || _INTRADAY.indexOf(tf) === -1) return bars;
+  const c = _sessCache[ticker];
+  if(c && c.src === bars && c.tf === tf) return c.out;
+  const out = bars.filter(b=>{ const m = _etMinutes(b.timestamp); return m == null || (m >= 570 && m < 960); });
+  _sessCache[ticker] = { src: bars, tf, out };
+  return out;
+}
+/* Status line: the legend text for one indicator, by what the reader asked to see. */
+function _indLegendText(cfg, last, dec){
+  const d = IND_DEFS[cfg.id]; if(!d) return '';
+  const bits = [];
+  if(_cs('status.indTitles') !== false) bits.push(_cs('status.indInputs') === false ? d.name : indLabel(cfg));
+  if(_cs('status.indValues') !== false) bits.push(last != null ? fmt(last, dec) : '—');
+  return bits.join('  ');
+}
+/* Status line › chart values: O H L C, the bar's change, its volume -- for the bar under
+   the cursor, else the last one. A DOM element rather than canvas text, so the crosshair
+   can update it at pointer rate without repainting the chart. */
+const _statusOn = ()=> _cs('status.ohlc') === true || _cs('status.change') === true || _cs('status.volume') === true;
+/* The top-left column of a chart, top to bottom: the timeframe badge and the order pills
+   on one row, then the chart values, then one legend row per overlay. Everything that
+   paints there asks this, so the rows cannot land on each other again. */
+const _legendTop = ()=> (_cs('trading.buySell') !== false ? 28 : 18) + (_statusOn() ? 16 : 0);
+function _ohlcHtml(b, prev){
+  if(!b) return '';
+  const dec = _priceDec(b.close >= 100 ? 2 : 4);
+  const up = prev ? b.close >= prev.close : b.close >= b.open;
+  const col = up ? 'var(--green)' : 'var(--red)';
+  const parts = [];
+  if(_cs('status.ohlc') === true) parts.push('O <b>'+fmt(b.open,dec)+'</b> H <b>'+fmt(b.high,dec)+'</b> L <b>'+fmt(b.low,dec)+'</b> C <b>'+fmt(b.close,dec)+'</b>');
+  if(_cs('status.change') === true && prev && prev.close){ const d = b.close - prev.close; parts.push('<b>'+(d>=0?'+':'')+fmt(d,dec)+' ('+(d>=0?'+':'')+(d/prev.close*100).toFixed(2)+'%)</b>'); }
+  if(_cs('status.volume') === true && b.volume) parts.push('Vol <b>'+_fmtVol(Number(b.volume))+'</b>');
+  return '<span style="color:'+col+'">'+parts.join('&nbsp;&nbsp;')+'</span>';
+}
+/* Scales › countdown to bar close, for the intraday frames whose bars start on the clock. */
+function _countdownText(tf, lastTs){
+  // Intraday only: a daily bar closes at the bell, not 24h after it opened.
+  const ms = _INTRADAY.indexOf(tf) === -1 ? 0 : _TF_MS[tf]; if(!ms) return '';
+  const t0 = Date.parse(String(lastTs).replace(' ','T')); if(!Number.isFinite(t0)) return '';
+  let left = t0 + ms - Date.now();
+  if(left < 0) left = ((left % ms) + ms) % ms;            // the feed is behind: the next boundary on the clock
+  const sec = Math.floor(left/1000);
+  const mm = Math.floor(sec/60), ss = sec % 60, hh = Math.floor(mm/60);
+  return (hh ? hh + ':' + String(mm % 60).padStart(2,'0') : String(mm)) + ':' + String(ss).padStart(2,'0');
+}
+setInterval(()=>{
+  const els = document.querySelectorAll('.chart-countdown'); if(!els.length) return;
+  for(const el of els) el.textContent = _countdownText(el.dataset.tf, el.dataset.ts);
+}, 1000);
+/* Alerts › lines: the price levels this symbol's alerts watch. The engine rules load with
+   the alerts dock; when the lines are on and the dock has not been opened, ask once. */
+let _alRulesAsked = false;
+function _ensureAlertRules(){
+  if(_alRulesAsked || window.GUEST) return; _alRulesAsked = true;
+  fetch('/api/trading/alerts/rules', { cache:'no-store' }).then(r=> r.ok ? r.json() : null)
+    .then(j=>{ if(j && Array.isArray(j.rules)){ alRules = j.rules; _indRerender(); } }).catch(()=>{});
+}
+function _alertLevelsFor(ticker){
+  const out = [];
+  const only = _cs('alerts.onlyActive') !== false;
+  for(const r of (alRules || [])){
+    if(!r || r.symbol !== ticker || r.type !== 'price') continue;
+    if(only && r.enabled === false) continue;
+    const op = String(r.op || '');
+    if(/^moving_/.test(op)) continue;                      // relative to the price, not a level
+    const sym = /^(greater|crossing_up)$/.test(op) ? '≥' : /^(less|crossing_down)$/.test(op) ? '≤' : '↕';
+    if(Number.isFinite(Number(r.value))) out.push({ price:Number(r.value), label:'Alert '+sym+' '+fmt(Number(r.value), _priceDec(Number(r.value)>=100?2:4)) });
+    if(/channel$/.test(op) && Number.isFinite(Number(r.value2))) out.push({ price:Number(r.value2), label:'Alert ↕ '+fmt(Number(r.value2), _priceDec(Number(r.value2)>=100?2:4)) });
+  }
+  for(const a of (_alerts[ticker] || [])) if(Number.isFinite(Number(a.price))) out.push({ price:Number(a.price), label:'Alert '+(a.dir==='above'?'≥':'≤')+' '+fmt(Number(a.price), _priceDec(Number(a.price)>=100?2:4)) });
+  return out;
+}
+/* Trading › execution marks: where this symbol's orders filled. From the orders the panel
+   already loads; nothing is fetched for the chart's sake. */
+let _lastOrders = [];
+function _fillsFor(ticker){
+  const out = [];
+  for(const o of (_lastOrders || [])){
+    if(!o || o.symbol !== ticker || o.status !== 'filled') continue;
+    const ts = Date.parse(String(o.filled_at || o.created_at || '').replace(' ','T')); if(!Number.isFinite(ts)) continue;
+    out.push({ ts, side: o.side === 'sell' ? 'sell' : 'buy', qty: Number(o.qty) || 0, price: Number(o.filled_avg_price) || Number(o.limit_price) || 0 });
+  }
+  return out;
+}
+/* Sounds: a short tone from WebAudio, no asset to load. One for a fill, two for an alert. */
+let _audioCtx = null;
+function _tone(freqs, volPct){
+  try{
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _audioCtx, vol = Math.max(0, Math.min(1, (Number(volPct) || 0)/100)) * 0.25;
+    freqs.forEach((f, i)=>{
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, ctx.currentTime + i*0.14);
+      g.gain.linearRampToValueAtTime(vol, ctx.currentTime + i*0.14 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i*0.14 + 0.13);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + i*0.14); o.stop(ctx.currentTime + i*0.14 + 0.14);
+    });
+  }catch(_e){ /* no audio here */ }
+}
+const _execSound  = ()=>{ if(_cs('trading.sound') === true) _tone([880], _cs('trading.soundVolume')); };
+const _alertSound = ()=>{ if(_cs('alerts.sound') === true) _tone([660, 990], _cs('alerts.soundVolume')); };
+/* Trading › P&L value on the card: percent (as always), money from the positions panel, or nothing. */
+function _pnlBadgeHtml(ticker, pos){
+  if(!pos) return '';
+  const mode = _cs('trading.pnl') || 'percent';
+  if(mode === 'hidden') return '';
+  if(mode === 'money'){
+    const p = (_lastPositions || []).find(x=> x && x.symbol === ticker);
+    const usd = p ? Number(p.unrealized_pl) : NaN;
+    if(Number.isFinite(usd)) return '<span class="pnl-badge '+(usd>=0?'pnl-pos':'pnl-neg')+'">'+(usd>=0?'+':'−')+'$'+fmt(Math.abs(usd),2)+'</span>';
+  }
+  return '<span class="pnl-badge '+(pos.pnl_pct>=0?'pnl-pos':'pnl-neg')+'">'+fmtPct(pos.pnl_pct)+'</span>';
+}
 const indOverlays = ()=> chartIndicators.filter(c=>IND_DEFS[c.id] && IND_DEFS[c.id].kind==='overlay');
 const indPanes    = ()=> chartIndicators.filter(c=>IND_DEFS[c.id] && IND_DEFS[c.id].kind==='pane');
 
@@ -2781,16 +3149,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
 
   const pw  = Math.max(0, w - AXIS_W);
   const ph  = Math.max(0, h - AXIS_H);
-  // Sub-pane indicators (#3333) take their strip off the BOTTOM of the plot, so the
-  // price pane shrinks rather than the panes overlapping the candles. Each strip is
-  // capped so that on a small tile the price series still owns most of the height —
-  // below ~48px a pane is unreadable, so we stop adding them instead of shrinking
-  // everything into mush.
-  const _panes = indPanes();
-  const _paneMax = Math.floor(ph * 0.5);
-  const _paneH = _panes.length ? Math.max(34, Math.min(78, Math.floor(_paneMax / _panes.length))) : 0;
-  const _paneN = _paneH >= 34 ? Math.min(_panes.length, Math.floor(_paneMax / _paneH)) : 0;
-  const priceH = Math.max(0, ph - _paneN * _paneH);
+  const { panes: _panes, paneH: _paneH, paneN: _paneN, priceH } = _paneLayout(ph);
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*priceH;
 
@@ -2799,19 +3158,20 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   // The DEFAULT auto-fit range is pre-snapped to step boundaries upstream
   // (_snapPriceRange), so every chart enters with the same 7 labels; once
   // the user zooms, ticks re-fit naturally and the count may vary.
-  ctx.font = CHART_AXIS_FONT;
+  ctx.font = _axisFont();
   ctx.lineWidth = 1;
   const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, PRICE_AXIS_INTERVALS);
-  const priceDec = Math.max(2, decimalsFor(priceStep));
+  const priceDec = _priceDec(Math.max(2, decimalsFor(priceStep)));
+  const _hGrid = _cs('canvas.hGrid') !== false, _vGrid = _cs('canvas.vGrid') !== false;
   for(const price of priceTicks){
     if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
-    ctx.strokeStyle = CHART_GRID_COLOR();
-    ctx.beginPath();
-    ctx.moveTo(0, yy);
-    ctx.lineTo(pw, yy);
-    ctx.stroke();
-    ctx.fillStyle = CHART_AXIS_COLOR();
+    if(_hGrid){
+      ctx.strokeStyle = _gridColour(); _gridDash(ctx);
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle = _axisColour();
     ctx.textAlign = 'left';
     const edge = yy < 8 ? 'top' : (yy > priceH-8 ? 'bottom' : 'middle');
     ctx.textBaseline = edge;
@@ -2819,14 +3179,14 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   }
 
   if(bars && bars.length >= 2){
-    const n = bars.length, slotW = pw/n;
+    const n = bars.length, slotW = pw/_slotsFor(n);   // Canvas › right margin adds empty slots
 
     // Time axis: ticks at the first bar of each round time bucket (hour/day/…),
     // with the bucket granularity chosen to fit the width (~one label per 84px).
     // Labels are real clock times/dates for the active timeframe, edge-clamped
     // so the first/last never bleed into the gutter or get clipped, plus a faint
     // vertical gridline per tick.
-    ctx.fillStyle = CHART_AXIS_COLOR();
+    ctx.fillStyle = _axisColour();
     ctx.textBaseline = 'bottom';
     // Wider slots + gap than the old 24-hour labels, because "9:30 AM" is longer than "09:30".
     const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 96)));
@@ -2838,11 +3198,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       const cx = t.idx*slotW + slotW/2;
       if(cx - lastLabelX < MIN_LABEL_GAP) continue;
       lastLabelX = cx;
-      ctx.strokeStyle = CHART_GRID_COLOR();
-      ctx.beginPath();
-      ctx.moveTo(Math.round(cx)+0.5, 0);
-      ctx.lineTo(Math.round(cx)+0.5, ph);
-      ctx.stroke();
+      if(_vGrid){
+        ctx.strokeStyle = _gridColour(); _gridDash(ctx);
+        ctx.beginPath(); ctx.moveTo(Math.round(cx)+0.5, 0); ctx.lineTo(Math.round(cx)+0.5, ph); ctx.stroke();
+        ctx.setLineDash([]);
+      }
       let tx = cx, align = 'center';
       if(cx < 24){ tx = 2; align = 'left'; }
       else if(cx > pw-24){ tx = pw-2; align = 'right'; }
@@ -2855,8 +3215,8 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     const _intraday = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
     if(_intraday){
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-      ctx.fillStyle = CHART_AXIS_COLOR();
-      ctx.fillText('ET', w-2, h-2);
+      ctx.fillStyle = _axisColour();
+      ctx.fillText(_tzTag(), w-2, h-2);
     }
 
     // Clip price series to the plot box so a zoomed-in price scale can push
@@ -2865,6 +3225,43 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.beginPath();
     ctx.rect(0, 0, pw, priceH);
     ctx.clip();
+    // ── Chart settings: what sits BEHIND the bars (#3602) ───────────────────
+    // Scales › pre/post market: the columns outside 09:30-16:00 ET, washed in the two
+    // colours TradingView uses for them. Only meaningful when those bars are drawn.
+    if(_intraday && _cs('scales.prePost') === true){
+      const pre = _chartRgba(_cs('scales.preColor') || '#ff9800', .07), post = _chartRgba(_cs('scales.postColor') || '#2962ff', .07);
+      for(let i=0;i<n;i++){
+        const m = _etMinutes(bars[i].timestamp); if(m == null) continue;
+        if(m < 570) ctx.fillStyle = pre; else if(m >= 960) ctx.fillStyle = post; else continue;
+        ctx.fillRect(i*slotW, 0, slotW + 0.5, priceH);
+      }
+    }
+    // Events › session breaks: a line where the exchange day changes.
+    if(_intraday && _cs('events.sessionBreaks') === true && n > 1){
+      ctx.save();
+      ctx.strokeStyle = _cs('events.sessionBreakColor') || _axisColour();
+      ctx.globalAlpha = 0.55; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+      let prevDay = _etDayKey(bars[0].timestamp);
+      for(let i=1;i<n;i++){
+        const dk = _etDayKey(bars[i].timestamp);
+        if(dk !== prevDay){ const bx = Math.round(i*slotW)+0.5; ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, priceH); ctx.stroke(); }
+        prevDay = dk;
+      }
+      ctx.restore();
+    }
+    // Canvas › watermark: the symbol, large and faint, behind everything.
+    if(_cs('canvas.watermark') === true){
+      const wm = String(_canvasTicker(canvas) || '').toUpperCase();
+      if(wm){
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.02, Math.min(0.6, (Number(_cs('canvas.watermarkOpacity')) || 8)/100));
+        ctx.fillStyle = _axisColour();
+        ctx.font = '700 ' + Math.max(14, Math.floor(Math.min(pw/(wm.length*0.72), priceH*0.6))) + 'px ' + '"Segoe UI",system-ui,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(wm, pw/2, priceH/2);
+        ctx.restore();
+      }
+    }
     // ── Feed-glitch wick sanitizer (#trader-candles v2) ──────────────────────
     // Yahoo ships bars with tiny bodies and monstrous ONE-SIDED wicks (measured
     // on AAPL: 96/2024 hourly bars with $14–26 spikes on ~$0.30 bodies — normal
@@ -2928,49 +3325,62 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       }
     }
     if(type==='candle'){
+      // Symbol › candles (#3602): each part of a candle has its own switch and its own
+      // up/down pair, the way TradingView's Symbol tab has them. A null colour is the
+      // reader's gain/loss palette, so nothing changes until someone asks.
+      const _byPrev = _cs('candles.byPrevClose') === true;
+      const _drawBody = _cs('candles.body') !== false, _drawWick = _cs('candles.wick') !== false, _drawBorder = _cs('candles.border') === true;
+      const _cUp = { body: _cs('candles.bodyUp') || CHART_CANDLE_UP(), wick: _cs('candles.wickUp') || CHART_CANDLE_UP(), border: _cs('candles.borderUp') || CHART_CANDLE_UP() };
+      const _cDn = { body: _cs('candles.bodyDown') || CHART_CANDLE_DOWN(), wick: _cs('candles.wickDown') || CHART_CANDLE_DOWN(), border: _cs('candles.borderDown') || CHART_CANDLE_DOWN() };
       for(let i=0;i<n;i++){
         const b = bars[i];
         const x = i*slotW + slotW/2;
-        const up = b.close >= b.open;
-        const color = up ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
+        // "Colour bars based on previous close": up when the close beats the previous
+        // bar's close, not its own open.
+        const up = (_byPrev && i > 0) ? b.close >= bars[i-1].close : b.close >= b.open;
+        const c = up ? _cUp : _cDn;
         const sw = saneHiLo(b);                     // per-side glitch clamp (v2)
         const wHi = sw.hi, wLo = sw.lo;
-        ctx.strokeStyle = color;
-        ctx.fillStyle   = color;
-        ctx.lineWidth   = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, y(wHi));
-        ctx.lineTo(x, y(wLo));
-        ctx.stroke();
+        ctx.lineWidth = 1;
+        if(_drawWick){
+          ctx.strokeStyle = c.wick;
+          ctx.beginPath(); ctx.moveTo(x, y(wHi)); ctx.lineTo(x, y(wLo)); ctx.stroke();
+        }
         const bodyTop = y(Math.max(b.open,b.close));
         const bodyBot = y(Math.min(b.open,b.close));
         // Cap the body width so a window with few visible bars doesn't render giant
         // candles (slotW*0.6 is unbounded when zoomed in) — TradingView-style max. #trader-candles
         const bw = Math.max(1, Math.min(slotW*0.6, 14));
-        ctx.fillRect(x-bw/2, bodyTop, bw, Math.max(1, bodyBot-bodyTop));
+        const bh = Math.max(1, bodyBot-bodyTop);
+        if(_drawBody){ ctx.fillStyle = c.body; ctx.fillRect(x-bw/2, bodyTop, bw, bh); }
+        // Borders on their own make a hollow candle; too thin a body has no room for one.
+        if(_drawBorder && bw >= 3){ ctx.strokeStyle = c.border; ctx.strokeRect(Math.round(x-bw/2)+0.5, Math.round(bodyTop)+0.5, Math.round(bw)-1, Math.max(1, Math.round(bh)-1)); }
       }
     }else{
       const pts = bars.map((b,i)=>[i*slotW + slotW/2, y(b.close)]);
       // #2433: direction-aware line — green when the visible window closed up,
       // red when down — with a vertical gradient fill fading to transparent.
+      // Symbol › line chart: a chosen colour, width, and whether the area is shaded.
       const up = bars[n-1].close >= bars[0].close;
-      const lc = up ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
-      const grad = ctx.createLinearGradient(0, 0, 0, priceH);
-      grad.addColorStop(0, _chartRgba(lc, .26));
-      grad.addColorStop(1, _chartRgba(lc, 0));
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], priceH);
-      for(const [x,yy] of pts) ctx.lineTo(x,yy);
-      ctx.lineTo(pts[n-1][0], priceH);
-      ctx.closePath();
-      ctx.fillStyle = grad;
-      ctx.fill();
+      const lc = _cs('line.color') || (up ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN());
+      if(_cs('line.area') !== false){
+        const grad = ctx.createLinearGradient(0, 0, 0, priceH);
+        grad.addColorStop(0, _chartRgba(lc, .26));
+        grad.addColorStop(1, _chartRgba(lc, 0));
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], priceH);
+        for(const [x,yy] of pts) ctx.lineTo(x,yy);
+        ctx.lineTo(pts[n-1][0], priceH);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
       // line
       ctx.beginPath();
       ctx.moveTo(pts[0][0], pts[0][1]);
       for(let i=1;i<n;i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.strokeStyle = lc;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = Number(_cs('line.width')) || 2;
       ctx.lineJoin = 'round';
       ctx.stroke();
     }
@@ -2987,6 +3397,50 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = dc;
       ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI*2); ctx.fill();
+    }
+    // Scales › high and low of the visible window.
+    if(_cs('scales.highLow') === true){
+      let hh = -Infinity, ll = Infinity;
+      for(const b of bars){ const sw = saneHiLo(b); if(sw.hi > hh) hh = sw.hi; if(sw.lo < ll) ll = sw.lo; }
+      if(Number.isFinite(hh) && Number.isFinite(ll)){
+        ctx.save();
+        ctx.strokeStyle = _axisColour(); ctx.fillStyle = _axisColour(); ctx.globalAlpha = 0.8;
+        ctx.setLineDash([2,4]); ctx.lineWidth = 1; ctx.font = _axisFont(); ctx.textAlign = 'right';
+        for(const [v, tag, base] of [[hh, 'H ', 'bottom'], [ll, 'L ', 'top']]){
+          const yy = Math.round(y(v)) + 0.5;
+          ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
+          ctx.textBaseline = base; ctx.fillText(tag + fmt(v, priceDec), pw - 3, yy + (base === 'top' ? 2 : -2));
+        }
+        ctx.restore();
+      }
+    }
+    // Trading › execution marks: a triangle on the bar an order filled on, at its price.
+    if(_cs('trading.executionMarks') === true){
+      const fills = _fillsFor(_canvasTicker(canvas));
+      if(fills.length){
+        const tsOf = (i)=> Date.parse(String(bars[i].timestamp).replace(' ','T'));
+        const span = n > 1 ? Math.max(1, tsOf(n-1) - tsOf(n-2)) : 6e4;
+        const labels = _cs('trading.executionLabels') === true;
+        ctx.save(); ctx.font = _axisFont(); ctx.textAlign = 'left';
+        for(const f of fills){
+          if(f.ts < tsOf(0) || f.ts >= tsOf(n-1) + span) continue;
+          let idx = n-1; while(idx > 0 && tsOf(idx) > f.ts) idx--;
+          const sw = saneHiLo(bars[idx]);
+          const x = idx*slotW + slotW/2, buy = f.side === 'buy';
+          const col = buy ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
+          const base = buy ? y(sw.lo) + 5 : y(sw.hi) - 5;
+          ctx.fillStyle = col; ctx.strokeStyle = col;
+          ctx.beginPath();
+          if(buy){ ctx.moveTo(x, base); ctx.lineTo(x-5, base+8); ctx.lineTo(x+5, base+8); }
+          else   { ctx.moveTo(x, base); ctx.lineTo(x-5, base-8); ctx.lineTo(x+5, base-8); }
+          ctx.closePath(); ctx.fill();
+          if(labels){
+            ctx.textBaseline = buy ? 'top' : 'bottom';
+            ctx.fillText((buy ? 'B ' : 'S ') + (f.qty || '') + (f.price ? ' @ ' + fmt(f.price, priceDec) : ''), x + 7, buy ? base + 2 : base - 2);
+          }
+        }
+        ctx.restore();
+      }
     }
     // -- User drawings (#2444, expanded) --------------------------------------
     // ONE generic renderer over DRAW_TOOLS: every shape is a list of (ts,price)
@@ -3561,6 +4015,24 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       for(const s of out.series) _indStroke(ctx, s.values, _xOfIdx, y, s.color, s.width, s.dash);
     }
     ctx.restore();
+    // Scales › indicator values on the price scale: a tag in the gutter at each overlay's
+    // latest value, in the line's colour, so the axis says what the line is at.
+    if(_cs('scales.indLabels') === true){
+      ctx.save(); ctx.font = _axisFont(); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      for(const cfg of indOverlays()){
+        const out = indCompute(cfg, bars); if(!out) continue;
+        const vals = out.series[0].values; let last = null;
+        for(let i=vals.length-1;i>=0;i--){ if(vals[i]!=null&&Number.isFinite(vals[i])){ last=vals[i]; break; } }
+        if(last == null) continue;
+        const yy = y(last); if(yy < 0 || yy > priceH) continue;
+        const col = out.series[0].color;
+        ctx.fillStyle = col; ctx.fillRect(pw+1, Math.round(yy)-7, AXIS_W-2, 14);
+        const c = _chartRgba(col, 1).match(/\d+/g) || [128,128,128];
+        ctx.fillStyle = (0.299*c[0] + 0.587*c[1] + 0.114*c[2]) > 150 ? '#111318' : '#ffffff';
+        ctx.fillText(fmt(last, priceDec), pw+4, yy);
+      }
+      ctx.restore();
+    }
 
     // ── Sub-panes (#3333) — each on its own scale, sharing the price pane's x
     // mapping so a candle and its RSI reading line up vertically. Drawn after the
@@ -3587,7 +4059,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         ctx.save();
         ctx.beginPath(); ctx.rect(0, top, pw, _paneH); ctx.clip();
         // separator above the strip
-        ctx.strokeStyle=CHART_GRID_COLOR(); ctx.lineWidth=1;
+        ctx.strokeStyle=_cs('canvas.paneSepColor') || _gridColour(); ctx.lineWidth=1;   // Canvas › pane separators
         ctx.beginPath(); ctx.moveTo(0, Math.round(top)+0.5); ctx.lineTo(pw, Math.round(top)+0.5); ctx.stroke();
         // reference guides (RSI 30/70, MACD 0, …)
         for(const g of (out.guides||[])){
@@ -3608,7 +4080,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         }
         for(const s of out.series) _indStroke(ctx, s.values, _xOfIdx, yOf, s.color, s.width, s.dash);
         // scale ends in the gutter, so a pane is readable without a full axis
-        ctx.fillStyle=CHART_AXIS_COLOR(); ctx.font=CHART_AXIS_FONT; ctx.textAlign='left';
+        ctx.fillStyle=_axisColour(); ctx.font=_axisFont(); ctx.textAlign='left';
         ctx.restore();
         ctx.textBaseline='top';    ctx.fillText(fmt(hi, Math.abs(hi)>=100?0:2), pw+4, top+1);
         ctx.textBaseline='bottom'; ctx.fillText(fmt(lo, Math.abs(lo)>=100?0:2), pw+4, bot-1);
@@ -3616,7 +4088,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         let last=null;
         for(let i=out.series[0].values.length-1;i>=0;i--){ const v=out.series[0].values[i]; if(v!=null&&Number.isFinite(v)){ last=v; break; } }
         ctx.fillStyle=out.series[0].color; ctx.textAlign='left'; ctx.textBaseline='top';
-        ctx.fillText(indLabel(cfg)+(last!=null? '  '+fmt(last, Math.abs(last)>=100?0:2) : ''), 3, top+2);
+        ctx.fillText(_indLegendText(cfg, last, Math.abs(last||0)>=100?0:2), 3, top+2);
       }
     }
 
@@ -3624,22 +4096,54 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // "which line is which" is answerable without opening the picker.
     const _ovs = indOverlays();
     if(_ovs.length){
-      ctx.font=CHART_AXIS_FONT; ctx.textAlign='left'; ctx.textBaseline='top';
-      let ly = 2;
+      // Status line › indicators: titles, inputs and values are each the reader's call;
+      // a legend can also get a wash behind it so it reads over busy candles.
+      ctx.font=_axisFont(); ctx.textAlign='left'; ctx.textBaseline='top';
+      const _lines = [];
       for(const cfg of _ovs){
         const out=indCompute(cfg,bars); if(!out) continue;
         const vals=out.series[0].values;
         let last=null;
         for(let i=vals.length-1;i>=0;i--){ if(vals[i]!=null&&Number.isFinite(vals[i])){ last=vals[i]; break; } }
-        ctx.fillStyle=out.series[0].color;
-        ctx.fillText(indLabel(cfg)+(last!=null? '  '+fmt(last,2) : '  —'), 34, ly);
-        ly += 11;
+        const text = _indLegendText(cfg, last, 2);
+        if(text) _lines.push({ text, color: out.series[0].color });
+      }
+      const _lh = (Number(_cs('canvas.axisFontSize')) || 11) + 1;
+      const _lt = _legendTop();
+      // Where each row was painted, for the click that opens that indicator's settings.
+      _legendRows[canvas.id] = _lines.map((l, i)=> ({ x:34, y:_lt + i*_lh, h:_lh, i }));
+      if(_lines.length && _cs('status.background') === true){
+        let wmax = 0; for(const l of _lines) wmax = Math.max(wmax, ctx.measureText(l.text).width);
+        const bgHex = _cs('canvas.bgColor') || chartVar('--bg0', '#0b0d12');
+        ctx.fillStyle = _chartRgba(bgHex, Math.max(0, Math.min(1, (Number(_cs('status.bgOpacity')) || 0)/100)));
+        ctx.fillRect(31, _lt - 2, wmax + 6, Math.min(priceH, _lines.length*_lh + 4));
+      }
+      let ly = _lt;
+      for(const l of _lines){
+        ctx.fillStyle=l.color;
+        ctx.fillText(l.text, 34, ly);
+        ly += _lh;
         if(ly > priceH-12) break;                 // never let the legend eat the chart
       }
     }
   }
 }
 
+/* Sub-pane indicators (#3333) take their strip off the BOTTOM of the plot, so the price
+   pane shrinks rather than the panes overlapping the candles. Each strip is capped so
+   that on a small tile the price series still owns most of the height — below ~34px a
+   pane is unreadable, so we stop adding them instead of shrinking everything into mush.
+
+   ONE definition, because the HTML overlay positions its lines by percent of ITS height
+   and used to assume that height was the price pane. With an RSI strip on, every overlay
+   line -- the live price, entry, stop, target -- landed a strip's height too low. */
+function _paneLayout(ph){
+  const panes = indPanes();
+  const paneMax = Math.floor(ph * 0.5);
+  const paneH = panes.length ? Math.max(34, Math.min(78, Math.floor(paneMax / panes.length))) : 0;
+  const paneN = paneH >= 34 ? Math.min(panes.length, Math.floor(paneMax / paneH)) : 0;
+  return { panes, paneH, paneN, priceH: Math.max(0, ph - paneN * paneH) };
+}
 const _ladderSig = {};
 function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl, force){
   const canvas  = canvasEl  || document.getElementById('chart-'+ticker);
@@ -3650,7 +4154,7 @@ function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl, force){
   // output has changed — the 5s price poll re-renders all 16 ladders even
   // when most prices haven't moved. `force` bypasses this for zoom/pan
   // updates, which change chartView state without changing d/price/bars.
-  const bars = barsData[ticker] || [];
+  const bars = _sessionBars(ticker, barsData[ticker] || [], chartTimeframe);   // Data › session
   const sigKey = overlay.id || ticker;
   if(!force){
     const prevSig = _ladderSig[sigKey];
@@ -3812,8 +4316,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     if(!isFinite(lo) || !isFinite(hi) || hi <= lo){
       const c = currentPrice || hi || 1; lo = c * 0.999; hi = c * 1.001;
     }
-    const pad = (hi - lo) * 0.08 || hi * 0.001;   // breathing room top/bottom
-    rMin = lo - pad; rMax = hi + pad;
+    // Canvas › margins: breathing room above and below, 8% each as the chart always drew.
+    const _span = (hi - lo) > 0 ? (hi - lo) : hi * 0.0125;
+    const _mt = _cs('canvas.marginTop'), _mb = _cs('canvas.marginBottom');
+    rMin = lo - _span * ((_mb == null ? 8 : Number(_mb)) / 100);
+    rMax = hi + _span * ((_mt == null ? 8 : Number(_mt)) / 100);
     // Default (auto-fit) view only: snap the range outward to clean 1/2/5
     // step boundaries so every chart ENTERS with the same 7 evenly-spaced
     // labels (#3141). Zoomed/panned ranges are left alone — the axis then
@@ -3823,6 +4330,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   const rng = rMax - rMin; if(rng<=0) return;
   view.lastRMin = rMin; view.lastRMax = rMax;
 
+  // The overlay ends where the price pane ends, so its percentages mean prices.
+  if(canvas){
+    const _pl = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H));
+    overlay.style.bottom = (AXIS_H + _pl.paneN * _pl.paneH) + 'px';
+  }
   const pct  = p => (((rMax-p)/rng)*100).toFixed(2)+'%';
   const hpct = (t,b) => (Math.max(0.3,(t-b)/rng*100)).toFixed(2)+'%';
 
@@ -3877,17 +4389,57 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += zlLine(pct(pos.tp),_sigRgba('gainTint', .85),`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'var(--green)');
   } // end patternPrefs.levels (P&L / entry-stop-TP)
 
+  // Scales › previous day close, on intraday charts: the level the day's change is
+  // measured from, derived the same way the watchlist derives its day %.
+  if(_cs('scales.prevClose') === true && _INTRADAY.indexOf(chartTimeframe) !== -1){
+    const wl = (wlPrices||[]).find(t=> t.ticker === ticker);
+    const chg = wl ? Number(wl.chg_pct) : NaN;
+    if(wl && Number.isFinite(chg) && (1 + chg/100) !== 0){
+      const pc = Number(wl.price) / (1 + chg/100);
+      if(pc >= rMin && pc <= rMax){
+        const col = _cs('scales.prevCloseColor') || 'var(--text2)';
+        html += zlLine(pct(pc), col, 'Prev close ' + fmt(pc, _priceDec(pc>=100?2:4)), col);
+      }
+    }
+  }
+  // Alerts › alert lines: the levels this symbol's alerts watch.
+  if(_cs('alerts.lines') === true){
+    if(!alRules.length) _ensureAlertRules();
+    const col = _cs('alerts.lineColor') || 'var(--gold)';
+    for(const a of _alertLevelsFor(ticker)) if(a.price >= rMin && a.price <= rMax) html += zlLine(pct(a.price), col, a.label, col);
+  }
   // Current price line
-  const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
+  const priceText = priceLabel || ('$' + fmt(currentPrice, _priceDec(currentPrice>=100?2:4)));
   // Tokens, not hex. These two literals were the dark palette's --text0/--text1, so in
   // LIGHT theme the current-price label rendered near-white on a white --bg1 chip --
   // invisible on every chart card. The line and the label share this colour, so the
   // line disappeared with it.
-  const lineColor = priceLabel ? 'var(--text2)' : 'var(--text0)';
-  html += `<div style="position:absolute;left:0;right:0;top:${pct(currentPrice)};height:1.5px;background:${lineColor};z-index:5;"></div>`;
-  html += `<div style="position:absolute;left:4px;top:${pct(currentPrice)};transform:translateY(-110%);z-index:6;
-    font-family:var(--mono);font-size:11px;font-weight:600;color:${lineColor};
-    background:var(--bg1);padding:1px 4px;border-radius:2px;white-space:nowrap;">${priceText}</div>`;
+  // Scales › last price: the line and its label can go, and can take the last bar's
+  // direction as their colour.
+  let lineColor = priceLabel ? 'var(--text2)' : 'var(--text0)';
+  if(!priceLabel && _cs('scales.lastPriceColor') === 'direction' && viewBars.length){
+    const lb = viewBars[viewBars.length-1]; lineColor = lb.close >= lb.open ? 'var(--green)' : 'var(--red)';
+  }
+  if(_cs('scales.lastPrice') !== false){
+    html += `<div style="position:absolute;left:0;right:0;top:${pct(currentPrice)};height:1.5px;background:${lineColor};z-index:5;"></div>`;
+    html += `<div style="position:absolute;${_lblCss()};top:${pct(currentPrice)};transform:translateY(-110%);z-index:6;
+      font-family:var(--mono);font-size:11px;font-weight:600;color:${lineColor};
+      background:var(--bg1);padding:1px 4px;border-radius:2px;white-space:nowrap;">${priceText}</div>`;
+    // Scales › countdown to bar close, under the label, ticking on its own clock.
+    if(_cs('scales.countdown') === true && _INTRADAY.indexOf(chartTimeframe) !== -1 && viewBars.length){
+      const lts = viewBars[viewBars.length-1].timestamp;
+      html += `<div class="chart-countdown" data-tf="${escHtml(chartTimeframe)}" data-ts="${escHtml(String(lts))}" style="position:absolute;${_lblCss()};top:${pct(currentPrice)};transform:translateY(15%);z-index:6;
+        font-family:var(--mono);font-size:10px;color:var(--text2);background:var(--bg1);padding:0 4px;border-radius:2px;white-space:nowrap;">${_countdownText(chartTimeframe, lts)}</div>`;
+    }
+  }
+  // Status line › chart values: top-right of the plot, clear of the order pills and the
+  // indicator legend that both live top-left. The crosshair rewrites it per bar.
+  if(_statusOn() && viewBars.length){
+    const lb = viewBars[viewBars.length-1], pb = viewBars[viewBars.length-2];
+    const cur = _ohlcHtml(lb, pb);
+    html += `<div class="chart-ohlc" data-last="${escHtml(cur)}" style="position:absolute;left:34px;top:${_legendTop() - 16}px;max-width:calc(100% - 40px);z-index:6;pointer-events:none;
+      font-family:var(--mono);font-size:10.5px;color:var(--text1);background:color-mix(in srgb, var(--bg1) 78%, transparent);padding:1px 4px;border-radius:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cur}</div>`;
+  }
 
   // Timeframe badge (top-left, always above the price line/label)
   if(chartTimeframe){
@@ -4011,8 +4563,7 @@ function buildCard(ticker, d){
   // badge made the BREAKOUT/quiet cards shorter + blank). Honest-degrade via sigBadge.
   const confHtml = sigBadge(d);
 
-  let pnlHtml = '';
-  if(pos){ const cl=pos.pnl_pct>=0?'pnl-pos':'pnl-neg'; pnlHtml=`<span class="pnl-badge ${cl}">${fmtPct(pos.pnl_pct)}</span>`; }
+  const pnlHtml = _pnlBadgeHtml(ticker, pos);   // Trading › profit and loss value
 
   let watchHtml = '';
 
@@ -4072,11 +4623,7 @@ function updateCardMeta(ticker, d){
   const dirIcon  = dir==='BULLISH'?'▲ LONG ':dir==='BEARISH'?'▼ SHORT ':'· FLAT ';
 
   const pnlEl = document.getElementById('pnl-'+ticker);
-  if(pnlEl){
-    pnlEl.innerHTML = pos
-      ? `<span class="pnl-badge ${pos.pnl_pct>=0?'pnl-pos':'pnl-neg'}">${fmtPct(pos.pnl_pct)}</span>`
-      : '';
-  }
+  if(pnlEl) pnlEl.innerHTML = _pnlBadgeHtml(ticker, pos);   // Trading › profit and loss value
 
   const stateEl = document.getElementById('state-'+ticker);
   if(stateEl){
@@ -4871,9 +5418,9 @@ function _drawAnchor(canvas, clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   const xPx = clientX - rect.left, yPx = clientY - rect.top;
   const pw = Math.max(0, canvas.clientWidth - AXIS_W);
-  const ph = Math.max(0, canvas.clientHeight - AXIS_H);
+  const ph = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H)).priceH;   // the price pane only
   if (xPx > pw || yPx > ph || xPx < 0 || yPx < 0) return null;
-  const n = data.bars.length, slotW = pw / n;
+  const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   // invert the renderer's xOf so a click lands on a real time, not a bar index
   const frac = n === 1 ? 0 : (xPx - slotW/2) / Math.max(1, (n-1)*slotW);
@@ -4890,7 +5437,7 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   const rng = data.rMax - data.rMin;
   if (rng <= 0) return false;
   const yOf = pr => ((data.rMax - pr) / rng) * ph;
-  const n = data.bars.length, slotW = pw / n;
+  const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
   const segDist = (px, py, x1, y1, x2, y2) => {
@@ -5017,7 +5564,7 @@ function _drawingAnchors(tk, data, idx, pw, ph) {
   if (!d || !data || !data.bars || !data.bars.length) return [];
   const rng = data.rMax - data.rMin; if (rng <= 0) return [];
   const yOf = pr => ((data.rMax - pr) / rng) * ph;
-  const n = data.bars.length, slotW = pw / n;
+  const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
   // A brush is a path, not a shape: a handle per point would be unusable, so it gets
@@ -5052,7 +5599,7 @@ function _selGeom(tk) {
   if (!canvas || !data || !data.bars || !data.bars.length) return null;
   const pw = Math.max(0, canvas.clientWidth - AXIS_W), ph = Math.max(0, canvas.clientHeight - AXIS_H);
   const rng = data.rMax - data.rMin; if (rng <= 0) return null;
-  const n = data.bars.length, slotW = pw / n;
+  const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   return { canvas, data, pw, ph, n,
     priceAt: (py) => data.rMax - (py / ph) * rng,
@@ -6035,7 +6582,7 @@ async function placeMarketOrder(sym, side, qty, source){
     });
     const result = await r.json();
     if(!r.ok || result.status!=='placed'){ _alertToast(''+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
-    _alertToast(`${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
+    _orderToast(`${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
     journalLog({ symbol:sym, side, qty, type:'market', source: source||'rapid' });
     refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
     return true;
@@ -6111,7 +6658,7 @@ async function submitOrderTicket(){
       const fill = result.fill_price ? ` @ $${result.fill_price}` : '';
       const sim = result.mode==='paper' ? ' (paper)' : '';
       const verb = result.fill_price ? 'filled' : 'placed';
-      _alertToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
+      _orderToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
       journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
       closeOrderTicket();
       refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
@@ -6407,17 +6954,21 @@ function _ensureXh(ladder){
 function _hideXh(ladder){
   const xh = ladder && ladder._xh; if(!xh) return;
   for(const el of [xh.v, xh.h, xh.dot, xh.price, xh.time]) el.style.display='none';
+  // Back to the last bar's values once the cursor leaves.
+  const ro = ladder.querySelector('.chart-ohlc'); if(ro && ro.dataset.last != null) ro.innerHTML = ro.dataset.last;
 }
 function _fmtCrossTime(ts){
   const d = new Date(String(ts).replace(' ','T'));
   if(isNaN(d)) return '';
   // US Eastern, 12-hour — same clock the axis reads (#trader-timescale).
-  return d.toLocaleString('en-US', { timeZone:_ET, month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+  return d.toLocaleString('en-US', { timeZone:_tz(), month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:_h12() });
 }
 // x,y are cursor coords relative to the canvas (CSS px); w,h the canvas size.
 function _updateXh(ladder, canvasId, x, y, w, h){
   const data = _crossData[canvasId];
-  const pw = w - AXIS_W, ph = h - AXIS_H;
+  // The price pane, not the whole plot: with an RSI strip on, the readout used to be a
+  // strip's height off (the same #3333 gap the overlay had).
+  const pw = w - AXIS_W, ph = _paneLayout(h - AXIS_H).priceH;
   if(!data || x < 0 || x > pw || y < 0 || y > ph){ _hideXh(ladder); return; }
   const xh = _ensureXh(ladder);
   const n = (data.bars || []).length;
@@ -6425,13 +6976,13 @@ function _updateXh(ladder, canvasId, x, y, w, h){
   // riding the price line, and the price read from the bar (not the free touch-Y). No
   // horizontal line. Deliberately different from the desktop mouse crosshair.
   if(isNarrowTrader() && n >= 1){
-    const slotW = pw / n;
+    const slotW = pw / _slotsFor(n);
     const idx = Math.max(0, Math.min(n-1, Math.floor(x / slotW)));
     const b = data.bars[idx];
     const bx = (idx + 0.5) * slotW;
     const bp = (b && b.close != null) ? b.close : (data.rMax - (y/ph)*(data.rMax - data.rMin));
     const by = ph * (1 - (bp - data.rMin) / (data.rMax - data.rMin));
-    const bdec = bp >= 100 ? 2 : bp >= 1 ? 3 : 4;
+    const bdec = _priceDec(bp >= 100 ? 2 : bp >= 1 ? 3 : 4);
     xh.h.style.display = 'none';
     xh.v.style.left = bx+'px'; xh.v.style.display = 'block';
     xh.dot.style.left = bx+'px'; xh.dot.style.top = by+'px'; xh.dot.style.display = 'block';
@@ -6444,12 +6995,14 @@ function _updateXh(ladder, canvasId, x, y, w, h){
   const price = data.rMax - (y/ph)*(data.rMax - data.rMin);   // invert price→y
   let timeLabel = '';
   if(n >= 1){
-    const slotW = pw/n;
+    const slotW = pw/_slotsFor(n);
     const idx = Math.max(0, Math.min(n-1, Math.floor(x/slotW)));  // nearest bar for the TIME TEXT
     const b = data.bars[idx];
     if(b && b.timestamp) timeLabel = _fmtCrossTime(b.timestamp);
+    // Status line › chart values follow the bar under the cursor.
+    const ro = ladder.querySelector('.chart-ohlc'); if(ro && b) ro.innerHTML = _ohlcHtml(b, data.bars[idx-1]);
   }
-  const dec = price >= 100 ? 2 : price >= 1 ? 3 : 4;
+  const dec = _priceDec(price >= 100 ? 2 : price >= 1 ? 3 : 4);
   // The line + labels follow the cursor x directly (smooth), not snapped to a bar —
   // only the time TEXT reflects the nearest bar. Feels continuous on wide-bar cards.
   xh.v.style.left = x+'px';   xh.v.style.display='block';
@@ -6606,7 +7159,7 @@ document.addEventListener('mousemove', function(e){
       // Pan: horizontally across bars, vertically across the price range.
       const dx = e.clientX-drag.startX, dy = e.clientY-drag.startY;
       if(drag.n > drag.visibleBars && drag.pw>0){
-        const slotW = drag.pw/drag.visibleBars;
+        const slotW = drag.pw/_slotsFor(drag.visibleBars);
         const maxOffset = drag.n-drag.visibleBars;
         view.visibleBars = drag.visibleBars;
         view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + dx/slotW));
@@ -6652,6 +7205,8 @@ document.addEventListener('mousemove', function(e){
       }
     } catch (_e) { /* hover feedback must never break the crosshair */ }
   }
+  // Over a legend row the pointer says "clickable": that row opens the indicator's settings.
+  if(!_drawTool){ const rows = _legendRows[target.canvas.id] || []; if(rows.some(row => x >= row.x - 2 && x <= row.x + 220 && y >= row.y - 1 && y <= row.y + row.h)) _plotCursor = 'pointer'; }
   ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : _plotCursor;
   _updateXh(ladder, target.canvas.id, x, y, w, h);   // live price/time crosshair
 });
@@ -7076,7 +7631,18 @@ function addPriceAlert(ticker){
 function removePriceAlert(ticker,i){ (_alerts[ticker]||[]).splice(i,1); _saveAlerts(); renderSymbolInfo(ticker); }
 function _alertToast(msg){
   const t=document.createElement('div'); t.className='alert-toast'; t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(), 6000);
+  t.setAttribute('role','status'); t.title='Click to dismiss'; t.style.cursor='pointer';
+  t.addEventListener('click', ()=>t.remove());
+  document.body.appendChild(t);
+  // Alerts › automatically hide notifications: off keeps it up until it is clicked.
+  if(_cs('alerts.autoHideToasts') !== false) setTimeout(()=>t.remove(), 6000);
+}
+/* A successful order: its toast can be silenced (Trading › show only rejection
+   notifications) and it can ring (Trading › execution sound). A failure always shows. */
+function _orderToast(msg){
+  _execSound();
+  if(_cs('trading.rejectionsOnly') === true) return;
+  _alertToast(msg);
 }
 function checkPriceAlerts(){
   for(const [ticker, list] of Object.entries(_alerts)){
@@ -7085,7 +7651,7 @@ function checkPriceAlerts(){
       const a=list[i];
       if((a.dir==='above' && px>=a.price) || (a.dir==='below' && px<=a.price)){
         const msg=`${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
-        _alertToast(msg);
+        _alertToast(msg); _alertSound();
         if(window.Notification && Notification.permission==='granted') try{ new Notification('Unisona Trader', {body:msg}); }catch(e){}
         list.splice(i,1); _saveAlerts();
         if(activeTicker===ticker) renderSymbolInfo(ticker);
@@ -7414,7 +7980,7 @@ function _closePatternMenu(){
    its trigger, flips up when there is no room below) so the toolbar has one menu
    look. Adding is a click; each ADDED row expands into a generic settings editor
    built from IND_DEFS[].params, which is why a new indicator needs no UI work. */
-let _indMenuEl = null, _indEditing = null;
+let _indMenuEl = null;
 function _buildIndMenu(){
   if(_indMenuEl) return _indMenuEl;
   const m = document.createElement('div');
@@ -7441,7 +8007,6 @@ function _buildIndMenu(){
 }
 function _closeIndMenu(){
   if(_indMenuEl) _indMenuEl.hidden=true;
-  _indEditing=null;
   const b=document.getElementById('indicatorsToggle'); if(b) b.setAttribute('aria-expanded','false');
 }
 function _indMenuHtml(){
@@ -7450,10 +8015,14 @@ function _indMenuHtml(){
   if(!chartIndicators.length) h+='<div class="pat-menu-note">None yet. Add one below.</div>';
   chartIndicators.forEach((cfg,idx)=>{
     const d=IND_DEFS[cfg.id]; if(!d) return;
-    const open=_indEditing===idx;
-    h+='<div class="pat-menu-item ind-active" data-idx="'+idx+'" style="align-items:center" onclick="indEdit('+idx+',event)">'
+    // A row is the indicator's name and a gear: clicking either opens ITS settings in a
+    // dialog beside the menu (#3602). The editor used to unfold inside this list, which
+    // hid the colour behind a click nobody expected to be one.
+    h+='<div class="pat-menu-item ind-active" data-idx="'+idx+'" style="align-items:center" onclick="openIndicatorSettings('+idx+',event)" title="Settings for '+esc(indLabel(cfg))+'">'
       +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(indLineColour(cfg.color||d.color))+'"></span>'
       +'<span style="flex:1;min-width:0">'+esc(indLabel(cfg))+'</span>'
+      +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
+      +'title="Inputs and style" aria-label="Settings for '+esc(indLabel(cfg))+'" onclick="event.stopPropagation();openIndicatorSettings('+idx+',event)">⚙</button>'
       // Duplicate lives HERE, on the active row, not by clicking the same add-list entry
       // twice: EMA 9 + EMA 21 + EMA 200 is a real want, but a second identical click
       // produced a clone drawing exactly on top of its twin, which nobody meant.
@@ -7462,21 +8031,6 @@ function _indMenuHtml(){
       +'aria-label="Add another '+esc(d.name)+'" onclick="event.stopPropagation();indDuplicate('+idx+')">+</button>'
       +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
       +'aria-label="Remove '+esc(indLabel(cfg))+'" onclick="event.stopPropagation();indRemove('+idx+')">✕</button></div>';
-    if(open){
-      h+='<div style="padding:4px 8px 8px;display:flex;flex-direction:column;gap:6px">';
-      for(const p of d.params){
-        const v=(cfg.params&&cfg.params[p.k]!=null)?cfg.params[p.k]:p.def;
-        h+='<label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2)">'
-          +'<span style="flex:1">'+esc(p.label)+'</span>'
-          +'<input type="number" value="'+esc(v)+'" min="'+p.min+'" max="'+p.max+'" step="'+(p.step||1)+'" '
-          +'style="width:74px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text0);padding:3px 6px;font:inherit" '
-          +'oninput="indSetParam('+idx+',\''+p.k+'\',this.value)"></label>';
-      }
-      h+='<label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2)">'
-        +'<span style="flex:1">Colour</span>'
-        +'<input type="color" value="'+esc(cfg.color||d.color)+'" style="width:74px;height:24px;background:none;border:1px solid var(--border);border-radius:5px;padding:0" '
-        +'oninput="indSetColor('+idx+',this.value)"></label></div>';
-    }
   });
   // An indicator already on the chart LEAVES this list. The list answers "what can I
   // still add", so an entry that silently cloned an existing one was both a duplicate
@@ -7529,12 +8083,11 @@ function indAdd(id){
   // Defence in depth behind the filtered list: a stale menu, a double-fire, or a
   // restored state must not create a clone that draws exactly on top of its twin.
   if(chartIndicators.some(c=>c.id===id)){
-    _indEditing = chartIndicators.findIndex(c=>c.id===id);   // open its settings instead
-    _indRefresh(); return;
+    openIndicatorSettings(chartIndicators.findIndex(c=>c.id===id));   // open its settings instead
+    return;
   }
   if(chartIndicators.length>=12) return;          // a bounded list keeps the render loop honest
   chartIndicators.push({ id, params:{}, color:IND_DEFS[id].color });
-  _indEditing=chartIndicators.length-1;
   _indRefresh();
 }
 /* A deliberate second copy, seeded from the row you pressed + on and nudged so the
@@ -7552,12 +8105,10 @@ function indDuplicate(i){
     clone.params[first.k]=Math.min(first.max, Math.max(first.min, Math.round(next/step)*step));
   }
   chartIndicators.splice(i+1,0,clone);
-  _indEditing=i+1;
   _indRefresh();
 }
-function indRemove(i){ chartIndicators.splice(i,1); _indEditing=null; _indRefresh(); }
-function indClear(){ chartIndicators=[]; _indEditing=null; _indRefresh(); }
-function indEdit(i,e){ if(e) e.stopPropagation(); _indEditing = _indEditing===i ? null : i; _indRefresh(); }
+function indRemove(i){ chartIndicators.splice(i,1); _closeIndSettings(); _indRefresh(); }
+function indClear(){ chartIndicators=[]; _closeIndSettings(); _indRefresh(); }
 function indSetParam(i,k,v){
   const cfg=chartIndicators[i]; if(!cfg) return;
   const d=IND_DEFS[cfg.id], spec=d.params.find(p=>p.k===k); if(!spec) return;
@@ -7570,6 +8121,94 @@ function indSetColor(i,v){
   const cfg=chartIndicators[i]; if(!cfg) return;
   cfg.color=String(v); saveIndicators(); _setIndicatorsBtn(); _indRerender();
 }
+/* Style fields beyond the colour: a second colour, a line width, dashed. Kept ON the
+   instance so they travel with it (device and account, #3594). */
+function indSetStyle(i, key, v){
+  const cfg=chartIndicators[i]; if(!cfg) return;
+  if(key === 'color2'){ if(v) cfg.color2 = String(v); else delete cfg.color2; }
+  else if(key === 'width'){ const n = Number(v); if(Number.isFinite(n) && n >= 0.5 && n <= 6) cfg.width = n; }
+  else if(key === 'dash'){ if(v) cfg.dash = true; else delete cfg.dash; }
+  else return;
+  saveIndicators(); _indRerender();
+}
+
+/* ── One dialog per indicator (#3602) ────────────────────────────────────────
+   Inputs (its periods) and Style (its colours, width, dashed), in the same flyout the
+   drawings use, so a moving average and a trend line are configured the same way.
+   Opened from the legend on the chart, from the row in the Indicators menu, and from the
+   gear on that row. */
+let _indStyleEl = null, _indStyleTab = 'Inputs', _indStyleIdx = null;
+function _closeIndSettings(){ if(_indStyleEl) _indStyleEl.hidden = true; _indStyleIdx = null; }
+function openIndicatorSettings(idx, ev, atX, atY){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  const cfg = chartIndicators[idx]; const d = cfg && IND_DEFS[cfg.id]; if(!d) return;
+  if(!_indStyleEl){
+    _indStyleEl = document.createElement('div');
+    _indStyleEl.className = 'dr-flyout dr-settings ind-settings'; _indStyleEl.id = 'indStyle'; _indStyleEl.hidden = true;
+    _indStyleEl.setAttribute('role','dialog'); _indStyleEl.setAttribute('aria-label','Indicator settings');
+    document.body.appendChild(_indStyleEl);
+    document.addEventListener('click', (e)=>{
+      if(!_indStyleEl || _indStyleEl.hidden || _indStyleEl.contains(e.target)) return;
+      if(e.target.closest && (e.target.closest('#indMenu') || e.target.closest('#indicatorsToggle'))) return;
+      _closeIndSettings();
+    });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && _indStyleEl && !_indStyleEl.hidden) _closeIndSettings(); });
+  }
+  const esc=(x)=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if(_indStyleIdx !== idx){ _indStyleTab = d.params.length ? 'Inputs' : 'Style'; }
+  _indStyleIdx = idx;
+  const tabs = ['Inputs', 'Style'];
+  let h = '<div class="dr-fly-group">' + esc(indLabel(cfg)) + '</div><div class="dset-tabs">'
+    + tabs.map(t => {
+        const empty = t === 'Inputs' && !d.params.length;
+        return '<button type="button" class="dset-tab' + (t === _indStyleTab ? ' on' : '') + (empty ? ' empty' : '') + '"'
+          + (empty ? ' disabled title="This indicator has no inputs"' : '')
+          + ' onclick="_indStyleTab=\'' + t + '\';openIndicatorSettings(' + idx + ')">' + t + '</button>';
+      }).join('') + '</div>';
+  if(_indStyleTab === 'Inputs'){
+    for(const p of d.params){
+      const v=(cfg.params&&cfg.params[p.k]!=null)?cfg.params[p.k]:p.def;
+      h+='<label class="dr-st-row"><span>'+esc(p.label)+'</span>'
+        +'<input type="number" value="'+esc(v)+'" min="'+p.min+'" max="'+p.max+'" step="'+(p.step||1)+'" '
+        +'oninput="indSetParam('+idx+',\''+p.k+'\',this.value)"></label>';
+    }
+  } else {
+    const second = (indCompute(cfg, [{open:1,high:1,low:1,close:1,volume:1}]) || {series:[]}).series.length > 1;
+    h+='<label class="dr-st-row"><span>Colour</span><input type="color" value="'+esc(cfg.color||d.color)+'" oninput="indSetColor('+idx+',this.value)"></label>';
+    if(second) h+='<label class="dr-st-row"><span>Second line</span><input type="color" value="'+esc(cfg.color2||'#fb923c')+'" oninput="indSetStyle('+idx+',\'color2\',this.value)"></label>';
+    h+='<label class="dr-st-row"><span>Width</span><input type="number" value="'+esc(cfg.width||1.4)+'" min="0.5" max="6" step="0.5" oninput="indSetStyle('+idx+',\'width\',this.value)"></label>';
+    h+='<label class="dr-st-row"><span>Dashed</span><input type="checkbox" '+(cfg.dash?'checked':'')+' onchange="indSetStyle('+idx+',\'dash\',this.checked)"></label>';
+    h+='<p class="dr-fly-why">A colour too close to the chart background is nudged until it reads (#3594); the swatch shows what is drawn.</p>';
+  }
+  h += '<div class="dr-fly-foot"><button type="button" onclick="indRemove(' + idx + ')">Remove</button>'
+    + '<button type="button" onclick="_closeIndSettings()">Done</button></div>';
+  _indStyleEl.innerHTML = h;
+  _indStyleEl.hidden = false;
+  // Beside where it was asked for: the legend line, the menu row, or the last spot.
+  let x = atX, y = atY;
+  if(ev && ev.clientX != null){ x = ev.clientX + 8; y = ev.clientY + 8; }
+  if(x == null){ const r = _indStyleEl.getBoundingClientRect(); x = r.left || 200; y = r.top || 120; }
+  const w = _indStyleEl.offsetWidth || 250, hh = _indStyleEl.offsetHeight || 200;
+  _indStyleEl.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+  _indStyleEl.style.top = Math.max(8, Math.min(y, window.innerHeight - hh - 8)) + 'px';
+}
+/* The legend on the chart is clickable: a click on "EMA 21  764.30" opens EMA 21's
+   settings, the way it does on TradingView. The renderer records where each row was
+   painted; this is the only reader of that record. */
+document.addEventListener('click', (e)=>{
+  // The click lands on the HTML overlay that sits over the canvas, so find the canvas
+  // through the ladder they share rather than expecting it to be the target.
+  const ladder = e.target && e.target.closest && e.target.closest('.zone-ladder'); if(!ladder) return;
+  const canvas = ladder.querySelector('canvas.chart-canvas'); if(!canvas) return;
+  if(typeof _drawTool !== 'undefined' && _drawTool) return;             // an armed tool owns the plot
+  const rows = _legendRows[canvas.id]; if(!rows || !rows.length) return;
+  const r = canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top;
+  const hit = rows.find(row => x >= row.x - 2 && x <= row.x + 220 && y >= row.y - 1 && y <= row.y + row.h);
+  if(!hit) return;
+  const ovs = indOverlays(); const cfg = ovs[hit.i]; if(!cfg) return;
+  const idx = chartIndicators.indexOf(cfg); if(idx < 0) return;
+  openIndicatorSettings(idx, e);
+});
 function _setIndicatorsBtn(){
   const b=document.getElementById('indicatorsToggle'); if(!b) return;
   const n=chartIndicators.length;
@@ -8138,7 +8777,11 @@ async function loadAlerts(force) {
     const fres = await fetch('/api/trading/alerts/feed?limit=40', { cache: 'no-store' });
     const fj = fres.ok ? await fres.json() : { alerts: [] };
     alRules = rj.rules || [];
+    // Alerts › alert sound: ring once for each fired alert that was not in the last load.
+    const _seen = new Set((_alFeed || []).map(a=> a && a.id));
+    if(_alFeed.length && (fj.alerts || []).some(a=> a && !_seen.has(a.id))) _alertSound();
     _alFeed = fj.alerts || [];
+    if(_cs('alerts.lines') === true) _indRerender();
     _alPrefs = rj.prefs || { email: false };
     _alEmailAvail = rj.email || { possible: false };
     pane.dataset.loaded = '1';
@@ -8784,6 +9427,9 @@ async function cancelOrder(id, btn){
 function renderOrders(orders){
   const openEl=document.getElementById('tp-orders'), histEl=document.getElementById('tp-history');
   const arr=Array.isArray(orders)?orders:[];
+  _lastOrders = arr;   // Trading › execution marks read these
+  // typeof-guarded: a test evaluates this function on its own, without the settings.
+  if(typeof _cs === 'function' && _cs('trading.executionMarks') === true) _indRerender();
   const row=(o,withActions)=>`<tr>
     <td><span class="tp-sym" onclick="focusTicker('${o.symbol}')">${o.symbol}</span></td>
     <td class="tp-side ${o.side==='buy'?'long':'short'}">${(o.side||'').toUpperCase()}</td>
