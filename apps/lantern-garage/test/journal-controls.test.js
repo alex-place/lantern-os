@@ -37,7 +37,18 @@ const grabFn = (name) => {
 test('the page never reloads itself: no focus, visibility or timer refresh', () => {
   assert.doesNotMatch(code, /addEventListener\('visibilitychange'/, 'no visibility refresh');
   assert.doesNotMatch(code, /window\.addEventListener\('focus'/, 'no focus refresh');
-  assert.doesNotMatch(code, /setInterval\(/, 'no background timer');
+  /* One timer exists, and it is the replay's Play button (#3561). The rule this test
+     protects is that the page never goes back to the SERVER on a clock — a timer that
+     walks a cursor over bars already in hand breaks nothing, and refusing it would only
+     have pushed the same loop into a setTimeout chain. So: exactly one, in that one
+     function, and it fetches nothing. */
+  const timers = (code.match(/setInterval\(/g) || []).length;
+  assert.strictEqual(timers, 1, 'the only timer on this page is the replay');
+  const play = grabFn('jpReplayPlay');
+  assert.match(play, /setInterval\(/, 'and it is the replay that owns it');
+  assert.doesNotMatch(play, /fetch\(/, 'which never refetches');
+  assert.doesNotMatch(play, /jp[A-Za-z]*Load\(/, 'nor reloads a card');
+  assert.match(play, /clearInterval|jpReplayStop\(\)/, 'and stops itself at the end');
   assert.strictEqual((code.match(/addEventListener\('DOMContentLoaded'/g) || []).length, 1, 'one load, when the page opens');
   assert.match(code, /addEventListener\('DOMContentLoaded', \(\) => \{[\s\S]{0,240}jpLoad\(\);/, 'the one load is on open');
   assert.match(code, /id="jpLoadedAt"/, 'the header says when it last read the record');

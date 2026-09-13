@@ -46,6 +46,8 @@ const P = new Function([
   grabFn('jpHeld'), grabFn('jpTradeWhen'), grabFn('jpLabelValue'),
   // The expanded row carries the note editor since #3559, so the harness needs it too.
   grabDecl('JP_FEELINGS'), 'let jpNotes = {}; let jpNoteTags = []; let jpData = { demo: false };',
+  // #3561 put a replay button in the expanded row. Stubbed: this file is about the list.
+  'let jpReplay = null; const jpReplayPanel = () => "";',
   grabDecl('jpNoteOf'), grabFn('jpNoteEditor'),
   grabFn('jpTradeDetail'), grabFn('jpTradeRNote'), grabFn('jpTradeControls'), grabFn('jpTrades'),
 ].join('\n') + '\nreturn { jpHeld, jpTrades, jpTradeDetail, jpTradeRNote, open: jpTradeOpen };')();
@@ -101,9 +103,15 @@ test('one request repaints one card, and never the page', () => {
 
 test('expanding a row costs nothing — the row is already in hand', () => {
   const toggle = grabFn('jpTradeToggle');
-  assert.doesNotMatch(toggle, /fetch\(/);
-  assert.doesNotMatch(toggle, /jpTradeLoad\(/);
-  assert.match(toggle, /jpTrades\(jpTradeData\)/, 'it repaints from what was already fetched');
+  const repaint = grabFn('jpTradeRepaint');
+  for (const fn of [toggle, repaint]) {
+    assert.doesNotMatch(fn, /fetch\(/);
+    assert.doesNotMatch(fn, /jpTradeLoad\(/);
+  }
+  // The repaint moved into a helper in #3561 (the replay needs it too); what matters is
+  // still that expanding redraws from the data already in hand.
+  assert.match(toggle, /jpTradeRepaint\(\)/);
+  assert.match(repaint, /jpTrades\(jpTradeData\)/, 'it repaints from what was already fetched');
 });
 
 test('the detail says what the record does NOT have, rather than leaving it blank', () => {
