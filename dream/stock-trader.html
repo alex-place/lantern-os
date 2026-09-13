@@ -573,6 +573,10 @@
   .range-strip .range-btn:hover{background:var(--bg3);color:var(--text0);border-color:transparent}
   .range-strip .range-btn.active{background:var(--bg3);color:var(--text0);border-color:transparent;font-weight:600}
   .range-sp{flex:1 1 auto}
+  .range-sess{margin-left:6px;height:22px;padding:0 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);
+    color:var(--text1);font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;cursor:pointer}
+  .range-sess:hover{color:var(--text0);background:var(--bg3)}
+  .range-sess[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
   .range-clock{flex:0 0 auto;gap:8px}
   .range-clock .l{padding:2px 7px;border-radius:4px;background:var(--bg2)}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:9px var(--hdr-px);border-bottom:1px solid var(--border)}
@@ -1133,7 +1137,7 @@
     .header{gap:8px;padding:0 10px}
   }
   @media (max-width:950px){
-    .hstat:not(.acct){display:none}   /* VIX/Market live in the Σ₀ panel too */
+    .header .hstat:not(.acct){display:none}   /* the strip's clock stays; VIX/Market live in the Σ₀ panel too */
   }
   @media (max-width:900px){
     :root{--chat-w:320px}
@@ -1474,7 +1478,9 @@
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
     <option value="15m">15m</option>
+    <option value="30m">30m</option>
     <option value="1h">1h</option>
+    <option value="2h">2h</option>
     <option value="4h">4h</option>
     <option value="1d">1d</option>
     <option value="1w">1W</option>
@@ -1532,6 +1538,8 @@
   <div class="range-row" id="rangeRow" role="group" aria-label="How much history to show"></div>
   <span class="range-sp" aria-hidden="true"></span>
   <div class="hstat range-clock" id="mktClockWrap" title="US equities session, Eastern Time"><span class="v" id="etClock">—</span><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
+  <button type="button" class="range-sess" id="rangeSess" aria-pressed="false" onclick="toggleSession()"
+    title="Regular trading hours (09:30–16:00 ET) or the extended session. The same switch as Settings › Symbol › Session.">RTH</button>
 </div>
 
 <!-- Footer -->
@@ -1893,7 +1901,7 @@ function escHtml(s){
 // The only bar intervals the chart supports. chartTimeframe reaches the overlay
 // markup, and both of its sources (localStorage, the timeframe <select>) are
 // caller-controlled text, so pin it to this set rather than trusting the input.
-const TF_ALLOWED = ['1m','5m','15m','1h','4h','1d','1w','1mo'];
+const TF_ALLOWED = ['1m','5m','15m','30m','1h','2h','4h','1d','1w','1mo'];
 function normalizeTf(tf){ return TF_ALLOWED.includes(String(tf)) ? String(tf) : '5m'; }
 let chartTimeframe = (()=>{ try{ return normalizeTf(localStorage.getItem('trader.tf') || '5m'); }catch(e){ return '5m'; } })();
 // Pattern overlays (S/R zone bands, P&L fill, entry/stop/TP markers) — the alternative
@@ -2001,31 +2009,67 @@ const chartView = {};
 const _crossData = {};   // canvas.id -> { bars, rMin, rMax } for the crosshair readout
 const _legendRows = {};  // canvas.id -> [{x,y,h,i}] where each overlay's legend line was painted
 function getChartView(key){
-  if(!chartView[key]) chartView[key] = { barOffset:0, visibleBars:null, yMin:null, yMax:null, lastRMin:null, lastRMax:null };
+  // span: the range clicked for this view, else the interval's own. spanDriven: nobody
+  // has zoomed or panned, so the window is re-measured from the bars every render.
+  if(!chartView[key]) chartView[key] = { barOffset:0, visibleBars:null, span:null, spanDriven:true, yMin:null, yMax:null, lastRMin:null, lastRMax:null };
   return chartView[key];
 }
 
-// Range presets map onto the bar-resolution timeframes AND a default visible-bar
-// window (~one range-label's worth of candles). Several ranges share the daily
-// timeframe — they differ only in how wide a window they open. `activeRange` tracks
-// which button is lit (a plain tf→range reverse-map can't, now that ranges collide).
+/* The range buttons, as TradingView pairs them: each range is a SPAN and the interval
+   whose bars make that span read at a consistent density -- a few hundred candles on a
+   wide chart whichever button was pressed. 1D at 1m is a session of 390 candles; 1M at
+   30m is ~290; 3M at 1h and 6M at 2h are ~450; 1Y at daily is 252; 5Y at weekly 260. The
+   old table drew 1M as 22 daily candles on the same width as 1D's 78, which is where the
+   fat, inconsistent candles came from.
+
+   A button is ONE click: every chart to that interval and window, price scale refitted,
+   and nothing remembered as a mode -- the interval itself is (trader.tf), the range is
+   not, and no button stays lit. */
 const RANGES = {
-  '1D':  { tf: '5m', bars: 78   },   // ~one 5m session
-  '5D':  { tf: '1h', bars: 35   },   // ~5 days of hourly
-  '1M':  { tf: '1d', bars: 22   },   // ~22 trading days
-  '3M':  { tf: '1d', bars: 64   },
-  '6M':  { tf: '1d', bars: 128  },
-  'YTD': { tf: '1d', bars: null },   // computed from the calendar (below)
-  '1Y':  { tf: '1d', bars: 252  },
-  '5Y':  { tf: '1d', bars: 1260 },
-  'All': { tf: '1d', bars: 99999 },  // clamped to whatever daily history is available
+  '1D':  { tf:'1m',  days:1 },
+  '5D':  { tf:'5m',  days:5 },
+  '1M':  { tf:'30m', days:22 },
+  '3M':  { tf:'1h',  days:64 },
+  '6M':  { tf:'2h',  days:128 },
+  'YTD': { tf:'1d',  ytd:true },
+  '1Y':  { tf:'1d',  days:252 },
+  '5Y':  { tf:'1w',  bars:260 },
+  'All': { tf:'1mo', bars:99999 },
 };
-let activeRange = (()=>{ try{ return localStorage.getItem('trader.range') || '1D'; }catch(e){ return '1D'; } })();
-// Approximate trading days elapsed this calendar year (~5 sessions per 7 days).
-function ytdTradingBars(){
-  const now = new Date();
-  const days = Math.floor((now - new Date(now.getFullYear(), 0, 1)) / 86400000);
-  return Math.max(5, Math.round(days * 5 / 7));
+/* An interval chosen on its own -- the toolbar select, or the one remembered from last
+   time -- opens the span TradingView pairs it with, so the density is the same either
+   way. The two intervals no button maps to get a span of their own. */
+const SPAN_FOR_TF = {
+  '1m': RANGES['1D'], '5m': RANGES['5D'], '15m': { days:10 }, '30m': RANGES['1M'], '1h': RANGES['3M'],
+  '2h': RANGES['6M'], '4h': { days:128 }, '1d': RANGES['1Y'], '1w': RANGES['5Y'], '1mo': RANGES['All'],
+};
+/* How many bars a span is, in THESE bars. Day spans count distinct exchange dates back
+   from the last bar, so "1 day" is the whole session whatever the interval and whether
+   extended hours are on; YTD is this year's bars; weekly and monthly spans are counts.
+   Then the width clamp: never fewer than MIN_BAR_PX per bar, so a small card shows the
+   most recent part of the span rather than sub-pixel candles -- the candle's size matters
+   more than the span, and the rest is a pan away. The right margin's empty slots are part
+   of the width, so the fit leaves room for them. */
+const MIN_BAR_PX = 2;
+function _windowBars(bars, span, pw){
+  const n = bars.length; if(!n) return MIN_VISIBLE_BARS;
+  let want = n;
+  if(span && span.bars) want = Math.min(n, span.bars);
+  else if(span && span.ytd){
+    const y = _etDayKey(bars[n-1].timestamp).split('/')[2];
+    let i = n; while(i > 0 && _etDayKey(bars[i-1].timestamp).split('/')[2] === y) i--;
+    want = n - i;
+  } else if(span && span.days){
+    let seen = 0, last = null, i = n;
+    while(i > 0){
+      const d = _etDayKey(bars[i-1].timestamp);
+      if(d !== last){ if(seen === span.days) break; seen++; last = d; }
+      i--;
+    }
+    want = n - i;
+  }
+  if(pw > 0) want = Math.min(want, Math.max(MIN_VISIBLE_BARS, Math.floor(pw / MIN_BAR_PX) - _slotsFor(0)));
+  return Math.max(MIN_VISIBLE_BARS, want);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -2962,6 +3006,11 @@ if(_CS){
   _CS.onChange((keys)=>{
     applyChartCss();
     saveChartSettings();
+    if(keys.indexOf('data.session') !== -1){
+      _renderSessBadge();
+      // The span is measured in bars, and the session decides which bars there are.
+      Object.values(chartView).forEach(v=>{ if(v.spanDriven){ v.visibleBars = null; v.barOffset = 0; } });
+    }
     if(keys.indexOf('trading.pnl') !== -1){
       (wlPrices||[]).forEach(t=>{ const d = zonesData[t.ticker]; if(d) updateCardMeta(t.ticker, d); });
     }
@@ -2973,7 +3022,8 @@ if(_CS){
     try{ _CS.adopt(e.detail && e.detail.chart); }catch(_e){}
     _csAdopting = false;
   });
-  if(document.body) applyChartCss(); else document.addEventListener('DOMContentLoaded', applyChartCss);
+  if(document.body){ applyChartCss(); _renderSessBadge(); }
+  else document.addEventListener('DOMContentLoaded', ()=>{ applyChartCss(); _renderSessBadge(); });
 }
 /* Readers of the settings, used by the renderer. Each answers "as the chart always
    drew it" when the key is at its default, which is what makes the defaults invisible. */
@@ -2984,7 +3034,7 @@ function _gridDash(ctx){ const st = _cs('canvas.gridStyle'); ctx.setLineDash(st 
 /* Bars-to-pixels has ONE definition. The right margin is empty slots after the last bar,
    so the slot width shrinks with it; the renderer, the crosshair, the drawing hit-tests
    and the pan all come through here and cannot disagree about where a bar is. */
-function _slotsFor(n){ const r = Number(_cs('canvas.marginRight')) || 0; return n + Math.max(0, Math.min(30, Math.round(r))); }
+function _slotsFor(n){ const r = _cs('canvas.marginRight'); const m = r == null ? 25 : Number(r) || 0; return n + Math.max(0, Math.min(60, Math.round(m))); }
 /* Data › Precision: a fixed number of decimals for the price scale, or the chart's own. */
 function _priceDec(fallback){ const p = _cs('data.precision'); return (p && p !== 'default') ? Number(p) : fallback; }
 /* Trading › label side: every price label the overlay draws sits on the same side. */
@@ -3012,7 +3062,7 @@ function _etDayKey(ts){
   }
   return v;
 }
-const _INTRADAY = ['1m','5m','15m','1h','4h'];
+const _INTRADAY = ['1m','5m','15m','30m','1h','2h','4h'];
 /* Data › Session: regular hours only drops the pre/after-hours bars before the visible
    window is cut, so "78 bars" is still a session. Memoised per ticker on the array's own
    identity, because the ladder's render memo compares bars by identity too. */
@@ -3242,7 +3292,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // Label the dynamic timescale with its timezone: the intraday axis reads in US
     // Eastern clock time and the buckets change with zoom, so anchor a small "ET" tag
     // in the axis corner. Skipped on daily+ scales (date-only, timezone-agnostic). #trader-timescale
-    const _intraday = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
+    const _intraday = _INTRADAY.indexOf(timeframe) !== -1;
     if(_intraday){
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
       ctx.fillStyle = _axisColour();
@@ -3306,7 +3356,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // pre/after-hours bars of every equity (META 12.8%, MSFT 12.3% of 1h bars;
     // crypto ~0%), while daily+ bars are clean — and on dailies a >4× wick can be
     // a REAL crash day that must render honestly. So dailies pass through raw.
-    const _sanitizing = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
+    const _sanitizing = _INTRADAY.indexOf(timeframe) !== -1;
     const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
     const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
     const _wdet = (_sanitizing && _med2>0) ? _med2*4 : Infinity;
@@ -4263,25 +4313,15 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   // candles sub-pixel. So on first render seed a modest window — wider for the
   // fullscreen chart ("zoomed-in version"), tighter for the small cards — that
   // the user can still zoom out to reveal the full history.
-  if(bars.length > 0 && view.visibleBars == null){
-    const isFs = viewKey === 'overlay-fs';
-    // #1699: default the visible window to ~one range-label's worth of candles per
-    // timeframe (1D≈78×5m, 5D≈35×1h, 1M≈22 daily trading days) instead of a flat
-    // 70 — so the candle count matches the selected range. Pan to see more history.
-    const DEFAULT_VIS = { '1m': 78, '5m': 78, '15m': 52, '1h': 35, '4h': 30, '1d': 22, '1w': 52, '1mo': 60 };
-    // Honor the saved/active RANGE window when it matches the current timeframe, so a
-    // chart re-opens at the same zoom the user left it (e.g. 1Y stays 1Y across reloads)
-    // instead of snapping back to the timeframe's default window.
-    const rangeBars = (RANGES[activeRange] && RANGES[activeRange].tf === chartTimeframe)
-      ? (RANGES[activeRange].bars == null ? ytdTradingBars() : RANGES[activeRange].bars)
-      : null;
-    const base = DEFAULT_VIS[chartTimeframe] || 70;
-    const want = rangeBars != null ? rangeBars : (isFs ? Math.round(base * 2.2) : base);
-    // Keep the INTENDED window even if the current bars array is short (e.g. a trimmed
-    // cache paint before full history loads) — the display slice below clamps to what's
-    // available, so the window expands once the real data arrives instead of locking small.
-    view.visibleBars = want;
+  if(bars.length > 0 && (view.visibleBars == null || view.spanDriven)){
+    // The window is a SPAN -- the range clicked, else the interval's own -- re-measured
+    // against the bars on every render while nobody has zoomed or panned, so a trimmed
+    // cache paint cannot lock it small and a fuller fetch widens it; and clamped to the
+    // plot width so the candles never go sub-pixel (see _windowBars).
+    const _pw = canvas ? Math.max(0, canvas.clientWidth - AXIS_W) : 0;
+    view.visibleBars = _windowBars(bars, view.span || SPAN_FOR_TF[chartTimeframe] || SPAN_FOR_TF['5m'], _pw);
     view.barOffset = 0;
+    view.spanDriven = true;
   }
 
   // Horizontal zoom/pan: slice to the visible bar window. visibleBars/barOffset
@@ -4326,7 +4366,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const _medSpan = _spans.length ? _spans[Math.floor(_spans.length/2)] : 0;
     // Intraday only (mirrors renderChart): dailies are clean and a >4× daily wick
     // can be a real crash day — it must set the range honestly.
-    const _saneTf = ['1m','5m','15m','1h','4h'].indexOf(chartTimeframe) !== -1;
+    const _saneTf = _INTRADAY.indexOf(chartTimeframe) !== -1;
     const _wickDet = (_saneTf && _medSpan>0) ? _medSpan*4 : Infinity;
     const _glitch  = (_saneTf && _medSpan>0) ? _medSpan*10 : Infinity;
     let _kept = 0;
@@ -7061,6 +7101,7 @@ function zoomTimeGoal(view, n, factor){
   const curVis = view.gVis != null ? view.gVis : (view.visibleBars || n);
   const curOff = view.gOff != null ? view.gOff : (view.barOffset || 0);
   const nv = Math.max(MIN_VISIBLE_BARS, Math.min(n, curVis*factor));
+  view.spanDriven = false;                      // the reader owns the window now
   // Right-anchored zoom: keep the latest visible bar pinned to the right edge
   // (the current time) and grow/shrink the window to the LEFT, so zooming never
   // drifts off "now". offset is bars-from-the-right; clamp it into the valid
@@ -7202,6 +7243,7 @@ document.addEventListener('mousemove', function(e){
         const slotW = drag.pw/_slotsFor(drag.visibleBars);
         const maxOffset = drag.n-drag.visibleBars;
         view.visibleBars = drag.visibleBars;
+        view.spanDriven = false;                  // the reader owns the window now
         view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + dx/slotW));
         view.gVis = view.visibleBars; view.gOff = view.barOffset;
       }
@@ -7328,7 +7370,7 @@ document.addEventListener('dblclick', function(e){
   if(y > ph && x <= pw){
     e.stopPropagation(); e.preventDefault();
     if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-    view.barOffset = 0; view.visibleBars = null;
+    view.barOffset = 0; view.visibleBars = null; view.spanDriven = true;   // back to the span
     view.gOff = null;   view.gVis = null;
     renderTicker(dataTicker);
     return;
@@ -7721,7 +7763,7 @@ function _sortedWlPrices(){
 // crosses a bar boundary. Server bars remain the truth — each loadBars() replaces
 // the whole array, so synthesis only ever fills the 15s gap (no fabricated data:
 // same feed, finer cadence). Feed gaps >1 bar are left alone rather than invented.
-const _TF_MS = { '1m':6e4, '5m':3e5, '15m':9e5, '1h':36e5, '4h':144e5, '1d':864e5 };
+const _TF_MS = { '1m':6e4, '5m':3e5, '15m':9e5, '30m':18e5, '1h':36e5, '2h':72e5, '4h':144e5, '1d':864e5 };
 // Ease the open candle's close between REAL ticks (Robinhood-style motion): the
 // canvas repaints each frame with an interpolated close, converging on the true
 // tick in ~450ms. Interpolation between actual prices only — no fabricated
@@ -8681,50 +8723,51 @@ document.addEventListener('mousedown', (e)=>{
 });
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') _closePatternMenu(); });
 
-function changeTimeframe(tf, winBars){
+function changeTimeframe(tf, span){
   tf = normalizeTf(tf);   // the <select> value is caller-controlled text (#466)
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
   document.getElementById('chartTfSelect').value = tf;
   document.getElementById('fsChartTfSelect').value = tf;
-  // Reset every chart's visible window. When a range preset supplies an explicit bar
-  // count (winBars), use it so ranges that share a timeframe (3M/6M/1Y/5Y on daily)
-  // open different windows; otherwise null → the timeframe's default window (#1699).
-  const vb = (winBars != null) ? winBars : null;
-  Object.values(chartView).forEach(v=>{ v.visibleBars=vb; v.barOffset=0; v.gVis=null; v.gOff=null; });
+  // Every chart, once: the window becomes the span asked for (a range button) or the
+  // interval's own, measured from the bars at render; the price scale refits. Nothing is
+  // remembered as a mode.
+  Object.values(chartView).forEach(v=>{
+    v.visibleBars=null; v.span=span||null; v.spanDriven=true; v.barOffset=0; v.gVis=null; v.gOff=null;
+    v.yMin=null; v.yMax=null; v.gYMin=null; v.gYMax=null;
+  });
   if(_restoreBarsCache()) _paintFromCache();    // instant paint from cache; loadBars refreshes
-  syncRangeButtons(tf);
   loadBars();
 }
 
 // ── Chart range presets ───────────────────────────────────────────────────────
+/* RTH / ETH on the strip, where TradingView keeps it: the same setting as Settings ›
+   Symbol › Session, so the two can never disagree. Pressed = the extended session. */
+function _renderSessBadge(){
+  const b = document.getElementById('rangeSess'); if(!b) return;
+  const ext = _cs('data.session') === 'extended';
+  b.textContent = ext ? 'ETH' : 'RTH';
+  b.setAttribute('aria-pressed', ext ? 'true' : 'false');
+}
+function toggleSession(){
+  if(!_CS) return;
+  _CS.set('data.session', _cs('data.session') === 'extended' ? 'regular' : 'extended');
+}
+/* A range button is an action, not a mode: this interval and this span, every chart,
+   once. TradingView's buttons work the same way and none of them stays lit. */
 function changeRange(range){
   const r = RANGES[range]; if(!r) return;
-  activeRange = range;
-  try{ localStorage.setItem('trader.range', range); }catch(e){}   // remember for next visit
-  const want = (r.bars == null) ? ytdTradingBars() : r.bars;
-  changeTimeframe(r.tf, want);
-}
-
-function syncRangeButtons(tf){
-  // Keep the lit button in sync. If the timeframe changed OUT from under the active
-  // range (e.g. the user picked a raw timeframe from the select), fall back to the
-  // first range that uses this timeframe; otherwise keep the active range lit.
-  if(tf !== undefined && !(RANGES[activeRange] && RANGES[activeRange].tf === tf)){
-    activeRange = Object.keys(RANGES).find(k => RANGES[k].tf === tf) || null;
-  }
-  renderRangeRow();
+  changeTimeframe(r.tf, r);
 }
 /* The range buttons live on the strip under the charts. Rebuilt from RANGES, so a new
-   range is one table entry and the lit one is whatever activeRange says. */
+   range is one table entry. */
 function renderRangeRow(){
   const row = document.getElementById('rangeRow'); if(!row) return;
   row.innerHTML = Object.keys(RANGES).map(k =>
-    '<button type="button" class="range-btn' + (k === activeRange ? ' active' : '') + '" data-range="' + k + '"'
-    + ' aria-pressed="' + (k === activeRange ? 'true' : 'false') + '" title="' + _rangeTitle(k) + '"'
+    '<button type="button" class="range-btn" data-range="' + k + '" title="' + _rangeTitle(k) + '"'
     + ' onclick="changeRange(\'' + k + '\')">' + k + '</button>').join('');
 }
-function _rangeTitle(k){ const r = RANGES[k] || {}; return k === 'All' ? 'All available history, daily bars' : k + ' of history, ' + r.tf + ' bars'; }
+function _rangeTitle(k){ const r = RANGES[k] || {}; return (k === 'All' ? 'All available history' : k + ' of history') + ', ' + r.tf + ' candles'; }
 
 // ── TradingView-style trading panel (#1712) ───────────────────────────────────
 function tpTab(name){
@@ -9847,7 +9890,6 @@ function startDashboard(){
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
   _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   _setIndicatorsBtn();          // …and the remembered indicator count (#3333)
-  syncRangeButtons(chartTimeframe);
   initFooterResize();
   initWlInfoResize();
   initColumnResizers();
@@ -9878,7 +9920,7 @@ function startDashboard(){
   buildLayoutOptions();
   // Reflect the saved chart preferences (type / timeframe / range) in the controls so the
   // toolbar matches what the charts render. The values themselves are restored above from
-  // localStorage (chartType/chartTimeframe/activeRange); this just syncs the <select>s.
+  // localStorage (chartType/chartTimeframe); this just syncs the <select>s and builds the range row.
   ['chartTypeSelect','fsChartTypeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartType; });
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
   renderRangeRow();
