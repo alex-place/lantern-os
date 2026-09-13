@@ -156,6 +156,11 @@ module.exports = async function authRoutes(req, res, url, deps) {
            chart. */
         const ind = prof && prof.preferences && prof.preferences.indicators;
         if (Array.isArray(ind)) info.indicators = ind.slice(0, 12);
+        /* The chart settings dialog's choices (#3602) ride along the same way. Only the
+           diff from the defaults is ever stored, so this is small; the page validates
+           every key against its own table before drawing anything with it. */
+        const chart = prof && prof.preferences && prof.preferences.chart;
+        if (chart && typeof chart === "object" && !Array.isArray(chart)) info.chart = chart;
       }
     } catch (_e) { /* no profile store, or no profile yet: the device's own choice stands */ }
     // Test-auth: expose the role picker to the auth page ONLY on a direct, un-proxied
