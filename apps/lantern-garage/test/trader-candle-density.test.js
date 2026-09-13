@@ -27,7 +27,7 @@ const ROUTE = read('routes', 'trading', 'market.js');
 
 // The tables, evaluated as written -- together, so SPAN_FOR_TF's entries ARE the RANGES rows.
 const { RANGES, SPAN_FOR_TF } = new Function(
-  PAGE.slice(PAGE.indexOf('const RANGES = {'), PAGE.indexOf('/* How many bars a span is')) + '; return { RANGES, SPAN_FOR_TF };')();
+  PAGE.slice(PAGE.indexOf('const RANGES = {'), PAGE.indexOf('/* Which span the charts are on')) + '; return { RANGES, SPAN_FOR_TF };')();
 
 test('each range opens with the interval TradingView pairs it with', () => {
   assert.deepStrictEqual(Object.fromEntries(Object.entries(RANGES).map(([k, r]) => [k, r.tf])), {

@@ -2043,6 +2043,12 @@ const SPAN_FOR_TF = {
   '1m': RANGES['1D'], '5m': RANGES['5D'], '15m': { days:10 }, '30m': RANGES['1M'], '1h': RANGES['3M'],
   '2h': RANGES['6M'], '4h': { days:128 }, '1d': RANGES['1Y'], '1w': RANGES['5Y'], '1mo': RANGES['All'],
 };
+/* Which span the charts are on -- feedback for the strip, never a saved mode. Set by
+   every interval change (a range click, the toolbar select, the remembered interval at
+   boot); cleared the moment a zoom or a pan takes a chart off it, exactly as
+   TradingView's buttons un-light when the view stops matching. */
+let _rangeSpan = SPAN_FOR_TF[chartTimeframe] || null, _rangeTouched = false;
+function _rangeLeft(){ if(!_rangeTouched){ _rangeTouched = true; renderRangeRow(); } }
 /* How many bars a span is, in THESE bars. Day spans count distinct exchange dates back
    from the last bar, so "1 day" is the whole session whatever the interval and whether
    extended hours are on; YTD is this year's bars; weekly and monthly spans are counts.
@@ -6181,6 +6187,9 @@ function _uiSelect(sel) {
   const sync = () => { const o = sel.options[sel.selectedIndex]; val.textContent = o ? o.text : ''; };
   sync();
   sel.addEventListener('change', sync);
+  // A programmatic `.value = x` fires no 'change', so the chip kept its old label after a
+  // range click set the interval. _setSelectValue() sets the value and calls this.
+  sel._uiSync = sync;
   const commit = (i) => {
     if (i < 0 || i >= sel.options.length) return;
     sel.selectedIndex = i; sync();
@@ -6238,6 +6247,14 @@ function _uiSelect(sel) {
       if (opts[i]) { opts[i].classList.add('act'); opts[i].scrollIntoView({ block: 'nearest' }); }
     }
   });
+}
+/* Set a native select's value the way code (not the reader) does, and let the chip
+   over it know -- the toolbar's candle-size label is that chip, and it was showing the
+   old interval after every range click. */
+function _setSelectValue(id, value) {
+  const sel = document.getElementById(id); if (!sel) return;
+  sel.value = value;
+  if (sel._uiSync) sel._uiSync();
 }
 function _uiSelectAll(root) {
   if (!root) return;
@@ -7102,6 +7119,7 @@ function zoomTimeGoal(view, n, factor){
   const curOff = view.gOff != null ? view.gOff : (view.barOffset || 0);
   const nv = Math.max(MIN_VISIBLE_BARS, Math.min(n, curVis*factor));
   view.spanDriven = false;                      // the reader owns the window now
+  _rangeLeft();
   // Right-anchored zoom: keep the latest visible bar pinned to the right edge
   // (the current time) and grow/shrink the window to the LEFT, so zooming never
   // drifts off "now". offset is bars-from-the-right; clamp it into the valid
@@ -7244,6 +7262,7 @@ document.addEventListener('mousemove', function(e){
         const maxOffset = drag.n-drag.visibleBars;
         view.visibleBars = drag.visibleBars;
         view.spanDriven = false;                  // the reader owns the window now
+        _rangeLeft();
         view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + dx/slotW));
         view.gVis = view.visibleBars; view.gOff = view.barOffset;
       }
@@ -7371,6 +7390,7 @@ document.addEventListener('dblclick', function(e){
     e.stopPropagation(); e.preventDefault();
     if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
     view.barOffset = 0; view.visibleBars = null; view.spanDriven = true;   // back to the span
+    _rangeTouched = false; renderRangeRow();
     view.gOff = null;   view.gVis = null;
     renderTicker(dataTicker);
     return;
@@ -7958,8 +7978,8 @@ async function loadBars(){
 function changeChartType(type){
   chartType = type;
   try{ localStorage.setItem('trader.chartType', type); }catch(e){}   // remember for next visit
-  document.getElementById('chartTypeSelect').value = type;
-  document.getElementById('fsChartTypeSelect').value = type;
+  _setSelectValue('chartTypeSelect', type);
+  _setSelectValue('fsChartTypeSelect', type);
   wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
   renderFullscreenChart();
 }
@@ -8727,11 +8747,13 @@ function changeTimeframe(tf, span){
   tf = normalizeTf(tf);   // the <select> value is caller-controlled text (#466)
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
-  document.getElementById('chartTfSelect').value = tf;
-  document.getElementById('fsChartTfSelect').value = tf;
+  _setSelectValue('chartTfSelect', tf);
+  _setSelectValue('fsChartTfSelect', tf);
   // Every chart, once: the window becomes the span asked for (a range button) or the
   // interval's own, measured from the bars at render; the price scale refits. Nothing is
-  // remembered as a mode.
+  // remembered as a mode -- but the strip SHOWS which span the charts are on, until a
+  // zoom or a pan moves them off it.
+  _rangeSpan = span || SPAN_FOR_TF[tf] || null; _rangeTouched = false; renderRangeRow();
   Object.values(chartView).forEach(v=>{
     v.visibleBars=null; v.span=span||null; v.spanDriven=true; v.barOffset=0; v.gVis=null; v.gOff=null;
     v.yMin=null; v.yMax=null; v.gYMin=null; v.gYMax=null;
@@ -8763,9 +8785,11 @@ function changeRange(range){
    range is one table entry. */
 function renderRangeRow(){
   const row = document.getElementById('rangeRow'); if(!row) return;
-  row.innerHTML = Object.keys(RANGES).map(k =>
-    '<button type="button" class="range-btn" data-range="' + k + '" title="' + _rangeTitle(k) + '"'
-    + ' onclick="changeRange(\'' + k + '\')">' + k + '</button>').join('');
+  row.innerHTML = Object.keys(RANGES).map(k => {
+    const lit = !_rangeTouched && RANGES[k] === _rangeSpan;
+    return '<button type="button" class="range-btn' + (lit ? ' active' : '') + '" data-range="' + k + '" title="' + _rangeTitle(k) + '"'
+      + ' aria-pressed="' + (lit ? 'true' : 'false') + '" onclick="changeRange(\'' + k + '\')">' + k + '</button>';
+  }).join('');
 }
 function _rangeTitle(k){ const r = RANGES[k] || {}; return (k === 'All' ? 'All available history' : k + ' of history') + ', ' + r.tf + ' candles'; }
 
@@ -9921,8 +9945,8 @@ function startDashboard(){
   // Reflect the saved chart preferences (type / timeframe / range) in the controls so the
   // toolbar matches what the charts render. The values themselves are restored above from
   // localStorage (chartType/chartTimeframe); this just syncs the <select>s and builds the range row.
-  ['chartTypeSelect','fsChartTypeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartType; });
-  ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
+  ['chartTypeSelect','fsChartTypeSelect'].forEach(id=> _setSelectValue(id, chartType));
+  ['chartTfSelect','fsChartTfSelect'].forEach(id=> _setSelectValue(id, chartTimeframe));
   renderRangeRow();
   applyGridCols();
   // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids

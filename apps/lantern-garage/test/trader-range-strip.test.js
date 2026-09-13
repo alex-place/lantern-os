@@ -45,16 +45,35 @@ test('the toolbar no longer carries the range select or the clock; the strip doe
   assert.strictEqual((PAGE.match(/id="mktClock"/g) || []).length, 1);
 });
 
-test('the buttons come from the RANGES table, and none of them is a mode', () => {
+test('the buttons come from the RANGES table; the lit one is derived from the view, never stored', () => {
   /* A range button is one click -- interval, window and price refit on every chart -- and
-     nothing stays lit or saved, the way TradingView's work (2026-09-13). */
+     nothing is saved as a mode (2026-09-13). But the strip SHOWS which span the charts are
+     on: the button whose span the last interval change set, until a zoom or a pan takes
+     a chart off it. Feedback, not a mode -- the way TradingView's buttons light. */
   assert.match(PAGE, /function renderRangeRow\(\)\{/);
-  assert.match(PAGE, /row\.innerHTML = Object\.keys\(RANGES\)\.map\(k =>/);
-  assert.ok(!PAGE.includes('activeRange'), 'a button still tracks being lit');
+  assert.match(PAGE, /row\.innerHTML = Object\.keys\(RANGES\)\.map\(k => \{/);
+  assert.match(PAGE, /const lit = !_rangeTouched && RANGES\[k\] === _rangeSpan;/);
+  assert.match(PAGE, /let _rangeSpan = SPAN_FOR_TF\[chartTimeframe\] \|\| null, _rangeTouched = false;/, 'at boot the remembered interval lights its own span');
+  assert.ok(!PAGE.includes('activeRange'), 'a stored lit state is back');
+  assert.ok(!PAGE.includes("'trader.range'"), 'the range is saved as a mode again');
   assert.ok(!PAGE.includes('function syncRangeButtons'), 'a lit state is still being synced');
-  assert.ok(!PAGE.includes("['chartRangeSelect','fsChartRangeSelect']"), 'something still syncs the removed selects');
-  // Init builds the row once; a click needs no rebuild because nothing on it changes.
-  assert.ok(PAGE.includes('  renderRangeRow();'), 'init does not build the row');
+  // Every interval change re-derives it; zoom and pan un-light; an axis reset re-lights.
+  assert.match(PAGE, /_rangeSpan = span \|\| SPAN_FOR_TF\[tf\] \|\| null; _rangeTouched = false; renderRangeRow\(\);/);
+  assert.strictEqual((PAGE.match(/_rangeLeft\(\);/g) || []).length, 2, 'zoom and pan each un-light the range');
+  assert.match(PAGE, /view\.spanDriven = true;   \/\/ back to the span\s*_rangeTouched = false; renderRangeRow\(\);/);
+});
+
+test('the toolbar chips re-read the interval a range click set', () => {
+  /* The chips are custom widgets over native <select>s and resync only on a 'change'
+     event; `.value = tf` from code fired none, so the candle-size chip kept its old
+     label after every range click. */
+  assert.match(PAGE, /sel\._uiSync = sync;/);
+  assert.match(PAGE, /function _setSelectValue\(id, value\) \{[\s\S]*?if \(sel\._uiSync\) sel\._uiSync\(\);/);
+  const ct = PAGE.slice(PAGE.indexOf('function changeTimeframe(tf, span){'), PAGE.indexOf('function changeRange('));
+  assert.match(ct, /_setSelectValue\('chartTfSelect', tf\);/);
+  assert.ok(!ct.includes(".value = tf"), 'changeTimeframe still sets the native value behind the chip');
+  const cc = PAGE.slice(PAGE.indexOf('function changeChartType(type){'), PAGE.indexOf('function changeTimeframe(tf, span){'));
+  assert.match(cc, /_setSelectValue\('chartTypeSelect', type\);/);
 });
 
 test('on phones the strip belongs to the Chart view', () => {
