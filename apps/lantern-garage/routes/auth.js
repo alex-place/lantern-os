@@ -136,6 +136,20 @@ module.exports = async function authRoutes(req, res, url, deps) {
     info.authRequired = loginGateEnabled();
     // Advertise which login methods are actually usable (configured OAuth + local).
     info.providers = listEnabledProviders();
+    /* The reader's gain/loss colours (#3592), carried on the session every page already
+       fetches rather than on a request of their own. Theme stays per-device; this does
+       not, because someone who chose the colour-blind palette did not express a taste,
+       they told us they cannot read the default one -- and that travels with the person,
+       not with the browser they happen to be at. */
+    try {
+      const _p = getSessionInfo(req);
+      const _id = _p && _p.user && _p.user.id;
+      if (_id) {
+        const prof = require("../lib/user-profiles").getProfile(_id);
+        const sig = prof && prof.preferences && prof.preferences.signals;
+        if (sig && typeof sig === "object") info.signals = sig;
+      }
+    } catch (_e) { /* no profile store, or no profile yet: the device's own choice stands */ }
     // Test-auth: expose the role picker to the auth page ONLY on a direct, un-proxied
     // hit while the mechanism is enabled (never advertised on public/proxied traffic).
     if (testAuthEnabled() && isDirectTestReq(req)) {

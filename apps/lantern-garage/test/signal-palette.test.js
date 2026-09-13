@@ -239,3 +239,121 @@ test('a page that loads the palette does not style destructive UI with a money t
     'settings.html styles something with the gain/loss token');
   assert.match(src, /\.btn\.danger \{ color: var\(--danger\)/);
 });
+
+// ── the wash a figure is written on (#3592) ──────────────────────────────────
+
+const washesOf = (tint, theme) => {
+  const out = [];
+  for (const a of SP.WASH_ALPHAS) {
+    for (const surf of SP.SURFACES[theme]) {
+      const t = SP.hexToRgb(tint), bg = SP.hexToRgb(surf);
+      out.push(SP.rgbToHex([0, 1, 2].map((i) => t[i] * a + bg[i] * (1 - a))));
+    }
+  }
+  return out;
+};
+
+test('a figure is readable on the washes the pages actually paint behind it', () => {
+  /* The dashboard writes a coloured figure on a wash at six alphas -- chips, badges,
+     hover states, the zone ladder. Clearing the flat surfaces is not the same as clearing
+     those, and it was the gap: the shipped light green measured 3.98:1 on its own 12%
+     wash while passing every surface. */
+  const fails = [];
+  for (const theme of THEMES) {
+    for (const p of SP.PRESETS) {
+      const r = SP.resolve({ id: p.id }, theme);
+      for (const [hex, tint] of [[r.gain, r.gainTint], [r.loss, r.lossTint]]) {
+        for (const w of washesOf(tint, theme)) {
+          const c = SP.ratio(hex, w);
+          if (c < 4.5) fails.push(theme + '/' + p.id + ' ' + hex + ' on ' + w + ' = ' + c.toFixed(2));
+        }
+      }
+    }
+  }
+  assert.deepStrictEqual(fails.slice(0, 4), [], fails.length + ' wash pairings below AA');
+});
+
+test('the wash comes from the TINT, never from the figure itself', () => {
+  /* The obvious first move -- derive the wash from the figure so it follows the palette --
+     is wrong, and expensively so: background and foreground then share a hue and converge,
+     which dragged Classic from the #00d4aa/#cf0012 the stylesheets ship down to
+     #005a48/#9c000e purely to stay legible against itself. The tint exists to be a
+     different colour (#3577). This pins the consequence rather than the implementation. */
+  for (const theme of THEMES) {
+    const r = SP.resolve({ id: 'classic' }, theme);
+    for (const [hex, tint] of [[r.gain, r.gainTint], [r.loss, r.lossTint]]) {
+      assert.notStrictEqual(hex, tint, theme + ': the wash and the figure are the same colour');
+      // Far enough apart that mixing the tint in at 22% cannot close on the figure.
+      assert.ok(SP.ratio(hex, tint) >= 3, theme + ' figure/tint are only ' + SP.ratio(hex, tint).toFixed(2) + ':1 apart');
+    }
+  }
+  const light = SP.resolve({ id: 'classic' }, 'light');
+  assert.strictEqual(light.gain, '#00735c', 'Classic drifted: the wash constraint is pulling on the figure');
+  assert.strictEqual(light.loss, '#cf0012');
+});
+
+// ── the account sync (#3592) ─────────────────────────────────────────────────
+
+test('adopt() takes the account\'s choice and ignores a matching one', () => {
+  /* The device paints first from <head>; this is the correction that arrives with the
+     session. Same-value has to be a no-op, because it is the common case on every page
+     load and a repaint there would be a flash for nothing. */
+  assert.strictEqual(typeof SP.adopt, 'function');
+  assert.strictEqual(SP.adopt(null), null, 'a session with no preference changes nothing');
+  assert.strictEqual(SP.adopt('classic'), null, 'and a non-object is ignored rather than trusted');
+  // normalise decides "same", and must not be fooled by key order or extra keys.
+  assert.deepStrictEqual(SP.normalise({ id: 'custom', gain: '#AABBCC', loss: '#112233' }),
+    SP.normalise({ loss: '#112233', gain: '#aabbcc', id: 'custom', stray: 1 }));
+  assert.notDeepStrictEqual(SP.normalise({ id: 'classic' }), SP.normalise({ id: 'mono' }));
+});
+
+test('the session carries the choice, so no page pays for a second request', () => {
+  const auth = fs.readFileSync(path.join(__dirname, '..', 'routes', 'auth.js'), 'utf8');
+  assert.match(auth, /info\.signals = sig/, 'the session does not carry the preference');
+  const gate = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'auth-gate.js'), 'utf8');
+  assert.match(gate, /SignalPalette\.adopt\(session\.signals\)/, 'nothing adopts it');
+  // And it must not become a page-load dependency: the palette still paints from <head>.
+  const sp = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'signal-palette.js'), 'utf8');
+  assert.doesNotMatch(sp, /fetch\(/, 'the palette fetches on its own, which is a request per page');
+});
+
+// ── the trading dashboard follows it (#3592) ─────────────────────────────────
+
+for (const page of ['stock-trader.html', 'watch.html']) {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', page), 'utf8');
+
+  test(page + ': the candles are the reader\'s colours, not a third palette', () => {
+    /* They were hard-coded to #26a69a/#ef5350 -- TradingView's, not even this page's own
+       green and red. So the chart, which is the reason the page exists, ignored both the
+       theme and the preference. */
+    /* Only where a candle is actually painted -- the file still says the words #26a69a
+       and #ef5350 in the comment explaining why it no longer uses them, and a drawing
+       tool keeps one as a Fibonacci default, which is an annotation a reader picks
+       rather than a signal the page asserts. */
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    assert.doesNotMatch(code, /CHART_CANDLE[^;]*#26a69a/, 'a candle still carries the old literal');
+    assert.doesNotMatch(code, /--tv-candle/, 'a token nothing reads is left for someone to trust');
+    assert.match(src, /CHART_CANDLE_UP\s+= \(\) => chartVar\('--green'/);
+    assert.match(src, /CHART_CANDLE_DOWN = \(\) => chartVar\('--red'/);
+    // Every use is a call; a stale bare reference would pass a function to the canvas.
+    const bare = src.match(/CHART_CANDLE_(?:UP|DOWN)(?!\s*\(|\s+=)/g) || [];
+    assert.deepStrictEqual(bare, [], 'a candle constant is used without calling it');
+  });
+
+  test(page + ': no wash is a frozen copy of the old green or red', () => {
+    // `background:rgba(0,212,170,.12)` beside `color:var(--green)` meant the text followed
+    // the reader and its background did not: blue text on a green wash.
+    assert.doesNotMatch(src, /rgba\(0,\s*212,\s*170/, 'a hard-coded gain wash survives');
+    assert.doesNotMatch(src, /rgba\(255,\s*95,\s*109/, 'a hard-coded loss wash survives');
+  });
+
+  test(page + ': washes are mixed from the TINT tokens, which the page also defines', () => {
+    assert.match(src, /color-mix\(in srgb, var\(--tint-pos\)/);
+    assert.match(src, /color-mix\(in srgb, var\(--tint-neg\)/);
+    // Defined in both themes, or the mix is invalid and the wash silently disappears.
+    assert.ok((src.match(/--tint-pos:/g) || []).length >= 2, page + ' defines --tint-pos for only one theme');
+    assert.ok((src.match(/--tint-neg:/g) || []).length >= 2, page + ' defines --tint-neg for only one theme');
+    assert.doesNotMatch(src, /color-mix\(in srgb, var\(--green\)/,
+      'a wash is mixed from the figure colour, which converges on it');
+  });
+}
