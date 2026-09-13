@@ -33,10 +33,24 @@
 html[data-skin="terminal"][data-theme="dark"]{
   --bg:#050e08;--surface:#08140d;--surface2:#0c1f14;--border:#14301f;
   --text:#cdefd8;--muted:#6fbf90;--accent:#2bff88;--accent-hover:#57ffa3;--accent-dim:#0f2a1b;
+  /* Same rule as the light block: this skin overrides --accent-dim, so it owns the text
+     that goes on it. Phosphor green rather than the shared cyan, so the badge reads as
+     part of this console. */
+  --on-tint-accent:#2bff88;
 }
 html[data-skin="terminal"][data-theme="light"]{
   --bg:#dfece1;--surface:#e9f3ea;--surface2:#d6e8da;--border:#a9c6b4;
   --text:#0f3524;--muted:#33604a;--accent:#0e6b3b;--accent-hover:#0b5730;--accent-dim:#c3ddca;
+  /* The CRT deck is its own dark device and is fine. The LIGHT PAGE AROUND IT is not:
+     the account and trade-history cards inherit site.css's signal colours, which are
+     tuned for a dark surface, so on this mint card +19% measured 2.23:1, the NO side
+     1.89 and -37% 3.31. AA wants 4.5. Scoped here rather than to site.css because only
+     this page puts them on a mint card. (#3587) */
+  --green:#00745d;--gold:#905a01;--danger:#cf0012;
+  /* This skin substitutes its OWN --accent-dim, so the shared --on-tint-accent (#0369a1,
+     picked in #3584 against site.css's pale cyan) lands on a green tint here and measures
+     4.10:1. A page that overrides the tint has to override the text that sits on it. */
+  --on-tint-accent:#0b5730;
 }
 html,body{height:100%;background:var(--bg);color:var(--text)}
 body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
@@ -248,7 +262,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .acct-bar:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .acct-summary{display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted)}
 .acct-summary b{color:var(--text);font-weight:600}
-.acct-sep{color:var(--border);margin:0 3px}
+.acct-sep{color:var(--muted);margin:0 3px}
 .acct-env{color:var(--accent);font-weight:600}
 .acct-edge{color:var(--gold)}
 .acct-caret{color:var(--muted);font-size:12px;flex-shrink:0}
