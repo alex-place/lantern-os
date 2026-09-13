@@ -148,5 +148,10 @@ test('by=r keeps the confirmed/all split every other slice has', () => {
   assert.strictEqual(r.confirmed.withR, 1, 'a dry run is not a booked outcome');
   assert.strictEqual(r.all.withR, 2, 'but it is a decision the strategy made');
   assert.strictEqual(r.confirmed.best, 1);
-  assert.ok(!JSON.stringify(r).includes('99'), 'a rejected attempt reaches neither view');
+  /* Asserted on the DISTRIBUTION, not by grepping the payload for "99": the payload
+     carries a generatedAt timestamp, and about one ISO timestamp in fifty contains
+     those two digits, so the grep version failed roughly one run in fifty. The
+     rejected row would be +33R, so the extremes are what prove it never landed. */
+  assert.deepStrictEqual([r.confirmed.best, r.confirmed.worst], [1, 1], 'only the filled trade is booked');
+  assert.deepStrictEqual([r.all.best, r.all.worst], [1, -1], 'the rejected +33R reaches neither view');
 });
