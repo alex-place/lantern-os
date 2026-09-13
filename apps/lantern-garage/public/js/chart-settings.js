@@ -65,6 +65,10 @@
   // Status line
   check('status.ohlc', false); check('status.change', false); check('status.volume', false);
   check('status.indTitles', true); check('status.indInputs', true); check('status.indValues', true);
+  // The legend's TEXT is its own decision, apart from the line's colour: a reader may want
+  // a blue EMA and a legend that stays black or white.
+  select('status.indText', 'line', [{ v: 'line', l: 'Line colour' }, { v: 'text', l: 'Chart text' }, { v: 'custom', l: 'Custom' }]);
+  color('status.indTextColor');
   check('status.background', false); range('status.bgOpacity', 60);
   // Scales and lines
   check('scales.lastPrice', true);
@@ -138,6 +142,8 @@
         { row: 'check', k: 'status.indTitles', label: 'Titles' },
         { row: 'check', k: 'status.indInputs', label: 'Inputs', hint: 'EMA 21 rather than EMA.' },
         { row: 'check', k: 'status.indValues', label: 'Values' },
+        { row: 'selectcolor', k: 'status.indText', color: 'status.indTextColor', when: 'custom', label: 'Text colour',
+          hint: 'Line colour writes each legend in its indicator’s colour; chart text keeps it black or white.' },
       ] },
       { title: 'Legend', rows: [
         { row: 'checkrange', toggle: 'status.background', range: 'status.bgOpacity', label: 'Background' },
@@ -445,6 +451,14 @@
       case 'checkrange': li.append(checkbox(row.toggle, row.label), lab, ctl); ctl.append(rangeEl(row.range, row.label + ' opacity')); break;
       case 'select': li.append(lab, ctl); ctl.append(selectEl(row.k, row.label)); break;
       case 'number': li.append(lab, ctl); ctl.append(numberEl(row.k, row.label, row.unit)); break;
+      case 'selectcolor': {
+        // A select, and a swatch that only appears for the option that needs one.
+        li.append(lab, ctl);
+        const sel = selectEl(row.k, row.label), sw = swatch(row.color, row.label);
+        const sync = () => { sw.hidden = get(row.k) !== row.when; };
+        sel.addEventListener('change', sync); sync();
+        ctl.append(sel, sw); break;
+      }
       case 'bgmode': {
         li.append(lab, ctl);
         const sel = selectEl(row.k, row.label), a = swatch(row.a, row.label), b = swatch(row.b, row.label + ' second colour');
