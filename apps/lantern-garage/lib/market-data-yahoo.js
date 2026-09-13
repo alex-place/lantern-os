@@ -24,7 +24,9 @@ const TF = {
   '1m':  { interval: '1m',  range: '5d',  agg: 1 },
   '5m':  { interval: '5m',  range: '1mo', agg: 1 },
   '15m': { interval: '15m', range: '1mo', agg: 1 },
+  '30m': { interval: '30m', range: '1mo', agg: 1 },  // the 1M range's interval (TradingView's pairing)
   '1h':  { interval: '60m', range: '6mo', agg: 1 },
+  '2h':  { interval: '60m', range: '1y',  agg: 2 },  // the 6M range's interval, rolled from hourly like 4h
   '4h':  { interval: '60m', range: '1y',  agg: 4 },
   '1d':  { interval: '1d',  range: '10y', agg: 1 },  // deep enough for the 5Y range and a real "All"
   '1w':  { interval: '1wk', range: '10y', agg: 1 },  // weekly candles for multi-year views

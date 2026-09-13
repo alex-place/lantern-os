@@ -59,7 +59,10 @@
   check('candles.border', false); color('candles.borderUp'); color('candles.borderDown');
   check('candles.wick', true);   color('candles.wickUp');   color('candles.wickDown');
   color('line.color'); number('line.width', 2, 1, 5, 0.5); check('line.area', true);
-  select('data.session', 'extended', [{ v: 'extended', l: 'Extended hours' }, { v: 'regular', l: 'Regular hours only' }]);
+  // Regular hours by default, as TradingView's RTH: the range densities are built on the
+  // regular session (1D at 1m is 390 candles). Extended hours are the RTH/ETH toggle on
+  // the strip under the charts, and here.
+  select('data.session', 'regular', [{ v: 'regular', l: 'Regular hours only' }, { v: 'extended', l: 'Extended hours' }]);
   select('data.precision', 'default', [{ v: 'default', l: 'Default' }, { v: '0', l: '0' }, { v: '1', l: '1' }, { v: '2', l: '2' }, { v: '3', l: '3' }, { v: '4', l: '4' }]);
   select('data.timezone', 'exchange', TIMEZONES);
   // Status line
@@ -88,7 +91,7 @@
   color('canvas.crosshairColor'); select('canvas.crosshairStyle', 'dashed', LINE_STYLES);
   check('canvas.watermark', false); range('canvas.watermarkOpacity', 8);
   color('canvas.axisTextColor'); number('canvas.axisFontSize', 11, 9, 15, 1);
-  number('canvas.marginTop', 8, 0, 40, 1); number('canvas.marginBottom', 8, 0, 40, 1); number('canvas.marginRight', 0, 0, 30, 1);
+  number('canvas.marginTop', 8, 0, 40, 1); number('canvas.marginBottom', 8, 0, 40, 1); number('canvas.marginRight', 25, 0, 60, 1);
   // Trading
   check('trading.buySell', true);
   check('trading.sound', false); range('trading.soundVolume', 60);
