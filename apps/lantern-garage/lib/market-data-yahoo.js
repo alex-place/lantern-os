@@ -124,11 +124,16 @@ function latestPrint(result) {
   return { price: reg, session: 'regular' };
 }
 
-async function fetchChart(ticker, interval, range) {
+async function fetchChart(ticker, interval, range, window) {
   const sym = encodeURIComponent(tickerToYahoo(ticker));
   // includePrePost=true adds pre-market (04:00–09:30) and after-hours (16:00–20:00)
   // bars to intraday charts. It's a no-op for daily+ intervals (no intraday sessions).
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includePrePost=true`;
+  // A `window` asks for a fixed span instead of a range ending now (#3561) — the only
+  // way to request the bars around a trade that closed days ago.
+  const span = window
+    ? `period1=${Math.floor(window.from / 1000)}&period2=${Math.ceil(window.to / 1000)}`
+    : `range=${range}`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&${span}&includePrePost=true`;
   const j = await httpsGetJson(url);
   const result = j && j.chart && Array.isArray(j.chart.result) && j.chart.result[0];
   if (!result) throw new Error('no chart result');
@@ -329,6 +334,39 @@ async function getBars(ticker, timeframe = '5m') {
     cacheSet(key, out);
     return out;
   } catch (e) {
+    return { bars: [], ticker, timeframe, count: 0, error: e.message };
+  }
+}
+
+/**
+ * OHLCV bars over a FIXED window rather than a range ending now (#3561).
+ *
+ * For replaying a trade in a symbol the bar archive does not cover — which is every
+ * symbol a reader holds that this machine does not watch. Yahoo serves roughly 60 days of
+ * 5m and 15m bars, so a replay reaches about as far back as the free data does and no
+ * further; beyond that the caller gets an empty list and says so.
+ *
+ * Cached hard: a window that has already closed cannot change, so re-opening the same
+ * replay must not cost another request.
+ */
+async function getBarsWindow(ticker, timeframe, from, to) {
+  const tf = TF[timeframe] || TF['5m'];
+  if (!(from < to)) return { bars: [], ticker, timeframe, count: 0, error: 'bad window' };
+  const key = `bw:${ticker}:${timeframe}:${Math.floor(from / 1000)}:${Math.ceil(to / 1000)}`;
+  // A window whose right edge is already in the past is settled history; one that runs up
+  // to now is still forming, so it keeps the ordinary short life.
+  const ttl = to < Date.now() - 15 * 60000 ? 6 * 3600000 : BARS_TTL;
+  const hit = cacheGet(key, ttl);
+  if (hit) return hit;
+  try {
+    const result = await fetchChart(ticker, tf.interval, tf.range, { from, to });
+    const bars = parseBars(result, tf.agg);
+    const out = { bars, ticker, timeframe, count: bars.length };
+    cacheSet(key, out);
+    return out;
+  } catch (e) {
+    // Deliberately not cached: a transient failure must not pin an empty chart in front
+    // of the reader for six hours.
     return { bars: [], ticker, timeframe, count: 0, error: e.message };
   }
 }
@@ -562,7 +600,7 @@ async function getQuoteSummary(ticker) {
 }
 
 module.exports = {
-  getQuotes, getBars, getBarsMulti, getMarketStatus, getSymbolStats, validateSymbol,
+  getQuotes, getBars, getBarsWindow, getBarsMulti, getMarketStatus, getSymbolStats, validateSymbol,
   getEarningsSurprise, getQuoteSummary,
   isCrypto, tickerToYahoo, isUsEquityMarketOpen, _TF: TF,
 };
