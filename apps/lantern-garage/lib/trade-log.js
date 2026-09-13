@@ -161,6 +161,24 @@ function tradeLog(logPath, userId, opts = {}) {
 }
 
 /**
+ * One trade by the id the list gave it, with the ledger row behind it (#3561).
+ *
+ * Runs the SAME `preparedRows` pipeline as `buildLog` for the same reason that does: ids
+ * are minted in `toTrade`, and a lookup that skipped the no-fill drop or the
+ * duplicate-collapse could resolve an id the list never showed — or fail to resolve one
+ * it did. Sharing the pipeline makes the two agree by construction rather than by care.
+ */
+function findTrade(rows, id) {
+  if (!id) return null;
+  const want = String(id);
+  for (const row of preparedRows(rows || [])) {
+    const t = toTrade(row);
+    if (t.id === want) return { trade: t, row };
+  }
+  return null;
+}
+
+/**
  * The reader's own tags, priced (#3559).
  *
  * Tagging is data entry until it pays something back, and this is the payback: win rate
@@ -208,4 +226,4 @@ function taggedStats(rows, notes, opts = {}) {
   };
 }
 
-module.exports = { tradeLog, buildLog, toTrade, taggedStats, SORTS, RESULTS, MAX_LIMIT };
+module.exports = { tradeLog, buildLog, toTrade, findTrade, taggedStats, SORTS, RESULTS, MAX_LIMIT };
