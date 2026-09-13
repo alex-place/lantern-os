@@ -215,7 +215,7 @@
           <button data-t="light" class="${theme === "light" ? "on" : ""}">☀ Light</button>
           <button data-t="dark" class="${theme === "dark" ? "on" : ""}">🌙 Dark</button>
         </div></div></div>
-      <div class="row" style="align-items:flex-start;flex-wrap:wrap"><div class="rl" style="flex:1 1 190px"><div class="k">Gains and losses</div><div class="v">The colours money is written in, across the journal and the trader. Not the rest of the interface.</div></div>
+      <div class="row" style="align-items:flex-start;flex-wrap:wrap"><div class="rl" style="flex:1 1 190px"><div class="k">Gains and losses</div><div class="v">The colours money is written in, across the journal and the trader. Not the rest of the interface. Saved to your account, so it follows you to other devices.</div></div>
         <div class="rc" style="flex:1 1 300px;flex-direction:column;align-items:stretch;gap:9px;min-width:0" id="g-signals"></div></div>`;
     $("g-name-save").onclick = async (e) => {
       e.target.disabled = true;
@@ -252,6 +252,28 @@
       renderSignals();
     });
     renderSignals();
+  }
+
+  /* Written to BOTH: the device so the next paint is instant and offline still works,
+     and the account so it follows the reader to their phone (#3592). The local write is
+     not waited on — a colour preference must never feel like a network round trip — and a
+     failed save leaves the device's copy in place rather than reverting under them.
+
+     The account write is debounced because the colour input fires on every drag of the
+     picker, and that is one PUT per pixel otherwise. */
+  let signalsSaveT = null;
+  function saveSignals(choice) {
+    const SP = window.SignalPalette;
+    SP.write(choice);
+    SP.applyStored();
+    renderSignals();
+    clearTimeout(signalsSaveT);
+    signalsSaveT = setTimeout(async () => {
+      if (!profile) return;              // signed out: the device's copy is all there is
+      const merged = Object.assign({}, profile.preferences || {}, { signals: choice });
+      const out = await api("/api/profiles/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferences: merged }) });
+      if (out.ok) profile.preferences = merged;
+    }, 400);
   }
 
   /* ── Gain / loss colours (#3589) ────────────────────────────────────────────────
@@ -311,16 +333,10 @@
       const id = b.dataset.sig;
       if (id === "custom") {
         const now = SP.resolve(SP.read(), document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
-        SP.write({ id: "custom", gain: now.asked.gain, loss: now.asked.loss });
-      } else SP.write({ id });
-      SP.applyStored();
-      renderSignals();
+        saveSignals({ id: "custom", gain: now.asked.gain, loss: now.asked.loss });
+      } else saveSignals({ id });
     });
-    const onPick = () => {
-      SP.write({ id: "custom", gain: $("sig-gain").value, loss: $("sig-loss").value });
-      SP.applyStored();
-      renderSignals();
-    };
+    const onPick = () => saveSignals({ id: "custom", gain: $("sig-gain").value, loss: $("sig-loss").value });
     if ($("sig-gain")) { $("sig-gain").oninput = onPick; $("sig-loss").oninput = onPick; }
   }
 
