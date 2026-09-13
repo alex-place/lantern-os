@@ -162,6 +162,16 @@ test('while the position is on, the readout prices it AT THAT BAR', () => {
   assert.match(end, /take profit/);
 });
 
+test('a trade with no recorded size shows no dollar figure at all', () => {
+  // `qty || 0` printed $0.00, which reads like a position that went nowhere rather than
+  // one we cannot price. The percentage is true either way.
+  const t = Object.assign(payload().trade, { qty: null });
+  const out = P.jpReplayReadout(payload({ trade: t }), 30);
+  assert.match(out, /size not recorded/);
+  assert.doesNotMatch(out, /\$0\.00/);
+  assert.match(out, /%/, 'but the percentage still holds');
+});
+
 test('a short is priced the other way round', () => {
   // Same bar, same entry, opposite side: whatever the long is making, the short is losing.
   const long = P.jpReplayReadout(payload(), 30);

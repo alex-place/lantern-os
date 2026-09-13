@@ -1539,10 +1539,16 @@ function jpReplayReadout(d, cursor) {
   if (typeof ei === 'number' && cursor >= ei && m.entry != null) {
     const dir = t.side === 'short' ? -1 : 1;
     const priced = typeof xi === 'number' && cursor >= xi ? m.exit : b.c;
-    const open = (priced - m.entry) * dir * (t.qty || 0);
     const pct = ((priced - m.entry) / m.entry) * 100 * dir;
     const closed = typeof xi === 'number' && cursor >= xi;
-    out += '<br>' + (closed ? 'Closed' : 'Open') + ' <span class="' + jpSign(open) + '">' + jpUsd(open) + '</span>'
+    // A trade with no recorded size has no dollar figure -- and `qty || 0` would have
+    // printed $0.00, which reads like a position that went nowhere rather than one we
+    // cannot price. The percentage is true either way, so that is what it shows.
+    const money = t.qty == null
+      ? '<span class="jp-dim">size not recorded</span>'
+      : '<span class="' + jpSign((priced - m.entry) * dir * t.qty) + '">'
+        + jpUsd((priced - m.entry) * dir * t.qty) + '</span>';
+    out += '<br>' + (closed ? 'Closed' : 'Open') + ' ' + money
       + ' <span class="' + jpSign(pct) + '">' + jpPct(pct) + '</span>'
       + (closed ? ' \u00b7 ' + jpEsc(jpLabelValue(t.reason || 'closed')) : ' \u00b7 still on');
   } else {
