@@ -24,7 +24,11 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
     --bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
-    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;--text2:#828a99;
+    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;
+    /* #828a99 measured 4.47:1 on the teal sign-in banner and 4.48 on --bg3 --
+       under by a rounding error, but under. Two points lighter clears both at 4.59.
+       Same figure the journal landed on in #3577. */
+    --text2:#848c9b;
     /* --blue is the terminal's INTERACTIVE/brand accent (active tabs, focus, links,
        hovers). Alias it to the site's shared --accent (from site.css, loaded first)
        so the trader's brand colour matches index + dream-chat and follows the theme.
@@ -46,9 +50,24 @@
   /* Light theme (#1577): the global ☀/🌙 toggle flips data-theme; remap the
      terminal palette so the whole trader is genuinely light-mode-aware, not
      hard-locked to dark. Accent colors (green/red/amber/blue) carry over. */
+  /* THE SIGNAL COLOURS ARE THEMED TOO (#3583). This block used to redefine only the
+     surfaces, the greys and the chart axes -- so the dark-tuned green, red, amber and
+     accent above leaked into light mode, where they measure 1.69, 2.61, 1.98 and 2.41 to
+     one against the surfaces right here in this same block. AA wants 4.5. This page is
+     mostly coloured money figures, so that was most of the terminal sitting under the
+     bar, not an edge case. Same fault, same fix as the journal's #3577.
+
+     These are the same hues taken down until they clear 4.5:1 against --bg3, the darkest
+     surface any of them sits on, which puts them at 4.6-5.9:1 everywhere else -- pale
+     tinted chips (the gain pill, the HIGH IMPACT badge) included. --accent takes the
+     value site.css already blesses as AA text (--accent-strong), so this is an existing
+     decision reused rather than a new colour invented. White on it is 5.93:1, so the
+     places that use accent as a FILL get better too. */
   html[data-theme="light"]{
     --bg0:#f4f6fa;--bg1:#ffffff;--bg2:#eef1f6;--bg3:#e3e8f0;
-    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#828b9c;
+    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#5f6778;
+    --green:#00745d;--red:#cf0012;--amber:#905a01;--gold:#905a01;
+    --accent:#0369a1;--blue:#0369a1;--purple:#6d3fd4;
     --tv-text-primary:#1a1d24;--tv-text-secondary:#4a5160;
     --tv-grid:rgba(0,0,0,.08);--tv-axis:rgba(0,0,0,.55);
   }
@@ -3764,9 +3783,9 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   // Stop + TP lines
   if(pos&&pos.stop&&pos.stop>=rMin&&pos.stop<=rMax)
-    html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'#ff5f6d');
+    html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'var(--red)');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
-    html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'#00d4aa');
+    html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'var(--green)');
   } // end patternPrefs.levels (P&L / entry-stop-TP)
 
   // Current price line
@@ -7339,7 +7358,7 @@ function _closeIndMenu(){
 function _indMenuHtml(){
   const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let h='<div class="pat-menu-note">Active — click one to change its settings</div>';
-  if(!chartIndicators.length) h+='<div class="pat-menu-note" style="opacity:.7">None yet. Add one below.</div>';
+  if(!chartIndicators.length) h+='<div class="pat-menu-note">None yet. Add one below.</div>';
   chartIndicators.forEach((cfg,idx)=>{
     const d=IND_DEFS[cfg.id]; if(!d) return;
     const open=_indEditing===idx;
@@ -7377,7 +7396,7 @@ function _indMenuHtml(){
   const addable = Object.entries(IND_DEFS).filter(([id])=>!onChart.has(id));
   h+='<div class="pat-menu-note" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">Add an indicator</div>';
   if(!addable.length){
-    h+='<div class="pat-menu-note" style="opacity:.7">All '+Object.keys(IND_DEFS).length+' are on the chart. Press + on one above for a second copy.</div>';
+    h+='<div class="pat-menu-note">All '+Object.keys(IND_DEFS).length+' are on the chart. Press + on one above for a second copy.</div>';
   }
   for(const [id,d] of addable){
     h+='<div class="pat-menu-item ind-add" data-add="'+id+'" onclick="indAdd(\''+id+'\')">'
@@ -8187,7 +8206,7 @@ function _accountDegraded(kind, reason){
     pp.innerHTML = '<div class="tp-empty">' + (kind === 'session'
       ? 'Positions unavailable — your session expired. Sign in again to see them.'
       : 'Positions unavailable — the broker could not be reached.'
-        + (reason ? '<br><span style="opacity:.7">' + String(reason).slice(0, 120) + '</span>' : ''))
+        + (reason ? '<br><span>' + String(reason).slice(0, 120) + '</span>' : ''))
       + '</div>';
   }
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
