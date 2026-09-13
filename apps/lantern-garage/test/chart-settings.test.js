@@ -365,4 +365,30 @@ test('_indDedupe keeps the first of each id and drops what the registry does not
   assert.deepStrictEqual(fn('not a list'), []);
   assert.strictEqual(fn(Array.from({ length: 40 }, (_, i) => ({ id: i % 2 ? 'ema' : 'rsi' }))).length, 2);
 });
+// ── the legend's text colour is its own decision (operator, 2026-09-13) ───────
+
+test('indicator text can stay black-or-white while the line is coloured', () => {
+  /* Every legend row and every pane label goes through one function, which reads the
+     mode: the line's colour (the chart as it always drew), the chart's text colour, or
+     one custom colour. */
+  assert.match(PAGE, /function _indTextColour\(lineColour\)\{/);
+  assert.match(PAGE, /if\(text\) _lines\.push\(\{ text, color: _indTextColour\(out\.series\[0\]\.color\) \}\);/, 'a legend row is written in the raw line colour');
+  assert.match(PAGE, /ctx\.fillStyle=_indTextColour\(out\.series\[0\]\.color\); ctx\.textAlign='left'; ctx\.textBaseline='top';/, 'a pane label is written in the raw line colour');
+  assert.strictEqual(CS.DEFAULTS['status.indText'], 'line', 'the default must be the chart as it drew before the setting existed');
+  assert.strictEqual(CS.DEFAULTS['status.indTextColor'], null);
+  assert.deepStrictEqual(CS.FIELDS['status.indText'].options.map((o) => o.v), ['line', 'text', 'custom']);
+  // Chart text means the theme's primary text token, so it flips with light/dark.
+  assert.match(PAGE, /if\(mode === 'text'\) return chartVar\('--tv-text-primary'/);
+});
+
+test('_indTextColour: line by default, the text token on request, the custom colour when given', () => {
+  const src = PAGE.slice(PAGE.indexOf('function _indTextColour(lineColour){'), PAGE.indexOf('/* Status line: the legend text for one indicator'));
+  const run = (mode, custom) => new Function('_cs', 'chartVar', src + '; return _indTextColour("#38bdf8");')(
+    (k) => (k === 'status.indText' ? mode : k === 'status.indTextColor' ? custom : undefined), (name, fb) => (name === '--tv-text-primary' ? '#1a1d24' : fb));
+  assert.strictEqual(run('line', null), '#38bdf8');
+  assert.strictEqual(run(undefined, null), '#38bdf8', 'no module: the chart as before');
+  assert.strictEqual(run('text', null), '#1a1d24');
+  assert.strictEqual(run('custom', '#ff00ff'), '#ff00ff');
+  assert.strictEqual(run('custom', null), '#1a1d24', 'custom with no colour picked yet falls back to the text token, not to nothing');
+});
 

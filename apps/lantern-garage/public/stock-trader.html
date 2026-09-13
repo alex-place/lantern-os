@@ -2889,6 +2889,7 @@ function _chartDefaultColour(k){
     'canvas.gridColor': CHART_GRID_COLOR(), 'canvas.paneSepColor': CHART_GRID_COLOR(),
     'canvas.crosshairColor': chartVar('--tv-text-secondary', '#8892a0'),
     'canvas.axisTextColor': CHART_AXIS_COLOR(),
+    'status.indTextColor': chartVar('--tv-text-primary', '#ffffff'),
     'canvas.bgColor': chartVar('--bg0', '#0b0d12'), 'canvas.bgColor2': chartVar('--bg1', '#111318'),
     'scales.prevCloseColor': chartVar('--text2', '#828a99'),
     'alerts.lineColor': chartVar('--gold', '#f5a623'),
@@ -3012,6 +3013,15 @@ function _sessionBars(ticker, bars, tf){
   const out = bars.filter(b=>{ const m = _etMinutes(b.timestamp); return m == null || (m >= 570 && m < 960); });
   _sessCache[ticker] = { src: bars, tf, out };
   return out;
+}
+/* Status line › text colour: what an indicator's legend and pane label are WRITTEN in.
+   'line' is the indicator's own colour, as always; 'text' is the chart's text colour, so a
+   coloured line can carry a black-or-white label; 'custom' is one colour for all of them. */
+function _indTextColour(lineColour){
+  const mode = _cs('status.indText');
+  if(mode === 'text') return chartVar('--tv-text-primary', '#ffffff');
+  if(mode === 'custom') return _cs('status.indTextColor') || chartVar('--tv-text-primary', '#ffffff');
+  return lineColour;
 }
 /* Status line: the legend text for one indicator, by what the reader asked to see. */
 function _indLegendText(cfg, last, dec){
@@ -4096,7 +4106,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         // name + latest value, top-left of its own strip
         let last=null;
         for(let i=out.series[0].values.length-1;i>=0;i--){ const v=out.series[0].values[i]; if(v!=null&&Number.isFinite(v)){ last=v; break; } }
-        ctx.fillStyle=out.series[0].color; ctx.textAlign='left'; ctx.textBaseline='top';
+        ctx.fillStyle=_indTextColour(out.series[0].color); ctx.textAlign='left'; ctx.textBaseline='top';
         ctx.fillText(_indLegendText(cfg, last, Math.abs(last||0)>=100?0:2), 3, top+2);
       }
     }
@@ -4115,7 +4125,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         let last=null;
         for(let i=vals.length-1;i>=0;i--){ if(vals[i]!=null&&Number.isFinite(vals[i])){ last=vals[i]; break; } }
         const text = _indLegendText(cfg, last, 2);
-        if(text) _lines.push({ text, color: out.series[0].color });
+        if(text) _lines.push({ text, color: _indTextColour(out.series[0].color) });
       }
       const _lh = (Number(_cs('canvas.axisFontSize')) || 11) + 1;
       const _lt = _legendTop();
