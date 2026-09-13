@@ -163,7 +163,7 @@
   /* The watchlist column is FIXED. It is not draggable, so it does not read a saved
      width -- 340px fits every track with ~40px to spare (measured, not guessed). */
   :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:340px}
-  .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) auto var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
   body.ticket-closed{--col-t:0px}
   body.rightdock-closed{--col-r:0px}
@@ -173,11 +173,11 @@
      panel with the order ticket stacked under it, and the widget rail hard right.
      Panels are grid children, so collapsing one really does hand the chart its
      pixels back rather than growing under an overlay. */
-  .draw-rail{grid-column:1;grid-row:2 / span 2;display:flex;flex-direction:column;gap:2px;
+  .draw-rail{grid-column:1;grid-row:2 / span 3;display:flex;flex-direction:column;gap:2px;
     padding:6px 5px;background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto}
-  .dockL{grid-column:2;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+  .dockL{grid-column:2;grid-row:2 / span 3;position:relative;display:flex;flex-direction:column;
     min-width:0;overflow:hidden;background:var(--bg1);border-right:1px solid var(--border)}
-  .dockR{grid-column:5;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+  .dockR{grid-column:5;grid-row:2 / span 3;position:relative;display:flex;flex-direction:column;
     min-width:0;overflow:hidden;background:var(--bg1);border-left:1px solid var(--border)}
   body.leftdock-closed .dockL,
   body.rightdock-closed .dockR{border:none}
@@ -206,7 +206,7 @@
 
   /* Order ticket: a sibling row under the widget panel, so both are open at once. */
   /* Its own column, left of the watchlist and the same size -- not stacked under it. */
-  .ticket-dock{grid-column:4;grid-row:2 / span 2;display:flex;flex-direction:column;min-width:0;
+  .ticket-dock{grid-column:4;grid-row:2 / span 3;display:flex;flex-direction:column;min-width:0;
     overflow:hidden;background:var(--bg1);border-left:1px solid var(--border);position:relative}
   .ticket-dock .dock-body{overflow-y:auto}
   .ticket-grip{position:absolute;left:-3px;top:0;bottom:0;width:7px;cursor:ew-resize;z-index:20}
@@ -217,7 +217,7 @@
   body.ticket-closed .ticket-dock{display:none}
 
   /* Rails */
-  .dock-rail{grid-column:6;grid-row:2 / span 2;display:flex;flex-direction:column;gap:4px;
+  .dock-rail{grid-column:6;grid-row:2 / span 3;display:flex;flex-direction:column;gap:4px;
     padding:8px 6px;background:var(--bg1);border-left:1px solid var(--border)}
   .dock-tab{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
     background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
@@ -554,7 +554,7 @@
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
      run all the way to the bottom; the footer trading panel sits under the charts. */
-  .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
+  .sidebar{grid-column:1;grid-row:2 / 5;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
   /* min-width:0 is load-bearing. A grid item defaults to min-width:auto, which means it
      refuses to shrink below its content -- so the chart column ignored its own track and
@@ -562,7 +562,19 @@
      minmax(0,1fr); that constrains the TRACK, not the item sitting in it. */
   .main{grid-column:3;grid-row:2;min-width:0;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
-  .footer{position:relative;grid-column:3;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
+  .footer{position:relative;grid-column:3;grid-row:4;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
+  /* Range strip: the chart's own bottom edge, where TradingView keeps it -- the history
+     buttons on the left, the session clock on the right, right above the account panel.
+     Its own grid row, so the fixed chart deck above still fills .main exactly. */
+  .range-strip{grid-column:3;grid-row:3;display:flex;align-items:center;gap:2px;min-height:34px;box-sizing:border-box;
+    padding:3px 10px;background:var(--bg1);border-top:1px solid var(--border)}
+  .range-strip .range-row{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .range-strip .range-btn{border:0;background:none;padding:4px 8px;border-radius:5px;font-size:11.5px;letter-spacing:.02em;color:var(--text1)}
+  .range-strip .range-btn:hover{background:var(--bg3);color:var(--text0);border-color:transparent}
+  .range-strip .range-btn.active{background:var(--bg3);color:var(--text0);border-color:transparent;font-weight:600}
+  .range-sp{flex:1 1 auto}
+  .range-clock{flex:0 0 auto;gap:8px}
+  .range-clock .l{padding:2px 7px;border-radius:4px;background:var(--bg2)}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:9px var(--hdr-px);border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
@@ -1168,6 +1180,9 @@
     /* default = chart view: charts get the whole screen */
     .sidebar{ display:none; }
     .footer{ display:none; }
+    .range-strip{ flex:0 0 auto; }
+    .layout.mobile-tickers .range-strip,
+    .layout.mobile-positions .range-strip{ display:none; }
     .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
     .wl-resize{ display:none!important; }
     /* tickers view: the watchlist gets the screen */
@@ -1436,7 +1451,6 @@
   <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
-  <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
@@ -1465,17 +1479,6 @@
     <option value="1d">1d</option>
     <option value="1w">1W</option>
     <option value="1mo">1Mo</option>
-  </select>
-  <select id="chartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
-    <option value="1D">1D</option>
-    <option value="5D">5D</option>
-    <option value="1M">1M</option>
-    <option value="3M">3M</option>
-    <option value="6M">6M</option>
-    <option value="YTD">YTD</option>
-    <option value="1Y">1Y</option>
-    <option value="5Y">5Y</option>
-    <option value="All">All</option>
   </select>
   <span class="hgroup-sep" aria-hidden="true"></span>
   <button id="drawToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
@@ -1521,6 +1524,14 @@
 <!-- Main: charts -->
 <div class="main" role="main" aria-label="Charts">
   <div class="cards-grid" id="cardsGrid"></div>
+</div>
+
+<!-- Range strip: how much history the charts show, on the chart's own bottom edge where
+     TradingView keeps it, with the session clock on the right. Built from RANGES. -->
+<div class="range-strip" id="rangeStrip">
+  <div class="range-row" id="rangeRow" role="group" aria-label="How much history to show"></div>
+  <span class="range-sp" aria-hidden="true"></span>
+  <div class="hstat range-clock" id="mktClockWrap" title="US equities session, Eastern Time"><span class="v" id="etClock">—</span><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
 </div>
 
 <!-- Footer -->
@@ -7640,6 +7651,10 @@ function _updateMktClock(){
   val.textContent = left!=null ? fmtC(left)+suffix : 'wknd';
 }
 setInterval(_updateMktClock, 30000); _updateMktClock();
+// The strip's wall clock, Eastern: the clock TradingView shows in the same corner.
+const _etClockFmt = new Intl.DateTimeFormat('en-US', { timeZone:_ET, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+function _tickEtClock(){ const el = document.getElementById('etClock'); if(el) el.textContent = _etClockFmt.format(new Date()) + ' ET'; }
+setInterval(_tickEtClock, 1000); _tickEtClock();
 
 // One-shot price alerts: stored per symbol in localStorage, checked on every
 // price poll, fire a toast + browser Notification, then self-remove.
@@ -8698,11 +8713,18 @@ function syncRangeButtons(tf){
   if(tf !== undefined && !(RANGES[activeRange] && RANGES[activeRange].tf === tf)){
     activeRange = Object.keys(RANGES).find(k => RANGES[k].tf === tf) || null;
   }
-  ['chartRangeSelect','fsChartRangeSelect'].forEach(id=>{
-    const s = document.getElementById(id);
-    if(s && activeRange) s.value = activeRange;
-  });
+  renderRangeRow();
 }
+/* The range buttons live on the strip under the charts. Rebuilt from RANGES, so a new
+   range is one table entry and the lit one is whatever activeRange says. */
+function renderRangeRow(){
+  const row = document.getElementById('rangeRow'); if(!row) return;
+  row.innerHTML = Object.keys(RANGES).map(k =>
+    '<button type="button" class="range-btn' + (k === activeRange ? ' active' : '') + '" data-range="' + k + '"'
+    + ' aria-pressed="' + (k === activeRange ? 'true' : 'false') + '" title="' + _rangeTitle(k) + '"'
+    + ' onclick="changeRange(\'' + k + '\')">' + k + '</button>').join('');
+}
+function _rangeTitle(k){ const r = RANGES[k] || {}; return k === 'All' ? 'All available history, daily bars' : k + ' of history, ' + r.tf + ' bars'; }
 
 // ── TradingView-style trading panel (#1712) ───────────────────────────────────
 function tpTab(name){
@@ -9859,7 +9881,7 @@ function startDashboard(){
   // localStorage (chartType/chartTimeframe/activeRange); this just syncs the <select>s.
   ['chartTypeSelect','fsChartTypeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartType; });
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
-  ['chartRangeSelect','fsChartRangeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s && activeRange) s.value=activeRange; });
+  renderRangeRow();
   applyGridCols();
   // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids
   // switch between the desktop tiling and the single-column phone stack.
