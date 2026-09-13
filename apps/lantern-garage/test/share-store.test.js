@@ -37,6 +37,23 @@ test('an id cannot be guessed, counted to, or misread', () => {
   assert.notStrictEqual(a.slice(0, 8), b.slice(0, 8));
 });
 
+test('every character of the alphabet is equally likely, at every position', () => {
+  /* The first version took a random byte modulo 32, which is unbiased only because 256
+     happens to be eight times 32 -- add one character to the alphabet and every id
+     quietly skews toward its first few letters, with nothing to notice. CodeQL caught the
+     pattern; this catches the behaviour, which is what would actually go wrong. */
+  const counts = new Map();
+  const N = 40000;
+  for (let i = 0; i < N; i++) for (const ch of S.newId()) counts.set(ch, (counts.get(ch) || 0) + 1);
+  assert.strictEqual(counts.size, 32, 'every character appears: ' + counts.size);
+  const expected = (N * S.ID_LEN) / 32;
+  for (const [ch, n] of counts) {
+    const dev = Math.abs(n - expected) / expected;
+    assert.ok(dev < 0.05, ch + ' appeared ' + n + ' times against ' + Math.round(expected)
+      + ' expected (' + (dev * 100).toFixed(1) + '% off)');
+  }
+});
+
 test('only our own ids can name a file', () => {
   for (const bad of ['../../etc/passwd', 'a/b', '', 'SHOUTING0000000000000000000',
     'short', 'l'.repeat(S.ID_LEN), 'i'.repeat(S.ID_LEN), null, undefined, 42]) {

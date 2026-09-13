@@ -8,7 +8,7 @@
  * a share that never existed are the same 404, which is also the right answer to anyone
  * probing for one.
  *
- * IDS ARE UNGUESSABLE AND UNORDERED. 128 bits of crypto randomness in base32 — a share
+ * IDS ARE UNGUESSABLE AND UNORDERED. 130 bits of crypto randomness in base32 — a share
  * cannot be found by counting up from someone else's, and nothing about a reader is
  * recoverable from one. The owner is stored INSIDE the record (so a reader can list and
  * revoke their own) and never leaves this module: the public route sends `payload` only.
@@ -25,14 +25,34 @@ const DIR = process.env.JOURNAL_SHARE_DIR
 
 const MAX_PER_OWNER = 25;
 // Crockford-ish base32, no I/L/O/U: an id gets read aloud and typed, and a shared link
-// that fails because a 1 was read as an l is a support ticket.
+// that fails because a 1 was read as an l is a support ticket. EXACTLY 32 characters —
+// newId slices five bits per character and would be wrong at any other length.
 const ALPHABET = '0123456789abcdefghjkmnpqrstvwxyz';
 const ID_LEN = 26;
 
+/**
+ * FIVE BITS PER CHARACTER, because the alphabet is exactly thirty-two long.
+ *
+ * The obvious version -- take a random byte modulo the alphabet length -- is unbiased
+ * here only by arithmetic coincidence: 256 happens to be eight times 32. Add one
+ * character to the alphabet and every id quietly becomes biased toward its first few
+ * letters, with nothing anywhere to notice. Slicing bits cannot drift that way, and it is
+ * what "base32" actually means. (CodeQL flags the modulo form on sight, and it is right
+ * to: the pattern is wrong even where this instance was not.)
+ *
+ * 26 characters x 5 bits = 130 bits of entropy per id.
+ */
 function newId() {
-  const bytes = crypto.randomBytes(ID_LEN);
+  const bits = crypto.randomBytes(Math.ceil((ID_LEN * 5) / 8) + 1);
   let out = '';
-  for (let i = 0; i < ID_LEN; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
+  for (let i = 0; i < ID_LEN; i++) {
+    const at = i * 5;                       // first bit of this character, MSB-first
+    const byte = at >> 3;
+    const offset = at & 7;
+    // Five bits can straddle a byte boundary, so read a 16-bit window and shift.
+    const pair = (bits[byte] << 8) | bits[byte + 1];
+    out += ALPHABET[(pair >> (11 - offset)) & 31];
+  }
   return out;
 }
 
@@ -76,7 +96,7 @@ function create(owner, payload) {
   }
   fs.mkdirSync(DIR, { recursive: true });
   const rec = { v: 1, id: newId(), owner: String(owner), createdAt: new Date().toISOString(), payload };
-  // wx: never overwrite. An id collision at 128 bits will not happen, and if it somehow
+  // wx: never overwrite. An id collision at 130 bits will not happen, and if it somehow
   // did, silently replacing somebody's share with somebody else's is not the failure to
   // choose.
   fs.writeFileSync(fileFor(rec.id), JSON.stringify(rec, null, 2), { flag: 'wx' });
