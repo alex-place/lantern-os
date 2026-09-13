@@ -21,6 +21,7 @@
     }catch(e){ document.documentElement.setAttribute('data-skin','terminal'); }
   })();
 </script>
+<script src="/js/signal-palette.js"></script>
 <link rel="stylesheet" href="/css/site.css">
 <link rel="stylesheet" href="/css/dream-chat-terminal.css?v=20260630-terminal"><!-- RobCo/Pip-Boy phosphor skin (data-skin=terminal); ?v matches chat.html so the shared CSS caches once (#2496) -->
 <link rel="stylesheet" href="/vendor/fonts/fonts.css"><!-- #861: vendored local-first (was Google Fonts CDN) -->
@@ -68,14 +69,14 @@ body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .card.front{box-shadow:var(--shadow-hover);z-index:2;border-color:#3a4355}
 .card.peek{transform:scale(.94) translateY(18px);filter:brightness(.65);z-index:1;pointer-events:none}
 .card.peek2{transform:scale(.88) translateY(36px);filter:brightness(.45);z-index:0;pointer-events:none}
-.card.exit{border-color:var(--danger)}
+.card.exit{border-color:var(--red, var(--danger))}
 
 /* card content */
 .card-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:4px;gap:8px}
 .card-klass{font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:10px}
-.card-klass.position{color:var(--accent)}.card-klass.exit{color:var(--danger)}.card-klass.engine,.card-klass.suggestion{color:var(--gold)}.card-klass.crypto{color:var(--green)}.card-klass.convergence{color:var(--green);font-size:11px}
+.card-klass.position{color:var(--accent)}.card-klass.exit{color:var(--red, var(--danger))}.card-klass.engine,.card-klass.suggestion{color:var(--gold)}.card-klass.crypto{color:var(--green)}.card-klass.convergence{color:var(--green);font-size:11px}
 .countdown{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px}
-.countdown.soon{color:var(--gold)}.countdown.now{color:var(--danger)}
+.countdown.soon{color:var(--gold)}.countdown.now{color:var(--red, var(--danger))}
 /* uniform real-time generation-age chip — same on every card kind */
 .gen-age{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;font-weight:600;
   color:var(--green);letter-spacing:.04em;padding:1px 6px;border:1px solid var(--green);
@@ -86,11 +87,11 @@ body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
 /* favorable hero */
 .fav{border-radius:8px;padding:9px 11px;margin:6px 0 8px;border:1px solid var(--border);background:var(--bg)}
-.fav.yes{border-color:var(--green);background:rgba(0,212,170,.04)}.fav.no{border-color:var(--danger);background:rgba(255,95,109,.04)}
+.fav.yes{border-color:var(--green);background:rgba(0,212,170,.04)}.fav.no{border-color:var(--red, var(--danger));background:rgba(255,95,109,.04)}
 .fav-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .fav-act{font-size:19px;font-weight:800;margin:4px 0 3px;line-height:1.2;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.fav.yes .fav-act{color:var(--green)}.fav.no .fav-act{color:var(--danger)}
+.fav.yes .fav-act{color:var(--green)}.fav.no .fav-act{color:var(--red, var(--danger))}
 .fav-px{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace}
 .conv-row{display:flex;align-items:center;gap:8px;margin-top:10px}
 .conv-bar{flex:1;height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
@@ -100,7 +101,7 @@ body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
 /* exit ribbon */
 .ribbon{font-size:11px;padding:5px 10px;border-radius:7px;background:rgba(239,68,68,.1);
-  border:1px solid var(--danger);color:var(--danger);margin-bottom:8px;font-weight:600;letter-spacing:.04em}
+  border:1px solid var(--red, var(--danger));color:var(--red, var(--danger));margin-bottom:8px;font-weight:600;letter-spacing:.04em}
 .ribbon.profit{background:rgba(52,211,153,.08);border-color:var(--green);color:var(--green)}
 
 /* market meta strip */
@@ -126,13 +127,13 @@ body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .side .lbl{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-transform:uppercase;letter-spacing:.08em;font-family:'IBM Plex Mono',ui-monospace,monospace}
 .side .pct{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:17px;font-weight:600;margin-top:2px}
-.side.yes .pct{color:var(--green)}.side.no .pct{color:var(--danger)}
+.side.yes .pct{color:var(--green)}.side.no .pct{color:var(--red, var(--danger))}
 
 /* stamps */
 .stamp{position:absolute;top:22px;font-weight:800;font-size:23px;letter-spacing:.06em;
   padding:4px 12px;border-radius:8px;border:3px solid;opacity:0}
 .stamp.take{left:20px;color:var(--green);border-color:var(--green);transform:rotate(-12deg)}
-.stamp.pass{right:20px;color:var(--danger);border-color:var(--danger);transform:rotate(12deg)}
+.stamp.pass{right:20px;color:var(--red, var(--danger));border-color:var(--red, var(--danger));transform:rotate(12deg)}
 
 /* IE state badge */
 .state-badge{font-size:10px;font-weight:700;letter-spacing:.1em;padding:2px 6px;border-radius:4px;border:1px solid;vertical-align:middle}
@@ -159,8 +160,8 @@ body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .card-actions{display:none}
 .btn-pass,.btn-take{font-size:17px;font-weight:700;padding:14px 42px;border-radius:12px;
   cursor:pointer;font-family:inherit;letter-spacing:.02em;transition:transform .1s,background .15s,filter .15s;min-width:140px}
-.btn-pass{border:2px solid var(--danger);background:transparent;color:var(--danger)}
-.btn-pass:hover{background:color-mix(in srgb,var(--danger) 12%,transparent);transform:scale(1.03)}
+.btn-pass{border:2px solid var(--red, var(--danger));background:transparent;color:var(--red, var(--danger))}
+.btn-pass:hover{background:color-mix(in srgb,var(--red, var(--danger)) 12%,transparent);transform:scale(1.03)}
 .btn-take{border:none;background:var(--green);color:#052e22}
 .btn-take:hover{filter:brightness(1.06);transform:scale(1.03)}
 .btn-pass:focus-visible,.btn-take:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
@@ -178,7 +179,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;
   font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;max-width:90vw;opacity:0;transition:.25s;z-index:50;white-space:pre-wrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast.dry{border-color:var(--green)}.toast.live{border-color:var(--danger)}.toast.err{border-color:var(--gold)}
+.toast.dry{border-color:var(--green)}.toast.live{border-color:var(--red, var(--danger))}.toast.err{border-color:var(--gold)}
 
 /* freshness dot pulse (extends site.css .dot) */
 @keyframes dotpulse{0%{transform:scale(1.7);opacity:1}100%{transform:scale(1);opacity:.8}}
@@ -210,7 +211,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
 .hist-row .rt{text-align:right;font-size:12px;white-space:nowrap}
 .hist-row .side-y{color:var(--green)} .hist-row .side-n{color:var(--gold)}
-.hist-row .pnl.pos{color:var(--green);font-weight:700} .hist-row .pnl.neg{color:var(--danger);font-weight:700}
+.hist-row .pnl.pos{color:var(--green);font-weight:700} .hist-row .pnl.neg{color:var(--red, var(--danger));font-weight:700}
 .hist-row .st{font-size:10.5px;color:var(--muted);letter-spacing:.06em}
 @media (max-width:820px){
   .kx-main{flex-direction:column;align-items:center;gap:10px}
@@ -683,10 +684,10 @@ function renderAcctPanel(){
   let pos;
   if(!acctState.posLoaded) pos='<div class="mut">Loading positions…</div>';
   else if(!(acctState.positions||[]).length) pos=`<div class="mut">No open Kalshi positions${cn.credentials?'':' — connect credentials to view'}.</div>`;
-  else pos=acctState.positions.map(p=>{const pnl=Number(p.realized_pnl||0);return `<div class="acct-kv"><span>${(p.ticker||'').slice(0,24)}</span><span>${p.position} · ${fmtUsd(p.market_exposure)} <b style="color:${pnl>=0?'var(--green)':'var(--danger)'}">${pnl>=0?'+':''}${fmtUsd(pnl)}</b></span></div>`;}).join('');
+  else pos=acctState.positions.map(p=>{const pnl=Number(p.realized_pnl||0);return `<div class="acct-kv"><span>${(p.ticker||'').slice(0,24)}</span><span>${p.position} · ${fmtUsd(p.market_exposure)} <b style="color:${pnl>=0?'var(--green)':'var(--red, var(--danger))'}">${pnl>=0?'+':''}${fmtUsd(pnl)}</b></span></div>`;}).join('');
   const wr=co.win_rate!=null?Math.round(co.win_rate*100)+'%':'—';
   const net=co.avg_pnl_pct!=null?(co.avg_pnl_pct>=0?'+':'')+co.avg_pnl_pct+'%':'—';
-  const netCol=co.avg_pnl_pct>=0?'var(--green)':'var(--danger)';
+  const netCol=co.avg_pnl_pct>=0?'var(--green)':'var(--red, var(--danger))';
   return `
     <div class="acct-grid">
       <section class="acct-sec">
@@ -987,7 +988,7 @@ function fmtStrategyFitness(fitness){
   const pnl=(fitness.pnl||0).toFixed(1);
   const dd=(fitness.drawdown||0).toFixed(1);
   const stab=(fitness.stability||0).toFixed(1);
-  const pnlCol=fitness.pnl>0?'var(--green)':fitness.pnl<0?'var(--danger)':'var(--muted)';
+  const pnlCol=fitness.pnl>0?'var(--green)':fitness.pnl<0?'var(--red, var(--danger))':'var(--muted)';
   return `<div style="margin-top:6px;padding:5px 8px;border-radius:4px;background:var(--bg);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;gap:10px;align-items:center">
     <span style="font-weight:600;color:var(--muted)">Fitness</span>
     <span>PnL <b style="color:${pnlCol}">${fitness.pnl>0?'+':''}${pnl}%</b></span>
@@ -1014,7 +1015,7 @@ function cardInner(card){
   if(isPosition){
     const netPct = card.netPnlPct != null ? card.netPnlPct : (card.pnlPct||0);
     const grossPct = card.pnlPct||0;
-    const pnlColor = netPct>=0?'var(--green)':'var(--danger)';
+    const pnlColor = netPct>=0?'var(--green)':'var(--red, var(--danger))';
     const netSign  = netPct>=0?'+':'';
     const grossSign= grossPct>=0?'+':'';
     const netDollars = card.netPnlCents!=null?(card.netPnlCents>=0?'+':'')+((card.netPnlCents/100).toFixed(2)):null;
