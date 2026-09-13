@@ -63,17 +63,14 @@ test('the buttons come from the RANGES table; the lit one is derived from the vi
   assert.match(PAGE, /view\.spanDriven = true;   \/\/ back to the span\s*_rangeTouched = false; renderRangeRow\(\);/);
 });
 
-test('the toolbar chips re-read the interval a range click set', () => {
-  /* The chips are custom widgets over native <select>s and resync only on a 'change'
-     event; `.value = tf` from code fired none, so the candle-size chip kept its old
-     label after every range click. */
-  assert.match(PAGE, /sel\._uiSync = sync;/);
-  assert.match(PAGE, /function _setSelectValue\(id, value\) \{[\s\S]*?if \(sel\._uiSync\) sel\._uiSync\(\);/);
+test('the toolbar pickers re-render on every interval and chart-type change', () => {
+  /* The interval and chart-type chips are rendered from the tables, so the current one
+     is lit by construction; both change paths rebuild them. */
   const ct = PAGE.slice(PAGE.indexOf('function changeTimeframe(tf, span){'), PAGE.indexOf('function changeRange('));
-  assert.match(ct, /_setSelectValue\('chartTfSelect', tf\);/);
-  assert.ok(!ct.includes(".value = tf"), 'changeTimeframe still sets the native value behind the chip');
-  const cc = PAGE.slice(PAGE.indexOf('function changeChartType(type){'), PAGE.indexOf('function changeTimeframe(tf, span){'));
-  assert.match(cc, /_setSelectValue\('chartTypeSelect', type\);/);
+  assert.match(ct, /renderTfPicker\(\);/);
+  assert.ok(!ct.includes(".value = tf"), 'changeTimeframe still sets a native select');
+  const cc = PAGE.slice(PAGE.indexOf('function changeChartType(type){'), PAGE.indexOf('// Reflect how many pattern layers'));
+  assert.match(cc, /renderTypePicker\(\);/);
 });
 
 test('on phones the strip belongs to the Chart view', () => {

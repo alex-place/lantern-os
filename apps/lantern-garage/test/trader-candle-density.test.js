@@ -57,8 +57,8 @@ test('every interval has a span of its own, so a chosen interval reads at the sa
 
 test('the two new intervals exist end to end: select, allow-list, feed, route', () => {
   assert.match(PAGE, /const TF_ALLOWED = \['1m','5m','15m','30m','1h','2h','4h','1d','1w','1mo'\];/);
-  assert.match(PAGE, /<option value="30m">30m<\/option>/);
-  assert.match(PAGE, /<option value="2h">2h<\/option>/);
+  assert.match(PAGE, /\{ id:'30m', label:'30m', name:'30 minutes', group:'Minutes' \}/);
+  assert.match(PAGE, /\{ id:'2h',  label:'2h',  name:'2 hours',    group:'Hours' \}/);
   assert.match(YAHOO, /'30m': \{ interval: '30m', range: '1mo', agg: 1 \}/);
   assert.match(YAHOO, /'2h': +\{ interval: '60m', range: '1y', +agg: 2 \}/, '2h is rolled from hourly, like 4h');
   assert.match(ROUTE, /new Set\(\['1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1mo'\]\)/);
