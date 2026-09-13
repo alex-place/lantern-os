@@ -73,6 +73,24 @@ test('every focusable control draws its own focus ring (#3579)', () => {
   for (const c of classes) {
     assert.match(src, new RegExp('\\.' + c + ':focus-visible\\{[^}]*outline'), c + ' has no focus ring');
   }
+  // The replay scrubber is an input rather than a class, and is the one control on this
+  // page a keyboard reader will hold an arrow key down on (#3561).
+  assert.match(src, /input\[type=range\]:focus-visible\{[^}]*outline/, 'the replay scrubber has no focus ring');
+});
+
+test('the replay states in text every figure it draws (#3561)', () => {
+  /* An SVG of candles is nothing to a screen reader, so the chart carries a name and each
+     figure on it is repeated as text: the bar under the cursor in the readout, and every
+     level in the legend. The drawing must never be the only place a number appears. */
+  const chart = grabFn('jpReplayChart');
+  assert.match(chart, /role="img"/);
+  assert.match(chart, /aria-label="/);
+  assert.match(grabFn('jpReplayReadout'), /jpUsd\(b\.o\)/, 'the bar under the cursor, in words');
+  assert.match(grabFn('jpReplayLegend'), /jpUsd\(m\.entry\)/, 'and every level that is drawn');
+  // Every control the panel renders is a real control with a name.
+  const inner = grabFn('jpReplayInner');
+  assert.match(inner, /aria-label="Step back one bar"/);
+  assert.match(inner, /aria-label="Bar ' \+ \(cursor \+ 1\) \+ ' of/, 'the scrubber says where it is');
 });
 
 test('the page has exactly one h1 and no heading levels are skipped', () => {

@@ -331,6 +331,26 @@
   .jp-note-text{width:100%;box-sizing:border-box;background:var(--bg0);color:var(--text1);
     border:1px solid var(--border);border-radius:7px;padding:7px 9px;font:inherit;font-size:11.5px;resize:vertical}
   .jp-note-text:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+  /* Replay (#3561). Sticky-left and 100cqi for the same reason the note editor is:
+     the cell belongs to a table that scrolls sideways, and a chart that scrolled off
+     the screen would be worse than no chart. */
+  .jp-replay{padding:2px 8px 12px;background:color-mix(in srgb, var(--blue) 5%, transparent);
+    position:sticky;left:0;width:100cqi;box-sizing:border-box}
+  /* Sized in the markup, in real pixels (jpReplayBox). max-width keeps it honest if the
+     panel narrows between a measure and a paint. */
+  .jp-replay-chart{max-width:100%;display:block;border:1px solid var(--border);
+    border-radius:9px;background:var(--bg0)}
+  .jp-replay-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:8px}
+  .jp-replay-ctl input[type=range]{flex:1 1 140px;min-width:100px;accent-color:var(--blue);height:18px}
+  .jp-replay-ctl input[type=range]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  .jp-replay-read{font-size:10.5px;color:var(--text2);margin-top:6px;
+    font-variant-numeric:tabular-nums;line-height:1.55}
+  .jp-replay-read b{color:var(--text1);font-weight:600}
+  .jp-replay-why{font-size:10.5px;color:var(--text2);line-height:1.55;padding:9px 0 2px}
+  .jp-replay-legend{display:flex;flex-wrap:wrap;gap:4px 13px;font-size:9.5px;color:var(--text2);margin-top:6px}
+  .jp-replay-legend i{display:inline-block;width:11px;height:0;border-top-width:2px;
+    vertical-align:middle;margin-right:5px}
   .jp-note-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:7px}
   .jp-note-row .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-right:3px}
   .jp-tag{font-size:10.5px;padding:3px 8px;border-radius:999px;cursor:pointer;font-family:inherit;
@@ -1360,6 +1380,321 @@ function jpTradeWhen(ts) {
   } catch (_e) { return String(ts).slice(0, 16).replace('T', ' '); }
 }
 
+/* ── Replay (#3561) ────────────────────────────────────────────────────────────────
+   One trade, back on the bars it was taken on. Every other card here is an aggregate;
+   aggregates can say that Tuesday afternoons lose money and cannot say what the setup
+   looked like, which is the only thing a discretionary trader can act on.
+
+   THE REVEAL IS THE POINT. Bars past the cursor are not drawn, and each mark appears only
+   once the replay reaches the moment it was known -- the stop and the targets at the
+   entry, the exit and the excursions at the exit. Showing the outcome while calling it a
+   replay would make it a picture of a trade rather than a re-run of one. */
+let jpReplay = null;       // { id, state:'loading'|'ready'|'error', data, cursor, playing }
+let jpReplayTimer = null;
+
+/* Redraw the trade card from the data already in hand -- the idiom the rest of this card
+   uses. Opening a replay is not new trade data, so it must not refetch the list (#3541). */
+function jpTradeRepaint() {
+  const card = document.getElementById('jpTradesCard');
+  if (card && jpTradeData) card.innerHTML = jpTrades(jpTradeData);
+}
+
+function jpReplayStop() {
+  if (jpReplayTimer) { clearInterval(jpReplayTimer); jpReplayTimer = null; }
+  if (jpReplay) jpReplay.playing = false;
+}
+
+async function jpReplayOpen(id) {
+  jpReplayStop();
+  if (jpReplay && jpReplay.id === id) { jpReplay = null; jpTradeRepaint(); return; }
+  jpReplay = { id: id, state: 'loading', data: null, cursor: 0, playing: false };
+  jpTradeRepaint();
+  try {
+    const q = (jpData && jpData.demo) ? '&demo=champion' : '';
+    const r = await fetch('/api/journal/replay?id=' + encodeURIComponent(id) + q, { credentials: 'same-origin' });
+    const d = await r.json();
+    if (!jpReplay || jpReplay.id !== id) return;        // the reader moved on while we fetched
+    if (!r.ok) { jpReplay.state = 'error'; jpReplay.data = d; }
+    else {
+      jpReplay.state = 'ready';
+      jpReplay.data = d;
+      // Start on the LAST bar before the entry: the setup, with nothing of the outcome
+      // on screen yet. That is where a reader would have been standing.
+      const ei = d.marks && d.marks.entryIdx;
+      jpReplay.cursor = (typeof ei === 'number' && ei > 0) ? ei - 1 : 0;
+    }
+  } catch (e) {
+    if (jpReplay && jpReplay.id === id) { jpReplay.state = 'error'; jpReplay.data = { message: e.message }; }
+  }
+  jpTradeRepaint();
+}
+
+/* A measured chart is only right for the width it was measured at, so a resize has to
+   redraw it. Debounced, and only while a replay is actually open. */
+let jpReplayResizeT = null;
+window.addEventListener('resize', () => {
+  if (!jpReplay || jpReplay.state !== 'ready') return;
+  clearTimeout(jpReplayResizeT);
+  jpReplayResizeT = setTimeout(jpReplayDraw, 140);
+});
+
+function jpReplaySeek(to) {
+  if (!jpReplay || jpReplay.state !== 'ready') return;
+  const n = (jpReplay.data.bars || []).length;
+  jpReplay.cursor = Math.max(0, Math.min(n - 1, to));
+  jpReplayDraw();
+}
+
+function jpReplayStep(d) { jpReplayStop(); jpReplaySeek(jpReplay ? jpReplay.cursor + d : 0); jpReplayDraw(); }
+
+function jpReplayPlay() {
+  if (!jpReplay || jpReplay.state !== 'ready') return;
+  if (jpReplay.playing) { jpReplayStop(); jpReplayDraw(); return; }
+  const n = (jpReplay.data.bars || []).length;
+  if (jpReplay.cursor >= n - 1) jpReplay.cursor = 0;
+  jpReplay.playing = true;
+  jpReplayTimer = setInterval(() => {
+    if (!jpReplay || !jpReplay.playing) { jpReplayStop(); return; }
+    if (jpReplay.cursor >= n - 1) { jpReplayStop(); jpReplayDraw(); return; }
+    jpReplay.cursor++;
+    jpReplayDraw();
+  }, 110);
+  jpReplayDraw();
+}
+
+/* Repaint the chart WITHOUT rebuilding the card. Stepping is a cursor move, not new data
+   -- the same rule the rest of this page follows (#3541): arranging never refetches. */
+function jpReplayDraw() {
+  const host = document.getElementById('jpReplayBody');
+  if (!host || !jpReplay || jpReplay.state !== 'ready') { jpTradeRepaint(); return; }
+  host.innerHTML = jpReplayInner(jpReplay.data, jpReplay.cursor, jpReplay.playing);
+  const sl = document.getElementById('jpReplaySlider');
+  if (sl) sl.value = String(jpReplay.cursor);
+}
+
+/* Fixed to the WHOLE frame, including every mark, so the scale never moves while the
+   reader steps. A chart that rescaled on each bar would make the same move look
+   different depending on when you paused, which is the opposite of a replay. */
+function jpReplayScale(bars, marks) {
+  let lo = Infinity, hi = -Infinity;
+  for (const b of bars) { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; }
+  for (const k of ['entry', 'exit', 'stop', 'target1', 'target2', 'mfe', 'mae']) {
+    const v = marks && marks[k];
+    if (typeof v === 'number' && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  }
+  if (!isFinite(lo) || !isFinite(hi)) return null;
+  if (hi === lo) { hi += 0.5; lo -= 0.5; }
+  const pad = (hi - lo) * 0.06;
+  return { lo: lo - pad, hi: hi + pad };
+}
+
+const JP_RPAD = { l: 6, r: 54, t: 8, b: 18 };
+
+/* The viewBox is measured, not fixed.
+   A fixed box scaled to the container gives you one of two bad charts: scale it
+   uniformly and a wide card renders a 460px-tall chart inside a table row; scale it
+   freely and the price labels stretch with the box. Measuring means one SVG unit is one
+   CSS pixel -- the text is the size it says it is and the candles are the width they
+   should be, at any card width. */
+function jpReplayBox() {
+  const host = document.getElementById('jpReplayBody');
+  const scroll = document.querySelector('.jp-trades-scroll');
+  const raw = (host && host.clientWidth) || ((scroll && scroll.clientWidth) ? scroll.clientWidth - 16 : 0);
+  const w = Math.max(300, Math.min(1200, raw || 640));
+  return { w: w, h: Math.round(Math.max(190, Math.min(330, w * 0.3))) };
+}
+
+function jpReplayInner(d, cursor, playing) {
+  const bars = d.bars || [];
+  if (!bars.length) return '<p class="jp-replay-why">' + jpEsc(d.why || 'No bars for this trade.') + '</p>';
+  const chart = jpReplayChart(d, cursor);
+  const n = bars.length;
+  return chart
+    + '<div class="jp-replay-ctl">'
+    + '<button type="button" class="jp-chip" onclick="jpReplayStep(-1)"' + (cursor <= 0 ? ' disabled' : '')
+    + ' aria-label="Step back one bar">\u2039 Bar</button>'
+    + '<button type="button" class="jp-chip" onclick="jpReplayPlay()">' + (playing ? '\u25a0 Pause' : '\u25b6 Play') + '</button>'
+    + '<button type="button" class="jp-chip" onclick="jpReplayStep(1)"' + (cursor >= n - 1 ? ' disabled' : '')
+    + ' aria-label="Step forward one bar">Bar \u203a</button>'
+    + '<input type="range" id="jpReplaySlider" min="0" max="' + (n - 1) + '" value="' + cursor + '"'
+    + ' aria-label="Bar ' + (cursor + 1) + ' of ' + n + '"'
+    + ' oninput="jpReplayStop();jpReplaySeek(+this.value)">'
+    + '</div>'
+    + jpReplayReadout(d, cursor)
+    + jpReplayLegend(d, cursor);
+}
+
+/* The numbers under the chart. While the cursor sits between the entry and the exit it
+   prices the position AT THAT BAR -- which is the thing a trader actually sat through,
+   and is computed from the bar close and the recorded entry rather than from anything
+   the record does not hold. */
+function jpReplayReadout(d, cursor) {
+  const b = (d.bars || [])[cursor];
+  if (!b) return '';
+  const m = d.marks || {}, t = d.trade || {};
+  const when = new Date(b.t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  let out = '<div class="jp-replay-read"><b>' + jpEsc(when) + '</b> \u00b7 O ' + jpUsd(b.o)
+    + ' H ' + jpUsd(b.h) + ' L ' + jpUsd(b.l) + ' C ' + jpUsd(b.c);
+  const ei = m.entryIdx, xi = m.exitIdx;
+  if (typeof ei === 'number' && cursor >= ei && m.entry != null) {
+    const dir = t.side === 'short' ? -1 : 1;
+    const priced = typeof xi === 'number' && cursor >= xi ? m.exit : b.c;
+    const open = (priced - m.entry) * dir * (t.qty || 0);
+    const pct = ((priced - m.entry) / m.entry) * 100 * dir;
+    const closed = typeof xi === 'number' && cursor >= xi;
+    out += '<br>' + (closed ? 'Closed' : 'Open') + ' <span class="' + jpSign(open) + '">' + jpUsd(open) + '</span>'
+      + ' <span class="' + jpSign(pct) + '">' + jpPct(pct) + '</span>'
+      + (closed ? ' \u00b7 ' + jpEsc(jpLabelValue(t.reason || 'closed')) : ' \u00b7 still on');
+  } else {
+    out += '<br><span class="jp-dim">Before the entry \u2014 this is the setup.</span>';
+  }
+  return out + '</div>';
+}
+
+function jpReplayLegend(d, cursor) {
+  const m = d.marks || {};
+  const ei = typeof m.entryIdx === 'number' ? m.entryIdx : Infinity;
+  const xi = typeof m.exitIdx === 'number' ? m.exitIdx : Infinity;
+  const bits = [];
+  const item = (col, dash, text) => '<span><i style="border-top:2px ' + dash + ' ' + col + '"></i>' + text + '</span>';
+  if (cursor >= ei && m.entry != null) bits.push(item('var(--blue)', 'solid', 'Entry ' + jpUsd(m.entry)));
+  if (cursor >= ei && m.stop != null) bits.push(item('var(--red)', 'dashed', 'Stop ' + jpUsd(m.stop)));
+  if (cursor >= ei && m.target1 != null) bits.push(item('var(--green)', 'dotted', 'Target ' + jpUsd(m.target1)));
+  if (cursor >= xi && m.exit != null) bits.push(item('var(--amber)', 'solid', 'Exit ' + jpUsd(m.exit)));
+  if (cursor >= xi && (m.mfe != null || m.mae != null)) {
+    bits.push('<span>Best ' + (m.mfe != null ? jpUsd(m.mfe) : '\u2014')
+      + ' \u00b7 worst ' + (m.mae != null ? jpUsd(m.mae) : '\u2014') + ' while open</span>');
+  }
+  if (!bits.length) return '';
+  return '<div class="jp-replay-legend">' + bits.join('') + '</div>';
+}
+
+function jpReplayChart(d, cursor) {
+  const bars = d.bars || [], m = d.marks || {};
+  const sc = jpReplayScale(bars, m);
+  if (!sc) return '';
+  const box = jpReplayBox(), JP_RW = box.w, JP_RH = box.h;
+  const plotW = JP_RW - JP_RPAD.l - JP_RPAD.r, plotH = JP_RH - JP_RPAD.t - JP_RPAD.b;
+  const step = plotW / bars.length;
+  const x = (i) => JP_RPAD.l + i * step + step / 2;
+  const y = (p) => JP_RPAD.t + (1 - (p - sc.lo) / (sc.hi - sc.lo)) * plotH;
+  const w = Math.max(1.4, step * 0.62);
+  const ei = typeof m.entryIdx === 'number' ? m.entryIdx : Infinity;
+  const xi = typeof m.exitIdx === 'number' ? m.exitIdx : Infinity;
+  const p = [];
+
+  // Session breaks. Bars are not evenly spaced in time -- an overnight gap between two
+  // adjacent candles is real and worth a line, or a reader reads a gap-up as a wick.
+  const stepMs = bars.length > 2 ? Math.min.apply(null, bars.slice(1).map((b, i) => b.t - bars[i].t)) : 0;
+  if (stepMs > 0) {
+    for (let i = 1; i < bars.length && i <= cursor; i++) {
+      if (bars[i].t - bars[i - 1].t > stepMs * 2.5) {
+        p.push('<line x1="' + (x(i) - step / 2).toFixed(1) + '" x2="' + (x(i) - step / 2).toFixed(1)
+          + '" y1="' + JP_RPAD.t + '" y2="' + (JP_RPAD.t + plotH) + '" stroke="var(--border)" stroke-width="1"/>');
+      }
+    }
+  }
+
+  // The excursion band, once the trade is over: how far it ran either way while it was on.
+  if (cursor >= xi && m.mfe != null && m.mae != null && ei < Infinity) {
+    const top = Math.min(y(m.mfe), y(m.mae)), bot = Math.max(y(m.mfe), y(m.mae));
+    const x0 = x(Math.min(ei, bars.length - 1)) - w / 2;
+    const x1 = x(Math.min(xi, bars.length - 1)) + w / 2;
+    p.push('<rect x="' + x0.toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + Math.max(1, x1 - x0).toFixed(1)
+      + '" height="' + Math.max(1, bot - top).toFixed(1)
+      + '" fill="color-mix(in srgb, var(--blue) 12%, transparent)"/>');
+  }
+
+  // Levels. Each appears when it was KNOWN: the stop and targets were set at the entry,
+  // the exit and the excursions only exist once the trade is closed.
+  const level = (v, col, dash, from) => {
+    if (v == null || !isFinite(v)) return;
+    const yy = y(v).toFixed(1);
+    const x0 = (from != null && from < bars.length) ? x(Math.max(0, from)) : JP_RPAD.l;
+    p.push('<line x1="' + x0.toFixed(1) + '" x2="' + (JP_RPAD.l + plotW) + '" y1="' + yy + '" y2="' + yy
+      + '" stroke="' + col + '" stroke-width="1" stroke-dasharray="' + dash + '" opacity="0.85"/>');
+    p.push('<text x="' + (JP_RPAD.l + plotW + 4) + '" y="' + (+yy + 3.2).toFixed(1)
+      + '" font-size="9" fill="' + col + '">' + jpEsc(jpUsd(v)) + '</text>');
+  };
+  if (cursor >= ei) {
+    level(m.stop, 'var(--red)', '4 3', ei);
+    level(m.target1, 'var(--green)', '2 3', ei);
+    level(m.target2, 'var(--green)', '2 3', ei);
+    level(m.entry, 'var(--blue)', '0', ei);
+  }
+  if (cursor >= xi) level(m.exit, 'var(--amber)', '0', xi);
+
+  // The bars themselves, up to the cursor and no further.
+  for (let i = 0; i <= cursor && i < bars.length; i++) {
+    const b = bars[i];
+    const up = b.c >= b.o;
+    const col = up ? 'var(--green)' : 'var(--red)';
+    const yo = y(b.o), yc = y(b.c);
+    p.push('<line x1="' + x(i).toFixed(1) + '" x2="' + x(i).toFixed(1) + '" y1="' + y(b.h).toFixed(1)
+      + '" y2="' + y(b.l).toFixed(1) + '" stroke="' + col + '" stroke-width="1"/>');
+    p.push('<rect x="' + (x(i) - w / 2).toFixed(1) + '" y="' + Math.min(yo, yc).toFixed(1)
+      + '" width="' + w.toFixed(1) + '" height="' + Math.max(1, Math.abs(yc - yo)).toFixed(1)
+      + '" fill="' + col + '"/>');
+  }
+
+  // Where the orders actually landed, at the price recorded rather than at the bar close.
+  const pin = (i, price, col, glyph) => {
+    if (i == null || !isFinite(i) || i > cursor || i >= bars.length || price == null) return;
+    p.push('<text x="' + x(i).toFixed(1) + '" y="' + (y(price) + (glyph === '\u25b2' ? 13 : -6)).toFixed(1)
+      + '" font-size="11" fill="' + col + '" text-anchor="middle">' + glyph + '</text>');
+  };
+  pin(m.entryIdx, m.entry, 'var(--blue)', '\u25b2');
+  pin(m.exitIdx, m.exit, 'var(--amber)', '\u25bc');
+
+  // The cursor itself, so a paused replay says where it is paused.
+  p.push('<line x1="' + x(Math.min(cursor, bars.length - 1)).toFixed(1) + '" x2="'
+    + x(Math.min(cursor, bars.length - 1)).toFixed(1) + '" y1="' + JP_RPAD.t + '" y2="' + (JP_RPAD.t + plotH)
+    + '" stroke="var(--text2)" stroke-width="1" opacity="0.45"/>');
+
+  const t0 = new Date(bars[0].t), t1 = new Date(bars[bars.length - 1].t);
+  const fmt = (dt) => dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  p.push('<text x="' + JP_RPAD.l + '" y="' + (JP_RH - 5) + '" font-size="9" fill="var(--text2)">' + jpEsc(fmt(t0)) + '</text>');
+  p.push('<text x="' + (JP_RPAD.l + plotW) + '" y="' + (JP_RH - 5)
+    + '" font-size="9" fill="var(--text2)" text-anchor="end">' + jpEsc(fmt(t1)) + '</text>');
+
+  const t = d.trade || {};
+  const label = t.symbol + ' ' + (d.timeframe || '') + ' \u2014 ' + bars.length + ' bars, showing '
+    + (cursor + 1) + '. Every figure drawn on it is also stated in the text below it.';
+  return '<svg class="jp-replay-chart" viewBox="0 0 ' + JP_RW + ' ' + JP_RH
+    + '" width="' + JP_RW + '" height="' + JP_RH + '" role="img" aria-label="'
+    + jpEsc(label) + '">' + p.join('') + '</svg>';
+}
+
+/* Where the bars came from, and what the record had to say about the opening. A reader
+   looking at a stop line is entitled to know whether we recorded it or reconstructed it. */
+function jpReplayProvenance(d) {
+  const bits = [];
+  if (d.source === 'live') bits.push('Bars fetched for this window');
+  else if (d.source === 'archive') bits.push('Bars from our own intraday record');
+  if (d.rolledUp) bits.push('rolled up from ' + jpEsc(d.rolledUp.from));
+  if (d.opening && d.opening.recovered) bits.push('the opening recovered from the entry this position was taken on');
+  else if (d.opening) bits.push('the opening as recorded');
+  if (d.marks && d.marks.stopFrom) bits.push('stop from ' + jpEsc(d.marks.stopFrom));
+  if (d.coverage === 'partial' && d.why) bits.push(jpEsc(d.why));
+  if (!bits.length) return '';
+  return '<p class="jp-replay-why">' + bits.join(' \u00b7 ') + '.</p>';
+}
+
+function jpReplayPanel(t) {
+  if (!jpReplay || jpReplay.id !== t.id) return '';
+  if (jpReplay.state === 'loading') {
+    return '<div class="jp-replay" id="jpReplayBody" aria-busy="true"><p class="jp-replay-why">Loading the bars\u2026</p></div>';
+  }
+  if (jpReplay.state === 'error') {
+    const msg = (jpReplay.data && (jpReplay.data.message || jpReplay.data.error)) || 'unknown';
+    return '<div class="jp-replay" id="jpReplayBody"><p class="jp-replay-why">The replay could not be loaded ('
+      + jpEsc(msg) + '). Every other figure on this page is unaffected.</p></div>';
+  }
+  const d = jpReplay.data || {};
+  return '<div class="jp-replay"><div id="jpReplayBody">' + jpReplayInner(d, jpReplay.cursor, jpReplay.playing)
+    + '</div>' + jpReplayProvenance(d) + '</div>';
+}
+
 /* What the row has that the table has no column for -- and, as importantly, what it does
    NOT have. An imported manual trade has no engine reason and no excursions; saying so is
    the difference between an honest record and one that looks like a zero. */
@@ -1379,7 +1714,10 @@ function jpTradeDetail(t) {
     + bit('R', t.r != null ? jpR(t.r) : '<span class="jp-dim">no stop recorded to measure against</span>')
     + bit('Source', src)
     + (t.estimated ? bit('Note', '<span class="jp-dim">priced off the last observed mark, not a broker fill</span>') : '')
-    + '</div>' + jpNoteEditor(t) + '</td></tr>';
+    + '<div><button type="button" class="jp-linkish" onclick="event.stopPropagation();jpReplayOpen(\''
+    + jpEsc(t.id).replace(/'/g, '') + '\')" aria-expanded="' + (jpReplay && jpReplay.id === t.id ? 'true' : 'false') + '">'
+    + (jpReplay && jpReplay.id === t.id ? 'Hide replay' : 'Replay this trade') + '</button></div>'
+    + '</div>' + jpReplayPanel(t) + jpNoteEditor(t) + '</td></tr>';
 }
 
 function jpTrades(data) {
@@ -1496,9 +1834,11 @@ function jpTradePage(dir) {
 
 /* Expanding costs nothing: the row is already in hand. */
 function jpTradeToggle(id) {
+  // A replay belongs to the row it was opened from; closing the row closes it, rather
+  // than leaving a chart playing under a collapsed trade.
+  if (jpReplay && jpReplay.id === id && jpTradeOpen.has(id)) { jpReplayStop(); jpReplay = null; }
   if (jpTradeOpen.has(id)) jpTradeOpen.delete(id); else jpTradeOpen.add(id);
-  const card = document.getElementById('jpTradesCard');
-  if (card && jpTradeData) card.innerHTML = jpTrades(jpTradeData);
+  jpTradeRepaint();
 }
 
 async function jpEnsureTrades() {
