@@ -37,6 +37,12 @@
     light: ['#f4f6fa', '#ffffff', '#eef1f6', '#e3e8f0'],
   };
 
+  /* The alphas the pages actually paint a signal's own colour at, behind text in that
+     same colour: chips, badges, hover states, the zone ladder. A new wash belongs here
+     rather than being trusted to be light enough -- at 0.22 on the lightest dark surface
+     the figure and its background are close enough to fail. */
+  const WASH_ALPHAS = [0.06, 0.08, 0.10, 0.12, 0.20, 0.22];
+
   /* A preset is a pair of HUES with a reason. The lightness is decided per theme by the
      same code that handles a custom colour, so a preset cannot be readable while a custom
      colour is not — there is only one path. */
@@ -108,13 +114,22 @@
    * is always the nearest readable version of what was asked for rather than something
    * on the other side of it. Returns how far it moved so the reader can be told.
    */
-  function readable(hex, surfaces, min, direction) {
+  function readable(hex, surfaces, min, direction, derive) {
     let rgb = hexToRgb(hex);
     if (!rgb) return null;
     let hsl = rgbToHsl(rgb);
     let step = direction === 'darker' ? -1 : 1;
+    /* `derive` yields the surfaces that depend on the candidate ITSELF -- the washes the
+       pages paint as color-mix(var(--green) 12%, surface), which move as the colour
+       moves. A fixed tint was not enough: the dashboard writes a figure on a wash OF that
+       figure at six alphas, and the pair can close to 3.1:1. Circular only in appearance,
+       since each candidate is checked against the washes that candidate would produce. */
     let clears = function (c) {
       for (let i = 0; i < surfaces.length; i++) if (contrast(c, hexToRgb(surfaces[i])) < min) return false;
+      if (derive) {
+        let extra = derive(c);
+        for (let j = 0; j < extra.length; j++) if (contrast(c, extra[j]) < min) return false;
+      }
       return true;
     };
     for (let d = 0; d <= 100; d++) {
@@ -181,8 +196,27 @@
     // actually render.
     let gainTint = tintFor(want.gain, theme);
     let lossTint = tintFor(want.loss, theme);
-    let g = readable(want.gain, surfaces.concat([gainTint]), 4.5, dir);
-    let l = readable(want.loss, surfaces.concat([lossTint]), 4.5, dir);
+    /* Every wash the figure can be written on: the TINT at each alpha, over each surface.
+       Deliberately the tint and not the figure itself. Deriving the wash from the figure
+       was the obvious first move and it is wrong -- background and foreground then share a
+       hue and converge, which dragged Classic from the #00d4aa/#cf0012 the stylesheets
+       ship down to #005a48/#9c000e just to stay legible against itself. The tint is a
+       separate colour for exactly this reason (#3577), and with it the shipped palette
+       clears everywhere unchanged. */
+    let washesOf = function (tintHex) {
+      return function () {
+        let out = [], t = hexToRgb(tintHex);
+        for (let i = 0; i < WASH_ALPHAS.length; i++) {
+          for (let j = 0; j < surfaces.length; j++) {
+            let bg = hexToRgb(surfaces[j]), a = WASH_ALPHAS[i];
+            out.push([t[0] * a + bg[0] * (1 - a), t[1] * a + bg[1] * (1 - a), t[2] * a + bg[2] * (1 - a)]);
+          }
+        }
+        return out;
+      };
+    };
+    let g = readable(want.gain, surfaces.concat([gainTint]), 4.5, dir, washesOf(gainTint));
+    let l = readable(want.loss, surfaces.concat([lossTint]), 4.5, dir, washesOf(lossTint));
 
     return {
       id: want.id,
@@ -250,6 +284,33 @@
     try { return apply(read()); } catch (e) { return null; }
   }
 
+  /**
+   * The account's choice, arriving after paint (#3592).
+   *
+   * The device's own copy is applied first, from <head>, so the page paints correctly
+   * with no flash. This is the second half: when the session resolves and the account
+   * says something different — a new browser, a phone, a machine where the reader has
+   * never set it — that wins, and is written down locally so the next load is instant.
+   *
+   * Same-value is a no-op rather than a repaint, which is the common case by far.
+   */
+  function adopt(serverChoice) {
+    if (!serverChoice || typeof serverChoice !== 'object') return null;
+    const local = read();
+    const same = JSON.stringify(normalise(local)) === JSON.stringify(normalise(serverChoice));
+    if (same) return null;
+    write(serverChoice);
+    return applyStored();
+  }
+  // Compared on the fields that MATTER, so a stray key or a different property order
+  // does not cause a pointless repaint on every page load.
+  function normalise(c) {
+    if (!c || typeof c !== 'object') return { id: 'classic' };
+    return c.id === 'custom'
+      ? { id: 'custom', gain: String(c.gain || '').toLowerCase(), loss: String(c.loss || '').toLowerCase() }
+      : { id: String(c.id || 'classic') };
+  }
+
   /* The lightness walk is per theme, so a theme change has to re-run it. Pages toggle the
      theme by setting data-theme, which this watches rather than asking every caller to
      remember. */
@@ -269,7 +330,9 @@
   return {
     PRESETS: PRESETS, SURFACES: SURFACES, STORAGE_KEY: STORAGE_KEY,
     resolve: resolve, readable: readable, tintFor: tintFor, distinguishable: distinguishable,
-    cssVars: cssVars, apply: apply, applyStored: applyStored, read: read, write: write,
+    WASH_ALPHAS: WASH_ALPHAS,
+    cssVars: cssVars, apply: apply, applyStored: applyStored, adopt: adopt, normalise: normalise,
+    read: read, write: write,
     ratio: ratio, hexToRgb: hexToRgb, rgbToHex: rgbToHex, rgbToHsl: rgbToHsl, hslToRgb: hslToRgb,
   };
 }));

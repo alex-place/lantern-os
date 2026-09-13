@@ -35,6 +35,9 @@
        so the trader's brand colour matches index + dream-chat and follows the theme.
        The domain up/down colours (--green/--red) stay distinct. #trader-consistency */
     --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:var(--accent,#4a9eff);
+    /* The wash behind a coloured figure -- a SEPARATE colour from the figure, so the
+       two cannot converge as the reader's palette moves (#3577, #3592). */
+    --tint-pos:#113b33;--tint-neg:#3b1115;
     --purple:#a78bfa;--gold:#f5a623;
     /* Fonts: the EXACT stacks index + dream-chat use — no vendored IBM Plex. #trader-fonts
        --sans = site.css body font; --display = the shared brand/heading stack (index
@@ -46,7 +49,6 @@
     /* TradingView-style chart contrast */
     --tv-text-primary:#ffffff;--tv-text-secondary:#d1d4dc;
     --tv-grid:rgba(255,255,255,.06);--tv-axis:rgba(255,255,255,.65);
-    --tv-candle-up:#26a69a;--tv-candle-down:#ef5350;
   }
   /* Light theme (#1577): the global ☀/🌙 toggle flips data-theme; remap the
      terminal palette so the whole trader is genuinely light-mode-aware, not
@@ -68,6 +70,7 @@
     --bg0:#f4f6fa;--bg1:#ffffff;--bg2:#eef1f6;--bg3:#e3e8f0;
     --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#5f6778;
     --green:#00745d;--red:#cf0012;--amber:#905a01;--gold:#905a01;
+    --tint-pos:#e2f8f4;--tint-neg:#f8e2e4;
     --accent:#0369a1;--blue:#0369a1;--purple:#6d3fd4;
     --tv-text-primary:#1a1d24;--tv-text-secondary:#4a5160;
     --tv-grid:rgba(0,0,0,.08);--tv-axis:rgba(0,0,0,.55);
@@ -93,8 +96,8 @@
      pills would render in the default text colour. */
   .chart-order-pills .pill-buy{color:var(--green)}
   .chart-order-pills .pill-sell{color:var(--red)}
-  .chart-order-pills .pill-buy:hover{background:rgba(0,212,170,.22);border-color:rgba(0,212,170,.6);color:var(--green)}
-  .chart-order-pills .pill-sell:hover{background:rgba(255,95,109,.22);border-color:rgba(255,95,109,.6);color:var(--red)}
+  .chart-order-pills .pill-buy:hover{background:color-mix(in srgb, var(--tint-pos) 22%, transparent);border-color:color-mix(in srgb, var(--tint-pos) 60%, transparent);color:var(--green)}
+  .chart-order-pills .pill-sell:hover{background:color-mix(in srgb, var(--tint-neg) 22%, transparent);border-color:color-mix(in srgb, var(--tint-neg) 60%, transparent);color:var(--red)}
   /* An armed drawing tool must not be interrupted by an accidental order. */
   body.drawing-armed .chart-order-pills{display:none}
   @media (max-width:580px){ .chart-order-pills button{font-size:12px;padding:5px 12px} }
@@ -597,9 +600,9 @@
       markup that used them was renderAdvisor()/startBrakePoll(). brake_status is
       still a chat tool, so the overlay is readable, just not rendered here. */
   .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
-    border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
-  .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
-  .tp-flat-btn.armed,.tp-flatten-all.armed{background:rgba(255,95,109,.32);animation:otArmPulse 1s ease-in-out infinite}
+    border:1px solid color-mix(in srgb, var(--tint-neg) 45%, transparent);background:color-mix(in srgb, var(--tint-neg) 10%, transparent);color:var(--red);white-space:nowrap;transition:background .15s}
+  .tp-flat-btn:hover,.tp-flatten-all:hover{background:color-mix(in srgb, var(--tint-neg) 25%, transparent)}
+  .tp-flat-btn.armed,.tp-flatten-all.armed{background:color-mix(in srgb, var(--tint-neg) 32%, transparent);animation:otArmPulse 1s ease-in-out infinite}
   /* ── Positions panel styles (#3518): density + choosable columns ─────────────
      Data columns size to their content and the actions column takes the slack, so a
      row reads as one line of numbers instead of ten islands spread across the panel. */
@@ -668,7 +671,7 @@
   .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
-  .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
+  .ovn-toggle.ovn-on{background:color-mix(in srgb, var(--tint-pos) 22%, transparent);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
@@ -781,7 +784,7 @@
   /* An open position changes the card's BORDER, never its footprint. This used to be
      `grid-column:span 2`, so opening a position silently doubled that card's width and
      re-flowed every other chart on the deck (#3139). */
-  .card.state-open{border-color:rgba(0,212,170,.35)}
+  .card.state-open{border-color:color-mix(in srgb, var(--tint-pos) 35%, transparent)}
   .card.state-watching{border-color:color-mix(in srgb, var(--accent) 28%, var(--border))}
   .card.state-quiet{opacity:.75}
   .card-header{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -816,24 +819,24 @@
   .card-price{font-family:var(--mono);font-size:13px;color:var(--text1)}
   /* Tick-flash (#1627): on each price change, flash green/red for ~1s then fade
      back to the normal colour. Normal state is untouched. */
-  @keyframes cpFlashUp{0%{color:var(--green);background:rgba(0,212,170,.20)}100%{color:var(--text1);background:transparent}}
-  @keyframes cpFlashDown{0%{color:var(--red);background:rgba(255,95,109,.20)}100%{color:var(--text1);background:transparent}}
+  @keyframes cpFlashUp{0%{color:var(--green);background:color-mix(in srgb, var(--tint-pos) 20%, transparent)}100%{color:var(--text1);background:transparent}}
+  @keyframes cpFlashDown{0%{color:var(--red);background:color-mix(in srgb, var(--tint-neg) 20%, transparent)}100%{color:var(--text1);background:transparent}}
   .card-price.flash-up{animation:cpFlashUp 1s ease-out;border-radius:3px}
   .card-price.flash-down{animation:cpFlashDown 1s ease-out;border-radius:3px}
   /* #2433: day-change chip — the at-a-glance win/loss cue for each card. */
   .card-chg{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
-  .card-chg.up{background:rgba(0,212,170,.12);color:var(--green)}
-  .card-chg.dn{background:rgba(255,95,109,.12);color:var(--red)}
+  .card-chg.up{background:color-mix(in srgb, var(--tint-pos) 12%, transparent);color:var(--green)}
+  .card-chg.dn{background:color-mix(in srgb, var(--tint-neg) 12%, transparent);color:var(--red)}
   .card-chg.flat{background:rgba(92,99,112,.12);color:var(--text2)}
   .card-chg:empty{display:none}
   .card-state{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;letter-spacing:.1em}
-  .state-open .card-state{background:rgba(0,212,170,.12);color:var(--green)}
+  .state-open .card-state{background:color-mix(in srgb, var(--tint-pos) 12%, transparent);color:var(--green)}
   .state-watching .card-state{background:rgba(74,158,255,.12);color:var(--blue);animation:pulse 2.4s ease-in-out infinite}
   .state-quiet .card-state{background:rgba(92,99,112,.1);color:var(--text2)}
   /* Live market-regime badge (shown in place of QUIET when the market is
      actually moving — see marketRegime() / regimeBadgeInfo()) */
-  .card-state.regime-bullish{background:rgba(0,212,170,.12);color:var(--green)}
-  .card-state.regime-bearish{background:rgba(255,95,109,.12);color:var(--red)}
+  .card-state.regime-bullish{background:color-mix(in srgb, var(--tint-pos) 12%, transparent);color:var(--green)}
+  .card-state.regime-bearish{background:color-mix(in srgb, var(--tint-neg) 12%, transparent);color:var(--red)}
   .card-state.regime-breakout{background:rgba(245,166,35,.18);color:var(--amber)}
   .card-state.regime-volatile{background:rgba(245,166,35,.12);color:var(--amber)}
   .card-state.regime-trending{background:rgba(74,158,255,.12);color:var(--blue)}
@@ -841,8 +844,8 @@
   /* Signal chip (#2301): a compact inline pill hugging its text, not a loud
      full-width bar. Sits inline in the card meta row, out of the chart's way. */
   .conf-badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .conf-badge.bull{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);color:var(--green)}
-  .conf-badge.bear{background:rgba(255,95,109,.1);border:1px solid rgba(255,95,109,.3);color:var(--red)}
+  .conf-badge.bull{background:color-mix(in srgb, var(--tint-pos) 10%, transparent);border:1px solid color-mix(in srgb, var(--tint-pos) 30%, transparent);color:var(--green)}
+  .conf-badge.bear{background:color-mix(in srgb, var(--tint-neg) 10%, transparent);border:1px solid color-mix(in srgb, var(--tint-neg) 30%, transparent);color:var(--red)}
   .conf-badge.neut{background:rgba(92,99,112,.15);border:1px solid var(--border);color:var(--text2)}
   /* Pattern-read chip (#trader-patterns): the honest name of the chart pattern the
      deterministic engine actually detected (last_signal.candle) — Head & Shoulders,
@@ -850,8 +853,8 @@
      Dashed border distinguishes a "read" from the solid conviction badge; only shown
      when Patterns is ON and a pattern is genuinely detected. Bias-coloured. */
   .pat-chip{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px dashed var(--border);background:var(--bg2);cursor:help}
-  .pat-chip.bull{border-color:rgba(0,212,170,.45);color:var(--green)}
-  .pat-chip.bear{border-color:rgba(255,95,109,.45);color:var(--red)}
+  .pat-chip.bull{border-color:color-mix(in srgb, var(--tint-pos) 45%, transparent);color:var(--green)}
+  .pat-chip.bear{border-color:color-mix(in srgb, var(--tint-neg) 45%, transparent);color:var(--red)}
   .pat-chip.neut{border-color:var(--border);color:var(--text1)}
   /* Honest-degrade: uncalibrated signal shown neutral, never dressed as an edge. */
   .conf-badge.uncal{background:rgba(92,99,112,.12);border:1px solid var(--border);color:var(--text2)}
@@ -860,8 +863,8 @@
   .conf-badge .cb-hit{color:var(--text2);font-size:8px}
   /* P&L badge */
   .pnl-badge{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:3px;font-weight:600}
-  .pnl-pos{background:rgba(0,212,170,.15);color:var(--green)}
-  .pnl-neg{background:rgba(255,95,109,.15);color:var(--red)}
+  .pnl-pos{background:color-mix(in srgb, var(--tint-pos) 15%, transparent);color:var(--green)}
+  .pnl-neg{background:color-mix(in srgb, var(--tint-neg) 15%, transparent);color:var(--red)}
   /* Zone ladder */
   .zone-ladder{position:relative;flex:1 1 auto;min-height:80px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
   /* Order ticket trigger row */
@@ -875,9 +878,9 @@
      directional tint on hover; theme-agnostic (var(--text1)). sig-on still lifts
      the side the grounded Σ₀ signal favors, but restrained. */
   .btn-buy{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:12px}
-  .btn-buy:hover{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.45)}
+  .btn-buy:hover{background:color-mix(in srgb, var(--tint-pos) 12%, transparent);color:var(--green);border-color:color-mix(in srgb, var(--tint-pos) 45%, transparent)}
   .btn-sell{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:12px}
-  .btn-sell:hover{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.45)}
+  .btn-sell:hover{background:color-mix(in srgb, var(--tint-neg) 12%, transparent);color:var(--red);border-color:color-mix(in srgb, var(--tint-neg) 45%, transparent)}
   /* beat .order-ticket button{font-size:11px;border:1px solid transparent} */
   .order-ticket .btn-buy, .order-ticket .btn-sell{font-size:12px;border-color:var(--border)}
   /* Σ₀-grounded signal emphasis (#1578): a side is highlighted only when the
@@ -888,8 +891,8 @@
   /* Restrained signal emphasis (#2301): the ▼ SHORT/▲ LONG chip already conveys
      direction, so the favored side gets only a faint colored border + text — no
      loud fill or glow. Keeps buy/sell neutral in the read-only/empty view. */
-  .btn-buy.sig-on{background:transparent;border-color:rgba(0,212,170,.55);color:var(--green);box-shadow:none}
-  .btn-sell.sig-on{background:transparent;border-color:rgba(255,95,109,.55);color:var(--red);box-shadow:none}
+  .btn-buy.sig-on{background:transparent;border-color:color-mix(in srgb, var(--tint-pos) 55%, transparent);color:var(--green);box-shadow:none}
+  .btn-sell.sig-on{background:transparent;border-color:color-mix(in srgb, var(--tint-neg) 55%, transparent);color:var(--red);box-shadow:none}
   /* #1696: buttons stay vibrant — Σ₀ no longer mutes them (sig-off is a no-op). */
   .order-ticket button.sig-off{opacity:1;filter:none}
   /* ── Symbol-search popup (#1692) ── */
@@ -1112,9 +1115,9 @@
   .ot-side-row{display:flex;gap:6px}
   .ot-side-btn{flex:1;text-align:center;padding:8px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:13px;cursor:pointer;line-height:1.6}
   .ot-side-btn .ot-side-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)}
-  .ot-side-btn.active.sell{background:rgba(255,95,109,.15);border-color:var(--red);color:var(--red)}
+  .ot-side-btn.active.sell{background:color-mix(in srgb, var(--tint-neg) 15%, transparent);border-color:var(--red);color:var(--red)}
   .ot-side-btn.active.sell .ot-side-label{color:var(--red)}
-  .ot-side-btn.active.buy{background:rgba(0,212,170,.15);border-color:var(--green);color:var(--green)}
+  .ot-side-btn.active.buy{background:color-mix(in srgb, var(--tint-pos) 15%, transparent);border-color:var(--green);color:var(--green)}
   .ot-side-btn.active.buy .ot-side-label{color:var(--green)}
   .ot-tabs{display:flex;gap:6px}
   .ot-tab{flex:1;text-align:center;padding:5px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
@@ -1137,22 +1140,22 @@
   .ot-info-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text2)}
   .ot-info-row span:last-child{color:var(--text0)}
   .ot-submit{font-family:var(--mono);font-size:13px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;text-transform:uppercase;text-align:center}
-  .ot-submit.buy{background:rgba(0,212,170,.15);color:var(--green);border-color:var(--green)}
-  .ot-submit.buy:hover{background:rgba(0,212,170,.28)}
+  .ot-submit.buy{background:color-mix(in srgb, var(--tint-pos) 15%, transparent);color:var(--green);border-color:var(--green)}
+  .ot-submit.buy:hover{background:color-mix(in srgb, var(--tint-pos) 28%, transparent)}
   /* Two-step confirm (order-ux): the armed state pulses so the "click again to
      confirm" step reads as deliberate, not a stuck button. */
   .ot-submit.armed{animation:otArmPulse 1s ease-in-out infinite;box-shadow:0 0 0 2px currentColor inset}
   @keyframes otArmPulse{0%,100%{opacity:1}50%{opacity:.62}}
-  .ot-submit.sell{background:rgba(255,95,109,.15);color:var(--red);border-color:var(--red)}
-  .ot-submit.sell:hover{background:rgba(255,95,109,.28)}
+  .ot-submit.sell{background:color-mix(in srgb, var(--tint-neg) 15%, transparent);color:var(--red);border-color:var(--red)}
+  .ot-submit.sell:hover{background:color-mix(in srgb, var(--tint-neg) 28%, transparent)}
   /* ── Footer panels ── */
   .fpanel{padding:10px 14px;overflow-y:auto;min-height:0;background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px}
   /* Sticky within the scrolling .fpanel (#1626): the section title stays pinned at
      the top while the feed scrolls under it. Opaque bg + the panel's own padding
      reclaimed via negative margins so nothing peeks above it. */
   .panel-title{font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);letter-spacing:.15em;text-transform:uppercase;position:sticky;top:-10px;z-index:3;background:var(--bg1);margin:-10px -14px 8px;padding:10px 14px 6px}
-  .s0-sig{border:1px solid var(--tv-border);border-left:3px solid var(--green);border-radius:4px;padding:7px 9px;margin-bottom:6px;background:rgba(0,212,170,.05)}
-  .s0-sig.short{border-left-color:var(--red);background:rgba(255,95,109,.05)}
+  .s0-sig{border:1px solid var(--tv-border);border-left:3px solid var(--green);border-radius:4px;padding:7px 9px;margin-bottom:6px;background:color-mix(in srgb, var(--tint-pos) 5%, transparent)}
+  .s0-sig.short{border-left-color:var(--red);background:color-mix(in srgb, var(--tint-neg) 5%, transparent)}
   .s0-head{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--tv-text)}
   .s0-lvl{font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);margin-top:2px}
   .s0-why{font-size:11px;color:var(--tv-text-secondary);margin-top:3px;font-style:italic}
@@ -1160,14 +1163,14 @@
   /* #1710: "watching" narration lines */
   .s0-watchhdr{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 4px;border-top:1px solid var(--tv-border);padding-top:7px}
   .s0-watch{font-family:var(--mono);font-size:11px;color:var(--tv-text);padding:4px 8px;margin-bottom:4px;border-left:3px solid var(--blue);border-radius:3px;background:rgba(74,158,255,.06);line-height:1.4}
-  .s0-watch.short{border-left-color:var(--red);background:rgba(255,95,109,.05)}
+  .s0-watch.short{border-left-color:var(--red);background:color-mix(in srgb, var(--tint-neg) 5%, transparent)}
   .s0-watch b{color:var(--tv-text);font-weight:700}
   .s0-eye{margin-right:2px}
   .s0-status{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);padding:2px 0 7px;margin-bottom:6px;border-bottom:1px solid var(--tv-border)}
   .s0-status .pos{color:var(--green)} .s0-status .neg{color:var(--red)}
   /* Σ₀ Council (Converge stage): calibration + per-signal realized edge */
   .s0-cl-mat{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.08em}
-  .s0-cl-mat.ready{color:var(--green);background:rgba(0,212,170,.12)}
+  .s0-cl-mat.ready{color:var(--green);background:color-mix(in srgb, var(--tint-pos) 12%, transparent)}
   .s0-cl-mat.warm{color:var(--amber);background:rgba(255,176,32,.12)}
   .s0-cl-stats{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);padding:7px 0;margin:6px 0;border-top:1px solid var(--tv-border);border-bottom:1px solid var(--tv-border)}
   .s0-cl-stats b{color:var(--tv-text);font-weight:700}
@@ -1280,7 +1283,7 @@
   .dc-msg{max-width:90%;padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
   .dc-msg.user{align-self:flex-end;background:color-mix(in srgb,var(--blue) 16%,var(--bg2));border:1px solid color-mix(in srgb,var(--blue) 45%,var(--border));color:var(--text0);border-bottom-right-radius:3px}
   .dc-msg.bot{align-self:flex-start;background:var(--bg2);color:var(--text0);border:1px solid var(--border);border-bottom-left-radius:3px}
-  .dc-msg.bot.err{border-color:var(--red);color:var(--red);background:rgba(255,95,109,.08)}
+  .dc-msg.bot.err{border-color:var(--red);color:var(--red);background:color-mix(in srgb, var(--tint-neg) 8%, transparent)}
   .dc-route{align-self:flex-start;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);
     padding:2px 8px;border:1px solid var(--border);border-radius:999px;background:var(--bg2);margin:-4px 0 -3px}
   /* Empty state = the site's hero pattern (mandala mark + tagline + starter chips),
@@ -1855,11 +1858,36 @@ const CHART_AXIS_FONT   = '11px ui-monospace, "SF Mono", Menlo, Consolas, monosp
 const chartVar = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
 const CHART_AXIS_COLOR  = () => chartVar('--tv-axis', 'rgba(255,255,255,.65)');
 const CHART_GRID_COLOR  = () => chartVar('--tv-grid', 'rgba(255,255,255,.06)');
-const CHART_CANDLE_UP   = '#26a69a';
-const CHART_CANDLE_DOWN = '#ef5350';
+/* The reader's own gain/loss colours (#3592), read live like the axis and grid
+   above. These were #26a69a/#ef5350 -- TradingView's palette, not even this
+   page's -- so the chart ignored both the theme and the preference. The
+   fallbacks are the page's defaults, for the moment before the palette lands. */
+const CHART_CANDLE_UP   = () => chartVar('--green', '#00d4aa');
+const CHART_CANDLE_DOWN = () => chartVar('--red', '#ff5f6d');
 // #2433: hex → rgba for canvas gradients (gradient stops can't use globalAlpha).
+/* The reader's gain/loss colour as an rgba() string, for the places that build
+   canvas fills and inline styles rather than CSS rules (#3592). Reads the token
+   at call time, so it follows a change without a reload. */
+function _sigRgba(which, a){
+  /* 'gain'/'loss' give the FIGURE colour, for a line or a candle. 'gainTint'/'lossTint'
+     give the WASH, which is a different colour on purpose: a wash mixed from the figure
+     converges on it as the reader's palette moves, and the text stops being readable on
+     its own background. */
+  const map = { gain: ['--green', '#00d4aa'], loss: ['--red', '#ff5f6d'],
+                gainTint: ['--tint-pos', '#113b33'], lossTint: ['--tint-neg', '#3b1115'] };
+  const t = map[which] || map.gain;
+  return _chartRgba(chartVar(t[0], t[1]), a);
+}
+
 function _chartRgba(hex, a){
-  const n = parseInt(hex.slice(1), 16);
+  /* It used to be handed a literal from two lines above; it is now handed whatever
+     a CSS custom property holds, which a page skin or a future palette could make
+     a short hex or something else entirely. A NaN here paints `rgba(NaN,...)`,
+     which a canvas silently ignores -- an invisible candle rather than an error. */
+  let h = String(hex || '').trim().replace('#', '');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (!/^[0-9a-f]{6}$/i.test(h)) return `rgba(128,128,128,${a})`;
+  const n = parseInt(h, 16);
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
 }
 
@@ -2810,7 +2838,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
         const x=i*slotW + slotW/2;
         const hgt=(v/maxVol)*bandH;
-        ctx.fillStyle=_chartRgba(b.close>=b.open ? CHART_CANDLE_UP : CHART_CANDLE_DOWN, .28);
+        ctx.fillStyle=_chartRgba(b.close>=b.open ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN(), .28);
         ctx.fillRect(x-bw2/2, priceH-hgt, bw2, hgt);
       }
       // ── VWAP overlay (#2436) — cumulative Σ(typical·vol)/Σ(vol) over the visible
@@ -2844,7 +2872,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const b = bars[i];
         const x = i*slotW + slotW/2;
         const up = b.close >= b.open;
-        const color = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
+        const color = up ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
         const sw = saneHiLo(b);                     // per-side glitch clamp (v2)
         const wHi = sw.hi, wLo = sw.lo;
         ctx.strokeStyle = color;
@@ -2866,7 +2894,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       // #2433: direction-aware line — green when the visible window closed up,
       // red when down — with a vertical gradient fill fading to transparent.
       const up = bars[n-1].close >= bars[0].close;
-      const lc = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
+      const lc = up ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
       const grad = ctx.createLinearGradient(0, 0, 0, priceH);
       grad.addColorStop(0, _chartRgba(lc, .26));
       grad.addColorStop(1, _chartRgba(lc, 0));
@@ -2891,7 +2919,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     {
       const last = bars[n-1];
       const lx = (n-1)*slotW + slotW/2, ly = y(last.close);
-      const dc = (last.close >= (type==='candle' ? last.open : bars[0].close)) ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
+      const dc = (last.close >= (type==='candle' ? last.open : bars[0].close)) ? CHART_CANDLE_UP() : CHART_CANDLE_DOWN();
       const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 9);
       glow.addColorStop(0, _chartRgba(dc, .45));
       glow.addColorStop(1, _chartRgba(dc, 0));
@@ -3374,8 +3402,8 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const risk = Math.abs(e0.price - st.price), reward = Math.abs(tg.price - e0.price);
               const rr = risk > 0 ? reward/risk : 0;
               const x1 = Math.min(e0.x, tg.x, st.x), x2 = Math.max(e0.x, tg.x, st.x, x1 + 40);
-              const tgCol = drawOptOf(d, 'targetColor') || CHART_CANDLE_UP;
-              const stCol = drawOptOf(d, 'stopColor')   || CHART_CANDLE_DOWN;
+              const tgCol = drawOptOf(d, 'targetColor') || CHART_CANDLE_UP();
+              const stCol = drawOptOf(d, 'stopColor')   || CHART_CANDLE_DOWN();
               ctx.globalAlpha = base*0.18;
               ctx.fillStyle = tgCol;
               ctx.fillRect(x1, Math.min(e0.y, tg.y), x2 - x1, Math.abs(tg.y - e0.y));
@@ -3514,7 +3542,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           for(let i=0;i<out.hist.length;i++){
             const v=out.hist[i]; if(v==null||!Number.isFinite(v)) continue;
             const vy=yOf(v);
-            ctx.fillStyle=_chartRgba(v>=0?CHART_CANDLE_UP:CHART_CANDLE_DOWN,.55);
+            ctx.fillStyle=_chartRgba(v>=0?CHART_CANDLE_UP():CHART_CANDLE_DOWN(),.55);
             ctx.fillRect(_xOfIdx(i)-bw/2, Math.min(vy,zero), bw, Math.max(1,Math.abs(zero-vy)));
           }
         }
@@ -3758,8 +3786,8 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const zTop = Math.min(rMax, z.top    || z.mid*1.001);
     const zBot = Math.max(rMin, z.bottom || z.mid*0.999);
     if(zTop<=rMin||zBot>=rMax) continue;
-    const bgColor  = sup ? `rgba(0,212,170,${op})` : `rgba(255,95,109,${op})`;
-    const bdColor  = z.triggered_entry ? '#f5a623' : (sup?`rgba(0,212,170,${today?'.65':'.35'})`:`rgba(255,95,109,${today?'.65':'.35'})`);
+    const bgColor  = sup ? `${_sigRgba('gainTint', op)}` : `${_sigRgba('lossTint', op)}`;
+    const bdColor  = z.triggered_entry ? '#f5a623' : (sup?`${_sigRgba('gainTint', today?'.65':'.35')}`:`${_sigRgba('lossTint', today?'.65':'.35')}`);
     const bdWidth  = '1px';   // every zone keeps a visible edge now that fills are faint
     html += `<div style="position:absolute;left:0;right:64px;top:${pct(zTop)};height:${hpct(zTop,zBot)};
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
@@ -3775,7 +3803,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     if(fillTop>fillBot){
       const profit = currentPrice>=pos.entry;
       html += `<div style="position:absolute;left:0;right:64px;top:${pct(fillTop)};height:${hpct(fillTop,fillBot)};
-        background:${profit?'rgba(0,212,170,.06)':'rgba(255,95,109,.06)'};min-height:2px;pointer-events:none;"></div>`;
+        background:${profit?_sigRgba('gainTint', .06):_sigRgba('lossTint', .06)};min-height:2px;pointer-events:none;"></div>`;
     }
     // Entry line
     if(pos.entry>=rMin&&pos.entry<=rMax)
@@ -3784,9 +3812,9 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   // Stop + TP lines
   if(pos&&pos.stop&&pos.stop>=rMin&&pos.stop<=rMax)
-    html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'var(--red)');
+    html += zlLine(pct(pos.stop),_sigRgba('lossTint', .85),`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'var(--red)');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
-    html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'var(--green)');
+    html += zlLine(pct(pos.tp),_sigRgba('gainTint', .85),`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'var(--green)');
   } // end patternPrefs.levels (P&L / entry-stop-TP)
 
   // Current price line

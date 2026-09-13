@@ -220,6 +220,13 @@
   })
     .then(r => (r.ok ? r.json() : null))
     .then(session => {
+      /* The reader's gain/loss colours follow the ACCOUNT (#3592). The device's own
+         copy has already painted from <head>, so this only corrects a machine where
+         they have not set it — and is a no-op when the two agree, which is almost
+         always. */
+      try {
+        if (session && window.SignalPalette) window.SignalPalette.adopt(session.signals);
+      } catch (_e) { /* a palette that cannot load must never take the nav down with it */ }
       updateNav(session);
       wireLogout();
       applyAdminControls(session);
