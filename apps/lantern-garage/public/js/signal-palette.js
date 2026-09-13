@@ -21,18 +21,18 @@
  * a second copy is how the two would drift.
  */
 (function (root, factory) {
-  var api = factory();
+  let api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
   else { root.SignalPalette = api; api.applyStored(); }
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var STORAGE_KEY = 'lantern-signals';
+  let STORAGE_KEY = 'lantern-signals';
 
   /* The surfaces a figure can sit on, per theme. Taken from the journal and trader
      palettes, which share them. Clearing the extreme clears the rest, but all four are
      checked because "the darkest one" is a fact that could change. */
-  var SURFACES = {
+  let SURFACES = {
     dark: ['#0a0c0f', '#111318', '#181c22', '#1f242d'],
     light: ['#f4f6fa', '#ffffff', '#eef1f6', '#e3e8f0'],
   };
@@ -40,7 +40,7 @@
   /* A preset is a pair of HUES with a reason. The lightness is decided per theme by the
      same code that handles a custom colour, so a preset cannot be readable while a custom
      colour is not — there is only one path. */
-  var PRESETS = [
+  let PRESETS = [
     { id: 'classic', name: 'Classic', gain: '#00d4aa', loss: '#ff5f6d',
       note: 'Green up, red down. What the page has always used.' },
     { id: 'colourblind', name: 'Colour-blind safe', gain: '#3b9eff', loss: '#ff8c42',
@@ -55,23 +55,23 @@
 
   // ── colour maths ───────────────────────────────────────────────────────────
   function hexToRgb(hex) {
-    var h = String(hex || '').trim().replace('#', '');
+    let h = String(hex || '').trim().replace('#', '');
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
     if (!/^[0-9a-f]{6}$/i.test(h)) return null;
     return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
   }
   function rgbToHex(c) {
     return '#' + c.map(function (v) {
-      var s = Math.max(0, Math.min(255, Math.round(v))).toString(16);
+      let s = Math.max(0, Math.min(255, Math.round(v))).toString(16);
       return s.length === 1 ? '0' + s : s;
     }).join('');
   }
   function rgbToHsl(c) {
-    var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
-    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-    var l = (max + min) / 2, h = 0, s = 0;
+    let r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let l = (max + min) / 2, h = 0, s = 0;
     if (max !== min) {
-      var d = max - min;
+      let d = max - min;
       s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
       if (max === r) h = ((g - b) / d + (g < b ? 6 : 0));
       else if (max === g) h = (b - r) / d + 2;
@@ -82,24 +82,24 @@
   }
   function hslToRgb(h, s, l) {
     h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
-    var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
-    var t = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+    let c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+    let t = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
       : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
     return [(t[0] + m) * 255, (t[1] + m) * 255, (t[2] + m) * 255];
   }
   function luminance(c) {
-    var a = c.map(function (v) {
-      var s = v / 255;
+    let a = c.map(function (v) {
+      let s = v / 255;
       return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
     });
     return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
   }
   function contrast(a, b) {
-    var x = luminance(a), y = luminance(b);
-    if (y > x) { var t = x; x = y; y = t; }
+    let x = luminance(a), y = luminance(b);
+    if (y > x) { let t = x; x = y; y = t; }
     return (x + 0.05) / (y + 0.05);
   }
-  var ratio = function (hexA, hexB) { return contrast(hexToRgb(hexA), hexToRgb(hexB)); };
+  let ratio = function (hexA, hexB) { return contrast(hexToRgb(hexA), hexToRgb(hexB)); };
 
   /**
    * The same hue, moved along lightness until it clears `min` on every surface.
@@ -109,33 +109,33 @@
    * on the other side of it. Returns how far it moved so the reader can be told.
    */
   function readable(hex, surfaces, min, direction) {
-    var rgb = hexToRgb(hex);
+    let rgb = hexToRgb(hex);
     if (!rgb) return null;
-    var hsl = rgbToHsl(rgb);
-    var step = direction === 'darker' ? -1 : 1;
-    var clears = function (c) {
-      for (var i = 0; i < surfaces.length; i++) if (contrast(c, hexToRgb(surfaces[i])) < min) return false;
+    let hsl = rgbToHsl(rgb);
+    let step = direction === 'darker' ? -1 : 1;
+    let clears = function (c) {
+      for (let i = 0; i < surfaces.length; i++) if (contrast(c, hexToRgb(surfaces[i])) < min) return false;
       return true;
     };
-    for (var d = 0; d <= 100; d++) {
-      var L = Math.max(0, Math.min(100, hsl[2] + step * d));
+    for (let d = 0; d <= 100; d++) {
+      let L = Math.max(0, Math.min(100, hsl[2] + step * d));
       /* Measure the QUANTISED colour, not the float one on the way to it. Checking the
          float and emitting the hex put 60 of 4800 fuzzed colours at 4.48-4.50 -- passing
          the test inside the loop and failing as rendered. Whatever is emitted is what
          gets measured. */
-      var c = hexToRgb(rgbToHex(hslToRgb(hsl[0], hsl[1], L)));
+      let c = hexToRgb(rgbToHex(hslToRgb(hsl[0], hsl[1], L)));
       if (clears(c)) return { hex: rgbToHex(c), moved: d, ok: true };
       if (L === 0 || L === 100) break;
     }
     // Nowhere on this hue's lightness axis works. Hand back the extreme and say so; the
     // caller reports it rather than pretending the choice was honoured.
-    var end = hslToRgb(hsl[0], hsl[1], direction === 'darker' ? 0 : 100);
+    let end = hslToRgb(hsl[0], hsl[1], direction === 'darker' ? 0 : 100);
     return { hex: rgbToHex(end), moved: null, ok: false };
   }
 
   /** The wash a figure is sometimes drawn on: the same hue, pushed away from the text. */
   function tintFor(hex, theme) {
-    var hsl = rgbToHsl(hexToRgb(hex) || [128, 128, 128]);
+    let hsl = rgbToHsl(hexToRgb(hex) || [128, 128, 128]);
     return theme === 'light'
       ? rgbToHex(hslToRgb(hsl[0], Math.min(hsl[1], 60), 93))
       : rgbToHex(hslToRgb(hsl[0], Math.min(hsl[1], 55), 15));
@@ -150,13 +150,13 @@
    * be 1.0 while they look nothing alike, and vice versa.
    */
   function distinguishable(gain, loss) {
-    var a = rgbToHsl(hexToRgb(gain)), b = rgbToHsl(hexToRgb(loss));
-    var dh = Math.abs(a[0] - b[0]); if (dh > 180) dh = 360 - dh;
+    let a = rgbToHsl(hexToRgb(gain)), b = rgbToHsl(hexToRgb(loss));
+    let dh = Math.abs(a[0] - b[0]); if (dh > 180) dh = 360 - dh;
     return { hueDistance: Math.round(dh), ratio: +ratio(gain, loss).toFixed(2), ok: dh >= 40 };
   }
 
-  var byId = function (id) {
-    for (var i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) return PRESETS[i];
+  let byId = function (id) {
+    for (let i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) return PRESETS[i];
     return null;
   };
 
@@ -169,20 +169,20 @@
    */
   function resolve(choice, theme) {
     theme = theme === 'light' ? 'light' : 'dark';
-    var want = choice && choice.id === 'custom'
+    let want = choice && choice.id === 'custom'
       ? { id: 'custom', name: 'Custom', gain: choice.gain, loss: choice.loss }
       : (byId(choice && choice.id) || PRESETS[0]);
     if (!hexToRgb(want.gain) || !hexToRgb(want.loss)) want = PRESETS[0];
 
-    var dir = theme === 'light' ? 'darker' : 'lighter';
-    var surfaces = SURFACES[theme].slice();
+    let dir = theme === 'light' ? 'darker' : 'lighter';
+    let surfaces = SURFACES[theme].slice();
     // The wash is decided from the hue as asked, so it does not chase the adjustment —
     // then the figure has to clear on it too, which is the case the heatmap and the pills
     // actually render.
-    var gainTint = tintFor(want.gain, theme);
-    var lossTint = tintFor(want.loss, theme);
-    var g = readable(want.gain, surfaces.concat([gainTint]), 4.5, dir);
-    var l = readable(want.loss, surfaces.concat([lossTint]), 4.5, dir);
+    let gainTint = tintFor(want.gain, theme);
+    let lossTint = tintFor(want.loss, theme);
+    let g = readable(want.gain, surfaces.concat([gainTint]), 4.5, dir);
+    let l = readable(want.loss, surfaces.concat([lossTint]), 4.5, dir);
 
     return {
       id: want.id,
@@ -215,9 +215,9 @@
   // ── storage + application ──────────────────────────────────────────────────
   function read() {
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      let raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return { id: 'classic' };
-      var v = JSON.parse(raw);
+      let v = JSON.parse(raw);
       return (v && typeof v === 'object') ? v : { id: 'classic' };
     } catch (e) { return { id: 'classic' }; }
   }
@@ -230,14 +230,14 @@
 
   function apply(choice, theme) {
     if (typeof document === 'undefined') return null;
-    var el = document.documentElement;
+    let el = document.documentElement;
     if (!theme) theme = el.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-    var r = resolve(choice, theme);
-    var vars = cssVars(r);
+    let r = resolve(choice, theme);
+    let vars = cssVars(r);
     // Classic is what the stylesheets already say, so it REMOVES the overrides rather
     // than restating them — a page's own palette (the Kalshi phosphor skin) then keeps
     // whatever it chose for itself.
-    for (var k in vars) {
+    for (let k in vars) {
       if (!Object.prototype.hasOwnProperty.call(vars, k)) continue;
       if (r.id === 'classic') el.style.removeProperty(k);
       else el.style.setProperty(k, vars[k]);
@@ -256,7 +256,7 @@
   function watchTheme() {
     if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
     new MutationObserver(function (muts) {
-      for (var i = 0; i < muts.length; i++) {
+      for (let i = 0; i < muts.length; i++) {
         if (muts[i].attributeName === 'data-theme') { applyStored(); return; }
       }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
