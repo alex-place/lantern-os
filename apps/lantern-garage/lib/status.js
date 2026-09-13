@@ -72,6 +72,12 @@ function getStatus() {
     },
     // #672: live Cloudflare Tunnel state — updated by server.js lifecycle hooks
     cloudflare_tunnel: getTunnelState(),
+    // #3525: is the trading loop still completing scans? A stalled loop is invisible
+    // from everything else on this page — the process is up and the endpoint answers,
+    // which is exactly what made the stalls of 2026-09-08 hard to see. In the split
+    // topology (#3523) this is the TRADER process's answer on its loopback port; a web
+    // process reports mode 'off' and no scans, which is the honest answer there.
+    trader_heartbeat: getTraderHeartbeat(),
     // #1049: key presence (boolean only, never expose values) so the root cause of
     // degraded mode (missing env vars in scheduled-task spawn) is immediately visible.
     api_keys: {
@@ -83,6 +89,16 @@ function getStatus() {
       kalshi:    !!process.env.KALSHI_API_KEY,
     },
   };
+}
+
+// Fail-soft by construction: the status page must render even if the trader half of
+// the app is absent or broken — that is precisely when someone is reading it.
+function getTraderHeartbeat() {
+  try {
+    return require("./trader-heartbeat").status();
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
 function getMiningLabStatus() {
