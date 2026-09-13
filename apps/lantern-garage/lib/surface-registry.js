@@ -31,6 +31,7 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
   "journal.html":           "Verify",    // trading journal — did the trades do what the plan said? (its own <meta loop-stage> agrees)
+  "transparency.html":      "Verify",    // the trader, scored (#3598) — the prediction ledger and live fills, misses kept visible
   "watch.html":             "Observe",   // market watch — tracking watchlist/charts/signals (the trader's Observe surface; trading split to stock-trader.html)
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
