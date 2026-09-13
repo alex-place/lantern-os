@@ -59,7 +59,19 @@
   /* KPI band. auto-fit keeps it one row on a wide screen and reflows rather than
      scrolling on a narrow one -- a metric you have to scroll to is a metric you
      will not read. */
-  .jp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+  /* THE COLUMN COUNT HAS TO DIVIDE THE TILE COUNT. auto-fit packed as many 150px
+     tiles as fitted, which at a common desktop width is six -- so eight tiles came
+     out as a row of six and an orphan pair against a half-empty row. Four and eight
+     both divide eight; five, six and seven do not.
+
+     Measured against the CARD rather than the window, because the reader can resize
+     the card now (#3565): a half-width Key figures card needs the two-column layout
+     whatever the window is doing. */
+  #jpKpis{container-type:inline-size}
+  .jp-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+  @container (min-width:560px){ .jp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  /* Eight across only once a tile can still hold "$1,391.64" at its own size. */
+  @container (min-width:1180px){ .jp-kpis{grid-template-columns:repeat(8,minmax(0,1fr))} }
   .jp-kpi{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:11px 13px;min-width:0}
   .jp-kpi .k{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis}
@@ -163,10 +175,15 @@
   .jp-week .v{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis}
   .jp-day .p-abbr{display:none}
-  /* Narrow screens: the 76px week column is a fifth of a 375px viewport, and the full
-     figure cannot fit what is left. Drop the column, show the short figure. The week
-     totals are not lost -- they are a sum of days already on screen. */
-  @media (max-width:560px){
+  /* A NARROW CALENDAR, not a narrow window. The 76px week column is a fifth of a 375px
+     viewport and the full figure cannot fit what is left -- but that was written when a
+     card was as wide as the window. Since #3565 the reader can make this card six columns
+     wide on a large screen, where a viewport query never fires and "-$198.00" truncates
+     to "-$198...". Measured against the card, it behaves the same at any window size.
+     The week totals are not lost when the column goes -- they are a sum of days already
+     on screen. */
+  #jpCalCard{container-type:inline-size}
+  @container (max-width:560px){
     .jp-cal, .jp-cal-head{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
     .jp-cal-head span:last-child, .jp-week{display:none}
     .jp-day{padding:3px 4px;min-height:clamp(40px,5.2vh,52px)}
@@ -175,6 +192,8 @@
     .jp-day .p-full{display:none}
     .jp-day .lv{font-size:0;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:3px}
     .jp-day .p-abbr{display:inline}
+  }
+  @media (max-width:560px){
     .jp-shell{padding:0 10px 32px}
   }
   .jp-monthbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -2186,13 +2205,22 @@ function jpCardBody(id, data) {
    what the card is. The grip does both jobs now: drag it with a pointer, or focus it and
    use the arrow keys -- which is more than the chips could do, since they could not
    resize at all. */
-function jpCardBar(id, span, h) {
+/**
+ * The bar that appears on a card while the page is being arranged.
+ *
+ * `titled` says the card already shows its own heading, in which case the bar does not
+ * repeat it -- ten of the twelve cards were printing their name twice the moment edit
+ * mode opened, once in the bar and once as their own <h2>. The grip keeps the name in
+ * its aria-label either way, so nothing is lost to a screen reader.
+ */
+function jpCardBar(id, span, h, titled) {
   if (!jpEdit) return '';
   const name = (JP_WIDGET[id] || {}).name || id;
   return '<div class="jp-bar">'
     + '<button type="button" class="grip" data-grip="' + jpEsc(id) + '" aria-label="Move or resize ' + jpEsc(name)
     + '. Arrow keys move it, shift and arrow keys resize it, Delete hides it.">\u283f</button>'
-    + '<span class="name">' + jpEsc(name) + '</span>'
+    // Empty, not absent: .name carries the margin that pushes the controls right.
+    + (titled ? '<span class="name"></span>' : '<span class="name">' + jpEsc(name) + '</span>')
     + '<span class="jp-span" aria-hidden="true">' + span + '/' + JP_COLS
     + (h ? ' \u00b7 ' + (h / JP_ROW) + 'r' : '') + '</span>'
     + '<button type="button" class="jp-chip" data-act="hide" aria-label="Hide ' + jpEsc(name) + '">Hide</button></div>';
@@ -2259,7 +2287,8 @@ function jpPaintCards() {
       // height -- so dragging the bottom edge shrank the contents inside a box that could
       // not move, which is not resizing anything.
       + ' data-card="' + id + '" style="grid-column:span ' + span + (h ? ';align-self:start' : '') + '">'
-      + jpCardBar(id, span, h)
+      // A card that prints its own <h2> does not need the bar to print it again.
+      + jpCardBar(id, span, h, /<h2[ >]/.test(body))
       + '<div class="jp-cbody"' + (h ? ' style="height:' + h + 'px;overflow:auto"' : '') + '>' + body + '</div>'
       + (jpEdit ? '<span class="jp-res jp-res-x' + (partner[id] ? ' jp-res-split' : '') + '" data-res="x"'
         + (partner[id] ? ' data-split="' + jpEsc(partner[id]) + '"' : '')
