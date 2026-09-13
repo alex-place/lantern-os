@@ -332,6 +332,36 @@
     border:1px solid var(--border);border-radius:7px;padding:7px 9px;font:inherit;font-size:11.5px;resize:vertical}
   .jp-note-text:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
 
+  /* Share (#3562). A dialog rather than a button per card: the accidental click that
+     publishes a reader's money is the failure mode worth designing against. */
+  .jp-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;
+    justify-content:center;padding:6vh 16px;z-index:60;overflow-y:auto}
+  .jp-sheet{background:var(--bg1);border:1px solid var(--border);border-radius:14px;
+    max-width:620px;width:100%;padding:18px 18px 16px}
+  .jp-sheet h2{font-size:14px;color:var(--text0);margin:0 0 3px}
+  .jp-sheet .lede{font-size:11.5px;color:var(--text2);margin:0 0 14px;line-height:1.55}
+  .jp-sheet label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);
+    display:block;margin:0 0 5px}
+  .jp-srow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+  /* `.jp-sheet label` uppercases the section headings, and this is a label too --
+     "INCLUDE DOLLAR AMOUNTS" is a heading shouting, not a control. */
+  .jp-switch{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text1);
+    cursor:pointer;text-transform:none;letter-spacing:normal;margin:0}
+  .jp-switch input{accent-color:var(--blue);width:15px;height:15px}
+  .jp-switch input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  .jp-preview{background:var(--bg0);border:1px solid var(--border);border-radius:10px;
+    padding:12px 13px;margin:0 0 12px;font-size:12px;min-height:64px}
+  .jp-preview .k{color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+  .jp-preview .row{display:flex;justify-content:space-between;gap:14px;padding:3px 0;
+    font-variant-numeric:tabular-nums}
+  .jp-preview .row span:last-child{color:var(--text0)}
+  .jp-shares{border-top:1px solid var(--border);margin-top:14px;padding-top:12px}
+  .jp-share-row{display:flex;align-items:center;gap:9px;justify-content:space-between;
+    font-size:11.5px;padding:5px 0;flex-wrap:wrap}
+  .jp-share-row code{font-size:11px;color:var(--text1);background:var(--bg2);
+    padding:2px 6px;border-radius:5px;word-break:break-all}
+  .jp-danger{color:var(--red);border-color:color-mix(in srgb, var(--red) 45%, var(--border))}
+
   /* Replay (#3561). Sticky-left and 100cqi for the same reason the note editor is:
      the cell belongs to a table that scrolls sideways, and a chart that scrolled off
      the screen would be worse than no chart. */
@@ -421,6 +451,8 @@
       <button type="button" class="jp-chip" id="jpEditBtn" onclick="jpSetEdit(!jpEdit)" title="Arrange the cards: drag them, set half or full width, hide what you do not read">Edit layout</button>
       <button type="button" class="jp-chip" id="jpImportBtn" hidden onclick="jpRunImport()"
         title="Read your own trades from the broker you have connected and put them in this journal">Import trades</button>
+      <button type="button" class="jp-chip" id="jpShareBtn" onclick="jpShareOpen()"
+        title="Publish one card - a month, your symbols, or your R multiples - as a link you can send. Nothing is public until you press Publish.">Share a card</button>
       <button type="button" class="jp-chip" onclick="jpLoad(true)" title="Read the broker record again">Refresh</button>
     </div>
   </div>
@@ -1378,6 +1410,217 @@ function jpTradeWhen(ts) {
   try {
     return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   } catch (_e) { return String(ts).slice(0, 16).replace('T', ' '); }
+}
+
+/* -- Share (#3562) ------------------------------------------------------------------
+   The one surface here that publishes a reader's money to the internet, so it is a
+   dialog you open, choose in, and LOOK at before anything leaves.
+
+   The preview is the real payload from /api/journal/share/preview -- the same builder
+   publishing uses, fetched from the server, not drawn from what is on screen. That makes
+   "you see exactly what will be public" a fact about the bytes rather than a claim about
+   the design. Nothing here posts figures: the server computes the card from the reader's
+   own record, so a shared page carries their book rather than their browser's. */
+let jpShare = null;   // { open, opts, kind, month, dollars, preview, shares, busy, error }
+
+const JP_SHARE_KINDS = {
+  month: 'One month',
+  symbols: 'Symbol statistics',
+  rmultiples: 'R multiples',
+};
+
+async function jpShareOpen() {
+  jpShare = { open: true, kind: null, month: null, dollars: false, preview: null,
+    shares: [], opts: null, busy: true, error: null };
+  jpSharePaint();
+  try {
+    const [o, s] = await Promise.all([
+      fetch('/api/journal/share/options', { credentials: 'same-origin' }).then((r) => r.json()),
+      fetch('/api/journal/shares', { credentials: 'same-origin' }).then((r) => r.json()),
+    ]);
+    jpShare.opts = o;
+    jpShare.shares = (s && s.shares) || [];
+    jpShare.kind = (o.kinds || [])[0] || null;
+    jpShare.month = (o.months || [])[0] || null;
+  } catch (e) { jpShare.error = e.message; }
+  jpShare.busy = false;
+  jpSharePaint();
+  await jpSharePreview();
+}
+
+function jpShareClose() { jpShare = null; jpSharePaint(); }
+
+function jpShareSet(patch) {
+  if (!jpShare) return;
+  Object.assign(jpShare, patch);
+  // A card with no money in it has nothing for the switch to withhold.
+  if (jpShareMoneyless()) jpShare.dollars = false;
+  jpSharePaint();
+  jpSharePreview();
+}
+
+const jpShareMoneyless = () => !!(jpShare && jpShare.opts
+  && (jpShare.opts.moneyless || []).indexOf(jpShare.kind) >= 0);
+
+function jpShareQuery() {
+  const q = new URLSearchParams({ kind: jpShare.kind || '' });
+  if (jpShare.kind === 'month' && jpShare.month) q.set('month', jpShare.month);
+  if (jpShare.dollars) q.set('dollars', '1');
+  return q.toString();
+}
+
+/* A GET, and it publishes nothing. Previewing through the publish path and deleting
+   afterwards would leave a window where it was live. */
+async function jpSharePreview() {
+  if (!jpShare || !jpShare.kind) return;
+  const want = jpShareQuery();
+  jpShare.preview = undefined;
+  jpSharePaint();
+  try {
+    const r = await fetch('/api/journal/share/preview?' + want, { credentials: 'same-origin' });
+    if (!jpShare || jpShareQuery() !== want) return;    // the reader changed their mind mid-flight
+    jpShare.preview = r.ok ? (await r.json()).payload : null;
+  } catch (_e) { if (jpShare) jpShare.preview = null; }
+  jpSharePaint();
+}
+
+async function jpSharePublish() {
+  if (!jpShare || !jpShare.kind || jpShare.busy) return;
+  jpShare.busy = true; jpShare.error = null; jpSharePaint();
+  try {
+    const r = await fetch('/api/journal/share', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: jpShare.kind, month: jpShare.month, dollars: jpShare.dollars }),
+    });
+    const d = await r.json();
+    if (!r.ok) { jpShare.error = d.error === 'share_limit'
+      ? 'You have ' + d.limit + ' links live. Take one down to make room.'
+      : 'That could not be published.'; }
+    else {
+      jpShare.shares = [{ id: d.id, createdAt: d.createdAt, kind: d.payload.kind,
+        label: d.payload.label, dollars: d.payload.dollars,
+        month: d.payload.card && d.payload.card.month }].concat(jpShare.shares);
+      jpShare.justMade = d.id;
+    }
+  } catch (e) { jpShare.error = e.message; }
+  jpShare.busy = false;
+  jpSharePaint();
+}
+
+async function jpShareRevoke(id) {
+  if (!jpShare) return;
+  jpShare.busy = true; jpSharePaint();
+  try {
+    const r = await fetch('/api/journal/share?id=' + encodeURIComponent(id),
+      { method: 'DELETE', credentials: 'same-origin' });
+    if (r.ok) {
+      jpShare.shares = jpShare.shares.filter((s) => s.id !== id);
+      if (jpShare.justMade === id) jpShare.justMade = null;
+    }
+  } catch (_e) { /* the row stays; the reader can try again */ }
+  jpShare.busy = false;
+  jpSharePaint();
+}
+
+function jpShareCopy(id) {
+  const url = location.origin + '/s/' + id;
+  const done = () => { const el = document.getElementById('jps-' + id); if (el) el.textContent = 'Copied'; };
+  try { navigator.clipboard.writeText(url).then(done, () => {}); } catch (_e) { /* no clipboard */ }
+}
+
+/* What the reader will see, drawn from the payload itself -- so a withheld figure is
+   missing here for the same reason it will be missing there: it is not in the payload. */
+function jpSharePreviewBody() {
+  if (jpShare.preview === undefined) return '<p class="jp-dim">Working out what that would show...</p>';
+  if (!jpShare.preview) return '<p class="jp-dim">There is nothing in your record to share as that card yet.</p>';
+  const p = jpShare.preview, c = p.card || {};
+  const row = (k, v) => '<div class="row"><span>' + jpEsc(k) + '</span><span>' + v + '</span></div>';
+  let body = '';
+  if (p.kind === 'symbols') {
+    const rows = c.rows || [];
+    body = row('Symbols', rows.length) + row('Closed trades', rows.reduce((s, r) => s + (r.trades || 0), 0))
+      + rows.slice(0, 3).map((r) => row(r.symbol, r.trades + ' trades, ' + jpPct(r.winRate)
+        + (r.realized !== undefined ? ' \u00b7 ' + jpUsd(r.realized) : ''))).join('')
+      + (rows.length > 3 ? '<div class="row"><span class="jp-dim">and ' + (rows.length - 3) + ' more</span><span></span></div>' : '');
+  } else if (p.kind === 'rmultiples') {
+    body = row('Trades measured', c.withR + ' of ' + c.n) + row('Expectancy', jpR(c.mean))
+      + row('Median', jpR(c.median)) + row('Best / worst', jpR(c.best) + ' / ' + jpR(c.worst));
+  } else {
+    body = row('Month', jpEsc(c.month || '')) + row('Trading days', c.tradingDays)
+      + (c.trades != null ? row('Closed trades', c.trades) : '')
+      + row('Day win %', jpPct(c.dayWinRate))
+      + (c.pnl !== undefined ? row('Net P&L', jpUsd(c.pnl)) : '')
+      + (c.bestDay !== undefined ? row('Best / worst day', jpUsd(c.bestDay) + ' / ' + jpUsd(c.worstDay)) : '');
+  }
+  const withheld = !p.dollars && !jpShareMoneyless();
+  return '<div class="k">' + jpEsc(p.label) + '</div>' + body
+    + '<p class="jp-dim" style="margin:9px 0 0;font-size:10.5px">'
+    + (jpShareMoneyless()
+      ? 'An R multiple is a ratio, so this card has no amounts in it to withhold.'
+      : (withheld ? 'Amounts are withheld. Everything above is what a reader would see.'
+        : 'Amounts are included. Everything above is what a reader would see.'))
+    + ' Your notes and tags are never shared.</p>';
+}
+
+function jpSharePaint() {
+  let host = document.getElementById('jpShareModal');
+  if (!jpShare || !jpShare.open) { if (host) host.remove(); return; }
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'jpShareModal';
+    document.body.appendChild(host);
+    // Escape closes it, because a dialog about publishing must be trivially escapable.
+    host.addEventListener('keydown', (e) => { if (e.key === 'Escape') jpShareClose(); });
+  }
+  const o = jpShare.opts || {};
+  const kinds = (o.kinds || []).map((k) => '<button type="button" class="jp-chip'
+    + (jpShare.kind === k ? ' on' : '') + '" onclick="jpShareSet({ kind: \'' + k + '\' })">'
+    + jpEsc(JP_SHARE_KINDS[k] || k) + '</button>').join('');
+  const months = jpShare.kind === 'month'
+    ? '<div class="jp-srow"><label for="jpShareMonth" class="visually-hidden">Which month</label>'
+      + '<select id="jpShareMonth" class="jp-select" onchange="jpShareSet({ month: this.value })">'
+      + (o.months || []).map((m) => '<option value="' + jpEsc(m) + '"'
+        + (jpShare.month === m ? ' selected' : '') + '>' + jpEsc(m) + '</option>').join('')
+      + '</select></div>'
+    : '';
+  const live = (jpShare.shares || []).map((s) => '<div class="jp-share-row">'
+    + '<span>' + jpEsc(JP_SHARE_KINDS[s.kind] || s.label || s.kind)
+    + (s.month ? ' \u00b7 ' + jpEsc(s.month) : '')
+    + (s.dollars ? ' <span class="jp-dim">with amounts</span>' : '') + '</span>'
+    + '<span><code>/s/' + jpEsc(s.id) + '</code> '
+    + '<button type="button" class="jp-chip" id="jps-' + jpEsc(s.id) + '" onclick="jpShareCopy(\'' + jpEsc(s.id) + '\')">Copy link</button> '
+    + '<button type="button" class="jp-chip jp-danger" onclick="jpShareRevoke(\'' + jpEsc(s.id) + '\')">Take down</button>'
+    + '</span></div>').join('');
+
+  host.className = 'jp-modal';
+  host.innerHTML = '<div class="jp-sheet" role="dialog" aria-modal="true" aria-label="Share a card">'
+    + '<h2>Share a card</h2>'
+    + '<p class="lede">One card becomes a link anyone you send it to can open. Nothing is public'
+    + ' until you press Publish, you can take it down at any time, and your trade log, notes and'
+    + ' tags are never shareable.</p>'
+    + (o.kinds && !o.kinds.length
+      ? '<p class="jp-dim">There is nothing in your record to share yet.</p>'
+      : '<label>What to share</label><div class="jp-srow">' + kinds + '</div>' + months
+        + '<label>Amounts</label><div class="jp-srow">'
+        + '<label class="jp-switch"><input type="checkbox"' + (jpShare.dollars ? ' checked' : '')
+        + (jpShareMoneyless() ? ' disabled' : '')
+        + ' onchange="jpShareSet({ dollars: this.checked })"> Include dollar amounts</label>'
+        + '<span class="jp-dim" style="font-size:10.5px">'
+        + (jpShareMoneyless() ? 'nothing to withhold on this card' : 'off by default') + '</span></div>'
+        + '<label>What a reader would see</label>'
+        + '<div class="jp-preview">' + jpSharePreviewBody() + '</div>'
+        + (jpShare.error ? '<p style="color:var(--red);font-size:11.5px;margin:0 0 10px">' + jpEsc(jpShare.error) + '</p>' : '')
+        + '<div class="jp-srow">'
+        + '<button type="button" class="jp-chip on" onclick="jpSharePublish()"'
+        + (jpShare.busy || !jpShare.preview ? ' disabled' : '') + '>Publish this card</button>'
+        + '<button type="button" class="jp-chip" onclick="jpShareClose()">Close</button>'
+        + '</div>')
+    + (live ? '<div class="jp-shares"><label>Your live links</label>' + live + '</div>'
+      : '<div class="jp-shares"><p class="jp-dim" style="font-size:11px;margin:0">Nothing of yours is public.</p></div>')
+    + '</div>';
+  const first = host.querySelector('button');
+  if (first && !jpShare.busy) { try { first.focus(); } catch (_e) { /* not focusable yet */ } }
 }
 
 /* ── Replay (#3561) ────────────────────────────────────────────────────────────────

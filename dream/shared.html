@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- A shared link is for the people it was sent to, not for a search index to surface
+     months later. Also set as X-Robots-Tag by routes/shared.js, because a crawler that
+     ignores one may honour the other. -->
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>A shared result — unisona</title>
+<style>
+  :root{--bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
+    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;--text2:#848c9b;
+    --green:#00d4aa;--red:#ff5f6d;--blue:#4a9eff}
+  html[data-theme="light"]{--bg0:#f4f6fa;--bg1:#ffffff;--bg2:#eef1f6;--bg3:#e3e8f0;
+    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#5f6778;
+    --green:#00745d;--red:#cf0012;--blue:#0062d3}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg0);color:var(--text1);
+    font:14px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  main{max-width:760px;margin:0 auto;padding:38px 18px 60px}
+  h1{font-size:17px;color:var(--text0);margin:0 0 3px;font-weight:650;letter-spacing:-.01em}
+  .sub{font-size:11.5px;color:var(--text2);margin:0 0 22px}
+  .card{background:var(--bg1);border:1px solid var(--border);border-radius:13px;padding:17px 16px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border)}
+  th{color:var(--text2);font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+  td.num,th.num{text-align:right}
+  tbody tr:last-child td{border-bottom:0}
+  .scroll{overflow-x:auto}
+  .figs{display:flex;flex-wrap:wrap;gap:14px 30px;margin:0 0 4px}
+  .fig{min-width:96px}
+  .fig .k{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)}
+  .fig .v{font-size:21px;color:var(--text0);font-variant-numeric:tabular-nums;line-height:1.3}
+  /* Qualified, because `.fig .v` is two selectors deep and a bare `.pos` loses to it --
+     which left every P&L on a shared card rendering in the plain text colour. */
+  .pos,.fig .v.pos,td.pos{color:var(--green)}
+  .neg,.fig .v.neg,td.neg{color:var(--red)}
+  .dim,.fig .v.dim{color:var(--text2)}
+  .hist{display:flex;align-items:flex-end;gap:3px;height:104px;margin:16px 0 4px}
+  .hist .col{flex:1 1 0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:7px}
+  .hist .b{width:100%;border-radius:3px 3px 0 0}
+  .hist .b.win{background:var(--green)} .hist .b.loss{background:var(--red)}
+  .hist .x{font-size:9px;color:var(--text2);padding-top:5px}
+  .note{font-size:11px;color:var(--text2);margin:15px 0 0;line-height:1.55}
+  footer{margin:26px 0 0;font-size:11px;color:var(--text2);display:flex;
+    justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+  footer a{color:var(--blue);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  footer a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:3px}
+</style>
+</head>
+<body>
+<main id="main">
+  <div class="card" id="card" aria-busy="true"><p class="note">Loading…</p></div>
+  <footer>
+    <span id="basis"></span>
+    <!-- Our name, which is the whole reason sharing is worth building. A product link,
+         not a profile: there is nothing of this reader's on the other end of it. -->
+    <span>Kept with <a href="https://unisona.ai/journal.html">unisona</a></span>
+  </footer>
+</main>
+<script>
+'use strict';
+/* The page carries no figures of its own -- it fetches them, so a share revoked a second
+   ago says so rather than serving a card baked into the HTML. */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v.toFixed(d == null ? 2 : d) : '—');
+const pct = (v) => (typeof v === 'number' && isFinite(v) ? v.toFixed(1) + '%' : '—');
+const usd = (v) => {
+  if (typeof v !== 'number' || !isFinite(v)) return '—';
+  const s = Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (v < 0 ? '-$' : '$') + s;
+};
+const sign = (v) => (typeof v !== 'number' || !isFinite(v) ? 'dim' : v > 0 ? 'pos' : v < 0 ? 'neg' : 'dim');
+const fig = (k, v, cls) => '<div class="fig"><div class="k">' + esc(k) + '</div>'
+  + '<div class="v ' + (cls || '') + '">' + v + '</div></div>';
+
+/* Every card renders only the fields the payload actually carries. A withheld figure is
+   ABSENT from the payload, so the reader's choice is honoured by there being nothing to
+   render rather than by a display rule that could be got wrong. */
+function renderMonth(c) {
+  const money = c.pnl !== undefined;
+  return '<h1>' + esc(monthName(c.month)) + '</h1>'
+    + '<p class="sub">' + c.tradingDays + ' trading day' + (c.tradingDays === 1 ? '' : 's')
+    + (c.trades != null ? ' · ' + c.trades + ' closed trade' + (c.trades === 1 ? '' : 's') : '') + '</p>'
+    + '<div class="figs">'
+    + (money ? fig('Net P&L', usd(c.pnl), sign(c.pnl)) : '')
+    + fig('Profit factor', num(c.profitFactor), '')
+    + fig('Day win %', pct(c.dayWinRate), '')
+    + (c.winRate != null ? fig('Trade win %', pct(c.winRate), '') : '')
+    + (money ? fig('Best day', usd(c.bestDay), sign(c.bestDay)) : '')
+    + (money ? fig('Worst day', usd(c.worstDay), sign(c.worstDay)) : '')
+    + (money ? fig('Drawdown', usd(-Math.abs(c.drawdown)), c.drawdown ? 'neg' : 'dim') : '')
+    + '</div>'
+    + (money ? '' : '<p class="note">Amounts are not shown. The ratios above are the whole month.</p>');
+}
+
+function renderSymbols(c) {
+  const rows = c.rows || [];
+  const money = rows.length && rows[0].realized !== undefined;
+  const head = '<tr><th scope="col">Symbol</th><th scope="col" class="num">Trades</th>'
+    + '<th scope="col" class="num">Win %</th><th scope="col" class="num">Profit factor</th>'
+    + (money ? '<th scope="col" class="num">Realized</th>' : '') + '</tr>';
+  const body = rows.map((r) => '<tr><td>' + esc(r.symbol) + '</td>'
+    + '<td class="num">' + (r.trades == null ? '—' : r.trades) + '</td>'
+    + '<td class="num">' + pct(r.winRate) + '</td>'
+    + '<td class="num">' + num(r.profitFactor) + '</td>'
+    + (money ? '<td class="num ' + sign(r.realized) + '">' + usd(r.realized) + '</td>' : '')
+    + '</tr>').join('');
+  const trades = rows.reduce((s, r) => s + (r.trades || 0), 0);
+  return '<h1>Symbol statistics</h1>'
+    + '<p class="sub">' + rows.length + ' symbol' + (rows.length === 1 ? '' : 's')
+    + ' · ' + trades + ' closed trade' + (trades === 1 ? '' : 's') + '</p>'
+    + '<div class="scroll"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>'
+    + (money ? '' : '<p class="note">Amounts are not shown.</p>');
+}
+
+function renderR(c) {
+  const buckets = c.buckets || [];
+  const max = buckets.reduce((m, b) => Math.max(m, b.count || 0), 0) || 1;
+  const bars = buckets.map((b) => {
+    const h = Math.round(((b.count || 0) / max) * 92);
+    const losing = (b.to || 0) <= 0;
+    return '<div class="col"><div class="b ' + (losing ? 'loss' : 'win') + '" style="height:'
+      + Math.max(b.count ? 3 : 0, h) + 'px"></div>'
+      + '<div class="x">' + (b.from > 0 ? '+' : '') + num(b.from, 1) + '</div></div>';
+  }).join('');
+  return '<h1>R multiples</h1>'
+    + '<p class="sub">' + c.withR + ' of ' + c.n + ' closed trades had a recorded stop to measure against'
+    + ' · ' + pct(c.coverage) + ' of the book</p>'
+    + '<div class="figs">'
+    + fig('Expectancy', num(c.mean) + 'R', sign(c.mean))
+    + fig('Median', num(c.median) + 'R', sign(c.median))
+    + fig('Payoff', num(c.payoff), '')
+    + fig('Best', num(c.best) + 'R', 'pos')
+    + fig('Worst', num(c.worst) + 'R', 'neg')
+    + '</div>'
+    + '<div class="hist" role="img" aria-label="' + esc(histLabel(c)) + '">' + bars + '</div>'
+    + '<p class="note">R is the trade result divided by the risk taken at entry: +1R is a winner the'
+    + ' size of the stop. This card has no amounts in it at all — an R multiple is a ratio.</p>';
+}
+
+const histLabel = (c) => 'Distribution of ' + c.withR + ' trades by R multiple, from '
+  + num(c.worst) + 'R to ' + num(c.best) + 'R, averaging ' + num(c.mean) + 'R.';
+
+function monthName(m) {
+  const parts = String(m || '').split('-');
+  const d = new Date(Date.UTC(+parts[0], +parts[1] - 1, 1));
+  if (!isFinite(d.getTime())) return String(m || 'A month');
+  try { return d.toLocaleString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+  catch (_e) { return String(m); }
+}
+
+const RENDER = { month: renderMonth, symbols: renderSymbols, rmultiples: renderR };
+
+function gone(msg) {
+  document.getElementById('card').innerHTML =
+    '<h1>This link is not live.</h1><p class="note">' + esc(msg) + '</p>';
+  document.getElementById('card').removeAttribute('aria-busy');
+}
+
+(async () => {
+  // Follow the OS where the reader has no say here -- this page is not theirs to configure.
+  try {
+    if (window.matchMedia && !window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } catch (_e) { /* keep dark */ }
+
+  const id = (location.pathname.match(/^\/s\/([^/]+)/) || [])[1];
+  if (!id) { gone('There is no share in this address.'); return; }
+  let d;
+  try {
+    const r = await fetch('/api/shared/' + encodeURIComponent(id), { cache: 'no-store' });
+    if (!r.ok) {
+      gone('It was either taken down by the person who shared it, or it never pointed anywhere.');
+      return;
+    }
+    d = await r.json();
+  } catch (_e) { gone('The card could not be loaded just now.'); return; }
+
+  const render = RENDER[d.kind];
+  if (!render) { gone('This card is of a kind this page does not know how to draw.'); return; }
+  const card = document.getElementById('card');
+  card.innerHTML = render(d.card || {});
+  card.removeAttribute('aria-busy');
+  document.title = (d.card && d.card.month ? monthName(d.card.month) : d.label) + ' — unisona';
+  document.getElementById('basis').textContent =
+    'Shared ' + new Date(d.sharedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    + ' · ' + d.basis;
+})();
+</script>
+</body>
+</html>
