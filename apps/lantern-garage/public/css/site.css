@@ -295,9 +295,14 @@ html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
   transition: color 0.15s;
 }
 .footer-inner a:hover { color: var(--text); text-decoration: underline; }
-.footer-inner .sep { color: var(--border); }
+/* A BORDER colour is not a text colour. As --border this dot measured 1.62:1 in light
+   and 1.32 in dark on the Kalshi terminal, which substitutes its own greener border
+   (#3587). --muted is the token that means "quiet text" and clears on every surface. */
+.footer-inner .sep { color: var(--muted); }
 .footer-inner .ml { margin-left: auto; }
-.footer-meta { color: var(--muted); opacity: 0.75; }
+/* --muted IS the de-emphasis; 0.75 of it said so twice and landed at 3.63:1 on the
+   light footer. Same double-dim removed from stock-trader in #3583. */
+.footer-meta { color: var(--muted); }
 .footer-brand {
   display: inline-flex;
   align-items: center;
@@ -429,10 +434,12 @@ html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
   border-color: var(--accent);
   background: var(--surface2);
 }
+/* --muted at 0.6 measured 2.45:1 in light and 3.33 in dark -- on a hero subtitle,
+   which is about the most-read line on a landing page. The colour already says
+   secondary; the opacity said it again, past legible. */
 .hero .sub {
   font-size: 0.78rem;
   color: var(--muted);
-  opacity: 0.6;
 }
 
 /* Panels and sections */

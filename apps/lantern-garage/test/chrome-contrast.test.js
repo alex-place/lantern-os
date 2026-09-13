@@ -114,3 +114,58 @@ test('no pill writes a raw signal colour on a wash of itself any more', () => {
       'a pill writes ' + colour[1] + ' on its own tint: ' + rule.replace(/\s+/g, ' ').slice(0, 90));
   }
 });
+
+/* -- A PAGE THAT OVERRIDES A TINT OWNS THE TEXT ON IT (#3587) ----------------------
+   The Kalshi terminal substitutes its own --accent-dim (a green wash instead of the pale
+   cyan), which left --on-tint-accent -- chosen in #3584 against that cyan -- landing at
+   4.10:1 there. Second time a page-level override has quietly undercut a shared
+   decision, so it is pinned rather than remembered. */
+const PUBLIC = path.join(__dirname, '..', 'public');
+const htmlPages = () => fs.readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))
+  .map((f) => ({ file: f, src: fs.readFileSync(path.join(PUBLIC, f), 'utf8') }));
+
+test('a page that redefines --accent-dim also redefines the text that sits on it', () => {
+  for (const { file, src } of htmlPages()) {
+    if (!/--accent-dim\s*:/.test(src)) continue;
+    assert.match(src, /--on-tint-accent\s*:/,
+      file + ' overrides --accent-dim but not --on-tint-accent, so the shared text colour'
+      + ' lands on a tint it was never measured against');
+  }
+});
+
+test('the Kalshi terminal clears AA on its own substituted tints, both themes', () => {
+  const src = fs.readFileSync(path.join(PUBLIC, 'kalshi-terminal.html'), 'utf8');
+  const grab = (marker) => {
+    const i = src.indexOf(marker);
+    assert.ok(i >= 0, 'block not found: ' + marker);
+    return tokensIn(src.slice(i, src.indexOf('}', i)));
+  };
+  const light = grab('html[data-skin="terminal"][data-theme="light"]{');
+  const dark = grab('html[data-skin="terminal"][data-theme="dark"]{');
+  for (const [name, T] of [['light', light], ['dark', dark]]) {
+    const r = ratio(rgb(T['--on-tint-accent']), rgb(T['--accent-dim']));
+    assert.ok(r >= 4.5, name + ': the nav badge measures ' + r.toFixed(2) + ':1 on this skin');
+  }
+  /* The signal colours it puts on its own card. It inherits them from site.css unless it
+     says otherwise, and site.css tunes them for a dark surface -- on a mint card that was
+     +19% at 2.23:1. */
+  for (const t of ['--green', '--gold', '--danger']) {
+    assert.ok(light[t], 'the light skin does not scope ' + t);
+    const r = ratio(rgb(light[t]), rgb(light['--surface']));
+    assert.ok(r >= 4.5, t + ' measures ' + r.toFixed(2) + ':1 on the terminal light card');
+  }
+});
+
+test('a border colour is never used as a text colour in shared chrome', () => {
+  // --border is the token for a line. Written as text it measured 1.62:1 light, 1.32 dark.
+  assert.doesNotMatch(CSS, /[^-]color:\s*var\(--border\)/, 'site.css writes text in --border');
+});
+
+test('shared chrome does not dim text that is already the dim colour', () => {
+  // color:var(--muted) + opacity:.75 was 3.63:1. The colour IS the de-emphasis.
+  for (const rule of CSS.match(/\{[^}]*var\(--muted\)[^}]*\}/g) || []) {
+    const op = rule.match(/opacity:\s*(0?\.\d+)/);
+    assert.ok(!op || Number(op[1]) >= 0.8,
+      'muted text dimmed to ' + (op && op[1]) + ': ' + rule.replace(/\s+/g, ' ').slice(0, 70));
+  }
+});
