@@ -148,6 +148,14 @@ module.exports = async function authRoutes(req, res, url, deps) {
         const prof = require("../lib/user-profiles").getProfile(_id);
         const sig = prof && prof.preferences && prof.preferences.signals;
         if (sig && typeof sig === "object") info.signals = sig;
+        /* The chart indicator setup travels with the reader too (#3594). Someone who
+           tuned eight indicators does not want to rebuild that on a laptop, and the
+           per-instance COLOURS live in here, so leaving it per-device would have
+           undone half of what #3592 just fixed. Capped on read as well as on write:
+           a profile edited by hand must not be able to put a thousand series on a
+           chart. */
+        const ind = prof && prof.preferences && prof.preferences.indicators;
+        if (Array.isArray(ind)) info.indicators = ind.slice(0, 12);
       }
     } catch (_e) { /* no profile store, or no profile yet: the device's own choice stands */ }
     // Test-auth: expose the role picker to the auth page ONLY on a direct, un-proxied
