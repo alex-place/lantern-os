@@ -43,11 +43,33 @@
      That is why every label on every chart was black on a dark background while the
      surrounding text looked fine. Same values as stock-trader.html so the pages agree. */
   :root{--bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
-    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;--text2:#828a99;
-    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:var(--accent,#4a9eff)}
+    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;
+    /* #828a99 measured 4.48:1 on --bg3, which a flat day cell uses -- under by a
+       rounding error, but under. Two points lighter clears it at 4.60. */
+    --text2:#848c9b;
+    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:var(--accent,#4a9eff);
+    /* The heatmap's wash, which scales to 52% with the size of a cell's figure. It is
+       a SEPARATE token from --green/--red because a background that dark text has to
+       survive is not the same colour as the text. In dark mode they coincide. */
+    --tint-pos:#0a6b58;--tint-neg:#7a1f27}
+  /* THE SIGNAL COLOURS ARE THEMED TOO. The block below used to redefine only the greys,
+     so the dark-tuned green, red, amber and blue above leaked into light mode -- where
+     they measure 1.91, 2.95, 2.03 and 2.75 to 1 against white. AA wants 4.5. This page is
+     almost entirely coloured money figures, so that is most of the journal sitting under
+     the bar, not an edge case.
+
+     These are the same hues taken down until they clear 4.5:1 against --bg3, the darkest
+     surface any of them sits on, which puts them at 4.6-5.8:1 everywhere else. */
   html[data-theme="light"]{
     --bg0:#f4f6fa;--bg1:#ffffff;--bg2:#eef1f6;--bg3:#e3e8f0;
-    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#828b9c}
+    /* --text2 carries every label, note and column header. At #828b9c it measured
+       2.79:1 on the darkest light surface, where the dark theme's equivalent manages
+       5.35:1 -- the same oversight as the signal colours below. */
+    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#5f6778;
+    --green:#00745d;--red:#cf0012;--amber:#905a01;--blue:#0062d3;
+    /* Pale enough that the figure on top still clears 4.5:1 at the strongest wash,
+       and the gradient survives: near-white at 12%, #84ead6 / #ffc6ca at 52%. */
+    --tint-pos:#12d7b0;--tint-neg:#ff919a}
   body{margin:0;background:var(--bg0);color:var(--text1);font-family:var(--sans,system-ui,sans-serif)}
   .jp-shell{max-width:1440px;margin:0 auto;padding:0 16px 40px}
 
@@ -156,6 +178,20 @@
   .jp-day .p{margin-top:auto;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .jp-day.win{background:color-mix(in srgb,var(--green) 15%,var(--bg2));border-color:color-mix(in srgb,var(--green) 35%,var(--border))}
+  /* A day's figure sits on a tint of its own colour, so in light mode it was reading
+     3.63:1 at ten pixels -- the sign was clear and the amount was not. Weakening the
+     tint would fix the text and cost the at-a-glance read the calendar exists for, so
+     the tint stays at full strength and the FIGURE goes darker instead. Nothing to do
+     in dark mode, where bright text on a dark tint already measures comfortably. */
+  html[data-theme="light"] .jp-day .p.jp-pos, html[data-theme="light"] .jp-heat-c .jp-pos{color:#006a55}
+  html[data-theme="light"] .jp-day .p.jp-neg, html[data-theme="light"] .jp-heat-c .jp-neg{color:#b90010}
+  /* The day NUMBER shares the tinted cell, where tertiary grey is not enough -- in
+     either theme. Dark measured 3.68:1 on a winning day before this. */
+  .jp-day.win .d, .jp-day.loss .d{color:var(--text1)}
+  html[data-theme="light"] .jp-day.today .d{color:#0a4b96}
+  /* A selected chip is dark-on-accent in the dark theme; in light mode the accent itself
+     went dark, so the label has to flip with it. */
+  html[data-theme="light"] .jp-chip.on{color:#ffffff}
   .jp-day.loss{background:color-mix(in srgb,var(--red) 15%,var(--bg2));border-color:color-mix(in srgb,var(--red) 35%,var(--border))}
   .jp-day.flat{background:var(--bg3)}
   /* Today is a RING, never a fill: it has to be legible on a green day, a red day and
@@ -248,8 +284,6 @@
   .jp-heat th[scope=row]{position:sticky;left:0;background:var(--bg1);text-align:left;
     font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);font-weight:600}
   .jp-heat td{font-size:11px;min-width:58px;width:58px}
-  /* Faded enough to read as unreliable, not so faded the figure stops being legible. */
-  .jp-heat td.few{opacity:.62}
   .jp-heat td.jp-heat-0{background:transparent}
 
   /* R distribution (#3550). A histogram, so the bars carry the shape and the four
@@ -1066,9 +1100,15 @@ function jpHeatmap(slice) {
     const few = s.trades < JP_THIN_TRADES;
     cellsWithTrades++;
     if (few) thinCells++;
-    // 12% at the faintest so a real cell never reads as an empty one, 52% at the strongest.
-    const strength = g.max > 0 ? Math.round(12 + 40 * (Math.abs(e) / g.max)) : 12;
-    const tint = e >= 0 ? 'var(--green)' : 'var(--red)';
+    /* 12% at the faintest so a real cell never reads as an empty one, 52% at the
+       strongest -- and a THIN cell gets a fraction of that rather than a fade over the
+       whole cell. Fading the cell dimmed the figure with it, which on a pale light
+       theme took it under 4:1; the signal belongs in the wash, which is decoration,
+       not in the number, which is the thing being read. */
+    const full = g.max > 0 ? Math.round(12 + 40 * (Math.abs(e) / g.max)) : 12;
+    const strength = few ? Math.round(full * 0.4) : full;
+    // The wash, not the text colour -- see --tint-pos/--tint-neg.
+    const tint = e >= 0 ? 'var(--tint-pos)' : 'var(--tint-neg)';
     const label = day + ' ' + hour + ':00 ET \u2014 ' + s.trades + ' trade' + (s.trades === 1 ? '' : 's')
       + ', ' + jpPct(s.winRate) + ' win, ' + jpUsd(e) + ' per trade, ' + jpUsd(s.totalRealized) + ' in total'
       + (few ? ' (too few to measure)' : '');
