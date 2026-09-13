@@ -17,7 +17,9 @@ Build and start come from the repo:
 - `railway.json`:
   - Nixpacks build, start `node apps/lantern-garage/start.js` (see *Website and trader as two processes* below).
   - Healthcheck `/api/status`, 120 s. It only gates a deploy going live; a running service that stops answering isn't restarted.
-  - Restart on failure, 3 retries. After three crashes the service stays down until someone redeploys.
+  - Restart ALWAYS, since #3525. It was on-failure with 3 retries, which left the service DOWN
+    after the third crash — for a trader, the worst of both worlds. This is the outer net, for
+    the supervisor itself; the trader's own restarts never reach it. See *Stall watchdog* below.
 - `nixpacks.toml`: Node only, `npm ci --ignore-scripts`. The `prepare` hook needs `.git`, which isn't uploaded.
 - `.railwayignore`: keeps `.git`, `node_modules`, `data/*`, models and the desktop app out of the upload.
 
