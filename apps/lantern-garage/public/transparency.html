@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="loop-stage" content="verify">
+<title>Unisona Trader — Transparency</title>
+
+<!-- Apply the saved theme before paint so the global header + light mode don't flash (#1577). -->
+<script>
+  (function(){ try {
+    var stored = localStorage.getItem('lantern-theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var isDark = stored ? stored === 'dark' : prefersDark;
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  } catch(e){ document.documentElement.setAttribute('data-theme','dark'); } })();
+</script>
+<link rel="stylesheet" href="/css/site.css">
+
+<style>
+  /* ── Transparency page (#3598): the scoring is the centerpiece ──────────── */
+  .tp-wrap { max-width: 1080px; margin: 0 auto; padding: 16px; }
+  .tp-honesty { font-size: 0.92rem; opacity: 0.85; border-left: 3px solid var(--accent, #7aa2f7);
+    padding: 8px 12px; margin: 12px 0 20px; }
+  .tp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .tp-card { border: 1px solid var(--border, #333); border-radius: 8px; padding: 14px; overflow-x: auto; }
+  .tp-card h2 { margin: 0 0 10px; font-size: 1.02rem; }
+  table.tp { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+  table.tp th, table.tp td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border, #2a2a2a); }
+  .tp-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.78rem; }
+  .tp-CONFIRMED { background: #1c3a26; color: #7fd8a0; }
+  .tp-REVERSED, .tp-MISLEADING, .tp-INVALIDATED_BY_FIDELITY { background: #3a1c1c; color: #e08a8a; }
+  .tp-OPEN, .tp-INCONCLUSIVE { background: #2a2a3a; color: #a8b3e6; }
+  .tp-counters { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 18px; }
+  .tp-counter { border: 1px solid var(--border, #333); border-radius: 8px; padding: 8px 14px; min-width: 120px; }
+  .tp-counter .v { font-size: 1.35rem; font-weight: 600; }
+  .tp-counter .k { font-size: 0.78rem; opacity: 0.75; }
+  .tp-neg { color: #e08a8a; } .tp-pos { color: #7fd8a0; }
+  .tp-evidence { font-size: 0.8rem; opacity: 0.8; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+<script src="/js/site-chrome.js"></script>
+
+<main class="tp-wrap">
+  <h1>The trader, scored</h1>
+  <div class="tp-honesty">
+    Every backtest verdict this trader acts on is filed as a falsifiable prediction and
+    scored against live fills. The misses stay on this page — that is the point. Paper
+    account. Nothing here is a performance promise.
+  </div>
+
+  <div class="tp-counters" id="counters"></div>
+
+  <div class="tp-grid">
+    <div class="tp-card">
+      <h2>Instrument scoreboard</h2>
+      <table class="tp" id="scoreboard"><thead><tr>
+        <th>instrument</th><th>n</th><th>confirmed</th><th>reversed</th><th>open</th><th>hit rate</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="tp-card">
+      <h2>Open predictions (scoreable)</h2>
+      <table class="tp" id="open"><thead><tr>
+        <th>due</th><th>change</th><th>prediction</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="tp-card">
+      <h2>Recent verdicts</h2>
+      <div id="verdicts"></div>
+    </div>
+    <div class="tp-card">
+      <h2>The book, daily</h2>
+      <table class="tp" id="strip"><thead><tr>
+        <th>date</th><th>equity</th><th>day P&amp;L</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</main>
+
+<script>
+(async function () {
+  let d;
+  try {
+    const r = await fetch('/api/trading/transparency');
+    d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.status);
+  } catch (e) {
+    document.getElementById('counters').textContent = 'Feed unavailable: ' + e.message;
+    return;
+  }
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const badge = (o) => '<span class="tp-badge tp-' + esc(o) + '">' + esc(o) + '</span>';
+
+  // discipline counters — rigor as the headline stat, borrowed shamelessly from
+  // the strategy-factory genre and pointed at scoring instead of searching.
+  const c = d.discipline || {};
+  const counters = [
+    [c.rows_total, 'predictions filed'],
+    [c.scored_last_7d, 'scored, last 7 days'],
+    [c.reversals_total, 'reversals kept visible'],
+    [c.open, 'open, awaiting live tape'],
+  ];
+  document.getElementById('counters').innerHTML = counters.map(([v, k]) =>
+    '<div class="tp-counter"><div class="v">' + esc(v ?? '—') + '</div><div class="k">' + esc(k) + '</div></div>').join('');
+
+  const sb = document.querySelector('#scoreboard tbody');
+  sb.innerHTML = (d.scoreboard || []).map((r) =>
+    '<tr><td>' + esc(r.instrument) + '</td><td>' + r.n + '</td><td>' + r.confirmed + '</td><td>' + r.bad +
+    '</td><td>' + r.open + '</td><td>' + (r.hit_rate == null ? '—' : r.hit_rate + '%') + '</td></tr>').join('');
+
+  const op = document.querySelector('#open tbody');
+  op.innerHTML = (d.open_predictions || []).map((r) =>
+    '<tr><td>' + esc(r.due || '—') + '</td><td>' + esc(r.change) + '</td><td>' + esc(r.prediction) + '</td></tr>').join('');
+
+  document.getElementById('verdicts').innerHTML = (d.recent_verdicts || []).map((r) =>
+    '<p>' + badge(r.outcome) + ' <strong>' + esc(r.id) + '</strong> · ' + esc(r.scored) +
+    '<br><span class="tp-evidence">' + esc(r.evidence) + '</span></p>').join('');
+
+  const st = document.querySelector('#strip tbody');
+  st.innerHTML = (d.equity_strip || []).slice().reverse().map((r) =>
+    '<tr><td>' + esc(r.date) + '</td><td>$' + Number(r.equity).toLocaleString() + '</td><td class="' +
+    (r.day_pnl < 0 ? 'tp-neg' : 'tp-pos') + '">' + (r.day_pnl < 0 ? '−$' + Math.abs(r.day_pnl).toLocaleString() : '+$' + Number(r.day_pnl).toLocaleString()) + '</td></tr>').join('');
+})();
+</script>
+</body>
+</html>
