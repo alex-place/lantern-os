@@ -2610,11 +2610,35 @@ const IND_DEFS = {
   stdev:    { name:'Std deviation',  kind:'pane',    params:[{k:'p',label:'Period',def:20,min:2,max:200}], color:'#c084fc' },
 };
 
+/**
+ * An indicator line, legible on the chart it is drawn on (#3594).
+ *
+ * 3:1, not 4.5:1 -- a plotted line is a graphical object under WCAG 1.4.11, not text.
+ *
+ * Corrects at DRAW time and never rewrites what the reader chose, the same contract the
+ * gain/loss palette uses (#3589): the hue they picked survives, only lightness moves, and
+ * it moves per theme. One property, two problems: every one of the 33 shipped defaults
+ * was tuned for the dark chart and measured 1.98-2.72:1 on the light one, and the picker
+ * would otherwise accept #111318 -- on the dark chart, the background's contrast with
+ * itself.
+ */
+function indLineColour(hex){
+  try{
+    const SP = window.SignalPalette;
+    if(!SP || !SP.readable) return hex;
+    const light = document.documentElement.getAttribute('data-theme') === 'light';
+    const bg = chartVar('--bg1', light ? '#ffffff' : '#111318');
+    const r = SP.readable(hex, [bg], 3, light ? 'darker' : 'lighter');
+    return (r && r.hex) || hex;
+  }catch(_e){ return hex; }
+}
+
 /** Compute one configured indicator → { series:[{values,color,width,dash}], hist?, band?, guides? } */
 function indCompute(cfg, bars){
   const d = IND_DEFS[cfg.id]; if(!d) return null;
   const P = (k) => Number(cfg.params && cfg.params[k] != null ? cfg.params[k] : (d.params.find(x=>x.k===k)||{}).def);
-  const c = cfg.color || d.color;
+  // Every one of the 33 resolves its colour here, so the correction has one home.
+  const c = indLineColour(cfg.color || d.color);
   const W = cfg.width || 1.4;
   switch(cfg.id){
     case 'sma': return { series:[{values:_iSMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
@@ -2628,7 +2652,7 @@ function indCompute(cfg, bars){
       return { series:[{values:b.upper,color:c,width:1},{values:b.mid,color:c,width:1,dash:[4,3]},{values:b.lower,color:c,width:1}] }; }
     case 'rsi': return { series:[{values:_iRSI(bars,P('p')), color:c, width:W}], band:d.band, guides:d.guides };
     case 'macd': { const m=_iMACD(bars,P('f'),P('s'),P('g'));
-      return { series:[{values:m.macd,color:c,width:W},{values:m.signal,color:'#fb923c',width:1}], hist:m.hist, guides:[0] }; }
+      return { series:[{values:m.macd,color:c,width:W},{values:m.signal,color:indLineColour('#fb923c'),width:1}], hist:m.hist, guides:[0] }; }
     case 'stoch': { const s=_iStoch(bars,P('p'),P('d'));
       return { series:[{values:s.k,color:c,width:W},{values:s.d,color:'#fbbf24',width:1}], band:d.band, guides:d.guides }; }
     case 'atr': return { series:[{values:_iATR(bars,P('p')), color:c, width:W}] };
@@ -2681,9 +2705,45 @@ let chartIndicators = (()=>{
     return Array.isArray(raw) ? raw.filter(x=>x && IND_DEFS[x.id]).slice(0,12) : [];
   }catch(_e){ return []; }
 })();
+/* Saved to BOTH (#3594): the device so the chart redraws instantly and an offline
+   session still works, and the account so a reader who tuned eight indicators does not
+   rebuild them on their laptop. The account write is debounced -- dragging a colour picker
+   fires on every pixel, and that is one PUT each otherwise -- and a failed save leaves the
+   device's copy alone rather than reverting the chart under them. */
+let _indSaveT = null;
 function saveIndicators(){
   try{ localStorage.setItem('trader.indicators', JSON.stringify(chartIndicators)); }catch(_e){}
+  clearTimeout(_indSaveT);
+  _indSaveT = setTimeout(()=>{
+    fetch('/api/profiles/me', { credentials:'same-origin' })
+      .then(r=> r.ok ? r.json() : null)
+      .then(p=>{
+        const prof = p && (p.profile || p);
+        if(!prof || !prof.id) return;            // signed out: the device's copy is all there is
+        const merged = Object.assign({}, prof.preferences || {}, { indicators: chartIndicators });
+        return fetch('/api/profiles/me', { method:'PUT', credentials:'same-origin',
+          headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ preferences: merged }) });
+      })
+      .catch(()=>{});                            // the chart is already right; the sync can miss
+  }, 600);
 }
+
+/* The account's setup, arriving after the chart has already drawn from the device's copy.
+   Same rule as the colour palette: local paints first, the account corrects, and an equal
+   setup is a no-op rather than a redraw. */
+function adoptIndicators(list){
+  if(!Array.isArray(list)) return false;
+  const clean = list.filter(x=> x && IND_DEFS[x.id]).slice(0, 12);
+  if(JSON.stringify(clean) === JSON.stringify(chartIndicators)) return false;
+  chartIndicators = clean;
+  try{ localStorage.setItem('trader.indicators', JSON.stringify(chartIndicators)); }catch(_e){}
+  _setIndicatorsBtn();
+  if(typeof _indRerender === 'function') _indRerender();
+  return true;
+}
+window.addEventListener('lantern:session', (e)=>{
+  try{ adoptIndicators(e.detail && e.detail.indicators); }catch(_e){}
+});
 const indOverlays = ()=> chartIndicators.filter(c=>IND_DEFS[c.id] && IND_DEFS[c.id].kind==='overlay');
 const indPanes    = ()=> chartIndicators.filter(c=>IND_DEFS[c.id] && IND_DEFS[c.id].kind==='pane');
 
@@ -7392,7 +7452,7 @@ function _indMenuHtml(){
     const d=IND_DEFS[cfg.id]; if(!d) return;
     const open=_indEditing===idx;
     h+='<div class="pat-menu-item ind-active" data-idx="'+idx+'" style="align-items:center" onclick="indEdit('+idx+',event)">'
-      +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(cfg.color||d.color)+'"></span>'
+      +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(indLineColour(cfg.color||d.color))+'"></span>'
       +'<span style="flex:1;min-width:0">'+esc(indLabel(cfg))+'</span>'
       // Duplicate lives HERE, on the active row, not by clicking the same add-list entry
       // twice: EMA 9 + EMA 21 + EMA 200 is a real want, but a second identical click
@@ -7429,7 +7489,7 @@ function _indMenuHtml(){
   }
   for(const [id,d] of addable){
     h+='<div class="pat-menu-item ind-add" data-add="'+id+'" onclick="indAdd(\''+id+'\')">'
-      +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(d.color)+'"></span>'
+      +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(indLineColour(d.color))+'"></span>'
       +'<span style="flex:1">'+esc(d.name)+'</span>'
       +'<span class="pat-count" style="background:none;color:var(--text2)">'+(d.kind==='pane'?'pane':'chart')+'</span></div>';
   }

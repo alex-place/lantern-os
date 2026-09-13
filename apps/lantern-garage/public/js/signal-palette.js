@@ -140,7 +140,12 @@
          gets measured. */
       let c = hexToRgb(rgbToHex(hslToRgb(hsl[0], hsl[1], L)));
       if (clears(c)) return { hex: rgbToHex(c), moved: d, ok: true };
-      if (L === 0 || L === 100) break;
+      /* Only once the walk has actually MOVED. At d === 0 this is the colour as asked,
+         and a reader who picks pure white or pure black starts at an extreme -- so this
+         broke out before trying a single step and handed back the far end instead.
+         White on a light chart became black rather than the mid-grey one step down.
+         The two most obvious picks in a colour picker were the two it could not fix. */
+      if (d > 0 && (L === 0 || L === 100)) break;
     }
     // Nowhere on this hue's lightness axis works. Hand back the extreme and say so; the
     // caller reports it rather than pretending the choice was honoured.

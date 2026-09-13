@@ -357,3 +357,132 @@ for (const page of ['stock-trader.html', 'watch.html']) {
       'a wash is mixed from the figure colour, which converges on it');
   });
 }
+
+// ── the extremes a colour picker makes easiest to reach (#3594) ──────────────
+
+test('pure white and pure black are corrected, not handed back unchanged', () => {
+  /* The lightness walk broke out of its loop at d === 0 when the colour it was given was
+     ALREADY at an extreme, so it never took a step and returned the far end instead: white
+     on a light page came back black. The 4800-colour fuzz missed it because it sampled
+     lightness 10 to 90 and never 0 or 100 -- the two values a colour picker puts under the
+     reader's thumb. */
+  const cases = [
+    ['light', '#ffffff', 4.5], ['dark', '#000000', 4.5],
+    ['light', '#fffffe', 4.5], ['dark', '#010101', 4.5],
+  ];
+  for (const [theme, hex, min] of cases) {
+    const r = SP.resolve({ id: 'custom', gain: hex, loss: hex }, theme);
+    const worst = minRatio(r.gain, surfacesFor(r, 'gain'));
+    assert.ok(worst >= min, theme + ' ' + hex + ' -> ' + r.gain + ' = ' + worst.toFixed(2));
+    assert.ok(r.adjusted.gain > 0, theme + ' ' + hex + ' should have moved');
+    // And not to the opposite extreme: the nearest readable value, not the far wall.
+    assert.notStrictEqual(r.gain, theme === 'light' ? '#000000' : '#ffffff',
+      'walked to the far end instead of stopping at the first readable step');
+  }
+});
+
+test('a colour already at an extreme AND already readable is left alone', () => {
+  // Black on a light page is 21:1. Moving it would be a bug of the opposite kind.
+  const light = SP.resolve({ id: 'custom', gain: '#000000', loss: '#000000' }, 'light');
+  assert.strictEqual(light.gain, '#000000');
+  assert.strictEqual(light.adjusted.gain, 0);
+  const dark = SP.resolve({ id: 'custom', gain: '#ffffff', loss: '#ffffff' }, 'dark');
+  assert.strictEqual(dark.gain, '#ffffff');
+  assert.strictEqual(dark.adjusted.gain, 0);
+});
+
+// ── indicator lines (#3594) ──────────────────────────────────────────────────
+
+const TRADER = fs.readFileSync(path.join(__dirname, '..', 'public', 'stock-trader.html'), 'utf8');
+/* A chart line is a graphical object under WCAG 1.4.11, so 3:1 against the pane it is
+   drawn on -- not the 4.5:1 that text owes. */
+const CHART_BG = { dark: '#111318', light: '#ffffff' };
+const indDefaults = () =>
+  [...TRADER.matchAll(/^ {2}(\w+):\s*\{ name:'([^']+)'[\s\S]*?color:'(#[0-9a-f]{6})'/gmi)]
+    .map((m) => ({ id: m[1], name: m[2], color: m[3] }));
+
+test('every shipped indicator default is legible on the chart, in BOTH themes', () => {
+  /* As shipped, all 33 were tuned for the dark chart: 6.8-9.4:1 there and 1.98-2.72:1 on
+     the light one. The correction happens at draw time, so this measures what
+     indLineColour would produce rather than the literal in the registry. */
+  const defs = indDefaults();
+  assert.ok(defs.length >= 30, 'found the registry: ' + defs.length);
+  const fails = [];
+  for (const theme of THEMES) {
+    const dir = theme === 'light' ? 'darker' : 'lighter';
+    for (const d of defs) {
+      const drawn = SP.readable(d.color, [CHART_BG[theme]], 3, dir);
+      const r = SP.ratio(drawn.hex, CHART_BG[theme]);
+      if (r < 3) fails.push(theme + '/' + d.id + ' ' + d.color + ' -> ' + drawn.hex + ' = ' + r.toFixed(2));
+    }
+  }
+  assert.deepStrictEqual(fails, []);
+});
+
+test('the dark chart was already right, so nothing moves there', () => {
+  // A correction that repainted a palette nobody complained about would be the wrong fix.
+  for (const d of indDefaults()) {
+    const drawn = SP.readable(d.color, [CHART_BG.dark], 3, 'lighter');
+    assert.strictEqual(drawn.hex, d.color, d.id + ' moved in dark: ' + d.color + ' -> ' + drawn.hex);
+  }
+});
+
+test('a reader cannot pick an indicator line that is not there', () => {
+  // #111318 on the dark chart is the background's contrast with itself.
+  for (const [theme, hex] of [['dark', '#111318'], ['dark', '#000000'], ['light', '#ffffff'], ['light', '#fdfdfd']]) {
+    const dir = theme === 'light' ? 'darker' : 'lighter';
+    const drawn = SP.readable(hex, [CHART_BG[theme]], 3, dir);
+    const r = SP.ratio(drawn.hex, CHART_BG[theme]);
+    assert.ok(r >= 3, theme + ' ' + hex + ' -> ' + drawn.hex + ' = ' + r.toFixed(2));
+  }
+});
+
+test('the correction has exactly one home, and it is the draw path', () => {
+  /* indCompute resolves the colour for all 33; correcting anywhere else would mean
+     remembering to do it again for indicator 34. */
+  assert.match(TRADER, /function indLineColour\(hex\)\{/);
+  assert.match(TRADER, /const c = indLineColour\(cfg\.color \|\| d\.color\);/);
+  // 3:1, not 4.5 — a line is not text.
+  assert.match(TRADER, /SP\.readable\(hex, \[bg\], 3,/);
+  // MACD's signal line is the one second series with its own literal.
+  assert.match(TRADER, /values:m\.signal,color:indLineColour\('#fb923c'\)/);
+  // The stored value is what the reader picked; the correction is applied when drawing.
+  assert.doesNotMatch(TRADER, /cfg\.color\s*=\s*indLineColour/, 'it rewrites the stored pick');
+});
+
+test('the menu swatch shows the colour the chart will actually paint', () => {
+  // Otherwise the dot and the line disagree exactly when a colour had to be moved.
+  const swatches = TRADER.match(/background:'\+esc\(indLineColour\([^)]*\)\)\+'/g) || [];
+  assert.ok(swatches.length >= 2, 'active and add-list swatches both corrected: ' + swatches.length);
+});
+
+// ── the indicator setup follows the account (#3594) ──────────────────────────
+
+test('the indicator setup is saved to the account as well as the device', () => {
+  assert.match(TRADER, /localStorage\.setItem\('trader\.indicators'/, 'the device copy is still written first');
+  assert.match(TRADER, /preferences: merged/, 'nothing is sent to the account');
+  assert.match(TRADER, /_indSaveT/, 'the account write is not debounced, so a colour drag is one PUT per pixel');
+  assert.match(TRADER, /function adoptIndicators\(list\)/);
+});
+
+test('the session carries the setup, and the page listens rather than fetching again', () => {
+  const auth = fs.readFileSync(path.join(__dirname, '..', 'routes', 'auth.js'), 'utf8');
+  assert.match(auth, /info\.indicators = ind\.slice\(0, 12\)/, 'uncapped, or not carried at all');
+  const gate = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'auth-gate.js'), 'utf8');
+  assert.match(gate, /new CustomEvent\('lantern:session'/, 'the session is not broadcast');
+  assert.match(TRADER, /addEventListener\('lantern:session'/, 'the trader does not listen for it');
+  /* The ADOPTION path specifically must not fetch. The page has fetched the session
+     elsewhere for entitlement checks since long before this, so a blanket "no session
+     fetch anywhere" assertion was wrong -- it failed on code this change never touched. */
+  const adopt = TRADER.slice(TRADER.indexOf('function adoptIndicators'),
+    TRADER.indexOf("addEventListener('lantern:session'") + 220);
+  assert.doesNotMatch(adopt, /fetch\(/, 'adopting the account setup costs its own request');
+});
+
+test('an adopted setup is filtered and capped, and an equal one is a no-op', () => {
+  const fn = TRADER.slice(TRADER.indexOf('function adoptIndicators'));
+  assert.match(fn, /IND_DEFS\[x\.id\]/, 'an indicator we no longer ship would reach the chart');
+  assert.match(fn, /slice\(0, 12\)/, 'a hand-edited profile could put a thousand series on the chart');
+  assert.match(fn, /JSON\.stringify\(clean\) === JSON\.stringify\(chartIndicators\)/,
+    'every page load would redraw the chart for nothing');
+});
