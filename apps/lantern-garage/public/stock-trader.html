@@ -7014,6 +7014,21 @@ async function submitOrderTicket(){
     const sl = Number(document.getElementById('otSlPrice').value);
     if(sl > 0) body.stopLoss = sl;
   }
+  // An exit on the wrong side of the entry is not an exit: a take-profit below a buy's
+  // entry, or a stop above it (the mirror for a sell), is already "hit" when the order
+  // fills and would close the position the moment it opened. Same side rule the tick
+  // fields use (otSyncFromTicks). QA, 2026-09-14: the ticket accepted 700 / 720 around a
+  // 714.88 buy and sent them.
+  const entry = otCurrentPrice();
+  if(entry > 0){
+    const long = otSide === 'buy';
+    if(body.takeProfit && (long ? body.takeProfit <= entry : body.takeProfit >= entry)){
+      _alertToast(`Take profit must be ${long ? 'above' : 'below'} the entry ($${fmt(entry)}) for a ${long ? 'buy' : 'sell'}`); return;
+    }
+    if(body.stopLoss && (long ? body.stopLoss >= entry : body.stopLoss <= entry)){
+      _alertToast(`Stop loss must be ${long ? 'below' : 'above'} the entry ($${fmt(entry)}) for a ${long ? 'buy' : 'sell'}`); return;
+    }
+  }
 
   // Inline two-step confirm (no native popup): the first click ARMS the submit
   // button ("Confirm BUY 10 AAPL"); a second click within 5s sends. Rapid mode
