@@ -180,6 +180,33 @@
   document.querySelectorAll(".set-nav a[data-panel]").forEach((a) => a.addEventListener("click", () => show(a.dataset.panel)));
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
 
+  /* The server answers with a code; the reader gets a sentence. One table for every modal
+     and alert on this page -- the password modal used to be the only one that translated,
+     and the change-email modal printed "invalid_email" (QA, 2026-09-14). A body that is
+     already a sentence (a broker's own message) is kept; an unknown bare code falls back
+     to the caller's words rather than showing the token. */
+  const SAID = {
+    invalid_email: "That doesn't look like an email address.",
+    email_taken: "That email is already used by another account.",
+    unknown_account: "Could not find your account — sign in again.",
+    sign_in_required: "Sign in again to do that.",
+    auth_required: "Sign in again to do that.",
+    wrong_password: "That current password is incorrect.",
+    weak_password: "Pick a longer password (at least 8 characters).",
+    unknown_provider: "That provider isn't supported here.",
+    invalid_key_value: "That doesn't look like a valid API key for this provider.",
+    invalid_json: "The request was malformed — reload the page and try again.",
+    billing_not_configured: "Billing isn't set up on this server.",
+    no_subscription: "There is no active subscription to cancel.",
+  };
+  function saidBy(o, fallback) {
+    const b = (o && o.body) || {};
+    const fields = [b.error, b.message, b.detail].filter((x) => typeof x === "string" && x.trim());
+    for (const f of fields) if (SAID[f]) return SAID[f];
+    for (const f of fields) if (/\s/.test(f.trim())) return f;   // a sentence from the server stays
+    return fallback;                                             // a bare token does not
+  }
+
   async function load() {
     const [prof, sess] = await Promise.all([
       api("/api/profiles/me"),
@@ -390,8 +417,10 @@
       submitLabel: "Send confirmation",
       onSubmit: async ({ email }, close) => {
         if (!email.trim()) return "Enter an email address.";
+        const current = profile && (profile.email || (profile.account && profile.account.email));
+        if (current && email.trim().toLowerCase() === String(current).trim().toLowerCase()) return "That is already the address on your account.";
         const o = await api("/api/profiles/me/change-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim() }) });
-        if (!o.ok) return (o.body && (o.body.error || o.body.message)) || "Could not change email.";
+        if (!o.ok) return saidBy(o, "Could not change email.");
         close(); alert("Check your inbox to confirm the change.");
       },
     });
@@ -407,7 +436,7 @@
         if (!v.next || v.next.length < 8) return "Pick a password of at least 8 characters.";
         const body = hasPw ? { currentPassword: v.current, newPassword: v.next } : { newPassword: v.next };
         const o = await api("/api/profiles/me/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        if (!o.ok) { const e = o.body && (o.body.error || o.body.message); return ({ wrong_password: "That current password is incorrect.", weak_password: "Pick a longer password (at least 8 characters)." })[e] || e || "Could not update your password."; }
+        if (!o.ok) return saidBy(o, "Could not update your password.");
         close(); alert("Password updated.");
       },
     });
@@ -476,7 +505,7 @@
         cancel.disabled = true;
         const o = await api("/api/billing/cancel", { method: "POST" });
         if (o.ok) { alert("Done — your plan ends at the close of the current period. You keep access until then."); load(); }
-        else { alert((o.body && (o.body.error || o.body.detail)) || "Could not cancel here — try Update → Stripe portal."); cancel.disabled = false; }
+        else { alert(saidBy(o, "Could not cancel here — try Update → Stripe portal.")); cancel.disabled = false; }
       };
       // Fill card + invoices (async; both gracefully handle billing-not-configured).
       const [pm, inv] = await Promise.all([api("/api/billing/payment-method"), api("/api/billing/invoices")]);
@@ -716,7 +745,7 @@
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;
       const o = await api("/api/providers/set-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: id, key: v.trim() }) });
-      if (!o.ok) alert((o.body && (o.body.error || o.body.detail)) || "Could not save key."); renderConnections();
+      if (!o.ok) alert(saidBy(o, "Could not save key.")); renderConnections();
     });
     el.querySelectorAll("[data-key-clear]").forEach((b) => b.onclick = async () => {
       if (!confirm("Remove this API key?")) return;
