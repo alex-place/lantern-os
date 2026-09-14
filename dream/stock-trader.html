@@ -8365,12 +8365,21 @@ function _paintFromCache(){
   try{ (wlPrices||[]).forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price)); }catch(e){}
   try{ renderFullscreenChart(); }catch(e){}
 }
+// The newest request owns the chart. `if(barsLoading) return` used to skip the second of
+// two quick interval switches, and the first reply then painted -- and cached, under the
+// interval the reader had moved to -- bars of the interval they had left (QA, 2026-09-14:
+// daily candles under "1m", 2 of 3 tries). A call for the SAME interval while one is in
+// flight is still folded into it; a call for another interval starts its own fetch, and a
+// reply is dropped when a newer request, or a newer interval, has taken over.
+let _barsReq = 0, _barsTf = null;
 async function loadBars(){
-  if(barsLoading) return;
+  if(barsLoading && _barsTf === chartTimeframe) return;
+  const req = ++_barsReq, tf = _barsTf = chartTimeframe;
   barsLoading = true;
   try{
-    const r = await fetch('/api/trading/bars-multi?timeframe='+chartTimeframe);
+    const r = await fetch('/api/trading/bars-multi?timeframe='+tf);
     const d = await r.json();
+    if(req !== _barsReq || tf !== chartTimeframe) return;   // the reader has moved on
     const bars = d.bars || {};
     barsData = {};
     for(const ticker of Object.keys(bars)){
@@ -8381,8 +8390,8 @@ async function loadBars(){
     wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
     updateRegimeBadges();
     renderFullscreenChart();
-  }catch(e){ console.warn('bars load failed', e); }
-  finally{ barsLoading = false; }
+  }catch(e){ if(req === _barsReq) console.warn('bars load failed', e); }
+  finally{ if(req === _barsReq){ barsLoading = false; _barsTf = null; } }
 }
 
 /* ── The toolbar's interval and chart-type pickers ───────────────────────────
