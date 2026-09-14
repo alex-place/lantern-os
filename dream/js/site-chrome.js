@@ -18,7 +18,7 @@
 (function () {
   "use strict";
 
-  // One Trader entry — Watch/Trade/Options switch via in-page tabs on those pages.
+  // One Trader entry — Trade/Journal switch via in-page tabs on those pages.
   // Settings lives behind the account (person) icon; Contest returns when launch-ready.
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
