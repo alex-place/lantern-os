@@ -1190,7 +1190,12 @@
      Priority: chart controls + sign-in/chat > stats > cross-links. The toolbar's
      horizontal scroll stays as the last resort, not the first. ── */
   @media (max-width:1024px){
-    .layout{grid-template-columns:var(--sidebar-w,296px) 1fr}   /* narrower watchlist on tablets */
+    /* Tablet tier of the six-column desk (#3360). The pre-desk two-column template
+       (`var(--sidebar-w) 1fr`, #3044) lived here until QA 2026-09-14: on a six-column grid
+       it put the 44px drawing rail in a 296px column and the ticket + right docks in
+       implicit ~80px slivers (the order ticket wrapped one letter per line at 768px).
+       The desk keeps its columns; the docks give way so the chart is not crushed. */
+    :root{--col-l:min(var(--dockl-w,360px),30vw);--col-t:min(var(--ticket-w,320px),28vw);--col-r:min(340px,28vw)}
     .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
     .header{gap:8px;padding:0 10px}
   }
