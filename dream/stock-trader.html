@@ -7343,7 +7343,12 @@ function _hideXh(ladder){
 function _fmtCrossTime(ts){
   const d = new Date(String(ts).replace(' ','T'));
   if(isNaN(d)) return '';
-  // US Eastern, 12-hour — same clock the axis reads (#trader-timescale).
+  // A daily or longer bar has a date, not a clock time: "Jun 26, 2025" rather than
+  // "Jun 26, 12:00 AM", and with the year, since such a window spans years (QA,
+  // 2026-09-14). Intraday bars keep the clock the axis reads (#trader-timescale).
+  if(typeof _INTRADAY !== 'undefined' && _INTRADAY.indexOf(chartTimeframe) === -1){
+    return d.toLocaleDateString('en-US', { timeZone:_tz(), month:'short', day:'numeric', year:'numeric' });
+  }
   return d.toLocaleString('en-US', { timeZone:_tz(), month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:_h12() });
 }
 // x,y are cursor coords relative to the canvas (CSS px); w,h the canvas size.
