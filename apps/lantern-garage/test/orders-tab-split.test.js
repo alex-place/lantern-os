@@ -33,7 +33,8 @@ const grab = (re) => {
   return out.join('\n');
 };
 
-const src = [/^function _isWorkingOrder\(/, /^function renderOrders\(/].map(grab).join('\n');
+// _tpSymCell: the symbol cell every panel table renders (badge, ticker, exchange).
+const src = [/^function _isWorkingOrder\(/, /^function _tpSymCell\(/, /^function renderOrders\(/].map(grab).join('\n');
 
 function render(orders, { positions = [], armed = null } = {}) {
   const els = { 'tp-orders': { innerHTML: '' }, 'tp-history': { innerHTML: '' }, 'tpOrdCount': { textContent: '' } };
