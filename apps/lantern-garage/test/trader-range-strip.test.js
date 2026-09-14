@@ -38,8 +38,8 @@ test('the toolbar no longer carries the range select or the clock; the strip doe
   assert.ok(!PAGE.includes('id="chartRangeSelect"'), 'the range <select> is still on the toolbar');
   assert.strictEqual((PAGE.match(/id="mktClockWrap"/g) || []).length, 1);
   const strip = PAGE.slice(PAGE.indexOf('<div class="range-strip"'), PAGE.indexOf('<!-- Footer -->'));
-  assert.ok(strip.includes('id="mktClockWrap"'), 'the clock is not on the strip');
-  assert.ok(strip.includes('id="etClock"'), 'no wall clock on the strip');
+  assert.ok(strip.includes('id="mktClockWrap"'), 'the market state is not on the strip');
+  assert.match(strip, /<button type="button" class="range-sess range-tz" id="tzBtn"[^>]*><span id="etClock">/, 'the wall clock is not the timezone button');
   // The ids the session-clock code writes survive the move, so nothing else changes.
   assert.strictEqual((PAGE.match(/id="mktClockLabel"/g) || []).length, 1);
   assert.strictEqual((PAGE.match(/id="mktClock"/g) || []).length, 1);
@@ -78,7 +78,8 @@ test('on phones the strip belongs to the Chart view', () => {
   assert.match(PAGE, /\.range-strip\{ flex:0 0 auto; \}/);
 });
 
-test('the wall clock reads Eastern, like the axis, and ticks on its own', () => {
-  assert.match(PAGE, /const _etClockFmt = new Intl\.DateTimeFormat\('en-US', \{ timeZone:_ET, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false \}\);/);
+test('the wall clock reads in the chart timezone, like the axis, and ticks on its own', () => {
+  assert.match(PAGE, /function _tickEtClock\(\)\{[\s\S]*?const z = _tz\(\) \|\| 'local';/);
+  assert.match(PAGE, /el\.textContent = _clockFmt\.format\(new Date\(\)\) \+ ' ' \+ _tzTag\(\);/);
   assert.match(PAGE, /setInterval\(_tickEtClock, 1000\); _tickEtClock\(\);/);
 });

@@ -66,6 +66,9 @@
   select('data.session', 'regular', [{ v: 'regular', l: 'Regular hours only' }, { v: 'extended', l: 'Extended hours' }]);
   select('data.precision', 'default', [{ v: 'default', l: 'Default' }, { v: '0', l: '0' }, { v: '1', l: '1' }, { v: '2', l: '2' }, { v: '3', l: '3' }, { v: '4', l: '4' }]);
   select('data.timezone', 'exchange', TIMEZONES);
+  // The corner's timezone menu offers every zone the browser knows, so this select is
+  // open: any IANA zone the runtime can format in is a valid value, listed or not.
+  F['data.timezone'].open = 'zone';
   // Status line
   check('status.ohlc', false); check('status.change', false); check('status.volume', false);
   check('status.indTitles', true); check('status.indInputs', true); check('status.indValues', true);
@@ -234,13 +237,18 @@
   const isHex = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 
   /** One value, checked against its field. Returns undefined when it is not usable. */
+  /** An IANA zone the runtime can format in -- "Asia/Kolkata", not "Mars/Olympus". */
+  function isZone(v) {
+    if (typeof v !== 'string' || !/^[A-Za-z][A-Za-z0-9_+\-]*(\/[A-Za-z0-9_+\-]+){1,2}$/.test(v)) return false;
+    try { new Intl.DateTimeFormat('en-US', { timeZone: v }); return true; } catch (e) { return false; }
+  }
   function coerce(k, v) {
     const f = FIELDS[k];
     if (!f) return undefined;
     switch (f.type) {
       case 'check': return typeof v === 'boolean' ? v : (v === 'true' ? true : v === 'false' ? false : undefined);
       case 'color': return v == null || v === '' ? null : (isHex(v) ? v.toLowerCase() : undefined);
-      case 'select': return f.options.some((o) => o.v === v) ? v : undefined;
+      case 'select': return f.options.some((o) => o.v === v) ? v : (f.open === 'zone' && isZone(v) ? v : undefined);
       case 'number': case 'range': {
         const n = Number(v);
         if (!Number.isFinite(n)) return undefined;
@@ -417,6 +425,9 @@
     const f = FIELDS[k];
     const sel = h('select', { 'aria-label': label });
     for (const o of f.options) { const op = h('option', { value: o.v }, esc(o.l)); if (o.v === get(k)) op.selected = true; sel.appendChild(op); }
+    // An open select showing a value off its list (a zone picked in the corner menu) lists
+    // that value too, so the dialog never shows a blank.
+    if (f.open && !f.options.some((o) => o.v === get(k))) { const op = h('option', { value: get(k) }, esc(String(get(k)).replace(/_/g, ' '))); op.selected = true; sel.appendChild(op); }
     sel.addEventListener('change', () => set(k, sel.value));
     return sel;
   }
