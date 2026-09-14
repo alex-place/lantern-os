@@ -746,7 +746,7 @@
      absolutely at right:5px, which put it 9px ON TOP of the Chg% figure on every row --
      invisible at rest, but on hover it covered the number being read and a click aimed at
      the percentage could land on remove. A real track cannot overlap. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 26px 18px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,1fr) 62px 56px 56px 20px 16px;align-items:center;gap:6px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -767,7 +767,7 @@
      the declared height is only a basis, not a floor. .dock-head held 32px all along
      because it already carried this; .wl-head did not, which is the whole 2px. */
   .wl-head{height:var(--hdr-h);flex:0 0 auto;box-sizing:border-box;position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 26px 18px;align-items:center;gap:8px;
+    grid-template-columns:18px minmax(0,1fr) 62px 56px 56px 20px 16px;align-items:center;gap:6px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
@@ -829,10 +829,10 @@
   .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
   /* The AI toggle: lit when the autopilot may trade the row's symbol, faint otherwise. */
-  .wl-ai{grid-column:7;justify-self:center;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 4px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--text2);opacity:.35;cursor:pointer;line-height:1.3;transition:opacity .12s}
+  .wl-ai{grid-column:6;justify-self:center;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.04em;padding:1px 3px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--text2);opacity:.35;cursor:pointer;line-height:1.3;transition:opacity .12s}
   .wl-item:hover .wl-ai,.wl-item:focus-within .wl-ai{opacity:.85}
   .wl-ai.on{opacity:1;color:var(--accent);border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent)}
-  .wl-remove{grid-column:8;justify-self:center;opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
+  .wl-remove{grid-column:7;justify-self:center;opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
@@ -1701,7 +1701,6 @@
       </div>
       <div class="wl-head" aria-hidden="true">
         <span class="wl-h-sym">Symbol</span>
-        <span></span>
         <span class="wl-h-num">Last</span>
         <span class="wl-h-num">Chg</span>
         <span class="wl-h-num">Chg%</span>
@@ -7109,7 +7108,6 @@ function renderWatchlist(){
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
       <span class="wl-sym">${t.ticker}</span>
-      <span></span>
       <span class="wl-price">${_wlPx(t.price)}</span>
       <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
       <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>

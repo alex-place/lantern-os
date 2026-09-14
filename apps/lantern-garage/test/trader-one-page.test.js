@@ -74,9 +74,13 @@ test('every row has an AI toggle; tracking needs no warning, the AI list gets on
   assert.match(PAGE, /const ai = AI_LIST\.has\(String\(t\.ticker\)\.toUpperCase\(\)\);/);
   assert.match(PAGE, /<button class="wl-ai\$\{ai\?' on':''\}" aria-pressed="\$\{ai\}" aria-label="AI trader \$\{ai\?'on':'off'\} for \$\{t\.ticker\}"/);
   assert.match(PAGE, /onclick="toggleAiTicker\('\$\{t\.ticker\}',event\)">AI<\/button>/);
-  assert.strictEqual((PAGE.match(/grid-template-columns:18px minmax\(0,max-content\) 1fr 66px 60px 58px 26px 18px;/g) || []).length, 2, 'the row and the header grids');
-  assert.match(PAGE, /\.wl-ai\{grid-column:7;/);
-  assert.match(PAGE, /\.wl-remove\{grid-column:8;/);
+  // The rail is 340px (12px padding each side): fixed tracks plus gaps must leave the
+  // symbol its width. 18+62+56+56+20+16 = 228, six 6px gaps = 36, so a 305px row keeps
+  // ~41px for the ticker; the old 302px of tracks left it 3px (operator, 2026-09-13).
+  assert.strictEqual((PAGE.match(/grid-template-columns:18px minmax\(0,1fr\) 62px 56px 56px 20px 16px;align-items:center;gap:6px;/g) || []).length, 2, 'the row and the header grids');
+  assert.match(PAGE, /\.wl-ai\{grid-column:6;/);
+  assert.match(PAGE, /\.wl-remove\{grid-column:7;/);
+  assert.doesNotMatch(PAGE, /<span class="wl-sym">\$\{t\.ticker\}<\/span>\s*<span><\/span>/, 'the empty spacer cell is back');
   // Adding to the watchlist asks nothing; the slot editor adds to the watchlist too.
   const add = slice('async function addWatchlistTicker(){', 'async function addWatchlistSymbol(sym){');
   assert.ok(!add.includes('_tradelistEditGuard'), 'tracking a symbol still gets the AI warning');
