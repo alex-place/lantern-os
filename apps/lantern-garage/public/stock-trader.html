@@ -639,7 +639,10 @@
   /* The footer is narrower now that the docks own real columns, so its tables scroll
      inside their pane instead of being clipped at the edge (#3355 follow-up). */
   .tp-pane{overflow-x:auto;width:100%}
-  .tp-pane .tp-table{min-width:max-content;width:100%}
+  /* The pane's width, never max-content: a percentage column under a max-content table
+     once drew it at 100x its content (11,391px in a 726px pane). Auto layout never
+     squeezes a column under its content anyway; when they outgrow the pane it scrolls. */
+  .tp-pane .tp-table{min-width:100%;width:100%}
   .tp-pane{display:none}
   .tp-pane.active{display:block}
   /* positions / orders table */
@@ -662,17 +665,14 @@
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:color-mix(in srgb, var(--tint-neg) 25%, transparent)}
   .tp-flat-btn.armed,.tp-flatten-all.armed{background:color-mix(in srgb, var(--tint-neg) 32%, transparent);animation:otArmPulse 1s ease-in-out infinite}
   /* ── Positions panel styles (#3518): density + choosable columns ─────────────
-     The columns share the panel's width the way TradingView's do (operator, 2026-09-13):
-     the table is the pane's width, auto layout hands every data column its share of the
-     slack, and the actions column stays as narrow as its buttons. Add a column and the
-     others close up to make room; when the columns outgrow the pane it scrolls sideways.
-     No percentage widths on the DATA cells: under a min-width:max-content table a 1%
-     column once drew the table at 100x its content (11,391px in a 726px pane); this
-     table is min-width:100% instead, where 1% on the actions column just means "as narrow
-     as its content". */
-  .tp-pane .tp-table.tp-pos-table{min-width:100%}
+     The columns share the panel's width EVENLY (operator, 2026-09-13): every data header
+     asks for the same share of the table (an inline width, since the column count is
+     the reader's), the symbol column a fixed share, and the actions column stays as
+     narrow as its buttons. A column whose content needs more simply takes more; when
+     they all do, the table outgrows the pane and scrolls sideways. */
   .tp-pos-table .tp-act{width:1%;white-space:nowrap}
-  .tp-pos-table th,.tp-pos-table td{padding:4px 10px}
+  .tp-pos-table th,.tp-pos-table td{padding:4px 8px}
+  .tp-pos-table th{letter-spacing:.04em}   /* the widest header (UNREALIZED P&L) sits closer to the common share */
   .tp-pos-table .tp-act{text-align:right}
   /* The symbol reads like the watchlist's row: the issuer's badge, the ticker, and the
      exchange once it is known. */
@@ -10027,6 +10027,12 @@ async function flattenAll(btn){
   for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
   _alertToast(`Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
 }
+/* Even columns (operator, 2026-09-13): the symbol column takes a fixed share of the table,
+   the actions column its 1%, and every data column the same slice of what is left. Auto
+   layout on its own hands surplus width out in proportion to content, which read as
+   random gaps -- wide after UNREALIZED P&L, cramped between SIDE and QTY. */
+const _TP_SYM_SHARE = 12;
+function _tpShare(n){ return n ? +((100 - _TP_SYM_SHARE - 2) / n).toFixed(2) : 0; }
 /* The symbol cell of every panel table: the issuer's badge, the ticker, and the exchange
    once the symbol-info fetch has told us it (the same "Name · EXCHANGE" cache the details
    panel fills, #1631) -- TradingView's "NASDAQ:AAPL", without guessing the exchange.
@@ -10063,7 +10069,7 @@ function renderPositionsTable(positions){
   const cols = _TP_COLS.filter((c) => shown.has(c.id));
   const eq = Number((_tpLastAccount || {}).equity) || 0;
   el.innerHTML = tools +
-    `<table class="tp-table tp-pos-table"><thead><tr><th>Symbol</th>${cols.map((c) => `<th${c.tip ? ` title="${_tpAttr(c.tip)}"` : ''}>${c.label}</th>`).join('')}<th class="tp-act"></th></tr></thead><tbody>`+
+    `<table class="tp-table tp-pos-table"><thead><tr><th style="width:${_TP_SYM_SHARE}%">Symbol</th>${cols.map((c) => `<th style="width:${_tpShare(cols.length)}%"${c.tip ? ` title="${_tpAttr(c.tip)}"` : ''}>${c.label}</th>`).join('')}<th class="tp-act"></th></tr></thead><tbody>`+
     positions.map(p=>{
       const side=(p.side||'long').toLowerCase();
       const x = { side, short: side === 'short', lev: _tpLev(p.symbol), stop: _tpStop(p), target: _tpTarget(p), eq };
@@ -10133,7 +10139,8 @@ function renderOrders(orders){
     <td>${o.qty}</td><td>${o.type||'market'}</td><td>${o.limit_price?'$'+fmt(o.limit_price,2):'—'}</td>
     <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}${o.operator_account?' <span style="color:var(--text2)">(op)</span>':''}</td>
     <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td>${withActions?`<td>${o.id?`<button class="tp-flat-btn" onclick="cancelOrder('${String(o.id).replace(/[^A-Za-z0-9-]/g,'')}',this)" title="Cancel this working order. To change it: cancel, then re-place from the ticket.">✕ Cancel</button>`:''}</td>`:''}</tr>`;
-  const tbl=(rows,withActions)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th>${withActions?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
+  // Even columns here too (operator, 2026-09-13): the same shares the positions table uses.
+  const tbl=(rows,withActions)=> rows.length ? `<table class="tp-table"><thead><tr><th style="width:16%">Symbol</th><th style="width:12%">Side</th><th style="width:12%">Qty</th><th style="width:12%">Type</th><th style="width:12%">Limit</th><th style="width:12%">Status</th><th style="width:14%">Time</th>${withActions?'<th style="width:1%"></th>':''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
   const working = arr.filter(_isWorkingOrder);
   _tpWorking = working;   // #3518: the positions panel's Stop / Take profit columns read these
   // Count badge, same convention as Positions (operator ask #3309: "it should
