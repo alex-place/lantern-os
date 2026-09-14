@@ -158,6 +158,47 @@ test('it is a dialog, escapable, and announced as one', () => {
   assert.match(paint, /host\.addEventListener\('click', \(e\) => \{ if \(e\.target === host\) jpShareClose\(\); \}\);/);
 });
 
+test('closing the sheet while its options are in flight drops the reply instead of throwing', async () => {
+  /* Open, Escape before the options arrived, and the reply wrote into a sheet that no
+     longer existed: "Cannot set properties of null (setting 'error')" (QA, 2026-09-14). */
+  const open = grabFn('jpShareOpen'), close = grabFn('jpShareClose'), publish = grabFn('jpSharePublish');
+  assert.match(open, /const me = jpShare;[\s\S]*?if \(jpShare !== me\) return;/);
+  assert.match(open, /catch \(e\) \{ if \(jpShare !== me\) return; jpShare\.error = e\.message; \}/);
+  assert.match(publish, /const me = jpShare;[\s\S]*?const d = await r\.json\(\);\s*if \(jpShare !== me\) return;/);
+  assert.match(publish, /catch \(e\) \{ if \(jpShare !== me\) return; jpShare\.error = e\.message; \}/);
+  // Run it: the fetches resolve only after the sheet was closed.
+  let release; const gate = new Promise((res) => { release = res; });
+  const paints = [];
+  const sb = {
+    fetch: () => gate.then(() => ({ json: () => Promise.resolve({ kinds: ['month'], months: ['2026-08'], shares: [] }) })),
+    jpSharePaint: () => { paints.push(sb.jpShare && sb.jpShare.open); },
+    jpSharePreview: () => Promise.resolve(),
+  };
+  const run = new Function('fetch', 'jpSharePaint', 'jpSharePreview',
+    'let jpShare = null;\n' + open + '\n' + close + '\n' + publish
+    + '\nreturn { open: jpShareOpen, close: jpShareClose, publish: jpSharePublish, get: () => jpShare, set: (v) => { jpShare = v; } };')(
+    sb.fetch, sb.jpSharePaint, sb.jpSharePreview);
+  const opening = run.open();
+  run.close();
+  release();
+  await opening;                                   // must settle, not reject
+  assert.strictEqual(run.get(), null, 'the closed sheet stayed closed');
+  // A publish whose sheet closed mid-flight is dropped the same way.
+  run.set({ open: true, kind: 'month', month: '2026-08', dollars: false, shares: [], busy: false, error: null });
+  let release2; const gate2 = new Promise((res) => { release2 = res; });
+  sb.fetch = () => gate2.then(() => ({ ok: true, json: () => Promise.resolve({ id: 'x', createdAt: 't', payload: { kind: 'month', label: 'm', dollars: false, card: {} } }) }));
+  const run2 = new Function('fetch', 'jpSharePaint', 'jpSharePreview',
+    'let jpShare = null;\n' + open + '\n' + close + '\n' + publish
+    + '\nreturn { publish: jpSharePublish, close: jpShareClose, get: () => jpShare, set: (v) => { jpShare = v; } };')(
+    (...a) => sb.fetch(...a), sb.jpSharePaint, sb.jpSharePreview);
+  run2.set({ open: true, kind: 'month', month: '2026-08', dollars: false, shares: [], busy: false, error: null });
+  const publishing = run2.publish();
+  run2.close();
+  release2();
+  await publishing;
+  assert.strictEqual(run2.get(), null, 'the closed sheet stayed closed after the publish reply');
+});
+
 test('a reader with nothing to share can still leave the sheet', () => {
   /* The empty branch rendered a sentence and no button: no Close, nothing to focus for
      Escape, no way out but a reload (QA, 2026-09-14). */
