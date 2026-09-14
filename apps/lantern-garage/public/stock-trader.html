@@ -618,6 +618,8 @@
   .pick-menu.tz{min-width:280px}
   .pick-search{display:block;width:100%;box-sizing:border-box;margin:2px 0 6px;padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text0);font:inherit;font-size:12px}
   .pick-list{max-height:50vh;overflow-y:auto}
+  .ind-settings .dr-reset{background:none;border:0;padding:0;margin-left:4px;color:var(--accent);cursor:pointer;font:inherit;font-size:inherit}
+  .ind-settings .dr-reset:hover{text-decoration:underline}
   /* The corner gives way before the range row does: the VIX goes first, then the market
      state, as the strip itself narrows (a container query, so the sidebar counts). */
   .range-strip{container-type:inline-size}
@@ -2916,6 +2918,14 @@ const IND_DEFS = {
   cmo:      { name:'Chande momentum',kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:200}], color:'#f87171', band:[-100,100], guides:[-50,50] },
   stdev:    { name:'Std deviation',  kind:'pane',    params:[{k:'p',label:'Period',def:20,min:2,max:200}], color:'#c084fc' },
 };
+/* What each plot of a multi-line indicator is called in its Style tab (colour, color2,
+   color3 in series order). An indicator not listed has one line. The MACD histogram's
+   up and down are their own two swatches (histUp / histDown). */
+const _PLOT_NAMES = {
+  macd:['MACD','Signal'], ppo:['PPO','Signal'], stoch:['%K','%D'], stochrsi:['%K','%D'],
+  adx:['ADX','+DI','−DI'], aroon:['Aroon up','Aroon down'],
+  bb:['Upper','Middle','Lower'], donchian:['Upper','Middle','Lower'], keltner:['Upper','Middle','Lower'], env:['Upper','Middle','Lower'],
+};
 
 /**
  * An indicator line, legible on the chart it is drawn on (#3594).
@@ -3003,6 +3013,9 @@ indCompute = function(cfg, bars){
   const out = _indComputeRaw(cfg, bars); if(!out) return out;
   if(cfg.dash && out.series[0]) out.series[0] = Object.assign({}, out.series[0], { dash:[5,4] });
   if(cfg.color2 && out.series[1]) out.series[1] = Object.assign({}, out.series[1], { color: indLineColour(cfg.color2) });
+  if(cfg.color3 && out.series[2]) out.series[2] = Object.assign({}, out.series[2], { color: indLineColour(cfg.color3) });
+  // The histogram's own up/down (the MACD's red and green), when the reader set them.
+  if(out.hist){ out.histUp = cfg.histUp ? indLineColour(cfg.histUp) : null; out.histDown = cfg.histDown ? indLineColour(cfg.histDown) : null; }
   return out;
 };
 /** Short label for the legend, e.g. "EMA 21" or "MACD 12/26/9". */
@@ -3372,11 +3385,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
   if(rMax<=rMin) return;
-  _crossData[canvas.id] = { bars, rMin, rMax };   // for the hover crosshair readout
+  _crossData[canvas.id] = { bars, rMin, rMax, panes: [] };   // for the hover crosshair readout; the panes add their scales below
 
   const pw  = Math.max(0, w - AXIS_W);
   const ph  = Math.max(0, h - AXIS_H);
-  const { panes: _panes, paneH: _paneH, paneN: _paneN, priceH } = _paneLayout(ph);
+  const { panes: _panes, paneN: _paneN, tops: _paneTops, hs: _paneHs, priceH } = _paneLayout(ph);
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*priceH;
 
@@ -3692,6 +3705,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         ctx.restore();
       }
     }
+    // The painter, the list and the ts->x map are shared with the pane loop below, which
+    // paints the drawings that live in an indicator pane with that pane's own scale.
+    let _drawOne = null, _drawList = [], _drawPend = null, _drawTk = null, _drawXOf = null, _yMap = y;
     // -- User drawings (#2444, expanded) --------------------------------------
     // ONE generic renderer over DRAW_TOOLS: every shape is a list of (ts,price)
     // anchors, so adding a tool is a spec entry + a case here, never new plumbing.
@@ -3704,8 +3720,10 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       if (list.length || pend) {
         const ts0 = +new Date(bars[0].timestamp), ts1 = +new Date(bars[n-1].timestamp) || ts0 + 1;
         const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+        _drawList = list; _drawPend = pend; _drawTk = tk; _drawXOf = xOf;
         const MONO = '9px ui-monospace, Menlo, Consolas, monospace';
-        const drawOne = (d, ghost) => {
+        const drawOne = (d, ghost, yMap) => {
+          _yMap = yMap || y;                      // the price scale, or the pane's
           // Per-drawing style (colour / width / dash) lives on the object, so it saves with it.
           const _st = (typeof drawStyleOf === 'function') ? drawStyleOf(d) : {};
           const col = d.color || _st.color || drawDefaultColor(d.t);
@@ -3713,7 +3731,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           if (ghost) ctx.globalAlpha = 0.55;
           const base = ghost ? 0.55 : 1;
           ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = d.w || _st.w || 1.2; if (_st.dash) ctx.setLineDash([_st.dash, _st.dash]); ctx.font = MONO;
-          const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: y(a.price), ts: a.ts, price: a.price }));
+          const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: _yMap(a.price), ts: a.ts, price: a.price }));
           if (!P.length) { ctx.restore(); return; }
           const tag = (txt, px, py, align) => {
             ctx.fillStyle = col; ctx.textAlign = align || 'left'; ctx.textBaseline = 'bottom';
@@ -3741,9 +3759,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               let sd = 0;
               for (let q=lo; q<=hi; q++) { const e = bars[q].close - (slope*q + icept); sd += e*e; }
               sd = Math.sqrt(sd/Math.max(1,m));
-              const at = (q) => ({ x: q*slotW + slotW/2, y: y(slope*q + icept) });
+              const at = (q) => ({ x: q*slotW + slotW/2, y: _yMap(slope*q + icept) });
               const a0 = at(lo), b0 = at(hi);
-              const dev = Math.abs(y(0) - y(sd));
+              const dev = Math.abs(_yMap(0) - _yMap(sd));
               shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
                 ctx.beginPath(); ctx.moveTo(a0.x, a0.y-dev); ctx.lineTo(b0.x, b0.y-dev);
                 ctx.lineTo(b0.x, b0.y+dev); ctx.lineTo(a0.x, a0.y+dev); ctx.closePath(); ctx.fill(); });
@@ -4127,7 +4145,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               // Each level in its own colour -- one flat purple made them indistinguishable.
               let _prevY = null;
               for (const lv of FIB_LEVELS) {
-                const pr = a.price + span*lv, yy = y(pr);
+                const pr = a.price + span*lv, yy = _yMap(pr);
                 const lc = (typeof fibColorOf === 'function') ? fibColorOf(d, lv) : col;
                 if (_prevY != null && drawOptOf(d, 'fill') !== false) {
                   ctx.globalAlpha = base*0.07; ctx.fillStyle = lc;
@@ -4151,7 +4169,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const a = P[0], b = P[1], c = P[2], span = b.price - a.price;
               const x1 = Math.min(a.x, c.x);
               for (const lv of FIB_EXT) {
-                const pr = c.price + span*lv, yy = y(pr);
+                const pr = c.price + span*lv, yy = _yMap(pr);
                 ctx.globalAlpha = base*0.8;
                 ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
                 tag((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
@@ -4225,8 +4243,10 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           }
           ctx.restore();
         };
-        for (const d of list) { if (d.hidden) continue; drawOne(d, false); }
-        if (pend) {
+        _drawOne = drawOne;
+        // The price pane paints its own drawings here; a pane's drawings paint in that pane.
+        for (const d of list) { if (d.hidden || d.pane) continue; drawOne(d, false); }
+        if (pend && !pend.pane) {
           // The shape follows the cursor while it is being placed, so its size and
           // angle are visible BEFORE the last click commits it -- TradingView's rubber
           // band. Without the hover point only the clicked anchors drew, so a two-click
@@ -4242,7 +4262,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         }
         // Selection handles: a ring on each anchor of the selected drawing, so what can
         // be grabbed is visible. Drawn last so nothing paints over them.
-        if (typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === tk && list[_selDraw.i]) {
+        if (typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === tk && list[_selDraw.i] && !list[_selDraw.i].pane) {
           const sd = list[_selDraw.i];
           const hp = (sd.t === 'pen' && (sd.pts || []).length > 2)
             ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
@@ -4289,13 +4309,19 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // price clip is released, each inside its own.
     if(_paneN > 0){
       const legend = [];
+      // A pane's scale is the reader's once they zoom or pan it (view.paneY, by indicator
+      // id); until then it is the indicator's band or a fit of its data.
+      const _pv = chartView['overlay-' + String(canvas.id).replace(/^chart-/, '')] || null;
+      const _paneMan = (_pv && _pv.paneY) || {};
       for(let pi=0; pi<_paneN; pi++){
         const cfg = _panes[pi];
         const out = indCompute(cfg, bars); if(!out) continue;
-        const top = priceH + pi*_paneH, bot = top + _paneH;
-        // scale: a fixed band when the indicator has one (RSI 0-100), else fit the data
+        const top = _paneTops[pi], _hp = _paneHs[pi], bot = top + _hp;
+        // scale: the reader's, else a fixed band when the indicator has one (RSI 0-100), else fit the data
         let lo, hi;
-        if(out.band){ lo=out.band[0]; hi=out.band[1]; }
+        const _man = _paneMan[cfg.id];
+        if(_man && Number.isFinite(_man.min) && Number.isFinite(_man.max) && _man.max > _man.min){ lo=_man.min; hi=_man.max; }
+        else if(out.band){ lo=out.band[0]; hi=out.band[1]; }
         else{
           lo=Infinity; hi=-Infinity;
           for(const s of out.series) for(const v of s.values){ if(v==null||!Number.isFinite(v)) continue; if(v<lo) lo=v; if(v>hi) hi=v; }
@@ -4304,10 +4330,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           if(hi===lo){ hi=lo+1; lo-=1; }
           const pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
         }
-        const yOf = (v)=> top + (1-(v-lo)/(hi-lo))*_paneH;
+        const yOf = (v)=> top + (1-(v-lo)/(hi-lo))*_hp;
+        _crossData[canvas.id].panes.push({ key: cfg.id, top, h: _hp, lo, hi });   // the crosshair, drawings and zoom read this
 
         ctx.save();
-        ctx.beginPath(); ctx.rect(0, top, pw, _paneH); ctx.clip();
+        ctx.beginPath(); ctx.rect(0, top, pw, _hp); ctx.clip();
         // separator above the strip
         ctx.strokeStyle=_cs('canvas.paneSepColor') || _gridColour(); ctx.lineWidth=1;   // Canvas › pane separators
         ctx.beginPath(); ctx.moveTo(0, Math.round(top)+0.5); ctx.lineTo(pw, Math.round(top)+0.5); ctx.stroke();
@@ -4324,11 +4351,32 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           for(let i=0;i<out.hist.length;i++){
             const v=out.hist[i]; if(v==null||!Number.isFinite(v)) continue;
             const vy=yOf(v);
-            ctx.fillStyle=_chartRgba(v>=0?CHART_CANDLE_UP():CHART_CANDLE_DOWN(),.55);
+            // The histogram's up and down are the indicator's own colours when set (Style
+            // tab), else the reader's gain/loss palette.
+            ctx.fillStyle=_chartRgba(v>=0 ? (out.histUp || CHART_CANDLE_UP()) : (out.histDown || CHART_CANDLE_DOWN()), .55);
             ctx.fillRect(_xOfIdx(i)-bw/2, Math.min(vy,zero), bw, Math.max(1,Math.abs(zero-vy)));
           }
         }
         for(const s of out.series) _indStroke(ctx, s.values, _xOfIdx, yOf, s.color, s.width, s.dash);
+        // The drawings that live in this pane, in its scale and inside its clip -- a trend
+        // line on the MACD is a trend line on the MACD, not on the price.
+        if(_drawOne && (_drawList.length || _drawPend)){
+          for(const d of _drawList){ if(d.hidden || d.pane !== cfg.id) continue; _drawOne(d, false, yOf); }
+          if(_drawPend && _drawPend.pane === cfg.id){
+            const _pp = _drawPend.hover ? _drawPend.pts.concat([_drawPend.hover]) : _drawPend.pts;
+            if(_pp.length) _drawOne({ t: _drawPend.t, pts: _pp, text: _drawPend.text }, true, yOf);
+            ctx.save(); ctx.lineWidth = 1.5;
+            for(const a of _drawPend.pts){ ctx.beginPath(); ctx.arc(_drawXOf(a.ts), yOf(a.price), 3.5, 0, Math.PI*2); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = SEL_BLUE; ctx.stroke(); }
+            ctx.restore();
+          }
+          if(typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === _drawTk && _drawList[_selDraw.i] && _drawList[_selDraw.i].pane === cfg.id){
+            const sd = _drawList[_selDraw.i];
+            const hp = (sd.t === 'pen' && (sd.pts || []).length > 2) ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
+            ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([]);
+            for(const a of hp){ ctx.beginPath(); ctx.arc(_drawXOf(a.ts), yOf(a.price), 4.5, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = SEL_BLUE; ctx.stroke(); }
+            ctx.restore();
+          }
+        }
         // scale ends in the gutter, so a pane is readable without a full axis
         ctx.fillStyle=_axisColour(); ctx.font=_axisFont(); ctx.textAlign='left';
         ctx.restore();
@@ -4387,12 +4435,71 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
    ONE definition, because the HTML overlay positions its lines by percent of ITS height
    and used to assume that height was the price pane. With an RSI strip on, every overlay
    line -- the live price, entry, stop, target -- landed a strip's height too low. */
+const PANE_MIN = 34;
 function _paneLayout(ph){
   const panes = indPanes();
+  if(!panes.length || ph <= 0) return { panes:[], paneN:0, paneH:0, panesH:0, tops:[], hs:[], priceH:Math.max(0, ph) };
+  // The default share: up to half the plot between them, 34-78px each. A pane the reader
+  // has sized (dragging the line above it, operator 2026-09-13) keeps its own share of
+  // the plot -- a fraction, so it survives a resize -- and the price pane keeps at least
+  // a quarter.
   const paneMax = Math.floor(ph * 0.5);
-  const paneH = panes.length ? Math.max(34, Math.min(78, Math.floor(paneMax / panes.length))) : 0;
-  const paneN = paneH >= 34 ? Math.min(panes.length, Math.floor(paneMax / paneH)) : 0;
-  return { panes, paneH, paneN, priceH: Math.max(0, ph - paneN * paneH) };
+  const def = Math.max(PANE_MIN, Math.min(78, Math.floor(paneMax / panes.length)));
+  let hs = panes.map(c => (c.paneFrac > 0) ? Math.max(PANE_MIN, Math.round(ph * c.paneFrac)) : def);
+  const cap = Math.floor(ph * 0.75);
+  let sum = hs.reduce((a, b) => a + b, 0);
+  if(sum > cap){ const k = cap / sum; hs = hs.map(h => Math.max(PANE_MIN, Math.floor(h * k))); sum = hs.reduce((a, b) => a + b, 0); }
+  // Panes that still do not fit are dropped from the bottom, never squeezed into mush.
+  let paneN = panes.length;
+  while(paneN > 0 && sum > cap){ paneN--; sum -= hs[paneN]; }
+  hs = hs.slice(0, paneN);
+  const priceH = Math.max(0, ph - sum);
+  const tops = []; let t = priceH; for(const h of hs){ tops.push(t); t += h; }
+  return { panes, paneN, hs, tops, paneH: hs[0] || 0, panesH: sum, priceH };
+}
+/* A pane's scale as the renderer last painted it (crossData.panes), by key or by the y
+   under the cursor: y-of-value and value-of-y, so the crosshair, the drawings and the
+   zoom all read the strip the same way. Null when that pane is not on the chart. */
+function _paneMapper(data, key, yPx){
+  const list = (data && data.panes) || [];
+  const p = key ? list.find(q => q.key === key) : list.find(q => yPx >= q.top && yPx < q.top + q.h);
+  if(!p || !(p.hi > p.lo) || !(p.h > 0)) return null;
+  return { key: p.key, top: p.top, h: p.h, lo: p.lo, hi: p.hi,
+    yOf: (v) => p.top + (1 - (v - p.lo) / (p.hi - p.lo)) * p.h,
+    valueAt: (py) => p.hi - ((py - p.top) / p.h) * (p.hi - p.lo) };
+}
+function _paneKeyAt(canvas, ph, y){
+  const pl = _paneLayout(ph);
+  const i = pl.tops.findIndex((t, k) => y >= t && y < t + pl.hs[k]);
+  return i >= 0 ? pl.panes[i].id : null;
+}
+/* Zoom one pane's scale about its middle: from the reader's range if they own it, else
+   from the auto range the renderer last used. Immediate, no easing -- a strip is small. */
+function _zoomPaneY(view, canvas, key, factor){
+  const cur = (view.paneY && view.paneY[key]) || (function(){ const pm = _paneMapper(_crossData[canvas.id], key); return pm ? { min: pm.lo, max: pm.hi } : null; })();
+  if(!cur) return;
+  const mid = (cur.min + cur.max) / 2, rng = Math.max(1e-9, (cur.max - cur.min) * factor);
+  view.paneY = view.paneY || {};
+  view.paneY[key] = { min: mid - rng/2, max: mid + rng/2 };
+}
+/* Dragging the line above a pane. Above the first pane, the price pane and that pane
+   trade height (the price pane keeps a quarter); between two panes, those two trade.
+   Heights are kept on the indicator as a share of the plot, so they follow the account
+   with the indicator (#3594). */
+function _paneSizeDrag(drag, yy){
+  const pl = drag.pl, i = drag.sepIdx, ph = drag.ph;
+  if(!pl || i < 0 || !(ph > 0)) return;
+  const bot = pl.tops[i] + pl.hs[i];
+  if(i === 0){
+    const others = pl.hs.slice(1).reduce((a, b) => a + b, 0);
+    const hNew = Math.max(PANE_MIN, Math.min(Math.floor(ph * 0.75) - others, bot - yy));
+    pl.panes[0].paneFrac = hNew / ph;
+  } else {
+    const total = pl.hs[i-1] + pl.hs[i];
+    const hNew = Math.max(PANE_MIN, Math.min(total - PANE_MIN, bot - yy));
+    pl.panes[i].paneFrac = hNew / ph;
+    pl.panes[i-1].paneFrac = (total - hNew) / ph;
+  }
 }
 const _ladderSig = {};
 function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl, force){
@@ -4573,7 +4680,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   // The overlay ends where the price pane ends, so its percentages mean prices.
   if(canvas){
     const _pl = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H));
-    overlay.style.bottom = (AXIS_H + _pl.paneN * _pl.paneH) + 'px';
+    overlay.style.bottom = (AXIS_H + _pl.panesH) + 'px';
   }
   const pct  = p => (((rMax-p)/rng)*100).toFixed(2)+'%';
   const hpct = (t,b) => (Math.max(0.3,(t-b)/rng*100)).toFixed(2)+'%';
@@ -5651,15 +5758,19 @@ function _drawAnchor(canvas, clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   const xPx = clientX - rect.left, yPx = clientY - rect.top;
   const pw = Math.max(0, canvas.clientWidth - AXIS_W);
-  const ph = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H)).priceH;   // the price pane only
-  if (xPx > pw || yPx > ph || xPx < 0 || yPx < 0) return null;
+  const ph = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H)).priceH;   // the price pane's height
+  if (xPx > pw || xPx < 0 || yPx < 0) return null;
+  // Below the price pane: an indicator strip, if the point is inside one (its scale is
+  // the pane's own, recorded at render time); the gutter and the time axis are nothing.
+  const pane = yPx > ph ? _paneMapper(data, null, yPx) : null;
+  if (yPx > ph && !pane) return null;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   // invert the renderer's xOf so a click lands on a real time, not a bar index
   const frac = n === 1 ? 0 : (xPx - slotW/2) / Math.max(1, (n-1)*slotW);
   const ts = ts0 + Math.max(0, Math.min(1, frac)) * (ts1 - ts0);
-  const price = data.rMax - (yPx / ph) * (data.rMax - data.rMin);
-  return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4) };
+  const price = pane ? pane.valueAt(yPx) : data.rMax - (yPx / ph) * (data.rMax - data.rMin);
+  return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4), pane: pane ? pane.key : null };
 }
 
 // Which drawing is under this point? Returns { i, dist, pts } or null. Shared by
@@ -5669,7 +5780,7 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   if (!list.length) return false;
   const rng = data.rMax - data.rMin;
   if (rng <= 0) return false;
-  const yOf = pr => ((data.rMax - pr) / rng) * ph;
+  const yPrice = pr => ((data.rMax - pr) / rng) * ph;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
@@ -5681,6 +5792,9 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   let best = -1, bestD = (tol == null ? 14 : tol);
   list.forEach((d, i) => {
     if (d.hidden) return;                 // invisible means unclickable
+    const pm = d.pane ? _paneMapper(data, d.pane) : null;
+    if (d.pane && !pm) return;            // its pane is not on the chart right now
+    const yOf = pm ? pm.yOf : yPrice;
     const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
     if (!P.length) return;
     let dist = Infinity;
@@ -5787,7 +5901,10 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
     if (dist < bestD) { bestD = dist; best = i; }
   });
   if (best < 0) return null;
-  const P = (list[best].pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
+  // The winner's own scale again (a pane drawing reads in its pane's units).
+  const _bpm = list[best].pane ? _paneMapper(data, list[best].pane) : null;
+  const _byOf = _bpm ? _bpm.yOf : yPrice;
+  const P = (list[best].pts || []).map(a => ({ x: xOf(a.ts), y: _byOf(a.price) }));
   return { i: best, dist: bestD, pts: P };
 }
 
@@ -5796,13 +5913,16 @@ function _drawingAnchors(tk, data, idx, pw, ph) {
   const d = (_drawings[tk] || [])[idx];
   if (!d || !data || !data.bars || !data.bars.length) return [];
   const rng = data.rMax - data.rMin; if (rng <= 0) return [];
-  const yOf = pr => ((data.rMax - pr) / rng) * ph;
+  const yPrice = pr => ((data.rMax - pr) / rng) * ph;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
   // A brush is a path, not a shape: a handle per point would be unusable, so it gets
   // its two ends and otherwise moves as a whole.
   const pts = (d.t === 'pen' && d.pts.length > 2) ? [d.pts[0], d.pts[d.pts.length - 1]] : (d.pts || []);
+  const pm = d.pane ? _paneMapper(data, d.pane) : null;
+  if (d.pane && !pm) return [];
+  const yOf = pm ? pm.yOf : yPrice;
   return pts.map(a => ({ x: xOf(a.ts), y: yOf(a.price), ts: a.ts, price: a.price }));
 }
 
@@ -5830,12 +5950,16 @@ function _selGeom(tk) {
   const canvas = document.getElementById('chart-' + tk);
   const data = canvas && _crossData[canvas.id];
   if (!canvas || !data || !data.bars || !data.bars.length) return null;
-  const pw = Math.max(0, canvas.clientWidth - AXIS_W), ph = Math.max(0, canvas.clientHeight - AXIS_H);
+  // The price pane's height, not the plot's: with a strip on, a dragged drawing used to
+  // map its y against the whole plot and drift by the strip's height.
+  const pw = Math.max(0, canvas.clientWidth - AXIS_W), ph = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H)).priceH;
   const rng = data.rMax - data.rMin; if (rng <= 0) return null;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
   const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
   return { canvas, data, pw, ph, n,
     priceAt: (py) => data.rMax - (py / ph) * rng,
+    // The drawing's own scale: a pane drawing reads in that pane's units.
+    valueAt: (py, d) => { const pm = d && d.pane ? _paneMapper(data, d.pane) : null; return pm ? pm.valueAt(py) : data.rMax - (py / ph) * rng; },
     tsAt: (px) => n === 1 ? ts0 : ts0 + ((px - slotW/2) / Math.max(1, (n-1)*slotW)) * (ts1 - ts0) };
 }
 function _refreshTicker(tk) {
@@ -6607,20 +6731,21 @@ document.addEventListener('pointerdown', e => {
   const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  _penDrag = { tk: _canvasTicker(canvas), canvas, tool: _drawTool, moved: false, pts: [{ ts: a.ts, price: a.price }] };
+  _penDrag = { tk: _canvasTicker(canvas), canvas, tool: _drawTool, moved: false, pts: [{ ts: a.ts, price: a.price }], pane: a.pane || null };
   // Only the brush claims _drawPending on press. A 2-point tool waits for actual
   // movement (below) — otherwise a press-release with no drag would wipe the click
   // handler's half-placed shape and click-click would silently stop working.
-  if (_drawTool === 'pen') _drawPending = { tk: _penDrag.tk, t: 'pen', pts: _penDrag.pts };
+  if (_drawTool === 'pen') _drawPending = { tk: _penDrag.tk, t: 'pen', pts: _penDrag.pts, pane: _penDrag.pane };
 }, true);
 document.addEventListener('pointermove', e => {
   if (!_penDrag) return;
   const a = _drawAnchor(_penDrag.canvas, e.clientX, e.clientY); if (!a) return;
+  if ((a.pane || null) !== (_penDrag.pane || null)) return;   // the shape stays in the pane it started in
   if (!_penDrag.moved) {
     _penDrag.moved = true;
     if (_penDrag.tool !== 'pen') {
       _penDrag.pts[1] = { ts: a.ts, price: a.price };
-      _drawPending = { tk: _penDrag.tk, t: _penDrag.tool, pts: _penDrag.pts };
+      _drawPending = { tk: _penDrag.tk, t: _penDrag.tool, pts: _penDrag.pts, pane: _penDrag.pane };
       _drawPendingFromDrag = true;
     }
   }
@@ -6636,15 +6761,15 @@ document.addEventListener('pointermove', e => {
 }, true);
 document.addEventListener('pointerup', () => {
   if (!_penDrag) return;
-  const { tk, pts, tool, moved } = _penDrag;
+  const { tk, pts, tool, moved, pane } = _penDrag;
   _penDrag = null;
   // Clearing _drawPending is ONLY correct when this gesture owned it. A no-drag press
   // leaves the click handler's accumulated anchors intact.
   if (moved || tool === 'pen') { _drawPending = null; _drawPendingFromDrag = false; }
   if (tool === 'pen') {
-    if (pts.length > 1) _commitDrawing(tk, { t: 'pen', pts });
+    if (pts.length > 1) _commitDrawing(tk, pane ? { t: 'pen', pts, pane } : { t: 'pen', pts });
   } else if (moved && pts.length === 2) {
-    _commitDrawing(tk, { t: tool, pts });
+    _commitDrawing(tk, pane ? { t: tool, pts, pane } : { t: tool, pts });
     setDrawTool('');                                       // one shape per arm
   }
   // A press with no drag is NOT a shape -- it falls through to the click handler,
@@ -6709,6 +6834,7 @@ document.addEventListener('pointermove', (e) => {
   const cv = lad.querySelector('.chart-canvas'); if (!cv) return;
   const a2 = _drawAnchor(cv, e.clientX, e.clientY); if (!a2) return;
   if (_canvasTicker(cv) !== _drawPending.tk) return;
+  if ((a2.pane || null) !== (_drawPending.pane || null)) return;   // no rubber band into another pane
   _drawPending.hover = { ts: a2.ts, price: a2.price };
   _repaintChart(_drawPending.tk);
 });
@@ -6724,12 +6850,12 @@ document.addEventListener('pointermove', (e) => {
     const src = _dragDraw.startPts;
     let idx = _dragDraw.handle;
     if (d.t === 'pen' && src.length > 2) idx = _dragDraw.handle === 0 ? 0 : src.length - 1;
-    d.pts[idx] = { ts: g.tsAt(x), price: g.priceAt(y) };
+    d.pts[idx] = { ts: g.tsAt(x), price: g.valueAt(y, d) };
   } else {
     // Move the WHOLE drawing by the pointer delta, in data units so it stays welded
     // to the bars rather than drifting when the scale changes.
     const dts = g.tsAt(x) - g.tsAt(_dragDraw.x0);
-    const dpr = g.priceAt(y) - g.priceAt(_dragDraw.y0);
+    const dpr = g.valueAt(y, d) - g.valueAt(_dragDraw.y0, d);
     d.pts = _dragDraw.startPts.map(pt => ({ ts: pt.ts + dts, price: pt.price + dpr }));
   }
   _repaintChart(_dragDraw.tk);     // pixels only -- keeps the crosshair alive
@@ -6776,13 +6902,17 @@ document.addEventListener('click', e => {
   e.stopPropagation(); e.preventDefault();
 
   if (!_drawPending || _drawPending.tk !== tk || _drawPending.t !== _drawTool) {
-    _drawPending = { tk, t: _drawTool, pts: [] };
+    _drawPending = { tk, t: _drawTool, pts: [], pane: a.pane || null };
   }
+  // A shape lives in one pane: a click in another while one is half-placed is not an
+  // anchor (TradingView ignores it too).
+  if (_drawPending.pts.length && (_drawPending.pane || null) !== (a.pane || null)) { renderTicker(tk); return; }
   _drawPending.pts.push({ ts: a.ts, price: a.price });
   _drawPending.hover = null;   // the click supersedes it
 
   if (_drawPending.pts.length >= spec.pts) {
     const obj = { t: _drawTool, pts: _drawPending.pts.slice() };
+    if (_drawPending.pane) obj.pane = _drawPending.pane;   // a pane drawing saves with its pane
     if (spec.text) {
       const txt = prompt(_drawTool === 'note' ? 'Note text' : 'Text');
       if (txt == null || !txt.trim()) { _drawPending = null; renderTicker(tk); return; }
@@ -7223,13 +7353,15 @@ function _updateXh(ladder, canvasId, x, y, w, h){
   // The price pane, not the whole plot: with an RSI strip on, the readout used to be a
   // strip's height off (the same #3333 gap the overlay had).
   const pw = w - AXIS_W, ph = _paneLayout(h - AXIS_H).priceH;
-  if(!data || x < 0 || x > pw || y < 0 || y > ph){ _hideXh(ladder); return; }
+  // Below the price pane the readout is the indicator's own value, in its pane's scale.
+  const _pn = (data && y > ph) ? _paneMapper(data, null, y) : null;
+  if(!data || x < 0 || x > pw || y < 0 || (y > ph && !_pn)){ _hideXh(ladder); return; }
   const xh = _ensureXh(ladder);
   const n = (data.bars || []).length;
   // Mobile: a phone-style scrubber — vertical line SNAPPED to the nearest bar, a dot
   // riding the price line, and the price read from the bar (not the free touch-Y). No
   // horizontal line. Deliberately different from the desktop mouse crosshair.
-  if(isNarrowTrader() && n >= 1){
+  if(isNarrowTrader() && n >= 1 && !_pn){
     const slotW = pw / _slotsFor(n);
     const idx = Math.max(0, Math.min(n-1, Math.floor(x / slotW)));
     const b = data.bars[idx];
@@ -7246,7 +7378,7 @@ function _updateXh(ladder, canvasId, x, y, w, h){
     xh.time.style.display = xh.time.textContent ? 'block' : 'none';
     return;
   }
-  const price = data.rMax - (y/ph)*(data.rMax - data.rMin);   // invert price→y
+  const price = _pn ? _pn.valueAt(y) : data.rMax - (y/ph)*(data.rMax - data.rMin);   // invert price→y, or the pane's value
   let timeLabel = '';
   if(n >= 1){
     const slotW = pw/_slotsFor(n);
@@ -7256,7 +7388,7 @@ function _updateXh(ladder, canvasId, x, y, w, h){
     // Status line › chart values follow the bar under the cursor.
     const ro = ladder.querySelector('.chart-ohlc'); if(ro && b) ro.innerHTML = _ohlcHtml(b, data.bars[idx-1]);
   }
-  const dec = _priceDec(price >= 100 ? 2 : price >= 1 ? 3 : 4);
+  const dec = _pn ? (Math.abs(price) >= 100 ? 0 : 2) : _priceDec(price >= 100 ? 2 : price >= 1 ? 3 : 4);
   // The line + labels follow the cursor x directly (smooth), not snapped to a bar —
   // only the time TEXT reflects the nearest bar. Feels continuous on wide-bar cards.
   xh.v.style.left = x+'px';   xh.v.style.display='block';
@@ -7343,7 +7475,13 @@ document.addEventListener('wheel', function(e){
 
   const view = getChartView(viewKey);
   const factor = Math.exp(e.deltaY * 0.0012);   // deltaY>0 (down) → zoom out
-  if(x >= w-AXIS_W) zoomPriceGoal(view, factor);
+  if(x >= w-AXIS_W){
+    // The gutter beside an indicator strip zooms that strip's own scale (y only; time
+    // always follows the price pane); beside the price pane it zooms the price scale.
+    const _pk = _paneKeyAt(canvas, h - AXIS_H, y);
+    if(_pk){ _zoomPaneY(view, canvas, _pk, factor); renderTicker(dataTicker); return; }
+    zoomPriceGoal(view, factor);
+  }
   else              zoomTimeGoal(view, (barsData[dataTicker]||[]).length, factor);
   kickZoom(viewKey, dataTicker);
 }, {passive:false});
@@ -7379,21 +7517,34 @@ document.addEventListener('mousedown', function(e){
   view.gVis = view.visibleBars; view.gOff = view.barOffset;
   view.gYMin = view.yMin; view.gYMax = view.yMax;
   const bars = barsData[dataTicker] || [];
+  // The indicator strips: a press on the line above one drags its height; a press in its
+  // gutter zooms its own scale; a press in its body pans time (and its scale, once that
+  // scale is the reader's rather than auto).
+  const _pl = _paneLayout(h - AXIS_H);
+  const _sepIdx = (x < w-AXIS_W) ? _pl.tops.findIndex(t => Math.abs(y - t) <= 4) : -1;
+  const _pi = _pl.tops.findIndex((t, k) => y >= t && y < t + _pl.hs[k]);
+  const paneKey = _pi >= 0 ? _pl.panes[_pi].id : null;
   let mode = 'pan';
-  if(x >= w-AXIS_W) mode = 'zoomY';
+  if(_sepIdx >= 0) mode = 'paneSize';
+  else if(x >= w-AXIS_W) mode = paneKey ? 'paneZoomY' : 'zoomY';
   else if(y >= h-AXIS_H) mode = 'zoomX';
 
   const visibleBars = Math.min(bars.length, view.visibleBars || bars.length) || 1;
+  const _cdp = paneKey ? _paneMapper(_crossData[canvas.id], paneKey) : null;
   _chartDrag = {
     ladder, dataTicker, viewKey, mode,
     lastX: e.clientX, lastY: e.clientY,
     startX: e.clientX, startY: e.clientY,
-    pw: w-AXIS_W, ph: h-AXIS_H,
+    pw: w-AXIS_W, ph: h-AXIS_H, pricePh: _pl.priceH,
     n: bars.length, visibleBars,
     startOffset: Math.min(Math.max(0,view.barOffset||0), Math.max(0,bars.length-visibleBars)),
-    startYMin: view.lastRMin, startYMax: view.lastRMax
+    startYMin: view.lastRMin, startYMax: view.lastRMax,
+    pl: _pl, sepIdx: _sepIdx, rectTop: rect.top, paneKey,
+    paneH: _pi >= 0 ? _pl.hs[_pi] : 0,
+    paneRange: (paneKey && view.paneY && view.paneY[paneKey]) ? Object.assign({}, view.paneY[paneKey]) : null,
+    paneAuto: _cdp ? { min: _cdp.lo, max: _cdp.hi } : null
   };
-  ladder.style.cursor = mode==='zoomY' ? 'ns-resize' : mode==='zoomX' ? 'ew-resize' : 'grabbing';
+  ladder.style.cursor = mode==='paneSize' ? 'row-resize' : (mode==='zoomY' || mode==='paneZoomY') ? 'ns-resize' : mode==='zoomX' ? 'ew-resize' : 'grabbing';
   _hideXh(ladder);   // hide the crosshair while panning/zooming
   e.preventDefault();
 });
@@ -7403,7 +7554,17 @@ document.addEventListener('mousemove', function(e){
     const drag = _chartDrag;
     const view = getChartView(drag.viewKey);
 
-    if(drag.mode === 'zoomY'){
+    if(drag.mode === 'paneSize'){
+      _paneSizeDrag(drag, e.clientY - drag.rectTop);
+      drag.lastX = e.clientX; drag.lastY = e.clientY;
+      renderTicker(drag.dataTicker);
+      return;
+    }
+    if(drag.mode === 'paneZoomY'){
+      const dy = e.clientY - drag.lastY;            // down → zoom out, about the middle
+      const cur = (view.paneY && view.paneY[drag.paneKey]) || drag.paneAuto;
+      if(cur){ const mid = (cur.min + cur.max)/2, rng = Math.max(1e-9, (cur.max - cur.min) * Math.exp(dy * 0.006)); view.paneY = view.paneY || {}; view.paneY[drag.paneKey] = { min: mid - rng/2, max: mid + rng/2 }; }
+    } else if(drag.mode === 'zoomY'){
       const dy = e.clientY - drag.lastY;            // down → zoom out
       zoomPriceGoal(view, Math.exp(dy * 0.006));
       view.yMin = view.gYMin; view.yMax = view.gYMax;   // immediate, tracks the mouse
@@ -7423,9 +7584,16 @@ document.addEventListener('mousemove', function(e){
         view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + dx/slotW));
         view.gVis = view.visibleBars; view.gOff = view.barOffset;
       }
-      if(drag.startYMin!=null && drag.startYMax!=null && drag.ph>0){
+      if(drag.paneKey){
+        // Inside a strip the vertical pan moves that strip's scale, and only once the
+        // reader owns it (a zoomed strip); an auto-scaled strip just pans time.
+        if(drag.paneRange && drag.paneH > 0){
+          const rngP = drag.paneRange.max - drag.paneRange.min, dP = (dy/drag.paneH)*rngP;
+          view.paneY = view.paneY || {}; view.paneY[drag.paneKey] = { min: drag.paneRange.min + dP, max: drag.paneRange.max + dP };
+        }
+      } else if(drag.startYMin!=null && drag.startYMax!=null && drag.pricePh>0){
         const rng = drag.startYMax-drag.startYMin;
-        const delta = (dy/drag.ph)*rng;
+        const delta = (dy/drag.pricePh)*rng;      // against the price pane's height, not the plot's
         view.yMin = drag.startYMin + delta;
         view.yMax = drag.startYMax + delta;
         view.gYMin = view.yMin; view.gYMax = view.yMax;
@@ -7465,7 +7633,9 @@ document.addEventListener('mousemove', function(e){
   }
   // Over a legend row the pointer says "clickable": that row opens the indicator's settings.
   if(!_drawTool){ const rows = _legendRows[target.canvas.id] || []; if(rows.some(row => x >= row.x - 2 && x <= row.x + 220 && y >= row.y - 1 && y <= row.y + row.h)) _plotCursor = 'pointer'; }
-  ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : _plotCursor;
+  // The line above a strip can be dragged: say so.
+  const _sepHover = !_drawTool && x < w-AXIS_W && _paneLayout(h - AXIS_H).tops.some(t => Math.abs(y - t) <= 4);
+  ladder.style.cursor = _sepHover ? 'row-resize' : (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : _plotCursor;
   _updateXh(ladder, target.canvas.id, x, y, w, h);   // live price/time crosshair
 });
 let _lastXhLadder = null;
@@ -7475,6 +7645,7 @@ document.addEventListener('mouseup', function(e){
   const drag = _chartDrag;
   drag.ladder.style.cursor = '';
   _chartDrag = null;
+  if(drag.mode === 'paneSize'){ saveIndicators(); _indRerender(); }   // the strip heights travel with the indicators
   // A click (negligible movement — not a pan/zoom drag) on a chart switches the
   // order panel to that chart's symbol, so BUY/SELL targets what you clicked.
   if(Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) < 6 && drag.dataTicker){
@@ -7524,10 +7695,12 @@ document.addEventListener('touchcancel', _endXhTouch);
 // Delegated at the document level so it survives card rebuilds (the grid
 // re-creates canvases on every layout/order change).
 document.addEventListener('dblclick', function(e){
-  const canvas = e.target.closest && e.target.closest('canvas.chart-canvas');
-  if(!canvas) return;
-  const ladder = canvas.closest('.zone-ladder');
+  // Resolve through the ladder, the way every other chart handler does: the crosshair's
+  // own elements and the overlay sit above the canvas, so the target is rarely the canvas.
+  const ladder = e.target.closest && e.target.closest('.zone-ladder');
   if(!ladder) return;
+  const canvas = ladder.querySelector('canvas.chart-canvas');
+  if(!canvas) return;
   const target = _ladderTarget(ladder);
   if(!target) return;
 
@@ -7553,6 +7726,14 @@ document.addEventListener('dblclick', function(e){
     return;
   }
 
+  // Double-click in the gutter beside an indicator strip → that strip back to auto scale
+  const _pkd = _paneKeyAt(canvas, ph, y);
+  if(x > pw && _pkd){
+    e.stopPropagation(); e.preventDefault();
+    if(view.paneY) delete view.paneY[_pkd];
+    renderTicker(dataTicker);
+    return;
+  }
   // Double-click on the price axis (right strip) → reset y-range to auto-fit
   if(x > pw && y <= ph){
     e.stopPropagation(); e.preventDefault();
@@ -8629,11 +8810,29 @@ function indSetColor(i,v){
    instance so they travel with it (device and account, #3594). */
 function indSetStyle(i, key, v){
   const cfg=chartIndicators[i]; if(!cfg) return;
-  if(key === 'color2'){ if(v) cfg.color2 = String(v); else delete cfg.color2; }
+  if(key === 'color2' || key === 'color3' || key === 'histUp' || key === 'histDown'){ if(v) cfg[key] = String(v); else delete cfg[key]; }
   else if(key === 'width'){ const n = Number(v); if(Number.isFinite(n) && n >= 0.5 && n <= 6) cfg.width = n; }
   else if(key === 'dash'){ if(v) cfg.dash = true; else delete cfg.dash; }
   else return;
   saveIndicators(); _indRerender();
+}
+/* Back to the indicator's own colours, width and line: the style keys go, the height the
+   reader gave its pane stays. */
+function indResetStyle(i){
+  const cfg=chartIndicators[i]; if(!cfg) return;
+  for(const k of ['color2','color3','histUp','histDown','width','dash']) delete cfg[k];
+  cfg.color = IND_DEFS[cfg.id].color;
+  saveIndicators(); _indRerender();
+  openIndicatorSettings(i);
+}
+/* A colour input takes #rrggbb only; anything else (a palette rgb(), a short hex) shows
+   as the mid grey rather than throwing the swatch blank. */
+function _hex6(v){
+  const m = String(v || '').trim().match(/^#([0-9a-f]{6})/i);
+  if(m) return '#' + m[1].toLowerCase();
+  const m3 = String(v || '').trim().match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+  if(m3) return ('#' + m3[1] + m3[1] + m3[2] + m3[2] + m3[3] + m3[3]).toLowerCase();
+  return '#888888';
 }
 
 /* ── One dialog per indicator (#3602) ────────────────────────────────────────
@@ -8677,12 +8876,24 @@ function openIndicatorSettings(idx, ev, atX, atY){
         +'oninput="indSetParam('+idx+',\''+p.k+'\',this.value)"></label>';
     }
   } else {
-    const second = (indCompute(cfg, [{open:1,high:1,low:1,close:1,volume:1}]) || {series:[]}).series.length > 1;
-    h+='<label class="dr-st-row"><span>Colour</span><input type="color" value="'+esc(cfg.color||d.color)+'" oninput="indSetColor('+idx+',this.value)"></label>';
-    if(second) h+='<label class="dr-st-row"><span>Second line</span><input type="color" value="'+esc(cfg.color2||'#fb923c')+'" oninput="indSetStyle('+idx+',\'color2\',this.value)"></label>';
+    // Every plot gets its own swatch (MACD, Signal; %K, %D; ADX, +DI, −DI; Upper, Middle,
+    // Lower), and a histogram its up and down -- the whole indicator is the reader's.
+    const _out = indCompute(cfg, [{open:1,high:1,low:1,close:1,volume:1}]) || { series:[] };
+    const _names = _PLOT_NAMES[cfg.id] || ['Colour'];
+    const _keys = ['color', 'color2', 'color3'];
+    for(let k=0; k<Math.min(3, _out.series.length); k++){
+      const cur = _hex6(cfg[_keys[k]] || (_out.series[k] && _out.series[k].color) || d.color);
+      const set = k === 0 ? 'indSetColor('+idx+',this.value)' : 'indSetStyle('+idx+',\''+_keys[k]+'\',this.value)';
+      h+='<label class="dr-st-row"><span>'+esc(_names[k] || ('Plot '+(k+1)))+'</span><input type="color" value="'+esc(cur)+'" oninput="'+set+'"></label>';
+    }
+    if(_out.hist){
+      h+='<label class="dr-st-row"><span>Histogram up</span><input type="color" value="'+esc(_hex6(cfg.histUp || CHART_CANDLE_UP()))+'" oninput="indSetStyle('+idx+',\'histUp\',this.value)"></label>';
+      h+='<label class="dr-st-row"><span>Histogram down</span><input type="color" value="'+esc(_hex6(cfg.histDown || CHART_CANDLE_DOWN()))+'" oninput="indSetStyle('+idx+',\'histDown\',this.value)"></label>';
+    }
     h+='<label class="dr-st-row"><span>Width</span><input type="number" value="'+esc(cfg.width||1.4)+'" min="0.5" max="6" step="0.5" oninput="indSetStyle('+idx+',\'width\',this.value)"></label>';
     h+='<label class="dr-st-row"><span>Dashed</span><input type="checkbox" '+(cfg.dash?'checked':'')+' onchange="indSetStyle('+idx+',\'dash\',this.checked)"></label>';
-    h+='<p class="dr-fly-why">A colour too close to the chart background is nudged until it reads (#3594); the swatch shows what is drawn.</p>';
+    h+='<p class="dr-fly-why">A colour too close to the chart background is nudged until it reads (#3594); the swatch shows what is drawn. '
+      +'<button type="button" class="dr-reset" onclick="indResetStyle('+idx+')">Reset colours</button></p>';
   }
   h += '<div class="dr-fly-foot"><button type="button" onclick="indRemove(' + idx + ')">Remove</button>'
     + '<button type="button" onclick="_closeIndSettings()">Done</button></div>';
