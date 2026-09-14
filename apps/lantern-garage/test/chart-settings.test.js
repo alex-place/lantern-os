@@ -99,6 +99,8 @@ test('normalise drops what it does not know and repairs what it cannot use', () 
   assert.strictEqual(n['candles.bodyUp'], null);
   assert.strictEqual(n['candles.bodyDown'], '#abcdef');
   assert.strictEqual(n['data.timezone'], 'exchange');
+  // ...but a real zone off the dialog's short list is a value: the corner menu offers every one.
+  assert.strictEqual(CS.normalise({ 'data.timezone': 'Asia/Kolkata' })['data.timezone'], 'Asia/Kolkata');
   assert.strictEqual(n['canvas.marginTop'], 40);
   assert.strictEqual(n['canvas.axisFontSize'], 12);
   assert.strictEqual(n['line.width'], 2.5);

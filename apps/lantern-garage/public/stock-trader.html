@@ -591,9 +591,23 @@
   .range-sess{margin-left:6px;height:22px;padding:0 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);
     color:var(--text1);font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;cursor:pointer}
   .range-sess:hover{color:var(--text0);background:var(--bg3)}
-  .range-sess[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
-  .range-clock{flex:0 0 auto;gap:8px}
-  .range-clock .l{padding:2px 7px;border-radius:4px;background:var(--bg2)}
+  .range-sess[data-session="extended"]{color:var(--accent);border-color:var(--accent)}
+  .range-sess .caret{font-size:9px;color:var(--text2);margin-left:4px}
+  .range-tz{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .range-stat{flex:0 0 auto;gap:6px;margin-left:8px}
+  .range-stat .l{padding:2px 7px;border-radius:4px;background:var(--bg2)}
+  /* The session rows carry their hours; the timezone menu is a search box over every zone
+     the browser knows, then the list, each row with its offset. */
+  .pick-sub{display:block;font-size:11px;color:var(--text2);margin-top:1px}
+  .pick-off{flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--text2);margin-left:10px}
+  .pick-menu.tz{min-width:280px}
+  .pick-search{display:block;width:100%;box-sizing:border-box;margin:2px 0 6px;padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text0);font:inherit;font-size:12px}
+  .pick-list{max-height:50vh;overflow-y:auto}
+  /* The corner gives way before the range row does: the VIX goes first, then the market
+     state, as the strip itself narrows (a container query, so the sidebar counts). */
+  .range-strip{container-type:inline-size}
+  @container (max-width:700px){ #stripVix{display:none} }
+  @container (max-width:560px){ #mktClockWrap{display:none} }
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:9px var(--hdr-px);border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
@@ -1468,7 +1482,6 @@
   </div>
   <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
-  <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
@@ -1548,9 +1561,15 @@
 <div class="range-strip" id="rangeStrip">
   <div class="range-row" id="rangeRow" role="group" aria-label="How much history to show"></div>
   <span class="range-sp" aria-hidden="true"></span>
-  <div class="hstat range-clock" id="mktClockWrap" title="US equities session, Eastern Time"><span class="v" id="etClock">—</span><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
-  <button type="button" class="range-sess" id="rangeSess" aria-pressed="false" onclick="toggleSession()"
-    title="Regular trading hours (09:30–16:00 ET) or the extended session. The same switch as Settings › Symbol › Session.">RTH</button>
+  <!-- The corner, as TradingView has it: the fear gauge and the session phase as readouts,
+       then two buttons -- the clock (click: timezone) and the session (click: regular or
+       extended). Every one says on hover what it is and what it is on. -->
+  <div class="hstat range-stat" id="stripVix" title="VIX — the CBOE volatility index, the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
+  <div class="hstat range-stat" id="mktClockWrap" title="Market state — the US equities session phase, in Eastern Time: pre-market 4:00–9:30, open 9:30–4:00, after-hours 4:00–8:00"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
+  <button type="button" class="range-sess range-tz" id="tzBtn" aria-haspopup="menu" aria-expanded="false" onclick="togglePickMenu('tz', this)"
+    title="Timezone — Exchange (New York). Click to change."><span id="etClock">—</span><span class="caret" aria-hidden="true">▾</span></button>
+  <button type="button" class="range-sess" id="rangeSess" aria-haspopup="menu" aria-expanded="false" onclick="togglePickMenu('sess', this)"
+    title="Regular — 9:30 AM to 4:00 PM ET. Click to change the session.">RTH<span class="caret" aria-hidden="true">▾</span></button>
 </div>
 
 <!-- Footer -->
@@ -2307,6 +2326,84 @@ function _tzTag(){
   if(!z || z === 'exchange') return 'ET';
   try{ return new Date().toLocaleTimeString('en-US', { timeZone:_tz(), timeZoneName:'short' }).split(' ').pop(); }catch(_e){ return z; }
 }
+/* ── The strip's corner: session and timezone (operator, 2026-09-13) ─────────
+   Two buttons where TradingView keeps them, each a menu, each saying on hover what it is
+   and what it is on. Both write the chart setting they stand for (Data › Session, Data ›
+   Timezone), so the corner and the Settings dialog can never disagree. Defined up here
+   because the settings hook paints the badges as the page loads. */
+const SESSIONS = [
+  { id:'regular',  tag:'RTH', name:'Regular',  hint:'9:30 AM to 4:00 PM ET' },
+  { id:'extended', tag:'ETH', name:'Extended', hint:'4:00 AM to 8:00 PM ET, pre-market and after-hours included' },
+  // A 24-hour row belongs here the day a feed serves the overnight session. Yahoo's chart
+  // data for US equities stops at the extended session (04:00–20:00 ET), so today two
+  // rows are the honest list.
+];
+function _session(){ const id = (typeof _cs === 'function') ? _cs('data.session') : 'regular'; return SESSIONS.find(s=> s.id === id) || SESSIONS[0]; }
+function _renderSessBadge(){
+  const b = document.getElementById('rangeSess'); if(!b) return;
+  const s = _session();
+  b.innerHTML = s.tag + '<span class="caret" aria-hidden="true">▾</span>';
+  b.setAttribute('data-session', s.id);
+  b.title = s.name + ' — ' + s.hint + '. Click to change the session.';
+  b.setAttribute('aria-label', 'Session: ' + s.name);
+}
+function setSession(id){ if(!_CS || !SESSIONS.some(s=> s.id === id)) return; _CS.set('data.session', id); }
+
+/* Timezone: the exchange, the device, UTC, then the trading cities the way TradingView
+   lists them (sorted by offset); the menu's search box reaches every zone the browser
+   knows. The clock in the corner and the chart's axis read in the chosen zone; the session
+   itself is always measured in New York. */
+const TZ_CITIES = [
+  ['Pacific/Honolulu','Honolulu'], ['America/Anchorage','Anchorage'], ['America/Los_Angeles','Los Angeles'], ['America/Vancouver','Vancouver'],
+  ['America/Phoenix','Phoenix'], ['America/Denver','Denver'], ['America/Mexico_City','Mexico City'], ['America/Chicago','Chicago'],
+  ['America/Bogota','Bogotá'], ['America/Lima','Lima'], ['America/New_York','New York'], ['America/Toronto','Toronto'],
+  ['America/Caracas','Caracas'], ['America/Santiago','Santiago'], ['America/Argentina/Buenos_Aires','Buenos Aires'], ['America/Sao_Paulo','São Paulo'],
+  ['Atlantic/Reykjavik','Reykjavik'], ['Europe/London','London'], ['Europe/Dublin','Dublin'], ['Europe/Lisbon','Lisbon'],
+  ['Europe/Madrid','Madrid'], ['Europe/Paris','Paris'], ['Europe/Amsterdam','Amsterdam'], ['Europe/Brussels','Brussels'],
+  ['Europe/Zurich','Zurich'], ['Europe/Berlin','Berlin'], ['Europe/Rome','Rome'], ['Europe/Stockholm','Stockholm'],
+  ['Europe/Oslo','Oslo'], ['Europe/Copenhagen','Copenhagen'], ['Europe/Warsaw','Warsaw'], ['Europe/Athens','Athens'],
+  ['Europe/Helsinki','Helsinki'], ['Europe/Istanbul','Istanbul'], ['Africa/Cairo','Cairo'], ['Africa/Johannesburg','Johannesburg'],
+  ['Africa/Lagos','Lagos'], ['Europe/Moscow','Moscow'], ['Asia/Riyadh','Riyadh'], ['Asia/Tehran','Tehran'],
+  ['Asia/Dubai','Dubai'], ['Asia/Karachi','Karachi'], ['Asia/Kolkata','Kolkata'], ['Asia/Dhaka','Dhaka'],
+  ['Asia/Bangkok','Bangkok'], ['Asia/Jakarta','Jakarta'], ['Asia/Ho_Chi_Minh','Ho Chi Minh'], ['Asia/Kuala_Lumpur','Kuala Lumpur'],
+  ['Asia/Singapore','Singapore'], ['Asia/Hong_Kong','Hong Kong'], ['Asia/Shanghai','Shanghai'], ['Asia/Taipei','Taipei'],
+  ['Asia/Manila','Manila'], ['Australia/Perth','Perth'], ['Asia/Seoul','Seoul'], ['Asia/Tokyo','Tokyo'],
+  ['Australia/Adelaide','Adelaide'], ['Australia/Brisbane','Brisbane'], ['Australia/Sydney','Sydney'], ['Pacific/Auckland','Auckland'],
+];
+/* A zone's offset from UTC in minutes at a moment, from Intl alone: the zone's own wall
+   clock re-read as UTC, minus the moment. Null for a zone the runtime does not know. */
+function _tzOffsetMin(z, d){
+  d = d || new Date();
+  try{
+    const opt = { hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' };
+    if(z) opt.timeZone = z;
+    const p = new Intl.DateTimeFormat('en-US', opt).formatToParts(d);
+    const g = (t)=> Number((p.find(x=> x.type === t) || {}).value);
+    const wall = Date.UTC(g('year'), g('month') - 1, g('day'), g('hour') % 24, g('minute'));
+    return Math.round((wall - (d.getTime() - (d.getTime() % 60000))) / 60000);
+  }catch(_e){ return null; }
+}
+function _tzOffsetLabel(z, d){
+  const m = _tzOffsetMin(z, d); if(m == null) return '';
+  if(m === 0) return 'UTC';
+  const a = Math.abs(m), h = Math.floor(a / 60), mm = a % 60;
+  return 'UTC' + (m < 0 ? '-' : '+') + h + (mm ? ':' + String(mm).padStart(2, '0') : '');
+}
+function _tzName(z){
+  if(!z || z === 'exchange') return 'Exchange (New York)';
+  if(z === 'local') return 'Your device';
+  if(z === 'UTC') return 'UTC';
+  const c = TZ_CITIES.find(x=> x[0] === z);
+  return c ? c[1] : String(z).split('/').pop().replace(/_/g, ' ');
+}
+function _renderTzBtn(){
+  const b = document.getElementById('tzBtn'); if(!b) return;
+  const z = (typeof _cs === 'function') ? _cs('data.timezone') : 'exchange';
+  b.title = 'Timezone — ' + _tzName(z) + '. Click to change.';
+  b.setAttribute('aria-label', 'Timezone: ' + _tzName(z));
+}
+function setTimezone(z){ if(!_CS) return; _CS.set('data.timezone', z); }
+
 function _etTime(d){ return d.toLocaleTimeString('en-US',{timeZone:_tz(),hour:'numeric',minute:'2-digit',hour12:_h12()}); } // "9:30 AM"
 function _etDayNum(d){
   // Scales › day of week on labels: "Mon 28" rather than "28".
@@ -3031,6 +3128,7 @@ if(_CS){
   _CS.onChange((keys)=>{
     applyChartCss();
     saveChartSettings();
+    if(keys.indexOf('data.timezone') !== -1){ _renderTzBtn(); _tickEtClock(); }
     if(keys.indexOf('data.session') !== -1){
       _renderSessBadge();
       // The span is measured in bars, and the session decides which bars there are.
@@ -3047,8 +3145,8 @@ if(_CS){
     try{ _CS.adopt(e.detail && e.detail.chart); }catch(_e){}
     _csAdopting = false;
   });
-  if(document.body){ applyChartCss(); _renderSessBadge(); }
-  else document.addEventListener('DOMContentLoaded', ()=>{ applyChartCss(); _renderSessBadge(); });
+  if(document.body){ applyChartCss(); _renderSessBadge(); _renderTzBtn(); }
+  else document.addEventListener('DOMContentLoaded', ()=>{ applyChartCss(); _renderSessBadge(); _renderTzBtn(); });
 }
 /* Readers of the settings, used by the renderer. Each answers "as the chart always
    drew it" when the key is at its default, which is what makes the defaults invisible. */
@@ -7748,9 +7846,21 @@ function _updateMktClock(){
   val.textContent = left!=null ? fmtC(left)+suffix : 'wknd';
 }
 setInterval(_updateMktClock, 30000); _updateMktClock();
-// The strip's wall clock, Eastern: the clock TradingView shows in the same corner.
-const _etClockFmt = new Intl.DateTimeFormat('en-US', { timeZone:_ET, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
-function _tickEtClock(){ const el = document.getElementById('etClock'); if(el) el.textContent = _etClockFmt.format(new Date()) + ' ET'; }
+// The strip's wall clock, in the chart's timezone (Data › Timezone): TradingView's corner
+// clock reads in the same zone as the axis. Always 24-hour, whatever the axis format.
+let _clockFmt = null, _clockZone = null;
+function _tickEtClock(){
+  const el = document.getElementById('etClock'); if(!el) return;
+  const z = _tz() || 'local';
+  if(!_clockFmt || _clockZone !== z){
+    _clockZone = z;
+    const opt = { hourCycle:'h23', hour:'2-digit', minute:'2-digit', second:'2-digit' };
+    if(z !== 'local') opt.timeZone = z;
+    try{ _clockFmt = new Intl.DateTimeFormat('en-US', opt); }
+    catch(_e){ _clockFmt = new Intl.DateTimeFormat('en-US', { timeZone:_ET, hourCycle:'h23', hour:'2-digit', minute:'2-digit', second:'2-digit' }); }
+  }
+  el.textContent = _clockFmt.format(new Date()) + ' ' + _tzTag();
+}
 setInterval(_tickEtClock, 1000); _tickEtClock();
 
 // One-shot price alerts: stored per symbol in localStorage, checked on every
@@ -8137,39 +8247,91 @@ function _pickMenuHtml(kind){
       h += '<div class="pat-menu-item pick-row' + (on ? ' on' : '') + '" role="menuitem" onclick="changeTimeframe(\'' + it.id + '\');_closePickMenu(\'tf\')">'
         + '<span class="pick-name">' + _esc(it.name) + '</span>' + star(tfFavs.indexOf(it.id) !== -1, it.name, 'toggleTfFav', it.id) + '</div>';
     }
-  } else {
+  } else if(kind === 'type') {
     h += '<div class="pat-menu-group">Chart type</div>';
     for(const t of CHART_TYPES){
       const on = t.id === chartType;
       h += '<div class="pat-menu-item pick-row' + (on ? ' on' : '') + '" role="menuitem" title="' + _esc(t.hint) + '" onclick="changeChartType(\'' + t.id + '\');_closePickMenu(\'type\')">'
         + '<span class="pick-name">' + t.icon + _esc(t.name) + '</span>' + star(typeFavs.indexOf(t.id) !== -1, t.name, 'toggleTypeFav', t.id) + '</div>';
     }
+  } else if(kind === 'sess') {
+    h += '<div class="pat-menu-group">Trading session</div>';
+    const cur = _session().id;
+    for(const s of SESSIONS){
+      h += '<div class="pat-menu-item pick-row' + (s.id === cur ? ' on' : '') + '" role="menuitemradio" aria-checked="' + (s.id === cur) + '" onclick="setSession(\'' + s.id + '\');_closePickMenu(\'sess\')">'
+        + '<span class="pick-name"><span>' + _esc(s.name) + '<span class="pick-sub">' + _esc(s.hint) + '</span></span></span><span class="pick-off">' + _esc(s.tag) + '</span></div>';
+    }
+  } else if(kind === 'tz') {
+    h += '<input class="pick-search" type="search" placeholder="Search every timezone…" aria-label="Search timezones" oninput="_tzFilter(this.value)">'
+      + '<div class="pick-list" id="tzList">' + _tzRowsHtml('') + '</div>';
   }
   return h;
 }
+/* The timezone rows: the three standing choices and the trading cities when the box is
+   empty; every zone the browser knows (Intl.supportedValuesOf) once the reader types. */
+let _tzAllCache = null;
+function _tzAll(){
+  if(_tzAllCache) return _tzAllCache;
+  try{ _tzAllCache = Intl.supportedValuesOf('timeZone'); }catch(_e){ _tzAllCache = TZ_CITIES.map(c=> c[0]); }
+  return _tzAllCache;
+}
+function _tzRowsHtml(q){
+  const cur = ((typeof _cs === 'function') && _cs('data.timezone')) || 'exchange';
+  const now = new Date();
+  const row = (v, name, off, sub) => '<div class="pat-menu-item pick-row' + (v === cur ? ' on' : '') + '" role="menuitemradio" aria-checked="' + (v === cur) + '"'
+    + (sub ? ' title="' + _esc(sub) + '"' : '') + ' onclick="setTimezone(\'' + _esc(v) + '\');_closePickMenu(\'tz\')">'
+    + '<span class="pick-name">' + _esc(name) + '</span><span class="pick-off">' + _esc(off) + '</span></div>';
+  q = String(q || '').trim().toLowerCase();
+  let h = '';
+  if(!q){
+    let deviceZone = ''; try{ deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(_e){}
+    h += row('exchange', 'Exchange (New York)', _tzOffsetLabel(_ET, now), _ET);
+    h += row('local', 'Your device', _tzOffsetLabel(undefined, now), deviceZone);
+    h += row('UTC', 'UTC', 'UTC', 'UTC');
+    h += '<div class="pat-menu-group">Trading cities</div>';
+    const rows = TZ_CITIES.map(c=> ({ v:c[0], name:c[1], min:_tzOffsetMin(c[0], now) })).sort((a,b)=> ((a.min || 0) - (b.min || 0)) || a.name.localeCompare(b.name));
+    for(const r of rows) h += row(r.v, r.name, _tzOffsetLabel(r.v, now), r.v);
+    return h;
+  }
+  // The cities first, by their names, then everything the browser lists that is not
+  // already there. Chrome's list still spells some zones the old way (Asia/Calcutta), so
+  // "kolk" has to find Kolkata through the city table, not the browser's list.
+  const pool = TZ_CITIES.map(c=> ({ v:c[0], name:c[1] }));
+  const seen = new Set(pool.map(p=> p.v));
+  for(const z of _tzAll()){ if(!seen.has(z)){ seen.add(z); pool.push({ v:z, name:_tzName(z) }); } }
+  const hits = pool.filter(p=> p.v.toLowerCase().replace(/_/g, ' ').indexOf(q) !== -1 || p.name.toLowerCase().indexOf(q) !== -1);
+  if(!hits.length) return '<div class="pat-menu-note">No timezone matches “' + _esc(q) + '”.</div>';
+  for(const p of hits.slice(0, 60)) h += row(p.v, p.name, _tzOffsetLabel(p.v, now), p.v);
+  if(hits.length > 60) h += '<div class="pat-menu-note">' + (hits.length - 60) + ' more — keep typing to narrow it down.</div>';
+  return h;
+}
+function _tzFilter(q){ const l = document.getElementById('tzList'); if(l) l.innerHTML = _tzRowsHtml(q); }
+const _PICK_LABELS = { tf:'Candle intervals', type:'Chart types', sess:'Trading session', tz:'Timezone' };
 function _buildPickMenu(kind){
   if(_pickMenus[kind]) return _pickMenus[kind];
   const m = document.createElement('div');
-  m.className = 'pat-menu pick-menu'; m.id = kind + 'PickMenu'; m.hidden = true;
-  m.setAttribute('role','menu'); m.setAttribute('aria-label', kind === 'tf' ? 'Candle intervals' : 'Chart types');
+  m.className = 'pat-menu pick-menu ' + kind; m.id = kind + 'PickMenu'; m.hidden = true;
+  m.setAttribute('role','menu'); m.setAttribute('aria-label', _PICK_LABELS[kind] || kind);
   document.body.appendChild(m);
   document.addEventListener('click', (e)=>{
     if(m.hidden) return;
     if(_clickInside(m, e)) return;                 // a star re-renders the row it lives in (#3604)
-    if(e.target.closest && e.target.closest('#' + kind + 'More')) return;
+    if(m._btn && m._btn.contains(e.target)) return;
     _closePickMenu(kind);
   });
   document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && !m.hidden) _closePickMenu(kind); });
   _pickMenus[kind] = m; return m;
 }
 function _closePickMenu(kind){
-  const m = _pickMenus[kind]; if(m) m.hidden = true;
-  const b = document.getElementById(kind + 'More'); if(b) b.setAttribute('aria-expanded','false');
+  const m = _pickMenus[kind]; if(!m) return;
+  m.hidden = true;
+  if(m._btn) m._btn.setAttribute('aria-expanded','false');
 }
 function _refreshPickMenu(kind){ const m = _pickMenus[kind]; if(m && !m.hidden) m.innerHTML = _pickMenuHtml(kind); }
 function togglePickMenu(kind, btn){
   const m = _buildPickMenu(kind);
   if(!m.hidden){ _closePickMenu(kind); return; }
+  m._btn = btn;
   m.innerHTML = _pickMenuHtml(kind);
   m.hidden = false;
   const r = btn.getBoundingClientRect();
@@ -8180,6 +8342,7 @@ function togglePickMenu(kind, btn){
   if(top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
   m.style.left = Math.max(8, left) + 'px'; m.style.top = top + 'px'; m.style.visibility = 'visible';
   btn.setAttribute('aria-expanded','true');
+  const inp = m.querySelector('.pick-search'); if(inp) setTimeout(()=> inp.focus(), 0);
 }
 
 /* Heikin Ashi: averaged bars. Close is the mean of the bar's four prices, open the
@@ -8925,18 +9088,8 @@ function changeTimeframe(tf, span){
 }
 
 // ── Chart range presets ───────────────────────────────────────────────────────
-/* RTH / ETH on the strip, where TradingView keeps it: the same setting as Settings ›
-   Symbol › Session, so the two can never disagree. Pressed = the extended session. */
-function _renderSessBadge(){
-  const b = document.getElementById('rangeSess'); if(!b) return;
-  const ext = _cs('data.session') === 'extended';
-  b.textContent = ext ? 'ETH' : 'RTH';
-  b.setAttribute('aria-pressed', ext ? 'true' : 'false');
-}
-function toggleSession(){
-  if(!_CS) return;
-  _CS.set('data.session', _cs('data.session') === 'extended' ? 'regular' : 'extended');
-}
+/* The session and timezone buttons on the strip -- SESSIONS, setSession, setTimezone -- live
+   up with the timezone helpers, since the settings hook paints them as the page loads. */
 /* A range button is an action, not a mode: this interval and this span, every chart,
    once. TradingView's buttons work the same way and none of them stays lit. */
 function changeRange(range){
@@ -8953,7 +9106,15 @@ function renderRangeRow(){
       + ' aria-pressed="' + (lit ? 'true' : 'false') + '" onclick="changeRange(\'' + k + '\')">' + k + '</button>';
   }).join('');
 }
-function _rangeTitle(k){ const r = RANGES[k] || {}; return (k === 'All' ? 'All available history' : k + ' of history') + ', ' + r.tf + ' candles'; }
+/* The tooltip in words -- "1 day in 1 minute intervals" -- since a new reader should not
+   have to decode "1d history, 1m candles". */
+const RANGE_NAMES = { '1D':'1 day', '5D':'5 days', '1M':'1 month', '3M':'3 months', '6M':'6 months', 'YTD':'Year to date', '1Y':'1 year', '5Y':'5 years', 'All':'All available history' };
+function _rangeTitle(k){
+  const r = RANGES[k] || {};
+  const iv = INTERVALS.find(i=> i.id === r.tf);
+  const unit = iv ? iv.name.replace(/s$/, '') : String(r.tf || '');
+  return (RANGE_NAMES[k] || k) + ' in ' + unit + ' intervals';
+}
 
 // ── TradingView-style trading panel (#1712) ───────────────────────────────────
 function tpTab(name){

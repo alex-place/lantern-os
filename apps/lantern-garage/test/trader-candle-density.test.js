@@ -141,9 +141,9 @@ test('regular hours by default, with the RTH/ETH switch on the strip', () => {
      837 an extended day has. TradingView shows RTH by default and keeps the switch in the
      strip's corner; so does this, and it is the same setting as Settings › Symbol › Session. */
   const strip = PAGE.slice(PAGE.indexOf('<div class="range-strip"'), PAGE.indexOf('<!-- Footer -->'));
-  assert.match(strip, /<button type="button" class="range-sess" id="rangeSess" aria-pressed="false" onclick="toggleSession\(\)"/);
-  assert.match(PAGE, /function toggleSession\(\)\{\s*if\(!_CS\) return;\s*_CS\.set\('data\.session', _cs\('data\.session'\) === 'extended' \? 'regular' : 'extended'\);/);
-  assert.match(PAGE, /b\.textContent = ext \? 'ETH' : 'RTH';/);
+  assert.match(strip, /<button type="button" class="range-sess" id="rangeSess" aria-haspopup="menu" aria-expanded="false" onclick="togglePickMenu\('sess', this\)"/);
+  assert.match(PAGE, /function setSession\(id\)\{ if\(!_CS \|\| !SESSIONS\.some\(s=> s\.id === id\)\) return; _CS\.set\('data\.session', id\); \}/);
+  assert.match(PAGE, /b\.innerHTML = s\.tag \+ '<span class="caret" aria-hidden="true">▾<\/span>';/);
   // A session change re-measures every span-driven window: the bars themselves changed.
   assert.match(PAGE, /if\(keys\.indexOf\('data\.session'\) !== -1\)\{\s*_renderSessBadge\(\);/);
 });
