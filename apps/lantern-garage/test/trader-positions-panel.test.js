@@ -130,14 +130,44 @@ test('nothing open: the Columns menu stays reachable, Close all does not render'
   assert.match(html, /No open positions/);
 });
 
-test('the table cannot blow up: no percentage widths on its data cells', () => {
+test('the table cannot blow up, and its columns share the width (operator, 2026-09-13)', () => {
   // A 1% width under .tp-pane's min-width:max-content drew the table at 100x its
-  // content (11,391px inside a 726px pane) the first time this panel was rendered.
+  // content (11,391px inside a 726px pane) the first time this panel was rendered. The
+  // table is min-width:100% now, where 1% on the ACTIONS column only means "as narrow as
+  // its buttons" and the data columns share the slack the way TradingView's do.
   const css = (src.match(/\.tp-pos-table[^{]*\{[^}]*\}/g) || []).join('\n');
   assert.ok(css.length, 'the panel has its own rules');
   assert.doesNotMatch(css, /:not\(\.tp-act\)[^{]*\{[^}]*width:\s*\d+%/, 'no percentage width on the data cells');
-  assert.match(src, /\.tp-pane \.tp-table\.tp-pos-table\{min-width:0\}/, 'the panel table opts out of min-width:max-content');
-  assert.match(src, /\.tp-pos-table \.tp-act\{width:100%\}/, 'the action column takes the slack');
+  assert.match(src, /\.tp-pane \.tp-table\.tp-pos-table\{min-width:100%\}/, 'the panel table is the pane\'s width, never max-content');
+  assert.match(src, /\.tp-pos-table \.tp-act\{width:1%;white-space:nowrap\}/, 'the action column is as narrow as its buttons');
+  assert.doesNotMatch(src, /\.tp-pos-table \.tp-act\{width:100%\}/, 'the action column no longer takes the slack');
+});
+
+test('the symbol cell carries the badge, the ticker, and the exchange once it is known', () => {
+  const cellSrc = fnText('_tpSymCell');
+  const cell = (names, logo) => {
+    const sb = { _symNames: names, tickerLogoHtml: logo };
+    vm.createContext(sb);
+    return vm.runInContext(cellSrc + '\n;_tpSymCell', sb);
+  };
+  // With the page's helpers: badge first, then the ticker, then the exchange from the cache.
+  const withAll = cell({ AAPL: 'Apple Inc · NASDAQ' }, (t) => `<span class="wl-logo mono">${t}</span>`)('AAPL');
+  assert.strictEqual(withAll, `<span class="tp-sym" onclick="focusTicker('AAPL')"><span class="wl-logo mono">AAPL</span><span class="tp-sym-text">AAPL</span><span class="tp-sym-ex">NASDAQ</span></span>`);
+  // Not cached yet: no pill, and nothing is guessed.
+  const noEx = cell({}, (t) => '')('SOXS');
+  assert.strictEqual(noEx, `<span class="tp-sym" onclick="focusTicker('SOXS')"><span class="tp-sym-text">SOXS</span></span>`);
+  // The sandbox the table test runs in has neither helper: the cell still renders.
+  const bare = vm.runInContext(cellSrc + '\n;_tpSymCell', vm.createContext({}))('BTC/USD');
+  assert.strictEqual(bare, `<span class="tp-sym" onclick="focusTicker('BTC/USD')"><span class="tp-sym-text">BTC/USD</span></span>`);
+  // A symbol with markup in it cannot reach the attribute or the text.
+  const nasty = vm.runInContext(cellSrc + '\n;_tpSymCell', vm.createContext({}))(`X'"><img>`);
+  assert.doesNotMatch(nasty, /<img>/);
+  assert.match(nasty, /focusTicker\('Ximg'\)/, 'only ticker characters reach the attribute');
+  // Every panel table uses it, and the positions render asks for the exchange once per symbol.
+  assert.match(fnText('renderPositionsTable'), /<td>\$\{_tpSymCell\(p\.symbol\)\}<\/td>/);
+  assert.match(fnText('renderOrders'), /<td>\$\{_tpSymCell\(o\.symbol\)\}<\/td>/);
+  assert.match(fnText('renderPositionsTable'), /\(positions\|\|\[\]\)\.forEach\(p => _ensureSymName\(p\.symbol\)\);/);
+  assert.match(fnText('_ensureSymName'), /if\(_lastPositions\.length && !\(typeof _armedBtn !== 'undefined' && _armedBtn\)\) renderPositionsTable\(_lastPositions\);/, 'an armed Flatten is never re-rendered over');
 });
 
 test('an order refresh never re-renders over an armed Flatten', () => {

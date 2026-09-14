@@ -638,11 +638,6 @@
   .tp-body{flex:1;min-height:0;overflow-y:auto;padding:6px 12px 10px}
   /* The footer is narrower now that the docks own real columns, so its tables scroll
      inside their pane instead of being clipped at the edge (#3355 follow-up). */
-  /* NOTE: the footer's rows sit at a 156px content width inside a 512px footer, so the
-     positions table cannot reach the right edge. It is NOT a width-cascade problem --
-     an inline width:100% on .tp-body does not move it either, so the containing block
-     itself is 156px. Left unfixed rather than papered over; the scroll below at least
-     keeps the far columns reachable instead of clipped. */
   .tp-pane{overflow-x:auto;width:100%}
   .tp-pane .tp-table{min-width:max-content;width:100%}
   .tp-pane{display:none}
@@ -667,15 +662,23 @@
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:color-mix(in srgb, var(--tint-neg) 25%, transparent)}
   .tp-flat-btn.armed,.tp-flatten-all.armed{background:color-mix(in srgb, var(--tint-neg) 32%, transparent);animation:otArmPulse 1s ease-in-out infinite}
   /* ── Positions panel styles (#3518): density + choosable columns ─────────────
-     Data columns size to their content and the actions column takes the slack, so a
-     row reads as one line of numbers instead of ten islands spread across the panel. */
-  /* No percentage widths on the data cells: under .tp-pane's min-width:max-content a 1%
-     column must fit its content in 1% of the table, which drew the table at 100x its
-     content (11,391px in a 726px pane). The action column alone takes the slack. */
-  .tp-pane .tp-table.tp-pos-table{min-width:0}
-  .tp-pos-table .tp-act{width:100%}
+     The columns share the panel's width the way TradingView's do (operator, 2026-09-13):
+     the table is the pane's width, auto layout hands every data column its share of the
+     slack, and the actions column stays as narrow as its buttons. Add a column and the
+     others close up to make room; when the columns outgrow the pane it scrolls sideways.
+     No percentage widths on the DATA cells: under a min-width:max-content table a 1%
+     column once drew the table at 100x its content (11,391px in a 726px pane); this
+     table is min-width:100% instead, where 1% on the actions column just means "as narrow
+     as its content". */
+  .tp-pane .tp-table.tp-pos-table{min-width:100%}
+  .tp-pos-table .tp-act{width:1%;white-space:nowrap}
   .tp-pos-table th,.tp-pos-table td{padding:4px 10px}
   .tp-pos-table .tp-act{text-align:right}
+  /* The symbol reads like the watchlist's row: the issuer's badge, the ticker, and the
+     exchange once it is known. */
+  .tp-sym{display:inline-flex;align-items:center;gap:7px;vertical-align:middle}
+  .tp-sym .tb-badge,.tp-sym .wl-logo{flex:0 0 auto}
+  .tp-sym-ex{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.05em;font-weight:500}
   .tp-dim{color:var(--text2)}
   .tp-sub{color:var(--text2);font-size:10.5px;margin-left:5px}
   .tp-lev-hi{color:var(--amber);font-weight:600}
@@ -10018,9 +10021,33 @@ async function flattenAll(btn){
   for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
   _alertToast(`Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
 }
+/* The symbol cell of every panel table: the issuer's badge, the ticker, and the exchange
+   once the symbol-info fetch has told us it (the same "Name · EXCHANGE" cache the details
+   panel fills, #1631) -- TradingView's "NASDAQ:AAPL", without guessing the exchange.
+   Guarded so the panel's own test can run the table without the rest of the page. */
+function _tpSymCell(symbol){
+  const s = String(symbol || '');
+  const safe = s.replace(/[^A-Za-z0-9.\-\/:]/g, '');
+  const esc = (x) => String(x).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const ex = ((typeof _symNames !== 'undefined' && _symNames[s]) || '').split(' · ')[1] || '';
+  const logo = (typeof tickerLogoHtml === 'function') ? tickerLogoHtml(s) : '';
+  return `<span class="tp-sym" onclick="focusTicker('${safe}')">${logo}<span class="tp-sym-text">${esc(s)}</span>${ex ? `<span class="tp-sym-ex">${esc(ex)}</span>` : ''}</span>`;
+}
+/* Ask once per symbol for its name and exchange; when the answer lands the positions
+   re-render with the exchange beside the ticker -- unless a Flatten is armed, which a
+   re-render would disarm. */
+const _symNameInflight = new Set();
+function _ensureSymName(ticker){
+  if(!ticker || typeof fetch !== 'function' || typeof _symNames === 'undefined' || _symNames[ticker] || _symNameInflight.has(ticker)) return;
+  _symNameInflight.add(ticker);
+  fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
+    if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(_lastPositions.length && !(typeof _armedBtn !== 'undefined' && _armedBtn)) renderPositionsTable(_lastPositions); }
+  }).catch(()=>{}).finally(()=>_symNameInflight.delete(ticker));
+}
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
   _lastPositions = positions||[];
+  (positions||[]).forEach(p => _ensureSymName(p.symbol));
   const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).filter(p=>Math.abs(Number(p.qty)||0)>=1).length;   // dust is not a position (#3298 rider)
   // The toolbar shows even with nothing open, so the Columns menu is always reachable (#3518).
   const has = !!(positions && positions.length);
@@ -10035,7 +10062,7 @@ function renderPositionsTable(positions){
       const side=(p.side||'long').toLowerCase();
       const x = { side, short: side === 'short', lev: _tpLev(p.symbol), stop: _tpStop(p), target: _tpTarget(p), eq };
       return `<tr>
-        <td><span class="tp-sym" onclick="focusTicker('${p.symbol}')">${p.symbol}</span></td>${cols.map((c) => c.cell(p, x)).join('')}
+        <td>${_tpSymCell(p.symbol)}</td>${cols.map((c) => c.cell(p, x)).join('')}
         <td class="tp-act">${Math.abs(p.qty||0)<1?`<button class="tp-flat-btn" onclick="dustClear('${p.symbol}',this)" title="Sub-share remnant. The normal exit path floors every quantity, so floor(${Math.abs(p.qty||0)})=0 and it cannot be expressed. This sends the EXACT held quantity, unfloored, and reports IBKR's verdict — if the broker refuses, clear it in Client Portal (enable Fractional Trading, then close there).">✕ Clear dust</button>`:`<button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button>`}</td></tr>`;
     }).join('') + '</tbody></table>';
 }
@@ -10095,7 +10122,7 @@ function renderOrders(orders){
   // typeof-guarded: a test evaluates this function on its own, without the settings.
   if(typeof _cs === 'function' && _cs('trading.executionMarks') === true) _indRerender();
   const row=(o,withActions)=>`<tr>
-    <td><span class="tp-sym" onclick="focusTicker('${o.symbol}')">${o.symbol}</span></td>
+    <td>${_tpSymCell(o.symbol)}</td>
     <td class="tp-side ${o.side==='buy'?'long':'short'}">${(o.side||'').toUpperCase()}</td>
     <td>${o.qty}</td><td>${o.type||'market'}</td><td>${o.limit_price?'$'+fmt(o.limit_price,2):'—'}</td>
     <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}${o.operator_account?' <span style="color:var(--text2)">(op)</span>':''}</td>
