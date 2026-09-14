@@ -1564,6 +1564,7 @@ function jpSharePreviewBody() {
     + ' Your notes and tags are never shared.</p>';
 }
 
+function jpShareEscape(e) { if (e.key === 'Escape' && jpShare && jpShare.open) jpShareClose(); }
 function jpSharePaint() {
   let host = document.getElementById('jpShareModal');
   if (!jpShare || !jpShare.open) { if (host) host.remove(); return; }
@@ -1571,8 +1572,14 @@ function jpSharePaint() {
     host = document.createElement('div');
     host.id = 'jpShareModal';
     document.body.appendChild(host);
-    // Escape closes it, because a dialog about publishing must be trivially escapable.
+    // Escape closes it, because a dialog about publishing must be trivially escapable --
+    // from anywhere on the page, not only with focus inside the sheet (the empty sheet
+    // had nothing to focus, so Escape went nowhere). The same listener reference each
+    // time, so re-opening never stacks a second one. A click on the dim backdrop closes
+    // it too, the way every other sheet on the site does.
     host.addEventListener('keydown', (e) => { if (e.key === 'Escape') jpShareClose(); });
+    document.addEventListener('keydown', jpShareEscape);
+    host.addEventListener('click', (e) => { if (e.target === host) jpShareClose(); });
   }
   const o = jpShare.opts || {};
   const kinds = (o.kinds || []).map((k) => '<button type="button" class="jp-chip'
@@ -1601,7 +1608,9 @@ function jpSharePaint() {
     + ' until you press Publish, you can take it down at any time, and your trade log, notes and'
     + ' tags are never shareable.</p>'
     + (o.kinds && !o.kinds.length
+      // Nothing to share is still a sheet the reader has to be able to leave.
       ? '<p class="jp-dim">There is nothing in your record to share yet.</p>'
+        + '<div class="jp-srow"><button type="button" class="jp-chip" onclick="jpShareClose()">Close</button></div>'
       : '<label>What to share</label><div class="jp-srow">' + kinds + '</div>' + months
         + '<label>Amounts</label><div class="jp-srow">'
         + '<label class="jp-switch"><input type="checkbox"' + (jpShare.dollars ? ' checked' : '')
