@@ -120,12 +120,17 @@ function normalizeRule(input) {
     const op = String(r.op || '').trim();
     if (!PRICE_OPS[op]) return { ok: false, error: 'invalid_op', supported: Object.keys(PRICE_OPS) };
     out.op = op;
-    const v = Number(r.value);
+    // A price, or a move, is a positive number. An empty box is NOT 0: the dialog sends
+    // null for it (parseFloat('') is NaN, JSON turns that into null) and Number(null) is
+    // 0, which used to save a "crossing $0" rule while the dialog closed as if all was
+    // well (QA, 2026-09-14). Zero and negative prices are refused the same way.
+    const num = (x) => (x == null || x === '' ? NaN : Number(x));
+    const v = num(r.value);
     if (!Number.isFinite(v)) return { ok: false, error: 'invalid_value' };
     out.value = v;
     if (PRICE_OPS[op].needs === 2) {
-      const v2 = Number(r.value2);
-      if (!Number.isFinite(v2)) return { ok: false, error: 'invalid_value2' };
+      const v2 = num(r.value2);
+      if (!Number.isFinite(v2) || v2 <= 0) return { ok: false, error: 'invalid_value2' };
       // Store the band already ordered so evaluation never has to care which way round
       // the user typed it.
       out.value = Math.min(v, v2); out.value2 = Math.max(v, v2);
@@ -134,6 +139,7 @@ function normalizeRule(input) {
     if ((op === 'moving_up_pct' || op === 'moving_down_pct') && (v <= 0 || v > 100))
       return { ok: false, error: 'invalid_percent' };
     if ((op === 'moving_up' || op === 'moving_down') && v <= 0) return { ok: false, error: 'invalid_move' };
+    if (v <= 0) return { ok: false, error: 'invalid_value' };   // a price is positive; the move ops answered above
   }
   return { ok: true, rule: out };
 }

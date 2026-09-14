@@ -30,6 +30,30 @@ const rule = (op, value, value2, lastPrice) => {
 };
 const sig = (price) => ({ symbol: 'SPY', entry_price: price });
 
+check('validation: a price is a positive number, and an empty box is not 0 (QA 2026-09-14)', () => {
+  // The dialog sends null for an empty price box; Number(null) is 0, and a "crossing $0"
+  // rule used to be saved while the dialog closed as if all was well.
+  const price = (value, value2) => store.normalizeRule({ symbol: 'SPY', type: 'price', op: value2 === undefined ? 'crossing' : 'entering_channel', value, value2 });
+  for (const empty of [null, undefined, '', 'abc', NaN]) assert.strictEqual(price(empty).error, 'invalid_value', 'empty price ' + String(empty));
+  assert.strictEqual(price(0).error, 'invalid_value');
+  assert.strictEqual(price(-5).error, 'invalid_value');
+  assert.strictEqual(price('0').error, 'invalid_value');
+  assert.ok(price(714.88).ok, 'a real price is fine');
+  assert.ok(price('714.88').ok, 'a real price as text is fine');
+  // The channel's second bound follows the same rule.
+  assert.strictEqual(price(700, null).error, 'invalid_value2');
+  assert.strictEqual(price(700, 0).error, 'invalid_value2');
+  assert.strictEqual(price(700, -1).error, 'invalid_value2');
+  assert.ok(price(700, 720).ok);
+  // Every operator refuses a zero or missing value, not just the crossing family.
+  for (const op of Object.keys(store.PRICE_OPS)) {
+    const needs2 = store.PRICE_OPS[op].needs === 2;
+    assert.strictEqual(store.normalizeRule({ symbol: 'SPY', type: 'price', op, value: null, value2: needs2 ? 20 : undefined }).error, 'invalid_value', op + ' with a null value');
+    const zeroErr = /_pct$/.test(op) ? 'invalid_percent' : /^moving_/.test(op) ? 'invalid_move' : 'invalid_value';   // the move ops keep their own words
+    assert.strictEqual(store.normalizeRule({ symbol: 'SPY', type: 'price', op, value: 0, value2: needs2 ? 20 : undefined }).error, zeroErr, op + ' with a zero value');
+  }
+});
+
 check('validation: every operator is accepted, junk is not', () => {
   for (const op of Object.keys(store.PRICE_OPS)) {
     const needs2 = store.PRICE_OPS[op].needs === 2;
