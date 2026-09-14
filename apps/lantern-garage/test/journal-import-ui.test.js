@@ -42,6 +42,18 @@ test('the empty state no longer promises that waiting will fill the page in', ()
   assert.match(render, /id="jpImport"/, 'and gives the offer somewhere to go');
 });
 
+test('the empty state paints the offer after it renders, so the colon never dangles', () => {
+  /* jpImportCheck painted into #jpImport, then the empty-state render (and every Refresh)
+     rewrote the host and never painted it again: "bring that history in:" with nothing
+     after it (QA, 2026-09-14). */
+  const render = grabFn('jpRender');
+  const empty = render.slice(render.indexOf('bring that history in:'), render.indexOf('jpBindPlots();', render.indexOf('bring that history in:')));
+  assert.match(empty, /host\.innerHTML = html;\s*(?:\/\/[^\n]*\n\s*)*jpPaintImportOffer\(\);/, 'the offer is not painted after the render');
+  // And the painter is safe before the check has answered.
+  const paint = grabFn('jpPaintImportOffer');
+  assert.match(paint, /if \(!st\) \{ host\.innerHTML = ''; return; \}/);
+});
+
 test('the offer only appears when it can actually do something', () => {
   const paint = grabFn('jpPaintImportOffer');
   assert.match(paint, /st\.available/);

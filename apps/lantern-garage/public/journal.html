@@ -3203,6 +3203,11 @@ function jpRender(host, data) {
       + '<div id="jpImport" class="jp-import"></div>';
     html += jpPlacements();          // things you DID still belong here
     host.innerHTML = html;
+    // The sentence above ends in a colon: paint what follows it now. jpImportCheck may
+    // already have painted into a host this render just replaced (QA, 2026-09-14: the
+    // colon dangled on every load and every Refresh); it paints again when its own
+    // fetch lands, and this is a no-op until then.
+    jpPaintImportOffer();
   jpBindPlots();
     return;
   }
