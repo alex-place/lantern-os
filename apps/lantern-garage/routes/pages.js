@@ -46,7 +46,6 @@ const PUBLIC_PAGES = {
   "/stock-trader.html":   "stock-trader.html",
   "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
   "/journal.html":        "journal.html",   // the trading journal — its own page since it outgrew the panel
-  "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js
   // (orchestrationControlGuard) and the sensitive panels are hidden client-side
@@ -94,6 +93,7 @@ const REDIRECTS = {
   "/agent-status.html": "/orchestration.html",
   "/systems.html": "/system-health.html",   // renamed for clarity (#3109)
   "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
+  "/watch.html": "/stock-trader.html",   // the tracking-only twin retired (operator, 2026-09-13): one trader for everyone, view-only without the account panel
   "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
   "/api-keys-settings.html": "/orchestration.html", // API keys now live on the operator page (settings.html reworked to user General/Account/Billing/Connections)
   "/profile.html": "/settings.html",     // profile merged into settings — one account/profile page (nav profile button → settings)

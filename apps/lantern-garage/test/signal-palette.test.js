@@ -201,7 +201,7 @@ test('Classic removes the overrides rather than restating them', () => {
 test('every page that shows money loads it in the HEAD, before paint', () => {
   /* theme-toggle.js sits at the end of the body, which is fine for an attribute and not
      for a colour: the reader would see the default green and watch it change. */
-  for (const page of ['journal.html', 'stock-trader.html', 'watch.html', 'kalshi-terminal.html', 'settings.html']) {
+  for (const page of ['journal.html', 'stock-trader.html', 'kalshi-terminal.html', 'settings.html']) {
     const src = fs.readFileSync(path.join(__dirname, '..', 'public', page), 'utf8');
     const tag = src.indexOf('/js/signal-palette.js');
     const headEnd = src.indexOf('</head>');
@@ -319,7 +319,7 @@ test('the session carries the choice, so no page pays for a second request', () 
 
 // ── the trading dashboard follows it (#3592) ─────────────────────────────────
 
-for (const page of ['stock-trader.html', 'watch.html']) {
+for (const page of ['stock-trader.html']) {
   const src = fs.readFileSync(path.join(__dirname, '..', 'public', page), 'utf8');
 
   test(page + ': the candles are the reader\'s colours, not a third palette', () => {
@@ -503,7 +503,7 @@ test('a page showing gains and losses loads the palette', () => {
      distinction on a scoreboard as much as in their own journal. What must not happen is
      a SHARER's palette reaching a viewer, and that is the shared-card case (#3562), which
      deliberately ships the default palette to whoever opens it. */
-  for (const page of ['journal.html', 'stock-trader.html', 'watch.html', 'kalshi-terminal.html',
+  for (const page of ['journal.html', 'stock-trader.html', 'kalshi-terminal.html',
     'settings.html', 'contest.html', 'explore.html']) {
     const src = fs.readFileSync(path.join(__dirname, '..', 'public', page), 'utf8');
     const tag = src.indexOf('/js/signal-palette.js');

@@ -696,7 +696,7 @@
   .tp-cols-reset:hover{text-decoration:underline}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
-  /* Watch | Trade | Options — in-page switcher (the header nav has one Trader entry) */
+  /* Trade | Journal — in-page switcher (the header nav has one Trader entry) */
   .page-tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto}
   .pt{font-family:var(--mono);font-size:11.5px;padding:5px 12px;color:var(--text2);text-decoration:none;border-right:1px solid var(--border);white-space:nowrap}
   .pt:last-child{border-right:0}
@@ -712,7 +712,6 @@
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
-  .badge-demo{background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
@@ -747,7 +746,7 @@
      absolutely at right:5px, which put it 9px ON TOP of the Chg% figure on every row --
      invisible at rest, but on hover it covered the number being read and a click aimed at
      the percentage could land on remove. A real track cannot overlap. */
-  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 18px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 26px 18px;align-items:center;gap:8px;padding:6px var(--hdr-px);min-height:32px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.028);transition:background .12s;line-height:1.25}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -768,7 +767,7 @@
      the declared height is only a basis, not a floor. .dock-head held 32px all along
      because it already carried this; .wl-head did not, which is the whole 2px. */
   .wl-head{height:var(--hdr-h);flex:0 0 auto;box-sizing:border-box;position:sticky;top:0;z-index:5;display:grid;
-    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 18px;align-items:center;gap:8px;
+    grid-template-columns:18px minmax(0,max-content) 1fr 66px 60px 58px 26px 18px;align-items:center;gap:8px;
     /* The list below scrolls and this does not, so without reserving the same gutter the
        labels sit a scrollbar-width right of the figures they name. --wl-sb is measured at
        runtime because the width differs by platform and overlay-scrollbar setting. */
@@ -829,7 +828,11 @@
   /* #1709: single full-width "Add symbol" button → opens the search popup */
   .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
-  .wl-remove{grid-column:7;justify-self:center;opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
+  /* The AI toggle: lit when the autopilot may trade the row's symbol, faint otherwise. */
+  .wl-ai{grid-column:7;justify-self:center;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 4px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--text2);opacity:.35;cursor:pointer;line-height:1.3;transition:opacity .12s}
+  .wl-item:hover .wl-ai,.wl-item:focus-within .wl-ai{opacity:.85}
+  .wl-ai.on{opacity:1;color:var(--accent);border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent)}
+  .wl-remove{grid-column:8;justify-self:center;opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
@@ -1360,8 +1363,7 @@
      ACTIONS + account panels are removed. The trade-gated data endpoints stay
      blocked server-side too (tradeApiGuard) — this is defence-in-depth, not the
      only gate. */
-  /* Hidden for ALL guests, incl. demo: the trade ACTIONS + broker/account config
-     (a demo visitor can look around, not trade). */
+  /* Hidden for every view-only visitor: the trade ACTIONS + broker/account config. */
   body.guest .footer-resize,
   body.guest #brokerBtn,           /* broker status/config — only for entitled traders */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
@@ -1369,17 +1371,16 @@
   body.guest .tp-flat-btn,         /* per-position "Flatten" (market-close = a trade) */
   body.guest .tp-flatten-all,      /* "Close all" (bulk market-close = a trade) */
   body.guest #otBg{ display:none !important; }
-  /* Hidden only for NON-demo guests. In demo mode (body.demo) these are SHOWN and
-     filled with the read-only simulated champion account: the header Equity / Day
-     P&L / Positions stats, the positions footer, and the mode badge (relabeled
-     DEMO in JS). */
-  body.guest:not(.demo) .footer,
-  body.guest:not(.demo) .acct-corner,
-  body.guest:not(.demo) .hstat.acct{ display:none !important; }
+  /* View-only (operator, 2026-09-13): no account panel, no account corner, no account
+     stats, no AI list -- the charts, the watchlist and the signals are the whole page. */
+  body.guest .footer,
+  body.guest .acct-corner,
+  body.guest .wl-ai,               /* the AI trader's list is the trader's to edit */
+  body.guest .hstat.acct{ display:none !important; }
   /* Guests CAN edit the watchlist (add/remove tickers) — it's "which symbols to
      chart", not a trade — so .wl-add / .wl-remove stay visible for them. */
-  /* No footer row for guests — the chart grid takes the full height. */
-  body.guest:not(.demo) .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
+  /* No footer row for guests — header, charts, the range strip; the grid takes the rest. */
+  body.guest .layout{ grid-template-rows:52px minmax(0,1fr) auto; }
   /* Uniform chart grid for guests: no "open" state spanning two columns and no
      per-state height changes, so every card is the same size. #guest-uniform-grid */
   body.guest .card.state-open{ grid-column:auto; }
@@ -1498,7 +1499,7 @@
 <div class="header" role="region" aria-label="Trading toolbar">
   <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
   <div class="page-tabs" role="navigation" aria-label="Trading pages">
-    <a class="pt" href="/watch.html">Watch</a><a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/journal.html" title="Your trading journal — realized results, the equity curve, and every declined trade">Journal</a>
+    <a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/journal.html" title="Your trading journal — realized results, the equity curve, and every declined trade">Journal</a>
   </div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
@@ -1734,18 +1735,6 @@
 
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
      move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
-<!-- Pro gate: the trading terminal is a $20 Pro feature. Watching stays free
-     (the Watch page); this overlay only mounts for guests/Free users when the
-     auth funnel is on. Backed by server-side capability gates (plan-matrix). -->
-<div class="trade-lock" id="tradeLock" style="display:none" role="dialog" aria-label="Pro feature">
-  <div class="tl-card">
-    <h2>The trading terminal is a Pro feature</h2>
-    <p>Watching, charts, news and signals are free on the Watch page. Placing trades and editing the AI tradelist unlock with the <b>$20 Pro</b> plan; the autonomous AI trader is part of <b>$200 Pilot</b>.</p>
-    <a class="tl-cta" href="/pricing.html">See plans</a>
-    <a href="/watch.html">Back to Watch</a>
-    <a href="/auth.html?returnTo=%2Fstock-trader.html" id="tlSignin">Sign in</a>
-  </div>
-</div>
 <div class="hmenu" id="hmenu" hidden role="menu" aria-label="Trader actions"></div>
 <!-- Keyboard hint appended into the menu at runtime (kept out of the mover's way) -->
 
@@ -4552,11 +4541,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
       if(!currentPrice || currentPrice <= 0){
         // Two very different states share this branch: the feed hasn't answered
         // YET (keep "waiting"), and the feed HAS answered and simply doesn't
-        // carry this symbol — a chart slot that outlived the tradelist (#3514).
+        // carry this symbol — a chart slot that outlived the list (#3514).
         // The latter never resolves on its own, so offer the repair instead of
         // implying data is on the way. The button goes through addWatchlistSymbol,
-        // which runs _tradelistEditGuard — membership in the AI tradelist only
-        // ever changes on an explicit, warned action. Symbol is user-typed via
+        // which puts the symbol on the WATCHLIST (tracking); the AI trader's list only
+        // ever changes through the row's own toggle. Symbol is user-typed via
         // the slot editor: strip it to ticker charset before innerHTML.
         const _sym = String(ticker).replace(/[^A-Za-z0-9._\-]/g, '');
         const _noFeed = pricesLoadedOnce && !feedTickers.has(_sym.toUpperCase());
@@ -5127,9 +5116,9 @@ function editSlot(oldTicker){
 async function commitSlotSymbol(oldTicker, sym){
   if(!sym || sym===oldTicker) return;
   if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
-  // The symbol is already Alpaca-validated by the search; charting it also adds it
-  // to the AI tradelist so price/zone data flows — that mutation needs the guard.
-  if(!_tradelistEditGuard()) return;
+  // The symbol is already Alpaca-validated by the search; charting it also adds it to
+  // the watchlist so price/zone data flows (tracking only -- the AI trader's list is the
+  // row's own toggle).
   try{ await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); await loadMyList(true); }catch(e){}
   lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
@@ -7113,6 +7102,7 @@ function renderWatchlist(){
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
+    const ai = AI_LIST.has(String(t.ticker).toUpperCase());
     // The per-row signal chip was removed (operator): at 320px it consumed the symbol
     // column and truncated four-letter tickers to 'S...'. The engine's read is still on
     // the card header and in the symbol details panel below the list.
@@ -7123,6 +7113,7 @@ function renderWatchlist(){
       <span class="wl-price">${_wlPx(t.price)}</span>
       <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
       <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
+      <button class="wl-ai${ai?' on':''}" aria-pressed="${ai}" aria-label="AI trader ${ai?'on':'off'} for ${t.ticker}" title="${ai ? 'The AI trader may trade '+t.ticker+'. Click to take it off the AI list.' : 'Let the AI trader trade '+t.ticker+'. Click to put it on the AI list.'}" onclick="toggleAiTicker('${t.ticker}',event)">AI</button>
       <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
   }).join('');
@@ -7748,27 +7739,38 @@ document.addEventListener('dblclick', function(e){
   }
 }, true);
 
-// ── Page list (TRADELIST): the AI's per-user trading universe drives this page's
-// sidebar + cards. /api/trading/watchlist-prices returns the UNION (watchlists +
-// tradelists) so data exists for both pages; we filter to THIS page's list.
-const LIST_API='/api/trading/tradelist'; const LIST_KEY='tradelist';
-let MY_LIST=null;
+// ── Page list: the WATCHLIST (every symbol the reader tracks) with the AI TRADELIST
+// (the symbols the autopilot may trade) marked on it. One page since the Watch page went
+// (operator, 2026-09-13): the list is the union of the two, a ticker is added to the
+// watchlist, and each row's AI toggle puts it on or takes it off the tradelist.
+// /api/trading/watchlist-prices returns the UNION across users so data exists for all.
+const LIST_API='/api/trading/watchlist'; const LIST_KEY='watchlist';
+const AI_LIST_API='/api/trading/tradelist'; const AI_LIST_KEY='tradelist';
+let MY_LIST=null, AI_LIST=new Set(), WL_LIST=new Set();
 async function loadMyList(force){
   if(MY_LIST && !force) return MY_LIST;
-  try{ const r=await fetch(LIST_API); const j=await r.json();
-    MY_LIST=new Set((j[LIST_KEY]||[]).map(s=>String(s).toUpperCase())); }catch(e){ MY_LIST=null; }
+  try{
+    const [w, t] = await Promise.all([
+      fetch(LIST_API).then(r=>r.json()).catch(()=>({})),
+      fetch(AI_LIST_API).then(r=>r.json()).catch(()=>({})),
+    ]);
+    const up = (a)=> (Array.isArray(a) ? a : []).map(x=>String(x).toUpperCase());
+    WL_LIST = new Set(up(w && w[LIST_KEY]));
+    AI_LIST = new Set(up(t && t[AI_LIST_KEY]));
+    MY_LIST = new Set([...WL_LIST, ...AI_LIST]);
+  }catch(e){ MY_LIST=null; }
   return MY_LIST;
 }
 
-// ── Watchlist add/remove ─────────────────────────────────────────────────────
-// Editing the AI tradelist changes what the autopilot trades — warn once per
-// session before the first mutation. The seeded ETF basket is the measured,
-// backtested universe; edits (especially single stocks) are riskier and not
-// recommended for the contest.
+// ── Watchlist add/remove, and the AI toggle ──────────────────────────────────
+// Putting a symbol on the AI trader's list changes what the autopilot trades — warn
+// once per session before the first such change. The seeded ETF basket is the
+// measured, backtested universe; additions (especially single stocks) are riskier and
+// not recommended for the contest. Tracking a symbol on the watchlist needs no warning.
 function _tradelistEditGuard(){
   try{ if(sessionStorage.getItem('tradelist.editWarned')) return true; }catch(e){}
   const ok = window.confirm(
-    'You are editing the AI tradelist — the set of symbols the autopilot is allowed to trade.\n\n' +
+    'You are changing the AI trader’s list — the symbols the autopilot is allowed to trade.\n\n' +
     'The default ETF basket is the backtested universe the AI’s strategies were measured on. ' +
     'Changing it is NOT recommended: single stocks and unfamiliar symbols are riskier, ' +
     'and the AI’s edge estimates may not apply to them.\n\n' +
@@ -7780,7 +7782,6 @@ async function addWatchlistTicker(){
   const input = document.getElementById('wlAddInput');
   const ticker = (input.value || '').trim().toUpperCase();
   if(!ticker) return;
-  if(!_tradelistEditGuard()) return;
   try{
     const r = await fetch(LIST_API, {
       method: 'POST',
@@ -7801,7 +7802,6 @@ async function addWatchlistTicker(){
 // Add a pre-validated symbol (chosen from the search popup, #1692) to the watchlist.
 async function addWatchlistSymbol(sym){
   if(!sym) return;
-  if(!_tradelistEditGuard()) return;
   try{
     await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
     await loadMyList(true);
@@ -7810,7 +7810,30 @@ async function addWatchlistSymbol(sym){
   }catch(e){}
 }
 
-// #3514: chart slots persist in localStorage while the tradelist lives
+/* The AI toggle on a watchlist row: on puts the symbol on the autopilot's tradelist
+   (warned once per session), off takes it back off. The row stays on the watchlist
+   either way -- tracking and trading are two decisions (operator, 2026-09-13). */
+async function toggleAiTicker(ticker, evt){
+  if(evt) evt.stopPropagation();
+  if(window.GUEST) return;                      // view-only: the list is not theirs to edit
+  const t = String(ticker || '').toUpperCase(); if(!t) return;
+  const on = AI_LIST.has(t);
+  if(!on && !_tradelistEditGuard()) return;
+  try{
+    // A symbol that was only on the AI list stays on the page when the AI lets go of it:
+    // it goes on the watchlist first, as a tracked symbol.
+    if(on && !WL_LIST.has(t)) await fetch(LIST_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ticker:t }) }).catch(()=>{});
+    const r = on ? await fetch(AI_LIST_API+'/'+encodeURIComponent(t), { method:'DELETE' })
+                 : await fetch(AI_LIST_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ticker:t }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok){ _alertToast((on ? 'Couldn’t take ' + t + ' off the AI list: ' : 'Couldn’t add ' + t + ' to the AI list: ') + (j.error || r.statusText)); return; }
+    await loadMyList(true);
+    renderWatchlist();
+    _alertToast(on ? t + ' is off the AI trader’s list' : 'The AI trader may now trade ' + t);
+  }catch(e){ _alertToast('AI list change failed: ' + e.message); }
+}
+
+// #3514: chart slots persist in localStorage while the list lives
 // server-side, so a slot can name a symbol the list no longer carries and its
 // card then charts nothing forever. The list is the source of truth ("why does
 // AAPL show if it's not on the watchlist") — once it's known, drop any slot it
@@ -7834,8 +7857,12 @@ function pruneStaleSlots(list){
 
 async function removeWatchlistTicker(ticker, evt){
   if(evt) evt.stopPropagation();
-  if(!_tradelistEditGuard()) return;
+  const _t = String(ticker).toUpperCase();
+  // Off the watchlist; and off the AI trader's list too if it was on it -- that is the
+  // AI change that gets the once-per-session warning.
+  if(AI_LIST.has(_t) && !_tradelistEditGuard()) return;
   try{
+    if(AI_LIST.has(_t)) await fetch(AI_LIST_API+'/'+encodeURIComponent(_t), { method: 'DELETE' }).catch(()=>{});
     const r = await fetch(LIST_API+'/'+encodeURIComponent(ticker), { method: 'DELETE' });
     const result = await r.json();
     if(!r.ok){ _alertToast('Couldn’t remove ticker: ' + (result.error || r.statusText)); return; }
@@ -8233,7 +8260,7 @@ async function _loadWatchlistPricesNow(){
     feedTickers = new Set((wlPrices||[]).map(t=>String(t.ticker).toUpperCase()));
     const _ml = await loadMyList();
     if(_ml) wlPrices = wlPrices.filter(t=>_ml.has(String(t.ticker).toUpperCase()));
-    pruneStaleSlots(_ml);   // #3514: the tradelist is the slots' source of truth
+    pruneStaleSlots(_ml);   // #3514: the list is the slots' source of truth
     _feedStatus(true);
     checkPriceAlerts();
     renderWatchlist();
@@ -9377,12 +9404,7 @@ function tpTab(name){
 }
 
 /* ── Journal tab (#3242 + #3243 v1) ─────────────────────────────────────────
-   Reads the gated journal data layer (/api/trading/track-record + scorecard
-   ?by=) for entitled users, or the sanctioned SIMULATED demo feed
-   (?demo=champion, lib/champion-demo.journalRows) for guests — never the real
-   ledger without entitlement. Plain-English labels for exit families; the
-   structural win-rate flag and the disclosures line are always visible. */
-/* The journal render lived here. It moved to public/journal.html when the journal
+   The journal render lived here. It moved to public/journal.html when the journal
    became its own page -- a calendar, an equity curve and a breakdown table could not
    share a 306px strip. Only the #journal redirect below is left. */
 function jrHash(){
@@ -9399,23 +9421,9 @@ function jrHash(){
   // send them on rather than landing them on a tab that no longer exists.
   if (location.hash === '#journal') { location.replace('/journal.html'); return; }
   return;
-  // Durable suppression: on a DIRECT deep link, applyTierGate() runs after this
-  // (session fetch) and would re-show the overlay — watch it for a few seconds
-  // and keep it hidden, then disconnect.
-  const tl=document.getElementById('tradeLock');
-  if(tl){
-    tl.style.display='none';
-    try{
-      const mo=new MutationObserver(()=>{ if(tl.style.display!=='none') tl.style.display='none'; });
-      mo.observe(tl,{attributes:true,attributeFilter:['style']});
-      setTimeout(()=>mo.disconnect(), 8000);
-    }catch(_e){ /* very old engines: the immediate hide above still applied */ }
-  }
-  const p=document.getElementById('tp-'+target);
-  if(p) p.scrollIntoView({block:'nearest'});
 }
 window.addEventListener('hashchange', jrHash);
-if(location.hash==='#journal'||location.hash==='#alerts') setTimeout(jrHash, 500);   // after guest/demo detection settles
+if(location.hash==='#journal'||location.hash==='#alerts') setTimeout(jrHash, 500);   // after guest detection settles
 
 /* -- Alerts, in the watchlist rail (#3352) -----------------------------------
    Alerts are a watchlist-scoped idea -- "tell me when SPY does X" -- so they belong
@@ -9568,7 +9576,7 @@ let _staleKind = null;
 let _lastGoodPoll = Date.now();
 const STALE_AFTER_MS = 90_000;                 // 3 missed 30s polls
 setInterval(() => {
-  if (window.GUEST && !window.DEMO_ACCT) return;
+  if (window.GUEST) return;
   if (Date.now() - _lastGoodPoll > STALE_AFTER_MS && !_staleKind) {
     _accountDegraded('unreachable', 'no account update for ' + Math.round((Date.now() - _lastGoodPoll) / 1000) + 's');
   }
@@ -10168,14 +10176,10 @@ function computeDayPnl(positions){
 }
 
 async function loadPortfolio(){
-  // Non-demo guests get the charts-only view (account/positions are trade-gated).
-  // In demo mode a guest sees the READ-ONLY simulated champion account instead —
-  // fetched with ?demo=champion, which the server serves publicly (never a real
-  // account) so the trader isn't an empty shell for logged-out visitors.
-  if(window.GUEST && !window.DEMO_ACCT) return;
-  const demoQS = window.DEMO_ACCT ? '?demo=champion' : '';
+  // View-only visitors get the charts-only view (account/positions are trade-gated).
+  if(window.GUEST) return;
   try{
-    const r  = await fetch('/api/trading/positions' + demoQS);
+    const r  = await fetch('/api/trading/positions');
     // HONEST DEGRADED STATES (2026-08-11). A session that expires overnight made
     // every poll fail and the header rendered $0.00 — which reads as "the account
     // is empty", the worst possible lie. Auth failures and backend outages now:
@@ -10491,37 +10495,11 @@ function initChartDrag(){
   });
 }
 
-async function applyTierGate(){
-  try{
-    const s = await (await fetch('/api/auth/session')).json();
-    if (s && s.authRequired === false) return;              // auth funnel off → operator box
-    const proPlus = ['deep_dreamer','founder','pilot','tech_support','admin'].includes(String(s && s.role));
-    if (proPlus) return;
-    // Free/guest: SEND THEM SOMEWHERE THEY CAN USE, don't wall them in.
-    // Landing a Free user on a dead page behind a modal is a hostile first
-    // experience — the nav "Trader" link is the main entry point, so they hit a
-    // paywall before seeing anything work. Watch is the free product (charts,
-    // watchlist, news, signals): go there, and say why, with the upgrade path.
-    // ?stay=1 escapes the redirect so the CTA is still reachable deliberately
-    // (e.g. from pricing), and we never bounce a page opened from Watch itself.
-    // Show the WHY, don't just teleport (operator 2026-07-30: "it just dosent
-    // let me open it" — the silent bounce reads as a broken page). Only the
-    // global nav auto-redirects to Watch, and even then it lands with a banner.
-    // Any DELIBERATE arrival — the in-page Trade tab (?stay=1), a pricing link,
-    // a direct URL with a referrer from this app — gets the explanatory CTA.
-    const params = new URLSearchParams(location.search);
-    const deliberate = params.get('stay') === '1' ||
-      (document.referrer && /\/(watch|options|pricing)\.html/.test(document.referrer));
-    if (deliberate) {
-      const el = document.getElementById('tradeLock'); if (el) el.style.display='flex';
-      return;
-    }
-    location.replace('/watch.html?from=trader');
-  }catch(_e){ /* session unreachable → leave the page usable */ }
-}
+// There is no tier gate on the page (operator, 2026-09-13): the one trader serves
+// everyone. A visitor without the trade entitlement gets the same page in view-only
+// mode -- charts, watchlist, signals -- without the account panel (detectGuestMode).
 
 function startDashboard(){
-  applyTierGate();
   _restoreBarsCache();          // preload cached bars so the first chart render paints instantly
   // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
   // from localStorage at init).
@@ -10615,40 +10593,9 @@ async function detectGuestMode(){
   }catch(e){ window.GUEST = true; }
   if(window.GUEST){
     document.body.classList.add('guest');
-    // Demo showroom: instead of an empty, gated shell, a logged-out / non-entitled
-    // visitor sees the READ-ONLY simulated champion account. body.demo re-shows the
-    // account header stats + positions footer (CSS), the mode badge is relabeled
-    // DEMO, and loadPortfolio() fetches it with ?demo=champion. Trade actions stay
-    // hidden (still body.guest), so nothing here can place an order.
-    window.DEMO_ACCT = true;
-    document.body.classList.add('demo');
-    // UNMISSABLE banner (user report 2026-07-28: a visitor watched the demo for
-    // days believing it was real — the 4-char DEMO badge is not enough). Sits
-    // above the deck, dismissible per session only.
-    if(!sessionStorage.getItem('demoBannerDismissed')){
-      const bar=document.createElement('div');
-      bar.id='demoBanner'; bar.setAttribute('role','status');
-      bar.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 14px;'
-        +'background:color-mix(in srgb, var(--amber,#f59e0b) 14%, var(--bg1,#0d1117));'
-        +'border-bottom:1px solid var(--amber,#f59e0b);font-size:12.5px;line-height:1.45;color:var(--text0,#e6e6ea)';
-      bar.innerHTML='<b style="white-space:nowrap">SIMULATED PORTFOLIO</b>'
-        +'<span>This is a <b>demo</b> of the Champion strategy — positions are simulated, marked to live market prices. It is not a real account and nothing here is yours. '
-        +'<a href="/auth.html?returnTo=%2Fstock-trader.html" style="color:var(--blue,#58a6ff)">Sign in</a> to trade your own paper account.</span>'
-        +'<button type="button" aria-label="Dismiss" style="margin-left:auto;background:none;border:1px solid var(--border,#30363d);color:inherit;border-radius:6px;padding:2px 9px;cursor:pointer">✕</button>';
-      bar.querySelector('button').onclick=()=>{ bar.remove(); try{sessionStorage.setItem('demoBannerDismissed','1');}catch(e){} };
-      // Above the grid, not inside it — the .layout grid has fixed template rows,
-      // so an extra child would auto-place into an implicit row below the footer.
-      const layout=document.querySelector('.layout');
-      if(layout && layout.parentNode) layout.parentNode.insertBefore(bar, layout);
-    }
-    const badge=document.querySelector('.badge-paper');
-    if(badge){
-      badge.classList.remove('badge-paper'); badge.classList.add('badge-demo');
-      badge.textContent='DEMO';
-      badge.dataset.desc='Demo account — a simulated "champion" strategy portfolio. Look around; sign in to trade your own.';
-      if(typeof _setTradePanel === 'function') _setTradePanel(); else badge.title=badge.dataset.desc;
-      badge.setAttribute('aria-label','Demo account — simulated');
-    }
+    // View-only (operator, 2026-09-13): the same charts, watchlist and signals, without
+    // the account panel, the order ticket or the AI list. No demo portfolio stands in
+    // for the missing panel any more.
     const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
     const cta=document.getElementById('signinCta');
     if(cta){

@@ -23,7 +23,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PAGES = ['stock-trader.html', 'watch.html'];
+const PAGES = ['stock-trader.html'];   // the Watch twin retired (operator, 2026-09-13)
 const read = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
 
 function tokensIn(block) {
@@ -127,9 +127,3 @@ for (const page of PAGES) {
   });
 }
 
-test('the two trader pages share one palette, so a fix cannot land on only one', () => {
-  // They are near-copies and drifted once already: watch.html kept a hard-coded ladder
-  // colour that stock-trader.html had already tokenised.
-  const [a, b] = PAGES.map((p) => tokensIn(blockAfter(read(p), '  html[data-theme="light"]{')));
-  assert.deepStrictEqual(a, b, 'the light palettes have drifted apart');
-});
