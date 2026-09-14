@@ -1433,17 +1433,22 @@ const JP_SHARE_KINDS = {
 async function jpShareOpen() {
   jpShare = { open: true, kind: null, month: null, dollars: false, preview: null,
     shares: [], opts: null, busy: true, error: null };
+  // The reply belongs to THIS sheet. Close it (or open it again) while the options are in
+  // flight and the old reply is dropped rather than written into a sheet that is gone
+  // (QA, 2026-09-14: "Cannot set properties of null (setting 'error')" on every such close).
+  const me = jpShare;
   jpSharePaint();
   try {
     const [o, s] = await Promise.all([
       fetch('/api/journal/share/options', { credentials: 'same-origin' }).then((r) => r.json()),
       fetch('/api/journal/shares', { credentials: 'same-origin' }).then((r) => r.json()),
     ]);
+    if (jpShare !== me) return;
     jpShare.opts = o;
     jpShare.shares = (s && s.shares) || [];
     jpShare.kind = (o.kinds || [])[0] || null;
     jpShare.month = (o.months || [])[0] || null;
-  } catch (e) { jpShare.error = e.message; }
+  } catch (e) { if (jpShare !== me) return; jpShare.error = e.message; }
   jpShare.busy = false;
   jpSharePaint();
   await jpSharePreview();
@@ -1488,6 +1493,7 @@ async function jpSharePreview() {
 async function jpSharePublish() {
   if (!jpShare || !jpShare.kind || jpShare.busy) return;
   jpShare.busy = true; jpShare.error = null; jpSharePaint();
+  const me = jpShare;   // the same rule as jpShareOpen: a reply for a closed sheet is dropped
   try {
     const r = await fetch('/api/journal/share', {
       method: 'POST', credentials: 'same-origin',
@@ -1495,6 +1501,7 @@ async function jpSharePublish() {
       body: JSON.stringify({ kind: jpShare.kind, month: jpShare.month, dollars: jpShare.dollars }),
     });
     const d = await r.json();
+    if (jpShare !== me) return;
     if (!r.ok) { jpShare.error = d.error === 'share_limit'
       ? 'You have ' + d.limit + ' links live. Take one down to make room.'
       : 'That could not be published.'; }
@@ -1504,7 +1511,7 @@ async function jpSharePublish() {
         month: d.payload.card && d.payload.card.month }].concat(jpShare.shares);
       jpShare.justMade = d.id;
     }
-  } catch (e) { jpShare.error = e.message; }
+  } catch (e) { if (jpShare !== me) return; jpShare.error = e.message; }
   jpShare.busy = false;
   jpSharePaint();
 }
