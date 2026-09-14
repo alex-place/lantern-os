@@ -148,6 +148,22 @@ test('it is a dialog, escapable, and announced as one', () => {
   const paint = grabFn('jpSharePaint');
   assert.match(paint, /role="dialog" aria-modal="true" aria-label="Share a card"/);
   assert.match(paint, /e\.key === 'Escape'/, 'a dialog about publishing must be trivially escapable');
+  // Escapable from ANYWHERE: the sheet's own keydown only fires with focus inside it, and
+  // an empty sheet had nothing to focus (QA, 2026-09-14). One named document listener,
+  // gated on the sheet being open, so re-opening never stacks a second one.
+  const escape = grabFn('jpShareEscape');
+  assert.match(escape, /e\.key === 'Escape' && jpShare && jpShare\.open/);
+  assert.match(paint, /document\.addEventListener\('keydown', jpShareEscape\);/);
+  // The dim backdrop closes it, like every other sheet.
+  assert.match(paint, /host\.addEventListener\('click', \(e\) => \{ if \(e\.target === host\) jpShareClose\(\); \}\);/);
+});
+
+test('a reader with nothing to share can still leave the sheet', () => {
+  /* The empty branch rendered a sentence and no button: no Close, nothing to focus for
+     Escape, no way out but a reload (QA, 2026-09-14). */
+  const paint = grabFn('jpSharePaint');
+  const empty = paint.slice(paint.indexOf("nothing in your record to share yet"), paint.indexOf("'<label>What to share</label>"));
+  assert.match(empty, /onclick="jpShareClose\(\)">Close<\/button>/, 'the empty sheet has no Close button');
 });
 
 test('every live share can be taken down from the panel', () => {
