@@ -42,6 +42,10 @@
     .btn:hover { border-color: var(--accent); }
     .btn.primary { background: var(--accent-strong); border: none; color: #fff; }
     .btn.primary:hover { background: var(--accent-strong-hover); }
+    /* Dark mode paints the accent light (cyan), so the button's text goes dark -- the same
+       rule site.css gives its own .btn-primary. White on that cyan measured 2.4:1 on the
+       three Save buttons and the selected palette chip (QA, 2026-09-14). */
+    [data-theme="dark"] .btn.primary { color: var(--bg); }
     .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
     .btn.danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
     .btn:disabled { opacity: .5; cursor: default; }
