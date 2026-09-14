@@ -126,7 +126,7 @@ test('the range buttons read in words: "1 day in 1 minute intervals"', () => {
 });
 
 test('the one menu builder serves all four menus, and the trigger is remembered rather than guessed by id', () => {
-  assert.match(PAGE, /const _PICK_LABELS = \{ tf:'Candle intervals', type:'Chart types', sess:'Trading session', tz:'Timezone' \};/);
+  assert.match(PAGE, /const _PICK_LABELS = \{ tf:'Candle intervals', type:'Chart types', sess:'Trading session', tz:'Timezone', acct:'Account menu' \};/);
   assert.match(PAGE, /m\._btn = btn;/);
   assert.match(PAGE, /if\(m\._btn && m\._btn\.contains\(e\.target\)\) return;/);
   assert.match(PAGE, /if\(m\._btn\) m\._btn\.setAttribute\('aria-expanded','false'\);/);
