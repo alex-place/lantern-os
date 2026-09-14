@@ -486,12 +486,19 @@
   /* Row compaction lives on the source rules above (.wl-item / .tb-badge) — an
      override placed earlier in this sheet would lose to them at equal specificity. */
 
-  /* Phone: rails stay, both docks become bottom sheets. */
+  /* Phone: rails stay, both docks become bottom sheets. The two rails share one band
+     directly under the site nav, so the page starts BELOW that band (QA, 2026-09-14: the
+     toolbar row sat under the rails, its pickers unreachable), and the drawing rail stops
+     where the dock rail starts and scrolls its tools rather than running under it. */
   @media (max-width:760px){
+    :root{--rail-band:50px;--dock-rail-w:124px}
     .layout, body.leftdock-closed .layout, body.rightdock-closed .layout,
     body.leftdock-closed.rightdock-closed .layout{grid-template-columns:0 0 minmax(0,1fr) 0 0}
-    .draw-rail{position:fixed;left:0;top:52px;bottom:auto;z-index:60;flex-direction:row;
-      grid-column:auto;grid-row:auto;border-right:none;border-bottom:1px solid var(--border);max-width:100vw}
+    .layout{padding-top:var(--rail-band);box-sizing:border-box}
+    .draw-rail{position:fixed;left:0;right:var(--dock-rail-w);top:52px;bottom:auto;z-index:60;flex-direction:row;
+      grid-column:auto;grid-row:auto;border-right:none;border-bottom:1px solid var(--border);max-width:100vw;
+      overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+    .draw-rail::-webkit-scrollbar{display:none}
     .dock-rail{position:fixed;right:0;top:52px;z-index:60;flex-direction:row;gap:2px;
       grid-column:auto;grid-row:auto;border-left:none;border-bottom:1px solid var(--border)}
     .dockL,.dockR{position:fixed;left:0;right:0;bottom:0;top:auto;height:62vh;z-index:1200;
