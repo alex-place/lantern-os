@@ -2800,7 +2800,18 @@ async function jpLayoutSync() {
     const r = await fetch('/api/journal/layout', { credentials: 'same-origin', cache: 'no-store' });
     if (!r.ok) return;
     const j = await r.json();
-    if (!j || !j.layout) return;
+    if (!j) return;
+    if (!j.layout) {
+      // The account has no layout -- a Reset on another device, or none ever saved. When
+      // the server can speak for the reader (stored) that answer is theirs, and a copy
+      // this browser kept for the first paint goes with it (QA, 2026-09-14: a Reset on one
+      // device left the old arrangement on every other one). A guest's copy stays.
+      if (!j.stored || !jpLayoutRead()) return;
+      jpLayout = jpLayoutDefault();
+      try { localStorage.removeItem(JP_LAYOUT_KEY); } catch (_e) { /* nothing to remove */ }
+      jpPaintCards();
+      return;
+    }
     const merged = jpLayoutMerge(j.layout);
     if (JSON.stringify(merged) === JSON.stringify(jpLayout)) return;
     jpLayout = merged;
