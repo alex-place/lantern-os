@@ -33,7 +33,7 @@ test('the badge left the header for the strip\'s left corner, ahead of the range
   assert.strictEqual((PAGE.match(/id="tradePanel"/g) || []).length, 1);
   assert.match(PAGE, /<div class="footer" id="tradePanel" style="position:relative">/);
   // Guests without the demo lose the whole corner, as they lost the badge before.
-  assert.match(PAGE, /body\.guest:not\(\.demo\) \.acct-corner,/);
+  assert.match(PAGE, /body\.guest \.acct-corner,/);
 });
 
 test('the chevron turns up while its menu is open, and the menu offers the two settings', () => {
@@ -75,8 +75,10 @@ test('clicking the badge collapses the panel, remembered per device, and the too
   store['trader.panelOpen'] = '0'; cls.clear();
   fns.initTradePanel();
   assert.ok(cls.has('panel-collapsed'));
-  // The demo switch renames the description and repaints, so the tooltip never fights it.
-  assert.match(PAGE, /badge\.dataset\.desc='Demo account — a simulated "champion" strategy portfolio\. Look around; sign in to trade your own\.';\s*if\(typeof _setTradePanel === 'function'\) _setTradePanel\(\);/);
+  // The description lives on the button (data-desc); nothing renames it any more (the demo
+  // showroom went with the Watch page, operator 2026-09-13).
+  assert.match(PAGE, /id="acctBadge"[^>]*data-desc="Paper trading — simulated money; orders are practice, not real\."/);
+  assert.ok(!PAGE.includes("badge.dataset.desc='Demo account"), 'the demo relabel survives');
   assert.match(PAGE, /initFooterResize\(\); initTradePanel\(\);/);
 });
 

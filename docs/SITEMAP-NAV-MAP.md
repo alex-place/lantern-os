@@ -36,7 +36,6 @@ flowchart TD
     settings["settings.html"]
     pricing["pricing.html"]
     options["options.html"]
-    watch["watch.html"]
     radio["fallout-radio.html"]
     ibkrGuide["ibkr-setup-guide.html"]
     faq["faq.html"]
@@ -68,14 +67,10 @@ flowchart TD
   trader --> kalshi
   trader --> options
   trader --> pricing
-  trader --> watch
   trader --> chat
   kalshi --> kc
   kalshi --> settings
   kalshi --> create
-  watch --> options
-  watch --> kalshi
-  options --> watch
   options --> pricing
   settings --> pricing
   radio --> explore
@@ -139,9 +134,9 @@ Two directions, and they are not equally bad.
 
 (`proof.html` was the third; it was retired in #3109 and removed from the sitemap.)
 
-**Reachable but absent from `sitemap.xml` (7)** — real, clickable surfaces invisible to search:
+**Reachable but absent from `sitemap.xml` (6)** — real, clickable surfaces invisible to search:
 
-`orchestration.html` · `work.html` · `settings.html` · `options.html` · `watch.html` · `fallout-radio.html` · `ibkr-setup-guide.html`
+`orchestration.html` · `work.html` · `settings.html` · `options.html` · `fallout-radio.html` · `ibkr-setup-guide.html`
 
 Note that `orchestration.html` and `work.html` are **depth-1 primary nav entries** that no crawler is told about.
 
