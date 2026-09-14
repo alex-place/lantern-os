@@ -20,7 +20,7 @@ const PAGE = fs.readFileSync(path.join(__dirname, '..', 'public', 'stock-trader.
 test('the strip sits between the charts and the account panel', () => {
   const main = PAGE.indexOf('<div class="main" role="main" aria-label="Charts">');
   const strip = PAGE.indexOf('<div class="range-strip" id="rangeStrip">');
-  const footer = PAGE.indexOf('<div class="footer" style="position:relative">');
+  const footer = PAGE.indexOf('<div class="footer" id="tradePanel" style="position:relative">');
   assert.ok(main > 0 && strip > main && footer > strip, 'main → strip → footer, in that order');
   assert.match(PAGE, /\.range-strip\{grid-column:3;grid-row:3;/);
   assert.match(PAGE, /\.footer\{position:relative;grid-column:3;grid-row:4;/, 'the panel did not move down a row');

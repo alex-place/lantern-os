@@ -588,6 +588,21 @@
   .range-strip .range-btn:hover{background:var(--bg3);color:var(--text0);border-color:transparent}
   .range-strip .range-btn.active{background:var(--bg3);color:var(--text0);border-color:transparent;font-weight:600}
   .range-sp{flex:1 1 auto}
+  /* The account corner: the badge is a button now, the chevron turns up while its menu
+     is open, and a collapsed panel drops the footer row (desktop grid only: phones switch
+     views instead). */
+  .acct-corner{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;margin-right:6px}
+  .acct-corner .badge{cursor:pointer;line-height:1.2;font-family:var(--mono)}
+  .acct-corner .badge:hover{filter:brightness(1.15)}
+  .acct-caret{height:22px;width:20px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text1);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  .acct-caret:hover{color:var(--text0);background:var(--bg3)}
+  .acct-caret svg{width:12px;height:12px;transition:transform .15s}
+  .acct-caret[aria-expanded="true"] svg{transform:rotate(180deg)}
+  a.pat-menu-item{text-decoration:none;color:var(--text0)}
+  @media (min-width:581px){
+    body.panel-collapsed .footer{display:none}
+    body.panel-collapsed .layout{grid-template-rows:52px minmax(0,1fr) auto}
+  }
   .range-sess{margin-left:6px;height:22px;padding:0 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);
     color:var(--text1);font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;cursor:pointer}
   .range-sess:hover{color:var(--text0);background:var(--bg3)}
@@ -1354,7 +1369,7 @@
      P&L / Positions stats, the positions footer, and the mode badge (relabeled
      DEMO in JS). */
   body.guest:not(.demo) .footer,
-  body.guest:not(.demo) .badge-paper,
+  body.guest:not(.demo) .acct-corner,
   body.guest:not(.demo) .hstat.acct{ display:none !important; }
   /* Guests CAN edit the watchlist (add/remove tickers) — it's "which symbols to
      chart", not a trade — so .wl-add / .wl-remove stay visible for them. */
@@ -1480,7 +1495,6 @@
   <div class="page-tabs" role="navigation" aria-label="Trading pages">
     <a class="pt" href="/watch.html">Watch</a><a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/journal.html" title="Your trading journal — realized results, the equity curve, and every declined trade">Journal</a>
   </div>
-  <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
@@ -1559,6 +1573,16 @@
 <!-- Range strip: how much history the charts show, on the chart's own bottom edge where
      TradingView keeps it, with the session clock on the right. Built from RANGES. -->
 <div class="range-strip" id="rangeStrip">
+  <!-- The account corner, as TradingView's trading panel has it: the badge hides or shows
+       the panel below (positions, orders, order history); the chevron beside it opens the
+       account menu (trading settings, broker settings) and turns up while it is open. -->
+  <div class="acct-corner" id="acctCorner">
+    <button type="button" class="badge badge-paper" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel()"
+      data-desc="Paper trading — simulated money; orders are practice, not real." title="Paper trading — simulated money; orders are practice, not real. Click to hide the account panel.">PAPER</button>
+    <button type="button" class="acct-caret" id="acctMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" onclick="togglePickMenu('acct', this)"
+      title="Account menu — trading settings, broker settings"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+  <span class="hgroup-sep" aria-hidden="true"></span>
   <div class="range-row" id="rangeRow" role="group" aria-label="How much history to show"></div>
   <span class="range-sp" aria-hidden="true"></span>
   <!-- The corner, as TradingView has it: the fear gauge and the session phase as readouts,
@@ -1573,7 +1597,7 @@
 </div>
 
 <!-- Footer -->
-<div class="footer" style="position:relative">
+<div class="footer" id="tradePanel" style="position:relative">
   <div class="footer-resize" id="footerResize" role="separator" aria-label="Resize the panel section" tabindex="0" title="Drag to resize"></div>
   <!-- Account summary row (#1712) -->
   <div class="tp-summary" id="tpSummary"></div>
@@ -8264,6 +8288,14 @@ function _pickMenuHtml(kind){
   } else if(kind === 'tz') {
     h += '<input class="pick-search" type="search" placeholder="Search every timezone…" aria-label="Search timezones" oninput="_tzFilter(this.value)">'
       + '<div class="pick-list" id="tzList">' + _tzRowsHtml('') + '</div>';
+  } else if(kind === 'acct') {
+    // TradingView's account menu: the trading settings (the dialog's Trading tab) and the
+    // broker page (Settings › Connections, where accounts are added and traders switched).
+    h += '<div class="pat-menu-group">' + (document.body.classList.contains('demo') ? 'Demo account' : 'Paper trading') + '</div>';
+    h += '<div class="pat-menu-item pick-row" role="menuitem" onclick="_closePickMenu(\'acct\');openChartSettings(\'trading\')">'
+      + '<span class="pick-name"><span>Trading settings…<span class="pick-sub">P&amp;L display and order labels on the chart</span></span></span></div>';
+    h += '<a class="pat-menu-item pick-row" role="menuitem" href="/settings.html#connections">'
+      + '<span class="pick-name"><span>Broker settings…<span class="pick-sub">Connect an account or switch traders</span></span></span></a>';
   }
   return h;
 }
@@ -8306,7 +8338,7 @@ function _tzRowsHtml(q){
   return h;
 }
 function _tzFilter(q){ const l = document.getElementById('tzList'); if(l) l.innerHTML = _tzRowsHtml(q); }
-const _PICK_LABELS = { tf:'Candle intervals', type:'Chart types', sess:'Trading session', tz:'Timezone' };
+const _PICK_LABELS = { tf:'Candle intervals', type:'Chart types', sess:'Trading session', tz:'Timezone', acct:'Account menu' };
 function _buildPickMenu(kind){
   if(_pickMenus[kind]) return _pickMenus[kind];
   const m = document.createElement('div');
@@ -10036,6 +10068,27 @@ async function fullRefresh(){
 // ── Init ──────────────────────────────────────────────────────────────────────
 // Drag-to-resize the bottom panel section (#1630). The footer row height is a CSS
 // var on .layout; the handle drags it between 120px and 75vh, and it persists.
+/* ── The account corner's panel toggle (operator, 2026-09-13) ─────────────────
+   The badge on the strip hides or shows the panel below it (positions, orders, order
+   history), the way TradingView's "Paper Trading" collapses its trading panel. Remembered
+   per device; the tooltip says which way the next click goes. */
+function _tradePanelOpen(){ try{ return localStorage.getItem('trader.panelOpen') !== '0'; }catch(_e){ return true; } }
+function _setTradePanel(open){
+  if(open === undefined) open = !document.body.classList.contains('panel-collapsed');
+  document.body.classList.toggle('panel-collapsed', !open);
+  const b = document.getElementById('acctBadge'); if(!b) return;
+  b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  b.title = (b.dataset.desc || '') + (open ? ' Click to hide the account panel.' : ' Click to show the account panel.');
+}
+function toggleTradePanel(){
+  // A phone has no panel row to collapse: there the badge opens the Positions view, which
+  // is where the account panel lives on a small screen.
+  try{ if(window.matchMedia('(max-width:580px)').matches && typeof setMobileView === 'function'){ setMobileView('positions'); return; } }catch(_e){}
+  const openIt = document.body.classList.contains('panel-collapsed');
+  _setTradePanel(openIt);
+  try{ localStorage.setItem('trader.panelOpen', openIt ? '1' : '0'); }catch(_e){}
+}
+function initTradePanel(){ _setTradePanel(_tradePanelOpen()); }
 function initFooterResize(){
   const handle = document.getElementById('footerResize');
   const layout = document.querySelector('.layout');
@@ -10239,7 +10292,7 @@ function startDashboard(){
   _setSelectValue('fsChartTfSelect', chartTimeframe);
   _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   _setIndicatorsBtn();          // …and the remembered indicator count (#3333)
-  initFooterResize();
+  initFooterResize(); initTradePanel();
   initWlInfoResize();
   initColumnResizers();
   initChartDrag();
@@ -10354,7 +10407,8 @@ async function detectGuestMode(){
     if(badge){
       badge.classList.remove('badge-paper'); badge.classList.add('badge-demo');
       badge.textContent='DEMO';
-      badge.title='Demo account — a simulated "champion" strategy portfolio. Look around; sign in to trade your own.';
+      badge.dataset.desc='Demo account — a simulated "champion" strategy portfolio. Look around; sign in to trade your own.';
+      if(typeof _setTradePanel === 'function') _setTradePanel(); else badge.title=badge.dataset.desc;
       badge.setAttribute('aria-label','Demo account — simulated');
     }
     const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
