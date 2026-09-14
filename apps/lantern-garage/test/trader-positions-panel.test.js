@@ -42,7 +42,7 @@ function load() {
     console, innerHeight: 900, innerWidth: 1600,
   };
   vm.createContext(sb);
-  vm.runInContext(code + '\n;globalThis.__tp = { renderTpSummary, renderPositionsTable, _tpShown, _tpLev, _TP_COLS, _TP_TILES,'
+  vm.runInContext(code + '\n;globalThis.__tp = { renderTpSummary, renderPositionsTable, _tpShown, _tpLev, _TP_COLS, _TP_TILES, _tpShare,'
     + ' _TP_LEVERAGE, _TP_INVERSE, setWorking: (w) => { _tpWorking = w; }, setMem: (m) => { _tpMem = m; } };', sb);
   return { tp: sb.__tp, els, store };
 }
@@ -137,10 +137,24 @@ test('the table cannot blow up, and its columns share the width (operator, 2026-
   // its buttons" and the data columns share the slack the way TradingView's do.
   const css = (src.match(/\.tp-pos-table[^{]*\{[^}]*\}/g) || []).join('\n');
   assert.ok(css.length, 'the panel has its own rules');
-  assert.doesNotMatch(css, /:not\(\.tp-act\)[^{]*\{[^}]*width:\s*\d+%/, 'no percentage width on the data cells');
-  assert.match(src, /\.tp-pane \.tp-table\.tp-pos-table\{min-width:100%\}/, 'the panel table is the pane\'s width, never max-content');
+  assert.match(src, /\.tp-pane \.tp-table\{min-width:100%;width:100%\}/, 'the panel tables are the pane\'s width, never max-content');
+  assert.doesNotMatch(src, /\.tp-pane \.tp-table\{min-width:max-content/, 'a max-content table blows up under percentage columns');
   assert.match(src, /\.tp-pos-table \.tp-act\{width:1%;white-space:nowrap\}/, 'the action column is as narrow as its buttons');
   assert.doesNotMatch(src, /\.tp-pos-table \.tp-act\{width:100%\}/, 'the action column no longer takes the slack');
+  // Even columns (operator, 2026-09-13): the symbol column a fixed share, every data
+  // column the same slice, and the shares add up to the table less the actions column.
+  const { tp, els } = load();
+  tp.renderPositionsTable(POS);
+  const widths = [...els['tp-positions'].innerHTML.matchAll(/<th style="width:([\d.]+)%"/g)].map((m) => Number(m[1]));
+  assert.strictEqual(widths[0], 12, 'the symbol column\'s share');
+  const data = widths.slice(1);
+  assert.ok(data.length >= 3 && data.every((w) => w === data[0]), 'the data columns are not equal: ' + data.join(','));
+  assert.ok(Math.abs(12 + data.reduce((a, b) => a + b, 0) - 98) < 0.5, 'the shares do not add up to the table');
+  // Fewer columns, bigger slices: the share follows the reader's column choice.
+  const store = {};
+  tp.renderPositionsTable(POS);
+  assert.strictEqual(typeof tp._tpShare, 'function');
+  assert.ok(tp._tpShare(4) > tp._tpShare(12) && tp._tpShare(0) === 0);
 });
 
 test('the symbol cell carries the badge, the ticker, and the exchange once it is known', () => {
