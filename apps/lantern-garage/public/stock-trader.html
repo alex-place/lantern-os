@@ -5069,6 +5069,10 @@ function setSlotCount(v){
   slotCount = parseInt(v,10) || 0;
   _preZoomSlot = null;                                       // manual layout change exits zoom mode
   const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='none';
+  // The toolbar chip over the layout <select> only learns a value through _setSelectValue
+  // (a bare `.value =` fires no 'change'). Every way in -- the chip itself, the 0-6 keys,
+  // "Back to grid", the phone migration -- lands here, so the chip is told here.
+  _setSelectValue('chartLayoutSelect', String(slotCount));
   persistSlots();
   lastCardOrder = '';            // force a full rebuild
   applyGridCols();
@@ -5098,7 +5102,10 @@ function buildLayoutOptions(){
   // DISABLED: Prevent automatic layout changes that trigger fullscreen zoom
   // if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
   // else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
-  sel.value = String(slotCount);
+  // A programmatic `.value =` fires no 'change', and the chip over this select had just
+  // been painted from the rebuilt options -- "All" -- so one chart showed under a chip
+  // that said All (founder, 2026-09-14). _setSelectValue sets the value and syncs the chip.
+  _setSelectValue('chartLayoutSelect', String(slotCount));
 }
 
 function renderCards(){
@@ -7329,7 +7336,7 @@ document.addEventListener('keydown', e=>{
   }
   if(/^[0-6]$/.test(e.key) && e.key!=='5'){   // 0=all · 1/2/3/4/6 charts (5 isn't a layout)
     const sel=document.getElementById('chartLayoutSelect');
-    if(sel && [...sel.options].some(o=>o.value===e.key)){ sel.value=e.key; setSlotCount(e.key); }
+    if(sel && [...sel.options].some(o=>o.value===e.key)) setSlotCount(e.key);   // setSlotCount syncs the chip
   }
 });
 
