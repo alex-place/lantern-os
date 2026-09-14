@@ -292,8 +292,8 @@ test('the overlay maps prices onto the PRICE pane, not the whole plot', () => {
      price line, entry, stop and target all landed a strip's height too low. One layout
      function now, and the overlay's bottom edge follows it. */
   assert.match(PAGE, /function _paneLayout\(ph\)\{/);
-  assert.match(PAGE, /const \{ panes: _panes, paneH: _paneH, paneN: _paneN, priceH \} = _paneLayout\(ph\);/, 'the renderer has its own copy of the pane maths');
-  assert.match(PAGE, /overlay\.style\.bottom = \(AXIS_H \+ _pl\.paneN \* _pl\.paneH\) \+ 'px';/);
+  assert.match(PAGE, /const \{ panes: _panes, paneN: _paneN, tops: _paneTops, hs: _paneHs, priceH \} = _paneLayout\(ph\);/, 'the renderer has its own copy of the pane maths');
+  assert.match(PAGE, /overlay\.style\.bottom = \(AXIS_H \+ _pl\.panesH\) \+ 'px';/);
   assert.match(PAGE, /const pw = w - AXIS_W, ph = _paneLayout\(h - AXIS_H\)\.priceH;/, 'the crosshair still reads prices off the full plot');
 });
 
