@@ -1,0 +1,3 @@
+### Changed
+
+- trading: **two prediction-ledger rows reach their due dates as coin-flips and are extended, not scored.** `hourblock-off` (due 09-15): five freed-hour entries since the arm net −$207 (−0.02% of equity) at 20% win rate, dominated by two offsetting ±$800 trades — a sample that neither confirms nor refutes the replay's +0.52pp, so the row carries an interim note and a 09-29 due date instead of a verdict. `cap6` (due 09-12): the raised ceiling never engaged for its first week (max slots ≤2) and engaged for the first time on 09-15 with the sixth slot's entries still carried overnight — unscoreable until they resolve; extended to 09-26. Scoring a coin-flip either way would be the exact instrument dishonesty the ledger exists to prevent.
