@@ -3727,8 +3727,8 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       const list = (tk && _drawings[tk]) || [];
       const pend = (_drawPending && _drawPending.tk === tk) ? _drawPending : null;
       if (list.length || pend) {
-        const ts0 = +new Date(bars[0].timestamp), ts1 = +new Date(bars[n-1].timestamp) || ts0 + 1;
-        const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+        // Through the bar index, never elapsed time: see _drawTimeMap.
+        const xOf = _drawTimeMap(bars, slotW).xOf;
         _drawList = list; _drawPend = pend; _drawTk = tk; _drawXOf = xOf;
         const MONO = '9px ui-monospace, Menlo, Consolas, monospace';
         const drawOne = (d, ghost, yMap) => {
@@ -3757,20 +3757,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           switch (d.t) {
             case 'regr': {                       // least-squares fit + 1 sigma channel
               if (!P[1]) break;
-              const i0 = Math.max(0, Math.min(P[0].idx == null ? 0 : P[0].idx, n-1));
-              const x1 = Math.min(P[0].x, P[1].x), x2 = Math.max(P[0].x, P[1].x);
-              const lo = Math.max(0, Math.floor(x1/slotW)), hi = Math.min(n-1, Math.ceil(x2/slotW));
-              let sx=0, sy=0, sxy=0, sxx=0, m=0;
-              for (let q=lo; q<=hi; q++) { const px=q, py=bars[q].close; sx+=px; sy+=py; sxy+=px*py; sxx+=px*px; m++; }
-              if (m < 2) break;
-              const slope = (m*sxy - sx*sy) / Math.max(1e-9, (m*sxx - sx*sx));
-              const icept = (sy - slope*sx) / m;
-              let sd = 0;
-              for (let q=lo; q<=hi; q++) { const e = bars[q].close - (slope*q + icept); sd += e*e; }
-              sd = Math.sqrt(sd/Math.max(1,m));
-              const at = (q) => ({ x: q*slotW + slotW/2, y: _yMap(slope*q + icept) });
-              const a0 = at(lo), b0 = at(hi);
-              const dev = Math.abs(_yMap(0) - _yMap(sd));
+              // The band is computed in one place (_regrBand) so the hit test can
+              // measure the same quadrilateral the painter fills.
+              const band = _regrBand(bars, slotW, Math.min(P[0].x, P[1].x), Math.max(P[0].x, P[1].x), _yMap);
+              if (!band) break;
+              const { a0, b0, dev } = band;
               shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
                 ctx.beginPath(); ctx.moveTo(a0.x, a0.y-dev); ctx.lineTo(b0.x, b0.y-dev);
                 ctx.lineTo(b0.x, b0.y+dev); ctx.lineTo(a0.x, a0.y+dev); ctx.closePath(); ctx.fill(); });
@@ -5822,16 +5813,93 @@ function _drawAnchor(canvas, clientX, clientY) {
   const pane = yPx > ph ? _paneMapper(data, null, yPx) : null;
   if (yPx > ph && !pane) return null;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
-  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
-  // invert the renderer's xOf so a click lands on a real time, not a bar index
-  const frac = n === 1 ? 0 : (xPx - slotW/2) / Math.max(1, (n-1)*slotW);
-  const ts = ts0 + Math.max(0, Math.min(1, frac)) * (ts1 - ts0);
+  // The painter's map, inverted: a click lands on the bar under it (and keeps going at
+  // the bars' own pace in the right margin, so a ray can be anchored ahead of the tape).
+  const ts = _drawTimeMap(data.bars, slotW).tsAt(xPx);
   const price = pane ? pane.valueAt(yPx) : data.rMax - (yPx / ph) * (data.rMax - data.rMin);
   return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4), pane: pane ? pane.key : null };
 }
 
+/* Where a moment sits among the bars. The chart lays bars out one slot each, whatever
+   the clock says between them -- an overnight or a weekend is no wider than five
+   minutes -- so a drawing pinned by time has to go through the BAR INDEX, never through
+   elapsed time. The old map spread the window's clock time evenly over its bars, and a
+   weekend inside the window pushed every anchor sideways by dozens of bars, by a
+   different amount each time the window moved (founder, 2026-09-14: "they render in a
+   weird way when you move the chart around"). Beyond the loaded bars the map keeps the
+   bars' own pace (the typical gap between neighbours), so an anchor scrolled off the
+   edge, or placed in the right margin, comes back where it was. One map for the
+   painter, the click, the hit test, the handles and the drag, so they cannot disagree. */
+function _drawTimeMap(bars, slotW) {
+  const n = bars.length, T = new Array(n);
+  for (let i = 0; i < n; i++) T[i] = +new Date(bars[i].timestamp);
+  let step = 60000;
+  if (n > 1) {
+    const ds = []; for (let i = 1; i < n; i++) ds.push(T[i] - T[i-1]);
+    ds.sort((p, q) => p - q);
+    step = ds[Math.floor(ds.length / 2)] || (T[n-1] - T[0]) / (n - 1) || 60000;   // the median: an overnight does not count
+  }
+  const idxOf = (ts) => {
+    if (!n) return 0;
+    if (ts <= T[0]) return (ts - T[0]) / step;
+    if (ts >= T[n-1]) return (n - 1) + (ts - T[n-1]) / step;
+    let lo = 0, hi = n - 1;                              // T[lo] <= ts < T[hi]
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= ts) lo = m; else hi = m; }
+    const span = T[hi] - T[lo];
+    return lo + (span > 0 ? (ts - T[lo]) / span : 0);    // a moment inside a gap sits inside that one slot
+  };
+  const tsOf = (idx) => {
+    if (!n) return 0;
+    if (idx <= 0) return T[0] + idx * step;
+    if (idx >= n - 1) return T[n-1] + (idx - (n - 1)) * step;
+    const lo = Math.floor(idx), f = idx - lo;
+    return T[lo] + f * (T[lo+1] - T[lo]);
+  };
+  return {
+    step, idxOf, tsOf,
+    xOf: (ts) => idxOf(ts) * slotW + slotW/2,
+    tsAt: (px) => tsOf((px - slotW/2) / slotW),
+    // Slide a moment by a pixel distance ALONG THE BARS (a drag), not by clock time --
+    // ten bars to the right stays ten bars even when a weekend sits in between.
+    shiftTs: (ts, dx) => tsOf(idxOf(ts) + dx / slotW),
+  };
+}
+
+/* The least-squares band a regression trend paints: the fit over the bars the span
+   covers, one standard deviation either side. One function for the painter and the hit
+   test, so what you click is what you see. Null with fewer than two bars in the span. */
+function _regrBand(bars, slotW, x1, x2, yOf) {
+  const n = bars.length;
+  const lo = Math.max(0, Math.floor(x1/slotW)), hi = Math.min(n-1, Math.ceil(x2/slotW));
+  let sx=0, sy=0, sxy=0, sxx=0, m=0;
+  for (let q=lo; q<=hi; q++) { const px=q, py=bars[q].close; sx+=px; sy+=py; sxy+=px*py; sxx+=px*px; m++; }
+  if (m < 2) return null;
+  const slope = (m*sxy - sx*sy) / Math.max(1e-9, (m*sxx - sx*sx));
+  const icept = (sy - slope*sx) / m;
+  let sd = 0;
+  for (let q=lo; q<=hi; q++) { const e = bars[q].close - (slope*q + icept); sd += e*e; }
+  sd = Math.sqrt(sd/Math.max(1,m));
+  const at = (q) => ({ x: q*slotW + slotW/2, y: yOf(slope*q + icept) });
+  return { a0: at(lo), b0: at(hi), dev: Math.abs(yOf(0) - yOf(sd)) };
+}
+
+/* The width of a label the way the painter draws it, so a text box is clickable across
+   its letters. Falls back to a monospace estimate where there is no canvas (tests). */
+let _measureCtx = null;
+function _drawTextWidth(txt, font) {
+  try {
+    if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+    _measureCtx.font = font;
+    return _measureCtx.measureText(String(txt || '')).width;
+  } catch (_e) {
+    const m = /(\d+(?:\.\d+)?)px/.exec(font || '');
+    return String(txt || '').length * (m ? +m[1] : 12) * 0.6;
+  }
+}
+
 // Which drawing is under this point? Returns { i, dist, pts } or null. Shared by
-// delete, selection and handle-dragging so all three agree on what you clicked.
+// delete, selection, handle-dragging and the hover cursor so all four agree on what
+// you clicked.
 function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   const list = _drawings[tk] || [];
   if (!list.length) return false;
@@ -5839,59 +5907,86 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   if (rng <= 0) return false;
   const yPrice = pr => ((data.rMax - pr) / rng) * ph;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
-  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
-  const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
-  const segDist = (px, py, x1, y1, x2, y2) => {
+  const xOf = _drawTimeMap(data.bars, slotW).xOf;
+  // Hit-test what the tool actually DRAWS: its strokes and its filled areas. An inside
+  // counts a little weaker than a stroke (INSIDE < TOL), so a line crossing a box still
+  // wins when you click on the line, and the box wins when you click on its fill
+  // (founder, 2026-09-14: "it only detects a small area/line").
+  const TOL = (tol == null ? 14 : tol), INSIDE = TOL * 0.75;
+  const segDist = (x1, y1, x2, y2) => {
     const dx = x2 - x1, dy = y2 - y1, L2 = dx*dx + dy*dy || 1;
-    const t = Math.max(0, Math.min(1, ((px - x1)*dx + (py - y1)*dy) / L2));
-    return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
+    const t = Math.max(0, Math.min(1, ((xPx - x1)*dx + (yPx - y1)*dy) / L2));
+    return Math.hypot(xPx - (x1 + t*dx), yPx - (y1 + t*dy));
   };
-  let best = -1, bestD = (tol == null ? 14 : tol);
+  const lineDist = (a, b) => {            // distance to the INFINITE line through a,b
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy;
+    if (!L2) return Math.hypot(xPx - a.x, yPx - a.y);
+    return Math.abs(dy*(xPx - a.x) - dx*(yPx - a.y)) / Math.sqrt(L2);
+  };
+  const rayDist = (a, b) => {             // distance to the ray starting at a through b
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy || 1;
+    const t = ((xPx - a.x)*dx + (yPx - a.y)*dy) / L2;
+    if (t < 0) return Math.hypot(xPx - a.x, yPx - a.y);
+    return lineDist(a, b);
+  };
+  const ptDist = (a) => Math.hypot(xPx - a.x, yPx - a.y);
+  const pathDist = (pts) => {             // an open polyline
+    let m = Infinity;
+    for (let q = 1; q < pts.length; q++) m = Math.min(m, segDist(pts[q-1].x, pts[q-1].y, pts[q].x, pts[q].y));
+    return pts.length === 1 ? ptDist(pts[0]) : m;
+  };
+  const edgeDist = (pts) => {             // a closed polygon's outline
+    let m = Infinity;
+    for (let q = 0; q < pts.length; q++) { const p1 = pts[q], p2 = pts[(q + 1) % pts.length]; m = Math.min(m, segDist(p1.x, p1.y, p2.x, p2.y)); }
+    return m;
+  };
+  const inPoly = (pts) => {               // even-odd rule
+    let inside = false;
+    for (let q = 0, r = pts.length - 1; q < pts.length; r = q++) {
+      const a = pts[q], b = pts[r];
+      if ((a.y > yPx) !== (b.y > yPx) && xPx < (b.x - a.x) * (yPx - a.y) / ((b.y - a.y) || 1e-9) + a.x) inside = !inside;
+    }
+    return inside;
+  };
+  const shape = (pts) => inPoly(pts) ? Math.min(edgeDist(pts), INSIDE) : edgeDist(pts);   // outline or fill
+  const rectPts = (x1, y1, x2, y2) => [{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 }];
+  const boxOf = (p1, p2) => rectPts(Math.min(p1.x, p2.x), Math.min(p1.y, p2.y), Math.max(p1.x, p2.x), Math.max(p1.y, p2.y));
+  // A label is its whole box: no stroke to prefer, so inside is a full hit.
+  const labelBox = (x, y, w, h) => (xPx >= x && xPx <= x + w && yPx >= y && yPx <= y + h) ? 0 : edgeDist(rectPts(x, y, x + w, y + h));
+  const mono = (fs, bold) => (bold ? 'bold ' : '') + fs + 'px ui-monospace, Menlo, Consolas, monospace';
+  let best = -1, bestD = TOL;
   list.forEach((d, i) => {
     if (d.hidden) return;                 // invisible means unclickable
     const pm = d.pane ? _paneMapper(data, d.pane) : null;
     if (d.pane && !pm) return;            // its pane is not on the chart right now
     const yOf = pm ? pm.yOf : yPrice;
-    const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
+    const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price), price: a.price }));
     if (!P.length) return;
+    const opt = (k) => (typeof drawOptOf === 'function') ? drawOptOf(d, k) : undefined;
+    const fs = opt('fontSize') || 12, bold = !!opt('bold');
     let dist = Infinity;
-    // Hit-test what the tool actually DRAWS, not the polyline between its anchors.
-    // Rays, extended lines, fans and arcs paint far outside their anchor span, so
-    // measuring the segment alone left most of a line unclickable.
     const A = P[0], B = P[1], C = P[2];
-    const lineDist = (a, b) => {            // distance to the INFINITE line through a,b
-      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy;
-      if (!L2) return Math.hypot(xPx - a.x, yPx - a.y);
-      return Math.abs(dy*(xPx - a.x) - dx*(yPx - a.y)) / Math.sqrt(L2);
-    };
-    const rayDist = (a, b) => {             // distance to the ray starting at a through b
-      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy || 1;
-      const t = ((xPx - a.x)*dx + (yPx - a.y)*dy) / L2;
-      if (t < 0) return Math.hypot(xPx - a.x, yPx - a.y);
-      return lineDist(a, b);
-    };
-    const boxDist = (p1, p2) => {
-      const x1 = Math.min(p1.x, p2.x), x2 = Math.max(p1.x, p2.x);
-      const y1 = Math.min(p1.y, p2.y), y2 = Math.max(p1.y, p2.y);
-      return Math.max(0, Math.max(x1 - xPx, xPx - x2, y1 - yPx, yPx - y2));
-    };
-    const pathDist = (pts) => {
-      let m = Infinity;
-      for (let q = 1; q < pts.length; q++) m = Math.min(m, segDist(xPx, yPx, pts[q-1].x, pts[q-1].y, pts[q].x, pts[q].y));
-      return pts.length === 1 ? Math.hypot(xPx - pts[0].x, yPx - pts[0].y) : m;
-    };
-    const levelsDist = (ys) => { let m = Infinity; for (const yy of ys) m = Math.min(m, Math.abs(yy - yPx)); return m; };
-
     switch (d.t) {
       // single levels drawn right across the plot
-      case 'h': case 'hray': case 'plabel': dist = Math.abs(A.y - yPx); break;
+      case 'h': case 'plabel': dist = Math.abs(A.y - yPx); break;
+      case 'hray': dist = xPx >= A.x - TOL ? Math.abs(A.y - yPx) : Infinity; break;   // it starts where it was placed
       case 'v': dist = Math.abs(A.x - xPx); break;
       case 'crossline': dist = Math.min(Math.abs(A.y - yPx), Math.abs(A.x - xPx)); break;
-      // lines that extend past their anchors
+      // lines: a segment, a ray, or both ways
       case 'ray': dist = B ? rayDist(A, B) : Infinity; break;
-      case 'xline': case 'angle': case 'regr': dist = B ? lineDist(A, B) : Infinity; break;
+      case 'xline': dist = B ? lineDist(A, B) : Infinity; break;
       case 'l': case 'info': case 'arrow':
-        dist = B ? segDist(xPx, yPx, A.x, A.y, B.x, B.y) : Infinity; break;
+        dist = B ? segDist(A.x, A.y, B.x, B.y) : Infinity; break;
+      case 'angle':                         // the line and its dashed horizontal leg
+        dist = B ? Math.min(segDist(A.x, A.y, B.x, B.y), segDist(A.x, A.y, B.x, A.y)) : Infinity; break;
+      case 'regr': {                        // the fitted line and its one-sigma band
+        if (!B) { dist = Infinity; break; }
+        const band = _regrBand(data.bars, slotW, Math.min(A.x, B.x), Math.max(A.x, B.x), yOf);
+        if (!band) { dist = segDist(A.x, A.y, B.x, B.y); break; }
+        const { a0, b0, dev } = band;
+        const quad = [{ x: a0.x, y: a0.y - dev }, { x: b0.x, y: b0.y - dev }, { x: b0.x, y: b0.y + dev }, { x: a0.x, y: a0.y + dev }];
+        dist = Math.min(segDist(a0.x, a0.y, b0.x, b0.y), shape(quad)); break;
+      }
       // fans: a bundle of rays from one origin
       case 'fibfan': case 'gannfan': {
         if (!B) { dist = Infinity; break; }
@@ -5909,14 +6004,35 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
         dist = Math.min(rayDist(A, mid), rayDist(B, { x: B.x + dx, y: B.y + dy }),
                         rayDist(C, { x: C.x + dx, y: C.y + dy })); break;
       }
-      // horizontal level families
-      case 'fib': case 'fibx': case 'pos': case 'poss':
-        dist = levelsDist(P.map(a => a.y)); break;
-      case 'fibchan': {
+      // horizontal level families: every level the painter draws, over the span it draws
+      case 'fib': case 'fibx': {
+        const from = d.t === 'fib' ? B : C;
+        if (!from) { dist = Infinity; break; }
+        const span = B.price - A.price, base = d.t === 'fib' ? A.price : C.price;
+        const x1 = Math.min(A.x, from.x), levels = d.t === 'fib' ? FIB_LEVELS : FIB_EXT;
+        const ys = levels.map(lv => yOf(base + span*lv));
+        let m = Infinity;
+        for (const yy of ys) m = Math.min(m, segDist(x1, yy, pw, yy));
+        const yTop = Math.min.apply(null, ys), yBot = Math.max.apply(null, ys);
+        const filled = d.t === 'fib' && opt('fill') !== false;
+        if (filled && xPx >= x1 && yPx >= yTop && yPx <= yBot) m = Math.min(m, INSIDE);
+        dist = m; break;
+      }
+      case 'pos': case 'poss': {            // entry / stop / target lines and the two boxes
+        if (!C) { dist = Infinity; break; }
+        const e0 = A, st = B, tg = C;
+        const x1 = Math.min(e0.x, tg.x, st.x), x2 = Math.max(e0.x, tg.x, st.x, x1 + 40);
+        let m = Infinity;
+        for (const q of [tg, st, e0]) m = Math.min(m, segDist(x1, q.y, x2, q.y));
+        for (const q of [tg, st]) m = Math.min(m, shape(rectPts(x1, Math.min(e0.y, q.y), x2, Math.max(e0.y, q.y))));
+        dist = m; break;
+      }
+      case 'fibchan': {                     // levels parallel to the trend, and the band
         if (!C) { dist = Infinity; break; }
         const off = C.y - B.y;
         let m = Infinity;
-        for (const lv of FIB_LEVELS) m = Math.min(m, segDist(xPx, yPx, A.x, A.y + off*lv, B.x, B.y + off*lv));
+        for (const lv of FIB_LEVELS) m = Math.min(m, segDist(A.x, A.y + off*lv, B.x, B.y + off*lv));
+        m = Math.min(m, shape([A, B, { x: B.x, y: B.y + off }, { x: A.x, y: A.y + off }]));
         dist = m; break;
       }
       case 'fibtime': {
@@ -5926,33 +6042,67 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
         if (unit) for (const n0 of [0,1,2,3,5,8,13,21]) m = Math.min(m, Math.abs((A.x + unit*n0) - xPx));
         dist = m; break;
       }
-      case 'fibcirc': {                       // distance to the nearest arc
+      case 'fibcirc': {                     // distance to the nearest arc
         if (!B) { dist = Infinity; break; }
         const r0 = Math.hypot(B.x - A.x, B.y - A.y), rp = Math.hypot(xPx - A.x, yPx - A.y);
         let m = Infinity;
         for (const lv of FIB_LEVELS) if (lv) m = Math.min(m, Math.abs(rp - r0*lv));
         dist = m; break;
       }
-      // boxes and bands
-      case 'rect': case 'ell': case 'meas': case 'range': case 'drange': case 'gannbox':
-        dist = B ? boxDist(A, B) : Infinity; break;
-      case 'flat': dist = C ? Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y), Math.abs(C.y - yPx)) : Infinity; break;
-      case 'djchan':
-        dist = P[3] ? Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y),
-                               segDist(xPx, yPx, C.x, C.y, P[3].x, P[3].y)) : Infinity; break;
+      // boxes and bands: outline or fill
+      case 'rect': case 'meas': case 'range': case 'drange': case 'gannbox':
+        dist = B ? shape(boxOf(A, B)) : Infinity; break;
+      case 'ell': {
+        if (!B) { dist = Infinity; break; }
+        const cx = (A.x + B.x)/2, cy = (A.y + B.y)/2, rx = Math.abs(B.x - A.x)/2 || 1, ry = Math.abs(B.y - A.y)/2 || 1;
+        const q = Math.hypot((xPx - cx)/rx, (yPx - cy)/ry);              // 1 on the outline
+        const edge = Math.abs(q - 1) * Math.min(rx, ry);                  // about the distance to it
+        dist = q <= 1 ? Math.min(edge, INSIDE) : edge; break;
+      }
+      case 'tri': dist = C ? shape([A, B, C]) : Infinity; break;
+      case 'chan': {                        // both lines and the band between them
+        if (!C) { dist = Infinity; break; }
+        const off = (C.y - (A.y + B.y)/2)*2;
+        dist = shape([A, B, { x: B.x, y: B.y + off }, { x: A.x, y: A.y + off }]); break;
+      }
+      case 'flat': {                        // the trend edge, the flat edge, the band
+        if (!C) { dist = Infinity; break; }
+        const x1 = Math.min(A.x, B.x), x2 = Math.max(A.x, B.x);
+        dist = Math.min(segDist(A.x, A.y, B.x, B.y), segDist(x1, C.y, x2, C.y),
+                        shape(rectPts(x1, Math.min(A.y, C.y), x2, Math.max(A.y, C.y)))); break;
+      }
+      case 'djchan': dist = P[3] ? shape([A, B, P[3], C]) : Infinity; break;
       case 'proj': {
         if (!C) { dist = Infinity; break; }
         const tgt = { x: C.x + (B.x - A.x), y: C.y + (B.y - A.y) };
-        dist = Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y), boxDist(C, tgt)); break;
+        dist = Math.min(segDist(A.x, A.y, B.x, B.y), shape(boxOf(C, tgt))); break;
       }
-      // markers and text sit at a point
-      case 'text': case 'note': case 'balloon': case 'arrowup': case 'arrowdn':
-        dist = Math.hypot(A.x - xPx, A.y - yPx); break;
-      case 'callout':
-        dist = B ? Math.min(Math.hypot(B.x - xPx, B.y - yPx), segDist(xPx, yPx, A.x, A.y, B.x, B.y)) : Infinity; break;
-      // freehand paths
-      case 'pen': case 'hl': dist = pathDist(P); break;
-      // multi-point polylines
+      // labels are their whole box, not just the anchor
+      case 'text': {
+        const w0 = _drawTextWidth(d.text || '', mono(11, false));
+        dist = Math.min(ptDist(A), labelBox(A.x + 4, A.y - 8, Math.max(w0, 8), 16)); break;
+      }
+      case 'note': {
+        const w0 = Math.min(240, _drawTextWidth(d.text || '', mono(11, false)) + 14);
+        dist = Math.min(ptDist(A), labelBox(A.x + 6, A.y - 10, w0, 20)); break;
+      }
+      case 'balloon': {
+        const w0 = _drawTextWidth(d.text || 'Comment', mono(fs, bold)) + 14, h0 = fs + 10;
+        dist = Math.min(ptDist(A), labelBox(A.x + 8, A.y - h0 - 8, w0, h0)); break;
+      }
+      case 'callout': {
+        if (!B) { dist = ptDist(A); break; }
+        const w0 = _drawTextWidth(d.text || 'Note', mono(fs, bold)) + 12, h0 = fs + 8;
+        dist = Math.min(segDist(A.x, A.y, B.x, B.y), labelBox(B.x, B.y - h0, w0, h0)); break;
+      }
+      case 'arrowup': case 'arrowdn': {     // the marker's own triangle
+        const s0 = opt('headSize') || 11, oy = d.t === 'arrowup' ? s0 : -s0;
+        dist = Math.min(ptDist(A), shape([A, { x: A.x - s0*0.55, y: A.y + oy }, { x: A.x + s0*0.55, y: A.y + oy }])); break;
+      }
+      // freehand paths: the highlighter is as wide as it paints
+      case 'pen': dist = pathDist(P); break;
+      case 'hl': dist = Math.max(0, pathDist(P) - (opt('w') || 10)/2); break;
+      // multi-point polylines (abcd, xabcd, hs, elliott, 3drives, fcast)
       default: dist = pathDist(P);
     }
     if (dist < bestD) { bestD = dist; best = i; }
@@ -5972,8 +6122,7 @@ function _drawingAnchors(tk, data, idx, pw, ph) {
   const rng = data.rMax - data.rMin; if (rng <= 0) return [];
   const yPrice = pr => ((data.rMax - pr) / rng) * ph;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
-  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
-  const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+  const xOf = _drawTimeMap(data.bars, slotW).xOf;
   // A brush is a path, not a shape: a handle per point would be unusable, so it gets
   // its two ends and otherwise moves as a whole.
   const pts = (d.t === 'pen' && d.pts.length > 2) ? [d.pts[0], d.pts[d.pts.length - 1]] : (d.pts || []);
@@ -6012,12 +6161,12 @@ function _selGeom(tk) {
   const pw = Math.max(0, canvas.clientWidth - AXIS_W), ph = _paneLayout(Math.max(0, canvas.clientHeight - AXIS_H)).priceH;
   const rng = data.rMax - data.rMin; if (rng <= 0) return null;
   const n = data.bars.length, slotW = pw / _slotsFor(n);
-  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  const tm = _drawTimeMap(data.bars, slotW);
   return { canvas, data, pw, ph, n,
     priceAt: (py) => data.rMax - (py / ph) * rng,
     // The drawing's own scale: a pane drawing reads in that pane's units.
     valueAt: (py, d) => { const pm = d && d.pane ? _paneMapper(data, d.pane) : null; return pm ? pm.valueAt(py) : data.rMax - (py / ph) * rng; },
-    tsAt: (px) => n === 1 ? ts0 : ts0 + ((px - slotW/2) / Math.max(1, (n-1)*slotW)) * (ts1 - ts0) };
+    tsAt: tm.tsAt, shiftTs: tm.shiftTs };
 }
 function _refreshTicker(tk) {
   try { renderZoneLadder(tk, zonesData[tk] || {}, (wlPrices.find(x => x.ticker === tk) || {}).price, null, null, true); }
@@ -6909,11 +7058,12 @@ document.addEventListener('pointermove', (e) => {
     if (d.t === 'pen' && src.length > 2) idx = _dragDraw.handle === 0 ? 0 : src.length - 1;
     d.pts[idx] = { ts: g.tsAt(x), price: g.valueAt(y, d) };
   } else {
-    // Move the WHOLE drawing by the pointer delta, in data units so it stays welded
-    // to the bars rather than drifting when the scale changes.
-    const dts = g.tsAt(x) - g.tsAt(_dragDraw.x0);
+    // Move the WHOLE drawing by the pointer delta: sideways along the bars (ten bars is
+    // ten bars, weekend or not), vertically in data units, so it stays welded to the
+    // bars rather than drifting when the scale changes.
+    const dx = x - _dragDraw.x0;
     const dpr = g.valueAt(y, d) - g.valueAt(_dragDraw.y0, d);
-    d.pts = _dragDraw.startPts.map(pt => ({ ts: pt.ts + dts, price: pt.price + dpr }));
+    d.pts = _dragDraw.startPts.map(pt => ({ ts: g.shiftTs(pt.ts, dx), price: pt.price + dpr }));
   }
   _repaintChart(_dragDraw.tk);     // pixels only -- keeps the crosshair alive
 });
