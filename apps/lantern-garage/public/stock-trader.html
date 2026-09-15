@@ -49,7 +49,7 @@
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
     /* TradingView-style chart contrast */
     --tv-text-primary:#ffffff;--tv-text-secondary:#d1d4dc;
-    --tv-grid:rgba(255,255,255,.06);--tv-axis:rgba(255,255,255,.65);
+    --tv-grid:rgba(255,255,255,.06);--tv-pane-sep:rgba(255,255,255,.3);--tv-axis:rgba(255,255,255,.65);
   }
   /* Light theme (#1577): the global ☀/🌙 toggle flips data-theme; remap the
      terminal palette so the whole trader is genuinely light-mode-aware, not
@@ -74,7 +74,7 @@
     --tint-pos:#e2f8f4;--tint-neg:#f8e2e4;
     --accent:#0369a1;--blue:#0369a1;--purple:#6d3fd4;
     --tv-text-primary:#1a1d24;--tv-text-secondary:#4a5160;
-    --tv-grid:rgba(0,0,0,.08);--tv-axis:rgba(0,0,0,.55);
+    --tv-grid:rgba(0,0,0,.08);--tv-pane-sep:rgba(0,0,0,.3);--tv-axis:rgba(0,0,0,.55);
   }
 
   /* De-boxing pass (#3049): the terminal read as a grid of hard same-weight
@@ -2033,6 +2033,9 @@ const CHART_AXIS_FONT   = '11px ui-monospace, "SF Mono", Menlo, Consolas, monosp
 const chartVar = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
 const CHART_AXIS_COLOR  = () => chartVar('--tv-axis', 'rgba(255,255,255,.65)');
 const CHART_GRID_COLOR  = () => chartVar('--tv-grid', 'rgba(255,255,255,.06)');
+// The line between the price pane and an indicator strip. Its own tone: the grid colour
+// is meant to disappear, a pane divider is meant to be seen (founder, 2026-09-14).
+const CHART_PANE_SEP_COLOR = () => chartVar('--tv-pane-sep', 'rgba(255,255,255,.3)');
 /* The reader's own gain/loss colours (#3592), read live like the axis and grid
    above. These were #26a69a/#ef5350 -- TradingView's palette, not even this
    page's -- so the chart ignored both the theme and the preference. The
@@ -3103,7 +3106,7 @@ function _chartDefaultColour(k){
   const m = {
     'candles.bodyUp': up, 'candles.wickUp': up, 'candles.borderUp': up, 'line.color': up,
     'candles.bodyDown': dn, 'candles.wickDown': dn, 'candles.borderDown': dn,
-    'canvas.gridColor': CHART_GRID_COLOR(), 'canvas.paneSepColor': CHART_GRID_COLOR(),
+    'canvas.gridColor': CHART_GRID_COLOR(), 'canvas.paneSepColor': CHART_PANE_SEP_COLOR(),
     'canvas.crosshairColor': chartVar('--tv-text-secondary', '#8892a0'),
     'canvas.axisTextColor': CHART_AXIS_COLOR(),
     'status.indTextColor': chartVar('--tv-text-primary', '#ffffff'),
@@ -3409,7 +3412,10 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   for(const price of priceTicks){
     if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
-    if(_hGrid){
+    // The auto-fit range is snapped to the ladder, so the lowest tick lands exactly on the
+    // price pane's bottom edge -- which is the first indicator strip's separator. A solid
+    // gridline there read as the separator and hid its dots; the separator owns that row.
+    if(_hGrid && !(_paneN && yy >= priceH - 1)){
       ctx.strokeStyle = _gridColour(); _gridDash(ctx);
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
       ctx.setLineDash([]);
@@ -4336,11 +4342,18 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const yOf = (v)=> top + (1-(v-lo)/(hi-lo))*_hp;
         _crossData[canvas.id].panes.push({ key: cfg.id, top, h: _hp, lo, hi });   // the crosshair, drawings and zoom read this
 
+        // Its own scale, in the same column as the price scale: nice ticks like the price
+        // axis, so the pane reads as a scale rather than two loose numbers (founder,
+        // 2026-09-14). Chosen before the series paint so the pane's gridlines go under it.
+        const _pt = _paneTicks(lo, hi, _hp);
         ctx.save();
         ctx.beginPath(); ctx.rect(0, top, pw, _hp); ctx.clip();
-        // separator above the strip
-        ctx.strokeStyle=_cs('canvas.paneSepColor') || _gridColour(); ctx.lineWidth=1;   // Canvas › pane separators
-        ctx.beginPath(); ctx.moveTo(0, Math.round(top)+0.5); ctx.lineTo(pw, Math.round(top)+0.5); ctx.stroke();
+        // the pane's own gridlines, at its ticks, the way the price pane has them
+        if(_hGrid){
+          ctx.strokeStyle=_gridColour(); ctx.lineWidth=1; _gridDash(ctx);
+          for(const v of _pt.ticks){ const gy=Math.round(yOf(v))+0.5; ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(pw,gy); ctx.stroke(); }
+          ctx.setLineDash([]);
+        }
         // reference guides (RSI 30/70, MACD 0, …)
         for(const g of (out.guides||[])){
           if(g<lo||g>hi) continue;
@@ -4380,11 +4393,23 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             ctx.restore();
           }
         }
-        // scale ends in the gutter, so a pane is readable without a full axis
-        ctx.fillStyle=_axisColour(); ctx.font=_axisFont(); ctx.textAlign='left';
         ctx.restore();
-        ctx.textBaseline='top';    ctx.fillText(fmt(hi, Math.abs(hi)>=100?0:2), pw+4, top+1);
-        ctx.textBaseline='bottom'; ctx.fillText(fmt(lo, Math.abs(lo)>=100?0:2), pw+4, bot-1);
+        // The separator: dotted, in its own colour, across the whole width -- gutter
+        // included -- so the strip reads as its own panel, not a faint rule inside the plot.
+        ctx.strokeStyle=_cs('canvas.paneSepColor') || CHART_PANE_SEP_COLOR(); ctx.lineWidth=1;   // Canvas › pane separators
+        ctx.setLineDash([2,3]);
+        ctx.beginPath(); ctx.moveTo(0, Math.round(top)+0.5); ctx.lineTo(w, Math.round(top)+0.5); ctx.stroke();
+        ctx.setLineDash([]);
+        // The labels, in the price scale's column. Set up AFTER the restore: they used to
+        // be set before it, and the restore put back whatever alignment the time axis had
+        // left ('right', from the "ET" tag), so the numbers ended where the price labels
+        // begin -- a column to the left.
+        ctx.fillStyle=_axisColour(); ctx.font=_axisFont(); ctx.textAlign='left';
+        for(const v of _pt.ticks){
+          const ty=yOf(v);
+          ctx.textBaseline = ty < top+7 ? 'top' : (ty > bot-7 ? 'bottom' : 'middle');
+          ctx.fillText(fmt(v, _pt.dec), pw+4, ty);
+        }
         // name + latest value, top-left of its own strip
         let last=null;
         for(let i=out.series[0].values.length-1;i>=0;i--){ const v=out.series[0].values[i]; if(v!=null&&Number.isFinite(v)){ last=v; break; } }
@@ -4438,6 +4463,28 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
    ONE definition, because the HTML overlay positions its lines by percent of ITS height
    and used to assume that height was the price pane. With an RSI strip on, every overlay
    line -- the live price, entry, stop, target -- landed a strip's height too low. */
+/* The ticks of an indicator pane's own scale: the 1/2/5 ladder the price axis uses, as
+   many as the strip's height allows (one per ~26px, two to five), kept off the strip's
+   edges so a label never straddles the separator. A strip too short for a ladder shows
+   its two ends, as before. Decimals follow the step (RSI 20/40/60 → none, MACD 0.2 → one). */
+function _paneTicks(lo, hi, h){
+  const fit = Math.floor((h || 0) / 18);                       // a label is ~13px tall; an 18px pitch reads
+  const span = hi - lo, inset = span * (6 / Math.max(h || 1, 1));
+  let best = null;
+  if(fit >= 2 && span > 0){
+    // The ladder rounds a target count down hard (4 wanted → a 0.5 step → one tick on a
+    // MACD strip), so try several targets and keep the most ticks that fit the height;
+    // a rung with too many is thinned to every other one (0, 0.4, 0.8 …), never dropped.
+    for(let target = 2; target <= 8; target++){
+      const { ticks, step } = niceTicks(lo, hi, target);
+      let inside = ticks.filter(v => v >= lo + inset && v <= hi - inset);
+      let k = step;
+      while(inside.length > fit){ k *= 2; inside = inside.filter(v => Math.abs(v / k - Math.round(v / k)) < 1e-6); }
+      if(inside.length >= 2 && (!best || inside.length > best.ticks.length)) best = { ticks: inside, dec: Math.min(4, decimalsFor(step)) };
+    }
+  }
+  return best || { ticks: [hi, lo], dec: (Math.abs(hi) >= 100 || Math.abs(lo) >= 100) ? 0 : 2 };
+}
 const PANE_MIN = 34;
 function _paneLayout(ph){
   const panes = indPanes();
