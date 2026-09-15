@@ -3753,7 +3753,26 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             const s = both ? { x: a.x - dx*1e4, y: a.y - dy*1e4 } : a;
             ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(b.x + dx*1e4, b.y + dy*1e4); ctx.stroke();
           };
-          const shade = (fn) => { ctx.globalAlpha = base*0.16; fn(); ctx.globalAlpha = base; };
+          // Style › Fill and Fill opacity, for every tool that offers them: the fill colour
+          // and the alpha come from the drawing, the 16% default is what shade() always
+          // painted. A caller may still pass its own alpha (a fib's 7% bands).
+          const fillA = () => { const v = drawOptOf(d, 'fillAlpha'); return (v == null || v === '') ? 0.16 : Math.max(0, Math.min(1, Number(v) / 100)); };
+          const shade = (fn, a) => { ctx.fillStyle = drawOptOf(d, 'fillColor') || col; ctx.globalAlpha = base*(a == null ? fillA() : a); fn(); ctx.globalAlpha = base; ctx.fillStyle = col; };
+          // Inputs › Extend right: a line's right end is the plot's edge, or its own anchor.
+          const xEnd = (a, b) => drawOptOf(d, 'extendRight') ? pw : Math.max(a.x, b.x);
+          // The y of the line through a,b at x; the price a pixel row reads on THIS drawing's
+          // scale (the pane's or the price pane's -- _yMap is affine either way).
+          const yAtX = (a, b, x) => (b.x === a.x) ? a.y : a.y + (x - a.x) * (b.y - a.y) / (b.x - a.x);
+          const priceAtY = (yy) => { const y0 = _yMap(0), y1 = _yMap(1); return (y1 === y0) ? 0 : (yy - y0) / (y1 - y0); };
+          // Visibility › Price labels: the level a line reaches at its right end.
+          const priceTag = (x, yy) => { if (drawOptOf(d, 'showLabels')) tag(fmt(priceAtY(yy), 2), Math.min(x, pw) - 3, yy - 2, 'right'); };
+          const leftRight = (a, b) => (a.x <= b.x) ? [a, b] : [b, a];
+          // Visibility › Height and bar count: what a shape spans, in price and in bars.
+          const sizeTag = (a, b, x, y) => {
+            const dp = Math.abs(b.price - a.price), pct = a.price ? dp / Math.abs(a.price) * 100 : 0;
+            const nb = Math.abs(Math.round((b.x - a.x) / Math.max(1, slotW)));
+            tag(fmt(dp, 2) + '  (' + pct.toFixed(2) + '%)  ' + nb + ' bars', x, y);
+          };
           switch (d.t) {
             case 'regr': {                       // least-squares fit + 1 sigma channel
               if (!P[1]) break;
@@ -3761,22 +3780,26 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               // measure the same quadrilateral the painter fills.
               const band = _regrBand(bars, slotW, Math.min(P[0].x, P[1].x), Math.max(P[0].x, P[1].x), _yMap);
               if (!band) break;
-              const { a0, b0, dev } = band;
-              shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
+              const { a0, dev } = band;
+              // Inputs › Extend right carries the fit and its band on to the plot's edge.
+              const b0 = drawOptOf(d, 'extendRight') ? { x: pw, y: yAtX(band.a0, band.b0, pw) } : band.b0;
+              shade(() => {
                 ctx.beginPath(); ctx.moveTo(a0.x, a0.y-dev); ctx.lineTo(b0.x, b0.y-dev);
                 ctx.lineTo(b0.x, b0.y+dev); ctx.lineTo(a0.x, a0.y+dev); ctx.closePath(); ctx.fill(); });
               seg(a0, b0);
               ctx.save(); ctx.setLineDash([4,3]); ctx.globalAlpha = base*0.7;
               seg({x:a0.x,y:a0.y-dev},{x:b0.x,y:b0.y-dev}); seg({x:a0.x,y:a0.y+dev},{x:b0.x,y:b0.y+dev});
               ctx.restore();
+              priceTag(b0.x, b0.y - dev); priceTag(b0.x, b0.y); priceTag(b0.x, b0.y + dev);
               break;
             }
             case 'djchan': {                     // two independently-drawn edges
               if (!P[3]) break;
-              shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
+              shade(() => {
                 ctx.beginPath(); ctx.moveTo(P[0].x,P[0].y); ctx.lineTo(P[1].x,P[1].y);
                 ctx.lineTo(P[3].x,P[3].y); ctx.lineTo(P[2].x,P[2].y); ctx.closePath(); ctx.fill(); });
               seg(P[0], P[1]); seg(P[2], P[3]);
+              for (const [p, q] of [[P[0], P[1]], [P[2], P[3]]]) { const r = leftRight(p, q)[1]; priceTag(r.x, r.y); }
               break;
             }
             case 'elliott': case '3drives': {
@@ -3791,24 +3814,50 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (!P[1]) break;
               const cx = P[0].x, cy = P[0].y;
               const r0 = Math.hypot(P[1].x-cx, P[1].y-cy);
+              let _prevR = 0;
               for (const lv of FIB_LEVELS) {
                 if (!lv) continue;
-                ctx.strokeStyle = fibColorOf(d, lv);
+                const r = r0*lv, lc = fibColorOf(d, lv);
+                if (drawOptOf(d, 'fill') !== false) {          // the ring between this arc and the last
+                  ctx.fillStyle = lc; ctx.globalAlpha = base*0.06;
+                  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.arc(cx, cy, _prevR, 0, Math.PI*2, true); ctx.fill('evenodd');
+                }
+                ctx.strokeStyle = lc;
                 ctx.globalAlpha = base*0.85;
-                ctx.beginPath(); ctx.arc(cx, cy, r0*lv, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = lc; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                  ctx.fillText((lv*100).toFixed(1) + '%', cx, cy - r - 2);
+                }
+                _prevR = r;
               }
-              ctx.globalAlpha = base; ctx.strokeStyle = col;
+              ctx.globalAlpha = base; ctx.strokeStyle = col; ctx.fillStyle = col;
               break;
             }
             case 'fibfan': {                     // rays through the fib divisions
               if (!P[1]) break;
               const a = P[0], b2 = P[1];
+              // The rays run toward the second anchor's side; the fill is the wedge between
+              // neighbouring rays out to the plot's edge, the label sits at that edge.
+              const dir = b2.x >= a.x ? 1 : -1, farX = dir > 0 ? pw : 0;
+              const endAt = (q) => (q.x === a.x) ? q : { x: farX, y: yAtX(a, q, farX) };
+              let _prevE = null;
               for (const lv of FIB_LEVELS) {
-                ctx.strokeStyle = fibColorOf(d, lv);
+                const q = { x: b2.x, y: a.y + (b2.y - a.y)*lv }, lc = fibColorOf(d, lv), e = endAt(q);
+                if (_prevE && drawOptOf(d, 'fill') !== false) {
+                  ctx.fillStyle = lc; ctx.globalAlpha = base*0.06;
+                  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(_prevE.x, _prevE.y); ctx.lineTo(e.x, e.y); ctx.closePath(); ctx.fill();
+                }
+                ctx.strokeStyle = lc;
                 ctx.globalAlpha = base*0.85;
-                extend(a, { x: b2.x, y: a.y + (b2.y - a.y)*lv }, false);
+                extend(a, q, false);
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = lc; ctx.textAlign = dir > 0 ? 'right' : 'left'; ctx.textBaseline = 'bottom';
+                  ctx.fillText((lv*100).toFixed(1) + '%', e.x - dir*3, e.y - 2);
+                }
+                _prevE = e;
               }
-              ctx.globalAlpha = base; ctx.strokeStyle = col;
+              ctx.globalAlpha = base; ctx.strokeStyle = col; ctx.fillStyle = col;
               break;
             }
             case 'gannfan': {                    // 1x1 and its harmonics
@@ -3820,7 +3869,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                 const one = (rx === 1 && ry === 1);
                 ctx.globalAlpha = base*(one ? 1 : 0.5);
                 ctx.lineWidth = one ? (drawOptOf(d,'w')||1.5)+0.5 : (drawOptOf(d,'w')||1.5);
-                extend(a, { x: a.x + dx*rx, y: a.y + dy*ry }, false);
+                const q = { x: a.x + dx*rx, y: a.y + dy*ry };
+                extend(a, q, false);
+                if (drawOptOf(d, 'showLabels') !== false) tag(rx + 'x' + ry, q.x + 3, q.y - 2);   // Visibility › Ratio labels
               }
               ctx.globalAlpha = base; ctx.lineWidth = drawOptOf(d,'w')||1.5;
               break;
@@ -3829,6 +3880,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (!P[1]) break;
               const x1 = Math.min(P[0].x,P[1].x), x2 = Math.max(P[0].x,P[1].x);
               const y1 = Math.min(P[0].y,P[1].y), y2 = Math.max(P[0].y,P[1].y);
+              shade(() => ctx.fillRect(x1, y1, x2-x1, y2-y1));               // Style › Fill, Fill opacity
               ctx.strokeRect(x1, y1, x2-x1, y2-y1);
               ctx.save(); ctx.globalAlpha = base*0.4;
               for (const f of [0.25, 0.382, 0.5, 0.618, 0.75]) {
@@ -3836,6 +3888,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                 ctx.beginPath(); ctx.moveTo(x1, y1+(y2-y1)*f); ctx.lineTo(x2, y1+(y2-y1)*f); ctx.stroke();
               }
               ctx.restore();
+              if (drawOptOf(d, 'showLabels')) {                              // Visibility › Division labels
+                for (const f of [0.25, 0.382, 0.5, 0.618, 0.75]) { tag(String(f), x1+(x2-x1)*f + 2, y1 - 2); tag(String(f), x2 + 3, y1+(y2-y1)*f + 4); }
+              }
               break;
             }
             case 'proj': {                       // repeat a measured move from a new anchor
@@ -3848,7 +3903,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                 ctx.fillRect(Math.min(P[2].x,tgt.x), Math.min(P[2].y,tgt.y),
                              Math.abs(tgt.x-P[2].x), Math.abs(tgt.y-P[2].y)); });
               seg(P[2], tgt);
-              tag(fmt(P[2].price + (P[1].price - P[0].price), 2), tgt.x+4, tgt.y-3);
+              if (drawOptOf(d, 'showLabels') !== false) tag(fmt(P[2].price + (P[1].price - P[0].price), 2), tgt.x+4, tgt.y-3);   // Visibility › Target price
               break;
             }
             case 'arrowup': case 'arrowdn': {    // a marker pinned to one bar
@@ -3918,28 +3973,41 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             case 'flat': {                       // channel with one horizontal edge
               if (!P[2]) break;
               const a = P[0], b = P[1], c2 = P[2];
-              const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
-              shade(() => { ctx.fillStyle = drawOptOf(d, 'fillColor') || col;
-                ctx.fillRect(x1, Math.min(a.y, c2.y), x2 - x1, Math.abs(c2.y - a.y)); });
-              seg(a, b);
-              ctx.beginPath(); ctx.moveTo(x1, c2.y); ctx.lineTo(x2, c2.y); ctx.stroke();
+              // Left to right, and on to the plot's edge when Extend right is on. The fill is
+              // the trapezoid between the trend edge and the flat edge -- the shape an
+              // ascending or descending triangle actually has.
+              const [s1, s2] = leftRight(a, b);
+              const L1 = drawOptOf(d, 'extendRight') ? { x: pw, y: yAtX(s1, s2, pw) } : s2;
+              shade(() => { ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(L1.x, L1.y);
+                ctx.lineTo(L1.x, c2.y); ctx.lineTo(s1.x, c2.y); ctx.closePath(); ctx.fill(); });
+              seg(s1, L1);
+              ctx.beginPath(); ctx.moveTo(s1.x, c2.y); ctx.lineTo(L1.x, c2.y); ctx.stroke();
               if (drawOptOf(d, 'midline')) {
                 ctx.save(); ctx.setLineDash([4,3]);
-                ctx.beginPath(); ctx.moveTo(x1, (a.y + c2.y)/2); ctx.lineTo(x2, (a.y + c2.y)/2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(s1.x, (s1.y + c2.y)/2); ctx.lineTo(L1.x, (L1.y + c2.y)/2); ctx.stroke();
                 ctx.restore();
               }
+              priceTag(L1.x, L1.y); priceTag(L1.x, c2.y);
               break;
             }
             case 'fork': {                       // Andrews pitchfork: median + two tines
               if (!P[2]) break;
               const a = P[0], b = P[1], c2 = P[2];
               const mid = { x: (b.x + c2.x)/2, y: (b.y + c2.y)/2 };
-              ctx.strokeStyle = drawOptOf(d, 'color') || col;
-              extend(a, mid, false);
-              ctx.strokeStyle = drawOptOf(d, 'fillColor') || col;
               const dx = mid.x - a.x, dy = mid.y - a.y;
-              for (const t0 of [b, c2]) extend(t0, { x: t0.x + dx, y: t0.y + dy }, false);
+              // Extend right (on by default): the median and the tines run to the plot's edge;
+              // off, each stops one handle-length past its anchor.
+              const ext = drawOptOf(d, 'extendRight') !== false;
+              const line = (p, q) => { if (ext) extend(p, q, false); else seg(p, q); };
+              ctx.strokeStyle = drawOptOf(d, 'color') || col;
+              line(a, ext ? mid : { x: mid.x + dx, y: mid.y + dy });
+              ctx.strokeStyle = drawOptOf(d, 'fillColor') || col;
+              for (const t0 of [b, c2]) line(t0, { x: t0.x + dx, y: t0.y + dy });
               ctx.strokeStyle = col;
+              for (const [p, q] of [[a, mid], [b, { x: b.x + dx, y: b.y + dy }], [c2, { x: c2.x + dx, y: c2.y + dy }]]) {
+                const ex = ext ? pw : q.x;
+                priceTag(ex, yAtX(p, q, ex));
+              }
               break;
             }
             case 'abcd': case 'xabcd': case 'hs': {
@@ -3963,15 +4031,24 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (!P[2]) break;
               const a = P[0], b = P[1], c2 = P[2];
               const offY = c2.y - b.y;
+              const [s1, s2] = leftRight(a, b);
+              const e2 = drawOptOf(d, 'extendRight') ? { x: pw, y: yAtX(s1, s2, pw) } : s2;   // Inputs › Extend right
+              let _prevO = null;
               for (const lv of FIB_LEVELS) {
-                ctx.strokeStyle = fibColorOf(d, lv);
-                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
-                const o = offY*lv;
-                ctx.beginPath(); ctx.moveTo(a.x, a.y + o); ctx.lineTo(b.x, b.y + o); ctx.stroke();
-                if (drawOptOf(d, 'showLabels') !== false) {
-                  ctx.fillStyle = fibColorOf(d, lv);
-                  tag((lv*100).toFixed(1) + '%', b.x + 4, b.y + o - 2);
+                const o = offY*lv, lc = fibColorOf(d, lv);
+                if (_prevO != null && drawOptOf(d, 'fill') !== false) {   // Style › Shade between levels
+                  ctx.fillStyle = lc; ctx.globalAlpha = base*0.07;
+                  ctx.beginPath(); ctx.moveTo(s1.x, s1.y + _prevO); ctx.lineTo(e2.x, e2.y + _prevO);
+                  ctx.lineTo(e2.x, e2.y + o); ctx.lineTo(s1.x, s1.y + o); ctx.closePath(); ctx.fill();
                 }
+                ctx.strokeStyle = lc;
+                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
+                ctx.beginPath(); ctx.moveTo(s1.x, s1.y + o); ctx.lineTo(e2.x, e2.y + o); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = lc; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+                  ctx.fillText((lv*100).toFixed(1) + '%', Math.min(e2.x, pw - 40) + 4, e2.y + o - 2);
+                }
+                _prevO = o;
               }
               ctx.globalAlpha = base; ctx.strokeStyle = col; ctx.fillStyle = col;
               break;
@@ -4002,6 +4079,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (drawOptOf(d, 'showPrice')) bits.push((dp >= 0 ? '+' : '') + fmt(dp, 2));
               if (drawOptOf(d, 'showPercent')) bits.push((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
               if (drawOptOf(d, 'showBars')) bits.push(bars + ' bars');
+              if (drawOptOf(d, 'showTime')) bits.push(_fmtElapsed(b.ts - a.ts));   // Visibility › Elapsed time
               if (bits.length) tag(bits.join('  '), (x1 + x2)/2, y1 - 3, 'center');
               break;
             }
@@ -4106,15 +4184,20 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const rw = Math.abs(b.x - a.x), rh = Math.abs(b.y - a.y);
               shade(() => ctx.fillRect(rx, ry, rw, rh));
               ctx.strokeRect(rx, ry, rw, rh);
+              priceTag(rx + rw, ry); priceTag(rx + rw, ry + rh);                 // Visibility › Price labels
+              if (drawOptOf(d, 'showSize')) sizeTag(a, b, rx + 3, ry - 3);        // Visibility › Height and bar count
               break;
             }
             case 'ell': {
               if (!P[1]) break;
               const a = P[0], b = P[1];
+              const ecx = (a.x + b.x)/2, ecy = (a.y + b.y)/2, erx = Math.abs(b.x - a.x)/2, ery = Math.abs(b.y - a.y)/2;
               ctx.beginPath();
-              ctx.ellipse((a.x + b.x)/2, (a.y + b.y)/2, Math.abs(b.x - a.x)/2, Math.abs(b.y - a.y)/2, 0, 0, Math.PI*2);
+              ctx.ellipse(ecx, ecy, erx, ery, 0, 0, Math.PI*2);
               shade(() => ctx.fill());
               ctx.stroke();
+              priceTag(ecx + erx, ecy - ery); priceTag(ecx + erx, ecy + ery);
+              if (drawOptOf(d, 'showSize')) sizeTag(a, b, ecx - erx + 3, ecy - ery - 3);
               break;
             }
             case 'tri': {
@@ -4122,26 +4205,43 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.lineTo(P[2].x, P[2].y); ctx.closePath();
               shade(() => ctx.fill());
               ctx.stroke();
+              if (drawOptOf(d, 'showLabels')) for (const q of [P[0], P[1], P[2]]) tag(fmt(q.price, 2), q.x + 4, q.y - 3);
+              if (drawOptOf(d, 'showSize')) {
+                const hiP = P.slice(0, 3).reduce((m, q) => q.price > m.price ? q : m), loP = P.slice(0, 3).reduce((m, q) => q.price < m.price ? q : m);
+                const l = Math.min(P[0].x, P[1].x, P[2].x), r = Math.max(P[0].x, P[1].x, P[2].x), t = Math.min(P[0].y, P[1].y, P[2].y);
+                sizeTag({ x: l, price: loP.price }, { x: r, price: hiP.price }, l + 3, t - 3);
+              }
               break;
             }
             case 'chan': {
               if (!P[2]) break;
               const a = P[0], b = P[1], c = P[2];
               const off = (c.y - (a.y + b.y)/2)*2;
-              seg(a, b);
-              ctx.beginPath(); ctx.moveTo(a.x, a.y + off); ctx.lineTo(b.x, b.y + off); ctx.stroke();
-              shade(() => {
+              // Left to right, and on to the plot's edge when Extend right is on.
+              const [s1, s2] = leftRight(a, b);
+              const L1 = drawOptOf(d, 'extendRight') ? { x: pw, y: yAtX(s1, s2, pw) } : s2;
+              shade(() => {                                                 // Style › Fill, Fill opacity
                 ctx.beginPath();
-                ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-                ctx.lineTo(b.x, b.y + off); ctx.lineTo(a.x, a.y + off);
+                ctx.moveTo(s1.x, s1.y); ctx.lineTo(L1.x, L1.y);
+                ctx.lineTo(L1.x, L1.y + off); ctx.lineTo(s1.x, s1.y + off);
                 ctx.closePath(); ctx.fill();
               });
+              seg(s1, L1);
+              ctx.beginPath(); ctx.moveTo(s1.x, s1.y + off); ctx.lineTo(L1.x, L1.y + off); ctx.stroke();
+              if (drawOptOf(d, 'midline')) {                                // Inputs › Show midline
+                ctx.save(); ctx.setLineDash([4,3]); ctx.globalAlpha = base*0.7;
+                ctx.beginPath(); ctx.moveTo(s1.x, s1.y + off/2); ctx.lineTo(L1.x, L1.y + off/2); ctx.stroke();
+                ctx.restore();
+              }
+              priceTag(L1.x, L1.y); priceTag(L1.x, L1.y + off);
               break;
             }
             case 'fib': {
               if (!P[1]) break;
               const a = P[0], b = P[1], span = b.price - a.price;
-              const x1 = Math.min(a.x, b.x);
+              const x1 = Math.min(a.x, b.x), x2 = xEnd(a, b);           // Inputs › Extend levels right
+              // Inputs › Show percentages / Show prices compose the label; neither means none.
+              const showPct = drawOptOf(d, 'showPercents') !== false, showPr = drawOptOf(d, 'showPrices') !== false;
               // Each level in its own colour -- one flat purple made them indistinguishable.
               let _prevY = null;
               for (const lv of FIB_LEVELS) {
@@ -4149,15 +4249,15 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                 const lc = (typeof fibColorOf === 'function') ? fibColorOf(d, lv) : col;
                 if (_prevY != null && drawOptOf(d, 'fill') !== false) {
                   ctx.globalAlpha = base*0.07; ctx.fillStyle = lc;
-                  ctx.fillRect(x1, Math.min(_prevY, yy), pw - x1, Math.abs(yy - _prevY));
+                  ctx.fillRect(x1, Math.min(_prevY, yy), x2 - x1, Math.abs(yy - _prevY));
                 }
                 ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
                 ctx.strokeStyle = lc;
-                ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
-                if (drawOptOf(d, 'showLabels') !== false) {
+                ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(x2, yy); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false && (showPct || showPr)) {
                   ctx.fillStyle = lc;
                   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-                  ctx.fillText((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+                  ctx.fillText([showPct ? (lv*100).toFixed(1) + '%' : '', showPr ? fmt(pr, 2) : ''].filter(Boolean).join('  '), x1 + 3, yy - 2);
                 }
                 _prevY = yy;
               }
@@ -4167,13 +4267,27 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             case 'fibx': {
               if (!P[2]) break;
               const a = P[0], b = P[1], c = P[2], span = b.price - a.price;
-              const x1 = Math.min(a.x, c.x);
+              const x1 = Math.min(a.x, c.x), x2 = xEnd(a, c);
+              const showPct = drawOptOf(d, 'showPercents') !== false, showPr = drawOptOf(d, 'showPrices') !== false;
+              // The same treatment as the retracement: a colour per level, shaded bands, and
+              // labels the reader can trim. It used to paint every level in one colour and
+              // ignore its whole dialog.
+              let _prevY = null;
               for (const lv of FIB_EXT) {
-                const pr = c.price + span*lv, yy = _yMap(pr);
-                ctx.globalAlpha = base*0.8;
-                ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
-                tag((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+                const pr = c.price + span*lv, yy = _yMap(pr), lc = fibColorOf(d, lv);
+                if (_prevY != null && drawOptOf(d, 'fill') !== false) {
+                  ctx.globalAlpha = base*0.07; ctx.fillStyle = lc;
+                  ctx.fillRect(x1, Math.min(_prevY, yy), x2 - x1, Math.abs(yy - _prevY));
+                }
+                ctx.globalAlpha = base*0.85; ctx.strokeStyle = lc;
+                ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(x2, yy); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false && (showPct || showPr)) {
+                  ctx.fillStyle = lc; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+                  ctx.fillText([showPct ? (lv*100).toFixed(1) + '%' : '', showPr ? fmt(pr, 2) : ''].filter(Boolean).join('  '), x1 + 3, yy - 2);
+                }
+                _prevY = yy;
               }
+              ctx.globalAlpha = base; ctx.strokeStyle = col; ctx.fillStyle = col;
               break;
             }
             case 'pos': case 'poss': {
@@ -4210,8 +4324,13 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const dP = b.price - a.price, pct = a.price ? (dP/a.price)*100 : 0;
               ctx.setLineDash([4, 3]); seg(a, b); ctx.setLineDash([]);
               shade(() => ctx.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)));
-              tag((dP >= 0 ? '+' : '') + fmt(dP, 2) + '  (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)',
-                  (a.x + b.x)/2, Math.min(a.y, b.y) - 3, 'center');
+              // Visibility: price change, percent, bar count, elapsed time -- each its own switch.
+              const bits = [];
+              if (drawOptOf(d, 'showPrice') !== false) bits.push((dP >= 0 ? '+' : '') + fmt(dP, 2));
+              if (drawOptOf(d, 'showPercent') !== false) bits.push('(' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)');
+              if (drawOptOf(d, 'showBars') !== false) bits.push(Math.abs(Math.round((b.x - a.x) / Math.max(1, slotW))) + ' bars');
+              if (drawOptOf(d, 'showTime')) bits.push(_fmtElapsed(b.ts - a.ts));
+              if (bits.length) tag(bits.join('  '), (a.x + b.x)/2, Math.min(a.y, b.y) - 3, 'center');
               break;
             }
             case 'pen': {
@@ -5820,6 +5939,16 @@ function _drawAnchor(canvas, clientX, clientY) {
   return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4), pane: pane ? pane.key : null };
 }
 
+/* Elapsed time between two anchors, the way a measure reads it: "45m", "3h 20m", "2d 4h". */
+function _fmtElapsed(ms) {
+  const m = Math.round(Math.abs(Number(ms) || 0) / 60000);
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60), mm = m % 60;
+  if (h < 24) return h + 'h' + (mm ? ' ' + mm + 'm' : '');
+  const dd = Math.floor(h / 24), hh = h % 24;
+  return dd + 'd' + (hh ? ' ' + hh + 'h' : '');
+}
+
 /* Where a moment sits among the bars. The chart lays bars out one slot each, whatever
    the clock says between them -- an overnight or a weekend is no wider than five
    minutes -- so a drawing pinned by time has to go through the BAR INDEX, never through
@@ -5930,6 +6059,7 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
     return lineDist(a, b);
   };
   const ptDist = (a) => Math.hypot(xPx - a.x, yPx - a.y);
+  const lineY = (a, b, x) => (b.x === a.x) ? a.y : a.y + (x - a.x) * (b.y - a.y) / (b.x - a.x);   // the line through a,b at x
   const pathDist = (pts) => {             // an open polyline
     let m = Infinity;
     for (let q = 1; q < pts.length; q++) m = Math.min(m, segDist(pts[q-1].x, pts[q-1].y, pts[q].x, pts[q].y));
@@ -5983,7 +6113,8 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
         if (!B) { dist = Infinity; break; }
         const band = _regrBand(data.bars, slotW, Math.min(A.x, B.x), Math.max(A.x, B.x), yOf);
         if (!band) { dist = segDist(A.x, A.y, B.x, B.y); break; }
-        const { a0, b0, dev } = band;
+        const a0 = band.a0, dev = band.dev;
+        const b0 = opt('extendRight') ? { x: pw, y: lineY(band.a0, band.b0, pw) } : band.b0;   // Extend right
         const quad = [{ x: a0.x, y: a0.y - dev }, { x: b0.x, y: b0.y - dev }, { x: b0.x, y: b0.y + dev }, { x: a0.x, y: a0.y + dev }];
         dist = Math.min(segDist(a0.x, a0.y, b0.x, b0.y), shape(quad)); break;
       }
@@ -5995,14 +6126,20 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
                                          : FIB_LEVELS.map(lv => [1, lv]);
         let m = Infinity;
         for (const [rx, ry] of ratios) m = Math.min(m, rayDist(A, { x: A.x + dx*rx, y: A.y + dy*ry }));
+        if (d.t === 'fibfan' && opt('fill') !== false && dx) {   // the filled wedge between the 0 and 100% rays
+          const farX = dx > 0 ? pw : 0, top = { x: farX, y: lineY(A, { x: B.x, y: A.y }, farX) }, bot = { x: farX, y: lineY(A, B, farX) };
+          if (inPoly([A, top, bot])) m = Math.min(m, INSIDE);
+        }
         dist = m; break;
       }
       case 'fork': {
         if (!C) { dist = Infinity; break; }
         const mid = { x: (B.x + C.x)/2, y: (B.y + C.y)/2 };
         const dx = mid.x - A.x, dy = mid.y - A.y;
-        dist = Math.min(rayDist(A, mid), rayDist(B, { x: B.x + dx, y: B.y + dy }),
-                        rayDist(C, { x: C.x + dx, y: C.y + dy })); break;
+        const ext = opt('extendRight') !== false;               // on by default; off stops one handle-length out
+        const along = (p, q) => ext ? rayDist(p, q) : segDist(p.x, p.y, q.x, q.y);
+        dist = Math.min(along(A, ext ? mid : { x: mid.x + dx, y: mid.y + dy }), along(B, { x: B.x + dx, y: B.y + dy }),
+                        along(C, { x: C.x + dx, y: C.y + dy })); break;
       }
       // horizontal level families: every level the painter draws, over the span it draws
       case 'fib': case 'fibx': {
@@ -6010,12 +6147,12 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
         if (!from) { dist = Infinity; break; }
         const span = B.price - A.price, base = d.t === 'fib' ? A.price : C.price;
         const x1 = Math.min(A.x, from.x), levels = d.t === 'fib' ? FIB_LEVELS : FIB_EXT;
+        const x2 = opt('extendRight') === false ? Math.max(A.x, from.x) : pw;   // Extend levels right (on by default)
         const ys = levels.map(lv => yOf(base + span*lv));
         let m = Infinity;
-        for (const yy of ys) m = Math.min(m, segDist(x1, yy, pw, yy));
+        for (const yy of ys) m = Math.min(m, segDist(x1, yy, x2, yy));
         const yTop = Math.min.apply(null, ys), yBot = Math.max.apply(null, ys);
-        const filled = d.t === 'fib' && opt('fill') !== false;
-        if (filled && xPx >= x1 && yPx >= yTop && yPx <= yBot) m = Math.min(m, INSIDE);
+        if (opt('fill') !== false && xPx >= x1 && xPx <= x2 && yPx >= yTop && yPx <= yBot) m = Math.min(m, INSIDE);
         dist = m; break;
       }
       case 'pos': case 'poss': {            // entry / stop / target lines and the two boxes
@@ -6030,9 +6167,11 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
       case 'fibchan': {                     // levels parallel to the trend, and the band
         if (!C) { dist = Infinity; break; }
         const off = C.y - B.y;
+        const [s1, s2] = A.x <= B.x ? [A, B] : [B, A];
+        const e2 = opt('extendRight') ? { x: pw, y: lineY(s1, s2, pw) } : s2;   // Extend right
         let m = Infinity;
-        for (const lv of FIB_LEVELS) m = Math.min(m, segDist(A.x, A.y + off*lv, B.x, B.y + off*lv));
-        m = Math.min(m, shape([A, B, { x: B.x, y: B.y + off }, { x: A.x, y: A.y + off }]));
+        for (const lv of FIB_LEVELS) m = Math.min(m, segDist(s1.x, s1.y + off*lv, e2.x, e2.y + off*lv));
+        if (opt('fill') !== false) m = Math.min(m, shape([s1, e2, { x: e2.x, y: e2.y + off }, { x: s1.x, y: s1.y + off }]));
         dist = m; break;
       }
       case 'fibtime': {
@@ -6042,11 +6181,12 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
         if (unit) for (const n0 of [0,1,2,3,5,8,13,21]) m = Math.min(m, Math.abs((A.x + unit*n0) - xPx));
         dist = m; break;
       }
-      case 'fibcirc': {                     // distance to the nearest arc
+      case 'fibcirc': {                     // distance to the nearest arc, or inside the rings
         if (!B) { dist = Infinity; break; }
         const r0 = Math.hypot(B.x - A.x, B.y - A.y), rp = Math.hypot(xPx - A.x, yPx - A.y);
         let m = Infinity;
         for (const lv of FIB_LEVELS) if (lv) m = Math.min(m, Math.abs(rp - r0*lv));
+        if (opt('fill') !== false && rp <= r0) m = Math.min(m, INSIDE);
         dist = m; break;
       }
       // boxes and bands: outline or fill
@@ -6063,13 +6203,16 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
       case 'chan': {                        // both lines and the band between them
         if (!C) { dist = Infinity; break; }
         const off = (C.y - (A.y + B.y)/2)*2;
-        dist = shape([A, B, { x: B.x, y: B.y + off }, { x: A.x, y: A.y + off }]); break;
+        const [s1, s2] = A.x <= B.x ? [A, B] : [B, A];
+        const L1 = opt('extendRight') ? { x: pw, y: lineY(s1, s2, pw) } : s2;   // Extend right
+        dist = shape([s1, L1, { x: L1.x, y: L1.y + off }, { x: s1.x, y: s1.y + off }]); break;
       }
-      case 'flat': {                        // the trend edge, the flat edge, the band
+      case 'flat': {                        // the trend edge, the flat edge, the trapezoid between
         if (!C) { dist = Infinity; break; }
-        const x1 = Math.min(A.x, B.x), x2 = Math.max(A.x, B.x);
-        dist = Math.min(segDist(A.x, A.y, B.x, B.y), segDist(x1, C.y, x2, C.y),
-                        shape(rectPts(x1, Math.min(A.y, C.y), x2, Math.max(A.y, C.y)))); break;
+        const [s1, s2] = A.x <= B.x ? [A, B] : [B, A];
+        const L1 = opt('extendRight') ? { x: pw, y: lineY(s1, s2, pw) } : s2;
+        dist = Math.min(segDist(s1.x, s1.y, L1.x, L1.y), segDist(s1.x, C.y, L1.x, C.y),
+                        shape([s1, L1, { x: L1.x, y: C.y }, { x: s1.x, y: C.y }])); break;
       }
       case 'djchan': dist = P[3] ? shape([A, B, P[3], C]) : Infinity; break;
       case 'proj': {
@@ -6242,7 +6385,15 @@ const DRAW_SPEC = {
   },
 };
 DRAW_SPEC.poss = DRAW_SPEC.pos;
-DRAW_SPEC.fibx = DRAW_SPEC.fib;
+// The extension draws 0 / 61.8 / 100 / 161.8 / 261.8%: its dialog offers those colours,
+// not the retracement's 23.6-78.6% that it never paints.
+DRAW_SPEC.fibx = {
+  inputs: DRAW_SPEC.fib.inputs,
+  style: [_col('c0', '0%', FIB_COLORS[0]), _col('c618', '61.8%', FIB_COLORS[0.618]), _col('c100', '100%', FIB_COLORS[1]),
+          _col('c1618', '161.8%', FIB_COLORS[1.618]), _col('c2618', '261.8%', FIB_COLORS[2.618]),
+          _num('w', 'Width', 1.2, { min: 1, max: 4, step: 0.5 }), _chk('fill', 'Shade between levels', true)],
+  vis: DRAW_SPEC.fib.vis,
+};
 
 /* The rest of the catalogue. Composed from shared style groups so a tool declares only
    what is genuinely its own -- a channel has a fill and a midline, a text box has a font
@@ -6251,7 +6402,7 @@ DRAW_SPEC.fibx = DRAW_SPEC.fib;
 const _lineStyle = (c) => [_col('color', 'Line colour', c || '#a78bfa'),
                            _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
 const _shapeStyle = (c) => [_col('color', 'Border', c || '#a78bfa'), _col('fillColor', 'Fill', c || '#a78bfa'),
-                            _num('fillAlpha', 'Fill opacity %', 12, { min: 0, max: 100 }),
+                            _num('fillAlpha', 'Fill opacity %', 16, { min: 0, max: 100 }),
                             _num('w', 'Border width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
 const _textStyle = () => [_col('color', 'Text colour', '#e6e8ef'), _num('fontSize', 'Font size', 12, { min: 8, max: 32 }),
                           _col('bgColor', 'Background', '#151823'), _chk('showBg', 'Show background', true),
@@ -6273,17 +6424,17 @@ DRAW_SPEC.info = { inputs: [_chk('showChange', 'Price change', true), _chk('show
                             _chk('showBars', 'Bar count', true)],
   style: _lineStyle(), vis: [_chk('showLabels', 'Stats label', true)] };
 for (const t of ['chan', 'flat']) DRAW_SPEC[t] = {
-  inputs: [_chk('extendRight', 'Extend right', true), _chk('midline', 'Show midline', false)],
-  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels', 'Price labels', true)] };
+  inputs: [_chk('extendRight', 'Extend right', false), _chk('midline', 'Show midline', false)],
+  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels', 'Price labels', false)] };
 DRAW_SPEC.fork = { inputs: [_chk('extendRight', 'Extend right', true)],
   style: [_col('color', 'Median line', '#089981'), _col('fillColor', 'Tines', '#2962ff'),
           _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
-  vis: [_chk('showLabels', 'Level labels', true)] };
+  vis: [_chk('showLabels', 'Price labels', false)] };
 
 // --- Patterns ---------------------------------------------------------------
 for (const t of ['rect', 'ell', 'tri']) DRAW_SPEC[t] = {
   inputs: [], style: _shapeStyle(),
-  vis: [_chk('showLabels', 'Price labels', true), _chk('showSize', 'Height and bar count', false)] };
+  vis: [_chk('showLabels', 'Price labels', false), _chk('showSize', 'Height and bar count', false)] };
 for (const t of ['abcd', 'xabcd', 'hs']) DRAW_SPEC[t] = {
   inputs: [_chk('showRatios', 'Leg ratios', true)],
   style: [_col('color', 'Lines', '#a78bfa'), _col('labelColor', 'Point labels', '#e6e8ef'),
@@ -6291,7 +6442,7 @@ for (const t of ['abcd', 'xabcd', 'hs']) DRAW_SPEC[t] = {
   vis: [_chk('showPoints', 'Point letters', true), _chk('showLabels', 'Price labels', false)] };
 
 // --- Fibonacci --------------------------------------------------------------
-DRAW_SPEC.fibchan = { inputs: [_chk('extendRight', 'Extend right', true)],
+DRAW_SPEC.fibchan = { inputs: [_chk('extendRight', 'Extend right', false)],
   style: DRAW_SPEC.fib.style, vis: [_chk('showLabels', 'Level labels', true)] };
 DRAW_SPEC.fibtime = { inputs: [], style: _lineStyle('#2962ff'),
   vis: [_chk('showLabels', 'Sequence labels', true)] };
@@ -6324,8 +6475,8 @@ DRAW_SPEC.plabel = { inputs: [], style: _textStyle(),
 
 // --- batch two -------------------------------------------------------------
 DRAW_SPEC.regr = { inputs: [_chk('extendRight','Extend right',false)],
-  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels','Channel labels',true)] };
-DRAW_SPEC.djchan = { inputs: [], style: _shapeStyle('#2962ff'), vis: [_chk('showLabels','Price labels',true)] };
+  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels','Price labels',false)] };
+DRAW_SPEC.djchan = { inputs: [], style: _shapeStyle('#2962ff'), vis: [_chk('showLabels','Price labels',false)] };
 for (const t of ['elliott','3drives']) DRAW_SPEC[t] = {
   inputs: [_chk('showRatios','Leg ratios',false)],
   style: [_col('color','Lines','#a78bfa'), _col('labelColor','Wave labels','#e6e8ef'),
@@ -6363,7 +6514,8 @@ function drawOptOf(d, key) {
 /** Colour for one fib level, honouring an override on the drawing. */
 function fibColorOf(d, lv) {
   const key = 'c' + String(lv).replace('0.', '').replace('.', '') || 'c0';
-  const map = { 0: 'c0', 0.236: 'c236', 0.382: 'c382', 0.5: 'c50', 0.618: 'c618', 0.786: 'c786', 1: 'c100' };
+  const map = { 0: 'c0', 0.236: 'c236', 0.382: 'c382', 0.5: 'c50', 0.618: 'c618', 0.786: 'c786', 1: 'c100',
+                1.272: 'c1272', 1.618: 'c1618', 2.618: 'c2618' };
   const k = map[lv];
   return (k && d.style && d.style[k]) || FIB_COLORS[lv] || (d.style && d.style.color) || '#a78bfa';
 }
