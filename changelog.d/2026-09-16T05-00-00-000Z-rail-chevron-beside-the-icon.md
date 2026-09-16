@@ -1,0 +1,3 @@
+### Changed
+
+- trader: **the drawing rail's flyout chevron sits beside its tool icon instead of on top of it.** It was pinned to the icon button's own right edge, which in a 44px rail put it over the last few pixels of the glyph. It has its own 11px strip now, next to the 36px icon, and the rail column widened to 56px to hold both — the most the chart-width budget allows, so the chart still clears its 520px floor on a 1280 laptop. The chevron stays invisible until the slot is hovered and now lights up in the accent when the pointer is on the chevron itself, rather than going to the ordinary text colour.
