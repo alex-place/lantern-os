@@ -163,7 +163,7 @@
   /* The watchlist column is FIXED. It is not draggable, so it does not read a saved
      width -- 340px fits every track with ~40px to spare (measured, not guessed). */
   :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:340px}
-  .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) auto var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:56px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) auto var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed{--col-l:0px}
   body.ticket-closed{--col-t:0px}
   body.rightdock-closed{--col-r:0px}
@@ -173,8 +173,11 @@
      panel with the order ticket stacked under it, and the widget rail hard right.
      Panels are grid children, so collapsing one really does hand the chart its
      pixels back rather than growing under an overlay. */
-  .draw-rail{grid-column:1;grid-row:2 / span 3;display:flex;flex-direction:column;gap:2px;
-    padding:6px 5px;background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto}
+  /* Packed to the start, so every glyph in the rail sits on one vertical line: a utility
+     button's 36px box begins where a category's does, and the 12px chevron strip beside a
+     category is simply empty for the ones that have no flyout. */
+  .draw-rail{grid-column:1;grid-row:2 / span 3;display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+    padding:6px 4px;background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto}
   .dockL{grid-column:2;grid-row:2 / span 3;position:relative;display:flex;flex-direction:column;
     min-width:0;overflow:hidden;background:var(--bg1);border-right:1px solid var(--border)}
   .dockR{grid-column:5;grid-row:2 / span 3;position:relative;display:flex;flex-direction:column;
@@ -227,16 +230,24 @@
   .rail-sep{height:1px;background:var(--border);margin:4px 2px}
 
   /* Drawing rail: grouped tool buttons, then the utility toggles. */
-  /* Category button: the tool icon, plus a chevron that appears on hover for the
-     flyout. Two hit targets in one 34px slot, the way TradingView's rail works. */
-  .dr-cat{position:relative;display:flex;align-items:center;flex:0 0 auto}
+  /* Category button: the tool icon, and BESIDE it a chevron that opens the flyout. The
+     chevron used to be pinned to the icon button's own right edge, which put it over the
+     last few pixels of the glyph (founder, 2026-09-16); it has its own strip now, so the
+     two are neighbours rather than stacked. Invisible until the slot is hovered, and it
+     lights up in the accent when the pointer is on the chevron itself.
+
+     The 47px slot is 36 + 11, and the rail column is 56: 47 + 8 of padding + the 1px
+     border. 56 is the most the rail can take -- trader-chart-width's budget leaves the
+     chart exactly 520px on a 1280 laptop at that width, and less than that is a chart
+     too narrow to read. A wider chevron has to come out of the icon, not the chart. */
+  .dr-cat{position:relative;display:flex;align-items:center;flex:0 0 auto;width:47px}
   .dr-cat .dr-btn{width:36px;height:34px;font-size:17px}
   .dr-cat.on .dr-btn{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
-  .dr-more{position:absolute;right:-1px;top:0;height:34px;width:11px;display:flex;align-items:center;
+  .dr-more{position:absolute;right:0;top:0;height:34px;width:11px;display:flex;align-items:center;
     justify-content:center;background:none;border:0;color:var(--text2);font-size:10px;line-height:1;
-    cursor:pointer;opacity:0;transition:opacity .12s;border-radius:0 5px 5px 0}
+    cursor:pointer;opacity:0;transition:opacity .12s,color .12s,background .12s;border-radius:5px}
   .dr-cat:hover .dr-more,.dr-more:focus-visible,.dr-more[aria-expanded="true"]{opacity:1}
-  .dr-more:hover{color:var(--text0);background:var(--bg3)}
+  .dr-more:hover,.dr-more[aria-expanded="true"]{color:var(--accent);background:var(--bg3)}
   .dr-btn{width:36px;height:34px;display:flex;align-items:center;justify-content:center;
     background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
     font-size:13px;cursor:pointer;flex:0 0 auto}
@@ -497,7 +508,7 @@
     .layout, body.leftdock-closed .layout, body.rightdock-closed .layout,
     body.leftdock-closed.rightdock-closed .layout{grid-template-columns:0 0 minmax(0,1fr) 0 0}
     .layout{padding-top:var(--rail-band);box-sizing:border-box}
-    .draw-rail{position:fixed;left:0;right:var(--dock-rail-w);top:52px;bottom:auto;z-index:60;flex-direction:row;
+    .draw-rail{position:fixed;left:0;right:var(--dock-rail-w);top:52px;bottom:auto;z-index:60;flex-direction:row;align-items:center;
       grid-column:auto;grid-row:auto;border-right:none;border-bottom:1px solid var(--border);max-width:100vw;
       overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
     .draw-rail::-webkit-scrollbar{display:none}
