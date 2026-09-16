@@ -1,0 +1,4 @@
+### Fixed
+
+- trader: **the last fifteen drawing tools honour their settings too.** Trend lines, rays and extended lines ignored Extend left, Extend right and Price label; horizontal lines and rays ignored Extend right, Price label and Tag on the price axis; a vertical line never said which moment it marked; the angle tool ignored its extensions and price label; the stats label switch, the pattern price labels, the arrow's head size and price label, the brush's opacity, and the Elliott and three-drives wave numbers and leg ratios were all inert. The audit that catches this now covers every tool rather than twenty, and its two blind spots are closed.
+- trader: **a ray no longer offers to extend itself.** Rays, extended lines and horizontal rays carried an Extend right switch that their own shape already decides. It is gone from those three rather than pretending to work.
