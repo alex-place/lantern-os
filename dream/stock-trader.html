@@ -4327,9 +4327,24 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                 ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(x1, q.y); ctx.lineTo(x2, q.y); ctx.stroke();
               }
               ctx.strokeStyle = col;
-              tag((d.t === 'pos' ? 'LONG' : 'SHORT') + '  ' + rr.toFixed(2) + 'R', x1 + 3, tg.y - 2);
-              tag('entry ' + fmt(e0.price, 2), x1 + 3, e0.y - 2);
-              tag('stop ' + fmt(st.price, 2), x1 + 3, st.y - 2);
+              // The summary, top-left above the box: side, reward-to-risk, and the size the
+              // plan implies. Inputs › Account size / Risk % / Lot size drive that size and
+              // used to drive nothing at all.
+              const qty = drawPositionSize(drawOptOf(d, 'account'), drawOptOf(d, 'riskPct'), drawOptOf(d, 'lot'), risk);
+              const head = [d.t === 'pos' ? 'LONG' : 'SHORT'];
+              if (drawOptOf(d, 'showR') !== false) head.push(rr.toFixed(2) + 'R');
+              if (drawOptOf(d, 'showQty') !== false && qty > 0)
+                head.push(fmt(qty, qty % 1 ? 2 : 0) + ' units  risking ' + fmt(qty * risk, 2));
+              // A line of its own ABOVE the box: the topmost level's price label sits on
+              // that level's row, and on a narrow plan the two ran into each other.
+              tag(head.join('  '), x1 + 3, Math.max(11, Math.min(tg.y, e0.y, st.y) - 15));
+              // Each level's own price, at the right end of its line -- the left is the
+              // summary's now, and the target's price was never shown at all.
+              if (drawOptOf(d, 'showPrices') !== false) {
+                tag('target ' + fmt(tg.price, 2), x2 - 3, tg.y - 2, 'right');
+                tag('entry ' + fmt(e0.price, 2), x2 - 3, e0.y - 2, 'right');
+                tag('stop ' + fmt(st.price, 2), x2 - 3, st.y - 2, 'right');
+              }
               break;
             }
             case 'meas': {
@@ -6602,6 +6617,18 @@ function drawOptOf(d, key) {
 function drawOptSet(d, key) {
   const bag = Object.assign({}, d.opts, d.style, d.vis);
   return bag[key];
+}
+
+/* How many units a plan risks what it says it risks: the cash at stake (account x risk%)
+   over the distance from entry to stop, rounded DOWN to a whole lot so the answer is
+   tradeable. Zero when the inputs cannot answer -- no account, no risk, no stop distance.
+   The same arithmetic the order ticket's risk field uses, so a drawn plan and a typed one
+   agree. */
+function drawPositionSize(account, riskPct, lot, perUnit) {
+  const cash = (Number(account) || 0) * (Number(riskPct) || 0) / 100;
+  const step = Math.max(0, Number(lot) || 0) || 1;
+  if (!(cash > 0) || !(perUnit > 0)) return 0;
+  return Math.floor(cash / perUnit / step) * step;
 }
 
 /* Break text into lines that fit `maxW` at the font the context already carries. Words
