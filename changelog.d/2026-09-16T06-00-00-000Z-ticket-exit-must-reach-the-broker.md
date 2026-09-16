@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: **a stop loss you switched on could leave the order without one.** The ticket only attached an exit when its price field held a positive number, so an empty or non-positive field silently dropped the exit and sent a bare order — while the checkbox stayed ticked, which is the only evidence you have that you are protected. Two ordinary ways in: clearing the price to retype it, and ticking the box before the first quote arrives (with no price, a buy's stop auto-filled at −0.50 and was then discarded). The ticket now refuses to send an exit it cannot honour, the way it has always refused an unusable limit price, and the tick auto-fill no longer invents a price it has nothing to anchor to.

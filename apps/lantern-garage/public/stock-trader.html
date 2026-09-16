@@ -5730,7 +5730,11 @@ function otSyncFromTicks(kind){
   }else{
     exitPrice = otSide === 'buy' ? price - ticks*TICK_SIZE : price + ticks*TICK_SIZE;
   }
-  priceEl.value = exitPrice.toFixed(2);
+  // No quote yet means nothing to measure the ticks from: price is 0, so a buy's stop
+  // would be written as -0.50 and then silently dropped at submit. Leave the field empty
+  // instead -- submitOrderTicket refuses an enabled exit with no price, which is the
+  // honest outcome of "you cannot place a stop before you have a price".
+  priceEl.value = price > 0 ? exitPrice.toFixed(2) : '';
   renderOrderTicket();
 }
 
@@ -7631,13 +7635,22 @@ async function submitOrderTicket(){
     if(!lp || lp <= 0){ _alertToast('Enter a valid limit price'); return; }
     body.limitPrice = lp;
   }
-  if(document.getElementById('otTpEnabled').checked){
-    const tp = Number(document.getElementById('otTpPrice').value);
-    if(tp > 0) body.takeProfit = tp;
-  }
-  if(document.getElementById('otSlEnabled').checked){
-    const sl = Number(document.getElementById('otSlPrice').value);
-    if(sl > 0) body.stopLoss = sl;
+  // An exit the reader switched ON either reaches the broker or stops the order. This
+  // read `if(price > 0)`, so an empty or non-positive field silently dropped the exit and
+  // sent a bare order while the checkbox stayed ticked -- and that ticked box is the
+  // reader's only evidence they are protected. Reachable by clearing the field to retype
+  // it, and by ticking the box before the first quote arrives (QA, 2026-09-16: with no
+  // price a buy's stop auto-filled at -0.50 and was dropped). The limit price above has
+  // refused an unusable value all along; the exits do now too.
+  for(const [kind, label, key] of [['Tp','Take profit','takeProfit'], ['Sl','Stop loss','stopLoss']]){
+    if(!document.getElementById('ot'+kind+'Enabled').checked) continue;
+    const el = document.getElementById('ot'+kind+'Price');
+    const v = Number(el.value);
+    if(!(v > 0)){
+      _alertToast(`Enter a ${label.toLowerCase()} price, or switch ${label.toLowerCase()} off`);
+      el.focus(); return;
+    }
+    body[key] = v;
   }
   // An exit on the wrong side of the entry is not an exit: a take-profit below a buy's
   // entry, or a stop above it (the mirror for a sell), is already "hit" when the order
