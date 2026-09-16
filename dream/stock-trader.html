@@ -4381,7 +4381,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         // be grabbed is visible. Drawn last so nothing paints over them.
         if (typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === tk && list[_selDraw.i] && !list[_selDraw.i].pane) {
           const sd = list[_selDraw.i];
-          const hp = (sd.t === 'pen' && (sd.pts || []).length > 2)
+          const hp = (_isBrush(sd.t) && (sd.pts || []).length > 2)
             ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
           ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([]);
           for (const a of hp) {
@@ -4495,7 +4495,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           }
           if(typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === _drawTk && _drawList[_selDraw.i] && _drawList[_selDraw.i].pane === cfg.id){
             const sd = _drawList[_selDraw.i];
-            const hp = (sd.t === 'pen' && (sd.pts || []).length > 2) ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
+            const hp = (_isBrush(sd.t) && (sd.pts || []).length > 2) ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
             ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([]);
             for(const a of hp){ ctx.beginPath(); ctx.arc(_drawXOf(a.ts), yOf(a.price), 4.5, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = SEL_BLUE; ctx.stroke(); }
             ctx.restore();
@@ -5870,6 +5870,13 @@ const DRAW_CAT_COLOR = {
   brushes:  '#ec6a5e',   // freehand -- warm, obviously hand-made
   text:     '#b3b9c5',   // notes are chrome, not signal
 };
+/* A brush is a tool you DRAG a path out of, and the catalogue says which ones are
+   (`drag: true`). Every path used to hardcode 'pen' instead, which is why the highlighter
+   -- declared exactly like the brush -- could never be drawn: no gesture collected a path
+   for it, and a click left a one-point stroke its renderer skips. A function, not a const,
+   so the painter can call it whatever the order of evaluation. */
+function _isBrush(t) { const spec = DRAW_TOOLS[t]; return !!(spec && spec.drag); }
+
 function drawDefaultColor(t) {
   const spec = DRAW_TOOLS[t];
   return (spec && DRAW_CAT_COLOR[spec.cat]) || DRAW_COLOR;
@@ -6266,10 +6273,21 @@ function _drawingAnchors(tk, data, idx, pw, ph) {
   const xOf = _drawTimeMap(data.bars, slotW).xOf;
   // A brush is a path, not a shape: a handle per point would be unusable, so it gets
   // its two ends and otherwise moves as a whole.
-  const pts = (d.t === 'pen' && d.pts.length > 2) ? [d.pts[0], d.pts[d.pts.length - 1]] : (d.pts || []);
+  const pts = (_isBrush(d.t) && d.pts.length > 2) ? [d.pts[0], d.pts[d.pts.length - 1]] : (d.pts || []);
   const pm = d.pane ? _paneMapper(data, d.pane) : null;
   if (d.pane && !pm) return [];
   const yOf = pm ? pm.yOf : yPrice;
+  // A regression trend is fitted to the BARS its span covers: the anchors set the span and
+  // their price is never read, so handles at the anchors floated above the channel, over
+  // empty chart. Put them on the ends of the line the fit actually draws.
+  if (d.t === 'regr' && pts.length >= 2) {
+    const l = xOf(pts[0].ts) <= xOf(pts[1].ts) ? 0 : 1;
+    const band = _regrBand(data.bars, slotW, Math.min(xOf(pts[0].ts), xOf(pts[1].ts)), Math.max(xOf(pts[0].ts), xOf(pts[1].ts)), yOf);
+    if (band) return [
+      { x: band.a0.x, y: band.a0.y, ts: pts[l].ts, price: pts[l].price },
+      { x: band.b0.x, y: band.b0.y, ts: pts[1 - l].ts, price: pts[1 - l].price },
+    ];
+  }
   return pts.map(a => ({ x: xOf(a.ts), y: yOf(a.price), ts: a.ts, price: a.price }));
 }
 
@@ -7116,7 +7134,7 @@ document.addEventListener('pointerdown', e => {
   // Multi-point tools (triangle, channel, position) still take discrete clicks --
   // three anchors cannot come from one drag -- so they fall through to the click path.
   const _spec = DRAW_TOOLS[_drawTool];
-  if (_drawTool !== 'pen' && !(_spec && _spec.pts === 2)) return;
+  if (!_isBrush(_drawTool) && !(_spec && _spec.pts === 2)) return;
   const lad = e.target.closest('.zone-ladder'); if (!lad) return;
   const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
@@ -7130,7 +7148,7 @@ document.addEventListener('pointerdown', e => {
   // Only the brush claims _drawPending on press. A 2-point tool waits for actual
   // movement (below) — otherwise a press-release with no drag would wipe the click
   // handler's half-placed shape and click-click would silently stop working.
-  if (_drawTool === 'pen') _drawPending = { tk: _penDrag.tk, t: 'pen', pts: _penDrag.pts, pane: _penDrag.pane };
+  if (_isBrush(_drawTool)) _drawPending = { tk: _penDrag.tk, t: _drawTool, pts: _penDrag.pts, pane: _penDrag.pane };
 }, true);
 document.addEventListener('pointermove', e => {
   if (!_penDrag) return;
@@ -7139,13 +7157,13 @@ document.addEventListener('pointermove', e => {
   if ((a.pane || null) !== (_penDrag.pane || null)) return;   // the shape stays in the pane it started in
   if (!_penDrag.moved) {
     _penDrag.moved = true;
-    if (_penDrag.tool !== 'pen') {
+    if (!_isBrush(_penDrag.tool)) {
       _penDrag.pts[1] = { ts: a.ts, price: a.price };
       _drawPending = { tk: _penDrag.tk, t: _penDrag.tool, pts: _penDrag.pts, pane: _penDrag.pane };
       _drawPendingFromDrag = true;
     }
   }
-  if (_penDrag.tool === 'pen') {
+  if (_isBrush(_penDrag.tool)) {
     const last = _penDrag.pts[_penDrag.pts.length - 1];
     if (Math.abs(a.price - last.price) < 1e-9 && Math.abs(a.ts - last.ts) < 1) return;
     _penDrag.pts.push({ ts: a.ts, price: a.price });
@@ -7163,9 +7181,12 @@ document.addEventListener('pointerup', () => {
   _penDrag = null;
   // Clearing _drawPending is ONLY correct when this gesture owned it. A no-drag press
   // leaves the click handler's accumulated anchors intact.
-  if (moved || tool === 'pen') { _drawPending = null; _drawPendingFromDrag = false; }
-  if (tool === 'pen') {
-    if (pts.length > 1) _commitDrawing(tk, pane ? { t: 'pen', pts, pane } : { t: 'pen', pts });
+  if (moved || _isBrush(tool)) { _drawPending = null; _drawPendingFromDrag = false; }
+  if (_isBrush(tool)) {
+    // One point is a dot, not a stroke: the renderer skips it, so committing it would
+    // leave an invisible object in the list (which is what the highlighter did).
+    if (pts.length > 1) _commitDrawing(tk, pane ? { t: tool, pts, pane } : { t: tool, pts });
+    if (pts.length > 1) setDrawTool('');                   // one stroke per arm, like the shapes
   } else if (moved && pts.length === 2) {
     _commitDrawing(tk, pane ? { t: tool, pts, pane } : { t: tool, pts });
     setDrawTool('');                                       // one shape per arm
@@ -7247,7 +7268,7 @@ document.addEventListener('pointermove', (e) => {
     // Move ONE anchor. A brush maps its two handles to the path's real endpoints.
     const src = _dragDraw.startPts;
     let idx = _dragDraw.handle;
-    if (d.t === 'pen' && src.length > 2) idx = _dragDraw.handle === 0 ? 0 : src.length - 1;
+    if (_isBrush(d.t) && src.length > 2) idx = _dragDraw.handle === 0 ? 0 : src.length - 1;
     d.pts[idx] = { ts: g.tsAt(x), price: g.valueAt(y, d) };
   } else {
     // Move the WHOLE drawing by the pointer delta: sideways along the bars (ten bars is
@@ -7285,7 +7306,7 @@ document.addEventListener('contextmenu', (e) => {
 // Capture-phase click so an armed tool wins over the card's own click-to-focus.
 document.addEventListener('click', e => {
   if (!_drawTool && !e.altKey) return;
-  if (_drawTool === 'pen' && !e.altKey) return;   // brush draws on drag; alt-click still deletes
+  if (_isBrush(_drawTool) && !e.altKey) return;   // a brush draws on drag; alt-click still deletes
   const lad = e.target.closest('.zone-ladder'); if (!lad) return;
   const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
@@ -7299,6 +7320,17 @@ document.addEventListener('click', e => {
   }
   const spec = DRAW_TOOLS[_drawTool]; if (!spec) return;
   e.stopPropagation(); e.preventDefault();
+
+  // The eraser deletes what you click and STAYS ARMED, which is what its help promises.
+  // Without this it fell through to the anchor path below and committed {t:'eraser'} --
+  // an object no renderer draws -- while the drawing it was aimed at survived.
+  if (spec.erase) {
+    if (_deleteNearestDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph)) renderTicker(tk);
+    return;
+  }
+  // A cursor is not a tool that draws. pickDrawTool() disarms those, but a shortcut or a
+  // saved state could still arm one, and one anchor would commit a shape of it.
+  if (spec.cursor) { setDrawTool(''); return; }
 
   if (!_drawPending || _drawPending.tk !== tk || _drawPending.t !== _drawTool) {
     _drawPending = { tk, t: _drawTool, pts: [], pane: a.pane || null };
