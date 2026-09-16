@@ -5,9 +5,14 @@
  *
  * One account, one active strategy. Each signed-in user picks which trader runs on
  * their connected (Alpaca) account:
- *   'stock'    — the day-trader: signal entries + their manual buy/sell (the default).
+ *   'off'      — nobody trades it. The kill-switch, and what a real signed-in user
+ *                gets until they choose otherwise (#3212, see defaultFor below).
+ *   'stock'    — the day-trader: signal entries + their manual buy/sell.
  *   'champion' — the Champion allocation book: the slow, diversified ETF-rebalance
  *                engine (lib/sigma-trader.js) run on THEIR own account.
+ *
+ * DEFAULT is 'stock' because that is what the OPERATOR identities get; everyone else
+ * gets 'off'. Read defaultFor(), not DEFAULT, when you mean "what does this user get".
  *
  * Only ONE is active per account at a time: the autopilot loop (routes/trading.js
  * `_autoscanTick`) reads this and, for a 'champion' user, PAUSES the day-trader and

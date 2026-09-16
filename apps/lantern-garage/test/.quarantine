@@ -36,7 +36,6 @@ tool-arg-repair.test.js
 tool-loop-hardening.test.js
 tool-loop-memory-refresh.test.js
 tool-provider-matrix.test.js
-trader-mode.test.js
 watchlist-store-seed.test.js
 web-search-snippet-quality.test.js
 
