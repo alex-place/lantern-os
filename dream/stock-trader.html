@@ -704,11 +704,8 @@
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   /* Trade | Journal — in-page switcher (the header nav has one Trader entry) */
-  .page-tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto}
-  .pt{font-family:var(--mono);font-size:11.5px;padding:5px 12px;color:var(--text2);text-decoration:none;border-right:1px solid var(--border);white-space:nowrap}
-  .pt:last-child{border-right:0}
-  .pt:hover{color:var(--text0)}
-  .pt.on{color:var(--text0);background:rgba(255,255,255,.07)}
+  /* The Trade | Journal tabs moved to the site header (founder, 2026-09-15), so the
+     toolbar keeps only what is about THIS chart. Their CSS went with them. */
   .logo span{color:var(--text1);font-weight:400}
   /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
      label-over-value pairs — halves the toolbar's height footprint. */
@@ -1510,9 +1507,6 @@
 <h1 class="visually-hidden">Unisona Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
 <div class="header" role="region" aria-label="Trading toolbar">
   <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
-  <div class="page-tabs" role="navigation" aria-label="Trading pages">
-    <a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/journal.html" title="Your trading journal — realized results, the equity curve, and every declined trade">Journal</a>
-  </div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
