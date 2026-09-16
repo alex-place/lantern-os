@@ -1,0 +1,5 @@
+### Fixed
+
+- trader: **a shape you drag out no longer collapses to a point.** A press-drag-release held the canvas it started on, and the card deck rebuilds itself whenever the watchlist poll reorders it — every couple of seconds. The held canvas was replaced, every later move of the drag was dropped, and the release committed the rectangle, ellipse or box at whatever size it had when the deck rebuilt. The gesture now follows the rebuild instead of losing it.
+- trader: **the colour button edits the colours a drawing actually has.** It always wrote one "colour", which the multi-coloured tools never read — a fib's levels, a position's target and stop, a channel's fill — so on those tools it did nothing at all. It now offers each of them, one row per colour. The swatch also matches the ink: it used to show the tool's colour while the chart painted a different one. And the per-family palette works again — lines blue, chart patterns amber, Fibonacci teal, brushes warm — instead of everything being violet.
+- trader: **a position's line colour paints its entry line**, which was fixed grey no matter what the setting said.

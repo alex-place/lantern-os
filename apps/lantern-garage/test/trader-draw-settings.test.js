@@ -26,7 +26,10 @@ const fn = (name) => {
 const specStart = PAGE.indexOf('const FIB_COLORS = {');
 const specEnd = PAGE.indexOf('\nconst drawSpecOf', specStart);
 assert.ok(specStart > 0 && specEnd > specStart, 'DRAW_SPEC block not found');
-const { DRAW_SPEC, FIB_COLORS } = new Function(PAGE.slice(specStart, specEnd) + '\nreturn { DRAW_SPEC, FIB_COLORS };')();
+// The block now ends by handing each tool that stated no colour of its own its family's,
+// so the sandbox has to supply the two names that loop reads. Colour values are not this
+// test's subject (trader-draw-colors is), so the stub leaves every default where it was.
+const { DRAW_SPEC, FIB_COLORS } = new Function('DRAW_COLOR', 'drawDefaultColor', PAGE.slice(specStart, specEnd) + '\nreturn { DRAW_SPEC, FIB_COLORS };')('#a78bfa', () => '#a78bfa');
 
 // The painter's cases, by tool id.
 const swStart = PAGE.indexOf('switch (d.t) {', PAGE.indexOf('const shade = (fn, a) =>'));
