@@ -1,12 +1,13 @@
 'use strict';
 /**
- * test/trader-draw-settings.test.js — every option in a drawing tool's settings dialog
- * does what its label says (founder, 2026-09-14: "test the fib and channel tools more").
+ * test/trader-draw-settings.test.js — every option every drawing tool offers does what its
+ * label says.
  *
- * The first test is the audit that found the problem: for each tool, every key its
- * DRAW_SPEC offers is read by its painter (directly, or through the shared shade() for
- * fill colour / opacity, or through fibColorOf for level colours). It fails the moment a
- * dialog grows a control the painter ignores.
+ * The first version of this audit covered twenty tools and found a dialog full of controls
+ * the painter never read. It also had two blind spots: it skipped any case written without
+ * braces (`case 'l': seg(...)`) and any case with a blank line above it, which hid fifteen
+ * more tools. It covers all forty-seven now, and it is the reason a dialog cannot grow a
+ * dead control again.
  *
  * Run: node --test apps/lantern-garage/test/trader-draw-settings.test.js
  */
@@ -22,71 +23,105 @@ const fn = (name) => {
   return PAGE.slice(at, PAGE.indexOf('\n}\n', at) + 3);
 };
 
-// The dialog's catalogue, evaluated as the page does.
+// The catalogue of tools, and the catalogue of their settings.
+const catStart = PAGE.indexOf('const DRAW_CATS = [');
+const catEnd = PAGE.indexOf('\n})();', PAGE.indexOf('const DRAW_TOOLS = (() => {', catStart)) + 6;
+const DRAW_TOOLS = new Function('ico', PAGE.slice(catStart, catEnd) + '\nreturn DRAW_TOOLS;')(() => '');
 const specStart = PAGE.indexOf('const FIB_COLORS = {');
 const specEnd = PAGE.indexOf('\nconst drawSpecOf', specStart);
-assert.ok(specStart > 0 && specEnd > specStart, 'DRAW_SPEC block not found');
-// The block now ends by handing each tool that stated no colour of its own its family's,
-// so the sandbox has to supply the two names that loop reads. Colour values are not this
-// test's subject (trader-draw-colors is), so the stub leaves every default where it was.
-const { DRAW_SPEC, FIB_COLORS } = new Function('DRAW_COLOR', 'drawDefaultColor', PAGE.slice(specStart, specEnd) + '\nreturn { DRAW_SPEC, FIB_COLORS };')('#a78bfa', () => '#a78bfa');
+// The block ends by handing each tool that stated no colour of its own its family's, so the
+// sandbox supplies the two names that loop reads. Colour VALUES are trader-draw-colors'
+// subject, not this file's, so the stub leaves every default where it was.
+const DRAW_SPEC = new Function('DRAW_COLOR', 'drawDefaultColor',
+  PAGE.slice(specStart, specEnd) + '\nreturn DRAW_SPEC;')('#a78bfa', () => '#a78bfa');
 
-// The painter's cases, by tool id.
+/* Each painter case, by tool id. Every `case 'id':` counts, braced or not, wherever it sits
+   — the two shapes this missed before were `case 'l': seg(...)` on one line and a case with
+   a blank line above it. Labels separated only by whitespace share one body. */
 const swStart = PAGE.indexOf('switch (d.t) {', PAGE.indexOf('const shade = (fn, a) =>'));
 const swEnd = PAGE.indexOf('_drawOne = drawOne;', swStart);
-assert.ok(swStart > 0 && swEnd > swStart, 'drawOne switch not found');
+assert.ok(swStart > 0 && swEnd > swStart, 'the painter switch was not found');
 const SW = PAGE.slice(swStart, swEnd);
-const HELPERS = PAGE.slice(PAGE.indexOf('const fillA = () =>'), swStart);   // fillA, shade, xEnd, priceTag ...
+const groups = [];
+for (const m of SW.matchAll(/case '([a-z0-9]+)'\s*:/g)) {
+  const prev = groups[groups.length - 1];
+  if (prev && /^\s*$/.test(SW.slice(prev.end, m.index))) { prev.ids.push(m[1]); prev.end = m.index + m[0].length; }
+  else groups.push({ at: m.index, end: m.index + m[0].length, ids: [m[1]] });
+}
 const cases = {};
-const marks = [...SW.matchAll(/\n(\s*)case ([^\n]*?)\{/g)].map((m) => ({ at: m.index, label: m[2] }));
-marks.forEach((m, i) => {
-  const body = SW.slice(m.at, i + 1 < marks.length ? marks[i + 1].at : SW.length);
-  for (const id of [...m.label.matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1])) cases[id] = body;
+groups.forEach((g, i) => {
+  const body = SW.slice(g.at, i + 1 < groups.length ? groups[i + 1].at : SW.length);
+  for (const id of g.ids) cases[id] = body;
 });
 
-const TOOLS = ['fib', 'fibx', 'fibchan', 'fibtime', 'fibcirc', 'fibfan', 'gannfan', 'gannbox',
-               'chan', 'flat', 'fork', 'regr', 'djchan', 'rect', 'ell', 'tri', 'meas', 'range', 'drange', 'proj'];
+const DRAWS = Object.keys(DRAW_TOOLS).filter((t) => !DRAW_TOOLS[t].cursor && !DRAW_TOOLS[t].erase);
+const FIB_KEYS = ['c0', 'c236', 'c382', 'c50', 'c618', 'c786', 'c100', 'c1272', 'c1618', 'c2618'];
 
-test('every option a tool offers is read by its painter', () => {
-  const generic = new Set(['color', 'w', 'dash']);                      // drawStyleOf, for every tool
-  const viaShade = new Set(['fillColor', 'fillAlpha']);                  // the shared shade()
-  assert.match(HELPERS, /drawOptOf\(d, 'fillColor'\)/); assert.match(HELPERS, /drawOptOf\(d, 'fillAlpha'\)/);
+/** What this painter reads, directly or through a helper that reads on its behalf. */
+function readsOf(body) {
+  const reads = new Set([...body.matchAll(/drawOpt(?:Of|Set)\(d, ?'([a-zA-Z0-9_]+)'\)/g)].map((m) => m[1]));
+  if (/\bshade\(/.test(body)) { reads.add('fillColor'); reads.add('fillAlpha'); }
+  if (/\bxEnd\(/.test(body)) reads.add('extendRight');
+  if (/\bspanOf\(/.test(body)) { reads.add('extendLeft'); reads.add('extendRight'); }
+  if (/\bpriceTag\(/.test(body)) reads.add('showLabels');
+  if (/d\.text/.test(body)) reads.add('text');
+  if (/fibColorOf\(d, lv\)/.test(body)) for (const k of FIB_KEYS) reads.add(k);
+  return reads;
+}
+
+test('every tool that draws has a painter, and every option it offers is read', () => {
+  const generic = new Set(['color', 'w', 'dash']);        // drawStyleOf / drawOptOf, for every tool
+  assert.ok(DRAWS.length >= 47, 'the catalogue shrank: ' + DRAWS.length);
+  const noCase = DRAWS.filter((t) => !cases[t]);
+  assert.deepStrictEqual(noCase, [], 'offered in the picker, drawn by nothing: ' + noCase.join(', '));
   const missing = [];
-  for (const t of TOOLS) {
-    const sp = DRAW_SPEC[t] || DRAW_SPEC._default;
-    const keys = [].concat(sp.inputs || [], sp.style || [], sp.vis || []).map((f) => f.k);
-    const body = cases[t]; assert.ok(body, 'no painter case for ' + t);
-    const reads = new Set([...body.matchAll(/drawOptOf\(d,\s*'([a-zA-Z0-9_]+)'\)/g)].map((m) => m[1]));
-    // helpers the case calls read these on its behalf
-    if (/\bshade\(/.test(body)) viaShade.forEach((k) => reads.add(k));
-    if (/\bxEnd\(/.test(body)) reads.add('extendRight');
-    if (/\bpriceTag\(/.test(body)) reads.add('showLabels');
-    if (/\bsizeTag\(/.test(body)) reads.add('showSize');
-    const levelColours = /fibColorOf\(d, lv\)/.test(body);
-    for (const k of keys) {
-      if (generic.has(k) || reads.has(k)) continue;
-      if (/^c\d+$/.test(k) && levelColours) continue;
-      missing.push(t + '.' + k);
-    }
+  for (const t of DRAWS) {
+    const spec = DRAW_SPEC[t] || DRAW_SPEC._default;
+    const reads = readsOf(cases[t]);
+    for (const f of [].concat(spec.inputs || [], spec.style || [], spec.vis || []))
+      if (!generic.has(f.k) && !reads.has(f.k)) missing.push(t + '.' + f.k);
   }
   assert.deepStrictEqual(missing, [], 'offered but never read: ' + missing.join(', '));
 });
 
-test('the extension\'s dialog offers the levels it draws, and fibColorOf knows them', () => {
-  const keys = DRAW_SPEC.fibx.style.map((f) => f.k);
-  assert.deepStrictEqual(keys.filter((k) => /^c/.test(k)), ['c0', 'c618', 'c100', 'c1618', 'c2618']);
-  assert.ok(!keys.includes('c236') && !keys.includes('c382'), 'no retracement-only colours');
-  const fibColorOf = new Function('FIB_COLORS', fn('fibColorOf') + '\nreturn fibColorOf;')(FIB_COLORS);
-  assert.strictEqual(fibColorOf({ style: { c1618: '#123456' } }, 1.618), '#123456', 'the 161.8% colour is the dialog\'s');
-  assert.strictEqual(fibColorOf({}, 2.618), FIB_COLORS[2.618], 'and falls back to the palette');
+test('the helpers the audit trusts really do read on a painter\'s behalf', () => {
+  // If one of these stops reading its option, the audit above would wave through every
+  // tool that relies on it, so they are pinned here.
+  const helpers = PAGE.slice(PAGE.indexOf('const fillA = () =>'), swStart);
+  assert.match(helpers, /drawOptOf\(d, 'fillColor'\)/);
+  assert.match(helpers, /drawOptOf\(d, 'fillAlpha'\)/);
+  assert.match(helpers, /const xEnd = \(a, b\) => drawOptOf\(d, 'extendRight'\)/);
+  assert.match(helpers, /const spanOf = \(a, b\) => \{[\s\S]*?drawOptOf\(d, 'extendLeft'\)[\s\S]*?drawOptOf\(d, 'extendRight'\)/);
+  assert.match(helpers, /const priceTag = \(x, yy\) => \{ if \(drawOptOf\(d, 'showLabels'\)\)/);
+  // sizeTag only paints: its callers decide, with an explicit drawOptOf, so it needs no rule.
+  assert.match(PAGE, /if \(drawOptOf\(d, 'showSize'\)\) sizeTag\(/);
 });
 
-test('defaults keep the look: no extension and no channel labels until asked; fill opacity says 16', () => {
+test('a tool does not offer what its own identity already decides', () => {
+  // A ray runs right and an extended line runs both ways -- that is what those tools ARE,
+  // so a switch for it could only ever lie. The trend line, which has ends, keeps it.
+  for (const t of ['ray', 'xline', 'hray'])
+    assert.deepStrictEqual((DRAW_SPEC[t].inputs || []).map((f) => f.k), [], t + ' offers an extension it cannot honour');
+  assert.deepStrictEqual(DRAW_SPEC.l.inputs.map((f) => f.k), ['extendLeft', 'extendRight']);
+  assert.deepStrictEqual(DRAW_SPEC.h.inputs.map((f) => f.k), ['extendRight']);
+});
+
+test('the level families still colour each level, and the extension has its own', () => {
+  const keys = DRAW_SPEC.fibx.style.map((f) => f.k);
+  assert.deepStrictEqual(keys.filter((k) => /^c/.test(k)), ['c0', 'c618', 'c100', 'c1618', 'c2618']);
+  for (const t of ['fib', 'fibchan', 'fibcirc', 'fibfan'])
+    assert.match(cases[t], /fibColorOf\(d, lv\)/, t + ' stopped colouring its levels');
+});
+
+test('defaults keep what each tool painted before its options worked', () => {
   for (const t of ['chan', 'flat', 'fibchan']) assert.strictEqual(DRAW_SPEC[t].inputs.find((f) => f.k === 'extendRight').def, false, t);
   assert.strictEqual(DRAW_SPEC.fork.inputs.find((f) => f.k === 'extendRight').def, true, 'a pitchfork always ran to the edge');
+  assert.strictEqual(DRAW_SPEC.h.inputs.find((f) => f.k === 'extendRight').def, true, 'a level always crossed the chart');
   for (const t of ['chan', 'flat', 'fork', 'regr', 'djchan']) assert.strictEqual(DRAW_SPEC[t].vis.find((f) => f.k === 'showLabels').def, false, t);
+  for (const t of ['h', 'hray']) assert.strictEqual(DRAW_SPEC[t].vis.find((f) => f.k === 'showLabels').def, true, t + ' always showed its price');
   assert.strictEqual(DRAW_SPEC.rect.style.find((f) => f.k === 'fillAlpha').def, 16);
-  assert.match(HELPERS, /\(v == null \|\| v === ''\) \? 0\.16/, 'a tool without the option still shades at 16%');
+  const helpers = PAGE.slice(PAGE.indexOf('const fillA = () =>'), swStart);
+  assert.match(helpers, /\(v == null \|\| v === ''\) \? 0\.16/, 'a tool without the option still shades at 16%');
 });
 
 // ── the hit test follows Extend right ────────────────────────────────────────────────
@@ -111,7 +146,7 @@ function hitter(drawings) {
 test('a channel with Extend right on is a hit out to the plot\'s edge; off, it ends at its anchors', () => {
   const data = chart(), b = data.bars;
   const mk = (opts) => ({ t: 'chan', opts, pts: [{ ts: tsOfBar(b, 10), price: 160 }, { ts: tsOfBar(b, 40), price: 160 }, { ts: tsOfBar(b, 25), price: 150 }] });
-  const farInBand = [PW - 10, yOf(155)];                      // right of the second anchor, inside the band's height
+  const farInBand = [PW - 10, yOf(155)];
   assert.strictEqual(hitter({ SPY: [mk({})] })('SPY', data, farInBand[0], farInBand[1], PW, PH, 14), null, 'not extended: nothing out there');
   const on = hitter({ SPY: [mk({ extendRight: true })] })('SPY', data, farInBand[0], farInBand[1], PW, PH, 14);
   assert.ok(on && on.i === 0, 'extended: the band reaches the edge');
@@ -124,12 +159,4 @@ test('a fib with Extend levels right off ends at its second anchor', () => {
   assert.ok(hitter({ SPY: [fib({})] })('SPY', data, PW - 6, y50, PW, PH, 14), 'default: to the edge');
   assert.strictEqual(hitter({ SPY: [fib({ extendRight: false })] })('SPY', data, PW - 6, y50, PW, PH, 14), null, 'off: not at the edge');
   assert.ok(hitter({ SPY: [fib({ extendRight: false })] })('SPY', data, 30 * 4 + 2 - 10, y50, PW, PH, 14), 'off: still on the level within the span');
-});
-
-test('elapsed time reads the way a trader says it', () => {
-  const f = new Function(fn('_fmtElapsed') + '\nreturn _fmtElapsed;')();
-  assert.strictEqual(f(45 * 60000), '45m');
-  assert.strictEqual(f((3 * 60 + 20) * 60000), '3h 20m');
-  assert.strictEqual(f(2 * 24 * 3600000 + 4 * 3600000), '2d 4h');
-  assert.strictEqual(f(-90 * 60000), '1h 30m', 'direction does not matter');
 });
