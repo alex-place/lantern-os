@@ -5,11 +5,11 @@
  *
  * stock-trader.html lays the desk out as one CSS grid:
  *
- *   .layout  grid-template-columns: 44px  var(--col-l)  minmax(0,1fr)  var(--col-t)  var(--col-r)  44px
+ *   .layout  grid-template-columns: 56px  var(--col-l)  minmax(0,1fr)  var(--col-t)  var(--col-r)  44px
  *              draw rail    chat        CHART         order ticket   watchlist   widget rail
  *
  * Only the chart track is flexible, so it gets whatever the fixed tracks leave.
- * Those defaults total 1088px (44 + 360 + 320 + 320 + 44), which is fine on a
+ * Those defaults total 1120px (56 + 360 + 320 + 340 + 44), which is fine on a
  * 1920px monitor and quietly awful on a laptop. Measured in a real browser against
  * the shipped page on 2026-08-18:
  *
