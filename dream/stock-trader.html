@@ -3771,6 +3771,13 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           // Visibility › Price labels: the level a line reaches at its right end.
           const priceTag = (x, yy) => { if (drawOptOf(d, 'showLabels')) tag(fmt(priceAtY(yy), 2), Math.min(x, pw) - 3, yy - 2, 'right'); };
           const leftRight = (a, b) => (a.x <= b.x) ? [a, b] : [b, a];
+          // Inputs › Extend left / Extend right: the two ends of a segment, each carried to
+          // the plot's edge when the reader asked for it.
+          const spanOf = (a, b) => {
+            const [l, r] = leftRight(a, b);
+            return [drawOptOf(d, 'extendLeft') ? { x: 0, y: yAtX(l, r, 0) } : l,
+                    drawOptOf(d, 'extendRight') ? { x: pw, y: yAtX(l, r, pw) } : r];
+          };
           // Visibility › Height and bar count: what a shape spans, in price and in bars.
           const sizeTag = (a, b, x, y) => {
             const dp = Math.abs(b.price - a.price), pct = a.price ? dp / Math.abs(a.price) * 100 : 0;
@@ -3809,9 +3816,19 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             case 'elliott': case '3drives': {
               const labels = d.t === 'elliott' ? ['0','1','2','3','4','5'] : ['0','1','2','3','4','5','6'];
               for (let q=1; q<P.length; q++) seg(P[q-1], P[q]);
-              ctx.fillStyle = drawOptOf(d,'labelColor') || col;
-              P.forEach((pt,q) => { if (labels[q]) tag(labels[q], pt.x+4, pt.y-3); });
-              ctx.fillStyle = col;
+              if (drawOptOf(d, 'showPoints') !== false) {         // Visibility › Wave numbers
+                ctx.fillStyle = drawOptOf(d,'labelColor') || col;
+                P.forEach((pt,q) => { if (labels[q]) tag(labels[q], pt.x+4, pt.y-3); });
+                ctx.fillStyle = col;
+              }
+              // Inputs › Leg ratios: each wave against the one before it, which is how a
+              // count is checked against the rules rather than eyeballed.
+              if (drawOptOf(d, 'showRatios') && P.length >= 3) {
+                for (let q = 2; q < P.length; q++) {
+                  const leg1 = Math.abs(P[q-1].price - P[q-2].price), leg2 = Math.abs(P[q].price - P[q-1].price);
+                  if (leg1 > 0) tag((leg2/leg1).toFixed(3), (P[q-1].x + P[q].x)/2, (P[q-1].y + P[q].y)/2 - 3, 'center');
+                }
+              }
               break;
             }
             case 'fibcirc': {                    // concentric arcs at the fib ratios
@@ -3955,19 +3972,24 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (drawOptOf(d, 'showChange') !== false) bits.push((dp >= 0 ? '+' : '') + fmt(dp, 2));
               if (drawOptOf(d, 'showPercent') !== false) bits.push((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
               if (drawOptOf(d, 'showBars') !== false) bits.push(bars + ' bars');
-              if (bits.length) tag(bits.join('  '), (P[0].x + P[1].x)/2, Math.min(P[0].y, P[1].y) - 3, 'center');
+              // Visibility › Stats label: the switch that decides whether the readout shows
+              // at all, above the three that decide what is in it.
+              if (bits.length && drawOptOf(d, 'showLabels') !== false)
+                tag(bits.join('  '), (P[0].x + P[1].x)/2, Math.min(P[0].y, P[1].y) - 3, 'center');
               break;
             }
             case 'angle': {                      // trend line plus the angle it makes
               if (!P[1]) break;
-              seg(P[0], P[1]);
+              const [g1, g2] = spanOf(P[0], P[1]);
+              seg(g1, g2);
               ctx.save(); ctx.setLineDash([3,3]); ctx.globalAlpha = base*0.5;
-              seg(P[0], { x: P[1].x, y: P[0].y });
+              seg(P[0], { x: P[1].x, y: P[0].y });      // the horizontal the angle is measured from
               ctx.restore();
               if (drawOptOf(d, 'showAngle') !== false) {
                 const deg = Math.atan2(P[0].y - P[1].y, P[1].x - P[0].x) * 180/Math.PI;
                 tag(deg.toFixed(1) + '°', P[1].x + 4, P[1].y - 2);
               }
+              priceTag(g2.x, g2.y);
               break;
             }
             case 'crossline': {                  // one point, both axes
@@ -4032,6 +4054,8 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                   if (leg1 > 0) tag((leg2/leg1).toFixed(3), (P[q-1].x + P[q].x)/2, (P[q-1].y + P[q].y)/2 - 3, 'center');
                 }
               }
+              // Visibility › Price labels: what each turning point actually cost.
+              if (drawOptOf(d, 'showLabels')) for (const q of P) tag(fmt(q.price, 2), q.x + 4, q.y + 11);
               break;
             }
             case 'fibchan': {                    // fib levels parallel to a trend
@@ -4162,33 +4186,61 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
 
             case 'h': {
               const yy = P[0].y;
-              ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
-              tag('$' + fmt(P[0].price, 2), pw - 3, yy - 2, 'right');
+              // Inputs › Extend right: on, the level crosses the whole chart; off, it stops
+              // where it was placed, which is the only other thing a level can mean.
+              const x2 = drawOptOf(d, 'extendRight') !== false ? pw : P[0].x;
+              ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(x2, yy); ctx.stroke();
+              if (drawOptOf(d, 'showLabels') !== false) tag('$' + fmt(P[0].price, 2), x2 - 3, yy - 2, 'right');
+              if (drawOptOf(d, 'showOnAxis') !== false) _drawAxisTags.push({ y: yy, text: fmt(P[0].price, 2), color: col });
               break;
             }
-            case 'hray': {
+            case 'hray': {                       // a ray runs right: there is nothing to switch
               const a = P[0];
               ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(pw, a.y); ctx.stroke();
-              tag('$' + fmt(a.price, 2), pw - 3, a.y - 2, 'right');
+              if (drawOptOf(d, 'showLabels') !== false) tag('$' + fmt(a.price, 2), pw - 3, a.y - 2, 'right');
+              if (drawOptOf(d, 'showOnAxis') !== false) _drawAxisTags.push({ y: a.y, text: fmt(a.price, 2), color: col });
               break;
             }
             case 'v': {
               const a = P[0];
               ctx.beginPath(); ctx.moveTo(a.x, 0); ctx.lineTo(a.x, priceH); ctx.stroke();
+              // Visibility › Time label: a vertical line marks a MOMENT, and it never said
+              // which one. The crosshair's own wording, so the two agree.
+              if (drawOptOf(d, 'showLabels') !== false) {
+                const when = _fmtCrossTime(new Date(a.ts).toISOString());
+                if (when) tag(when, a.x + 3, priceH - 3);
+              }
               break;
             }
-            case 'l': if (P[1]) seg(P[0], P[1]); break;
-            case 'ray': if (P[1]) extend(P[0], P[1], false); break;
-            case 'xline': if (P[1]) extend(P[0], P[1], true); break;
+            case 'l': {
+              if (!P[1]) break;
+              const [s1, s2] = spanOf(P[0], P[1]);
+              seg(s1, s2); priceTag(s2.x, s2.y);        // Visibility › Price label
+              break;
+            }
+            case 'ray': {                        // a ray runs right: there is nothing to switch
+              if (!P[1]) break;
+              extend(P[0], P[1], false);
+              const far = P[1].x >= P[0].x ? pw : 0;
+              priceTag(far, yAtX(P[0], P[1], far));
+              break;
+            }
+            case 'xline': {
+              if (!P[1]) break;
+              extend(P[0], P[1], true);
+              priceTag(pw, yAtX(P[0], P[1], pw));
+              break;
+            }
             case 'arrow': {
               if (!P[1]) break;
               const a = P[0], b = P[1];
               seg(a, b);
-              const ang = Math.atan2(b.y - a.y, b.x - a.x), hh = 8;
+              const ang = Math.atan2(b.y - a.y, b.x - a.x), hh = drawOptOf(d, 'headSize') || 9;
               ctx.beginPath(); ctx.moveTo(b.x, b.y);
               ctx.lineTo(b.x - hh*Math.cos(ang - 0.4), b.y - hh*Math.sin(ang - 0.4));
               ctx.lineTo(b.x - hh*Math.cos(ang + 0.4), b.y - hh*Math.sin(ang + 0.4));
               ctx.closePath(); ctx.fill();
+              if (drawOptOf(d, 'showLabels')) tag(fmt(b.price, 2), b.x + hh, b.y - 3);   // what it points at
               break;
             }
             case 'rect': {
@@ -4364,9 +4416,12 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
             }
             case 'pen': {
               if (P.length < 2) break;
+              ctx.save();
+              ctx.globalAlpha = base*Math.max(0, Math.min(1, (drawOptOf(d, 'alpha') == null ? 100 : Number(drawOptOf(d, 'alpha'))) / 100));
+              ctx.lineCap = 'round'; ctx.lineJoin = 'round';
               ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y);
               for (let q = 1; q < P.length; q++) ctx.lineTo(P[q].x, P[q].y);
-              ctx.stroke();
+              ctx.stroke(); ctx.restore();
               break;
             }
             case 'text': {
@@ -6497,9 +6552,13 @@ const _extendInputs = () => [_chk('extendLeft', 'Extend left', false), _chk('ext
 const _priceVis = () => [_chk('showLabels', 'Price label', true)];
 
 // --- Lines -----------------------------------------------------------------
-for (const t of ['l', 'ray', 'xline']) DRAW_SPEC[t] = { inputs: _extendInputs(), style: _lineStyle(), vis: _priceVis() };
-for (const t of ['h', 'hray']) DRAW_SPEC[t] = {
-  inputs: [_chk('extendRight', 'Extend right', true)], style: _lineStyle('#f5a623'),
+// Only the trend line has ends to extend. A ray runs right and an extended line runs both
+// ways -- that is what those tools ARE -- so a switch for it could only ever lie.
+DRAW_SPEC.l = { inputs: _extendInputs(), style: _lineStyle(), vis: _priceVis() };
+for (const t of ['ray', 'xline']) DRAW_SPEC[t] = { inputs: [], style: _lineStyle(), vis: _priceVis() };
+DRAW_SPEC.h = { inputs: [_chk('extendRight', 'Extend right', true)], style: _lineStyle('#f5a623'),
+  vis: [_chk('showLabels', 'Price label', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
+DRAW_SPEC.hray = { inputs: [], style: _lineStyle('#f5a623'),     // a ray already runs right
   vis: [_chk('showLabels', 'Price label', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
 DRAW_SPEC.v = { inputs: [], style: _lineStyle('#787b86'), vis: [_chk('showLabels', 'Time label', true)] };
 DRAW_SPEC.crossline = { inputs: [], style: _lineStyle('#787b86'),
