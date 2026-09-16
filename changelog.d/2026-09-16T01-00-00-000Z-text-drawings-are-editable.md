@@ -1,0 +1,4 @@
+### Fixed
+
+- trader: **the words on a text drawing can be changed after you place it.** They were asked for once, by a browser prompt, when the drawing went down. The settings dialog could only offer colours, numbers and checkboxes, so fixing a typo in a note meant deleting it and drawing it again. All five text tools now open on a Text field you can edit, and it saves with the drawing.
+- trader: **their style options do what they say.** Font size, Bold, Background and Show background moved nothing on the Text and Note tools, which painted a fixed small size with no background. Wrap long text did nothing at all, so a long note ran off the side of the chart in one line. The Text tool's Price label, and the Price label tool's Price value and Tag on the price axis, were inert too. Existing drawings look the same until you change something.

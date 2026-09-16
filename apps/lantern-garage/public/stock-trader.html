@@ -273,6 +273,8 @@
   /* Style popup rows for a selected drawing. */
   .dr-st-row{display:flex;align-items:center;gap:8px;padding:6px 9px;font-size:var(--pop-fs);color:var(--text1)}
   .dr-st-row span{flex:1}
+  .dr-st-text{flex:1 1 130px;min-width:0;background:var(--bg0);color:var(--text0);border:1px solid var(--border);border-radius:5px;padding:4px 7px;font-family:inherit;font-size:var(--pop-fs)}
+  .dr-st-text:focus{outline:none;border-color:var(--accent)}
   .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:5px;padding:0}
   .dr-st-row input[type=range]{width:96px}
   .dr-settings{min-width:250px}
@@ -3711,6 +3713,10 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // The painter, the list and the ts->x map are shared with the pane loop below, which
     // paints the drawings that live in an indicator pane with that pane's own scale.
     let _drawOne = null, _drawList = [], _drawPend = null, _drawTk = null, _drawXOf = null, _yMap = y;
+    // A drawing paints inside a clip on the plot box, so it cannot reach the price gutter.
+    // One that wants a tag there (a price label's "Tag on the price axis") leaves it here,
+    // and they are painted once the clip is released, the way the indicator tags are.
+    const _drawAxisTags = [];
     // -- User drawings (#2444, expanded) --------------------------------------
     // ONE generic renderer over DRAW_TOOLS: every shape is a list of (ts,price)
     // anchors, so adding a tool is a spec entry + a case here, never new plumbing.
@@ -3917,18 +3923,21 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const a = P[0], txt = d.text || 'Comment';
               const fs = drawOptOf(d,'fontSize') || 12;
               ctx.font = (drawOptOf(d,'bold') ? 'bold ' : '') + fs + 'px ui-monospace, Menlo, Consolas, monospace';
-              const w0 = ctx.measureText(txt).width + 14, h0 = fs + 10, r0 = 6;
+              const lh = fs + 4;
+              const lines = drawOptOf(d, 'wrap') !== false ? _wrapLines(ctx, txt, 226) : [txt];   // Inputs › Wrap long text
+              let tw = 0; for (const ln of lines) tw = Math.max(tw, ctx.measureText(ln).width);
+              const w0 = tw + 14, h0 = lines.length*lh + 10, r0 = 6;
               const bx = a.x + 8, by = a.y - h0 - 8;
               ctx.beginPath();
               ctx.moveTo(bx+r0, by); ctx.arcTo(bx+w0, by, bx+w0, by+h0, r0);
               ctx.arcTo(bx+w0, by+h0, bx, by+h0, r0); ctx.arcTo(bx, by+h0, bx, by, r0);
               ctx.arcTo(bx, by, bx+w0, by, r0); ctx.closePath();
-              if (drawOptOf(d,'showBg') !== false) { ctx.fillStyle = drawOptOf(d,'bgColor') || '#151823'; ctx.fill(); }
+              if (drawOptOf(d,'showBg') !== false) { ctx.fillStyle = drawOptSet(d,'bgColor') || CHART_NOTE_BG(); ctx.fill(); }
               ctx.stroke();
               ctx.beginPath(); ctx.moveTo(bx+6, by+h0); ctx.lineTo(a.x, a.y); ctx.lineTo(bx+14, by+h0); ctx.stroke();
               ctx.fillStyle = drawOptOf(d,'color') || col;
               ctx.textAlign='left'; ctx.textBaseline='middle';
-              ctx.fillText(txt, bx+7, by+h0/2);
+              lines.forEach((ln, q) => ctx.fillText(ln, bx+7, by + 5 + lh*q + lh/2));
               ctx.font = MONO; ctx.fillStyle = col;
               break;
             }
@@ -4110,23 +4119,30 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
                 ctx.strokeStyle = drawOptOf(d, 'lineColor') || col;
                 seg(anchor, box); ctx.restore();
               }
-              const txt = d.text || 'Note';
-              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + (drawOptOf(d, 'fontSize') || 12) + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
-              const w0 = ctx.measureText(txt).width + 12, h0 = (drawOptOf(d, 'fontSize') || 12) + 8;
+              const txt = d.text || 'Note', fs = drawOptOf(d, 'fontSize') || 12;
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + fs + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
+              const lh = fs + 4;
+              const lines = drawOptOf(d, 'wrap') !== false ? _wrapLines(ctx, txt, 226) : [txt];   // Inputs › Wrap long text
+              let tw = 0; for (const ln of lines) tw = Math.max(tw, ctx.measureText(ln).width);
+              const w0 = tw + 12, h0 = lines.length*lh + 8;
               if (drawOptOf(d, 'showBg') !== false) {
-                ctx.fillStyle = drawOptOf(d, 'bgColor') || '#151823';
+                ctx.fillStyle = drawOptSet(d, 'bgColor') || CHART_NOTE_BG();
                 ctx.fillRect(box.x, box.y - h0, w0, h0);
                 ctx.strokeRect(box.x, box.y - h0, w0, h0);
               }
               ctx.fillStyle = drawOptOf(d, 'color') || col;
               ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-              ctx.fillText(txt, box.x + 6, box.y - h0/2);
+              lines.forEach((ln, q) => ctx.fillText(ln, box.x + 6, box.y - h0 + 4 + lh*q + lh/2));
               ctx.font = MONO; ctx.fillStyle = col;
               break;
             }
             case 'plabel': {                     // a price tag pinned to one level
               const a = P[0];
-              const txt = (d.text ? d.text + '  ' : '') + fmt(a.price, 2);
+              // Visibility › Price value: the label is the reader's words, the price, or both.
+              const showPx = drawOptOf(d, 'showLabels') !== false;
+              const txt = (d.text ? d.text + (showPx ? '  ' : '') : '') + (showPx ? fmt(a.price, 2) : '');
+              // Visibility › Tag on the price axis: painted in the gutter after the clip.
+              if (drawOptOf(d, 'showOnAxis') !== false) _drawAxisTags.push({ y: a.y, text: fmt(a.price, 2), color: drawOptOf(d, 'color') || col });
               ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + (drawOptOf(d, 'fontSize') || 12) + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
               const w0 = ctx.measureText(txt).width + 10, h0 = (drawOptOf(d, 'fontSize') || 12) + 6;
               ctx.save(); ctx.globalAlpha = base*0.5; ctx.setLineDash([4,3]);
@@ -4339,22 +4355,42 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               break;
             }
             case 'text': {
-              const a = P[0];
-              ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+              const a = P[0], fs = drawOptOf(d, 'fontSize') || 12;
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + fs + 'px ui-monospace, Menlo, Consolas, monospace';
+              const body = d.text || '';
+              // Visibility › Price label: the price this text is pinned to, after it.
+              const txt = drawOptOf(d, 'showLabels') ? (body ? body + '  ' : '') + fmt(a.price, 2) : body;
+              if (drawOptOf(d, 'showBg')) {           // off by default: this tool never drew one
+                ctx.fillStyle = drawOptSet(d, 'bgColor') || CHART_NOTE_BG();
+                ctx.fillRect(a.x + 2, a.y - fs/2 - 3, ctx.measureText(txt).width + 8, fs + 6);
+              }
               ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-              ctx.fillText(d.text || '', a.x + 4, a.y);
+              ctx.fillText(txt, a.x + 4, a.y);
+              ctx.font = MONO;
               break;
             }
             case 'note': {
-              const a = P[0], txt = d.text || '';
-              ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-              const wTxt = Math.min(240, ctx.measureText(txt).width + 14);
-              ctx.fillStyle = CHART_NOTE_BG();
-              ctx.fillRect(a.x + 6, a.y - 10, wTxt, 20);
-              ctx.strokeStyle = col; ctx.strokeRect(a.x + 6, a.y - 10, wTxt, 20);
+              const a = P[0], txt = d.text || '', fs = drawOptOf(d, 'fontSize') || 12;
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + fs + 'px ui-monospace, Menlo, Consolas, monospace';
+              const lh = fs + 4;
+              // Inputs › Wrap long text: a note is where the reasoning goes, and it used to
+              // run off the side of the chart in one line.
+              const lines = drawOptOf(d, 'wrap') !== false ? _wrapLines(ctx, txt, 226) : [txt];
+              let wTxt = 0; for (const ln of lines) wTxt = Math.max(wTxt, ctx.measureText(ln).width);
+              const bw = Math.min(240, wTxt + 14), bh = lines.length*lh + 8;
+              const bx = a.x + 6, by = a.y - bh/2;
+              if (drawOptOf(d, 'showBg') !== false) {
+                // The reader's background if they picked one; otherwise the theme's, which
+                // no fixed spec value could follow.
+                ctx.fillStyle = drawOptSet(d, 'bgColor') || CHART_NOTE_BG();
+                ctx.fillRect(bx, by, bw, bh);
+              }
+              ctx.strokeStyle = col; ctx.strokeRect(bx, by, bw, bh);
+              ctx.fillStyle = col;
               ctx.beginPath(); ctx.arc(a.x, a.y, 2.5, 0, Math.PI*2); ctx.fill();
-              ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-              ctx.fillText(txt, a.x + 12, a.y);
+              ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              lines.forEach((ln, q) => ctx.fillText(ln, bx + 6, by + 4 + lh*q + lh/2));
+              ctx.font = MONO;
               break;
             }
           }
@@ -4402,6 +4438,19 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       for(const s of out.series) _indStroke(ctx, s.values, _xOfIdx, y, s.color, s.width, s.dash);
     }
     ctx.restore();
+    // Tags a drawing asked for, in the gutter, where its own clip could not reach.
+    if(_drawAxisTags.length){
+      ctx.save(); ctx.font = _axisFont(); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      for(const t of _drawAxisTags){
+        if(t.y < 0 || t.y > priceH) continue;
+        ctx.fillStyle = t.color; ctx.fillRect(pw+1, Math.round(t.y)-7, AXIS_W-2, 14);
+        const c = _chartRgba(t.color, 1).match(/\d+/g) || [128,128,128];
+        ctx.fillStyle = (0.299*c[0] + 0.587*c[1] + 0.114*c[2]) > 150 ? '#111318' : '#ffffff';
+        ctx.fillText(t.text, pw+4, t.y);
+      }
+      ctx.restore();
+    }
+
     // Scales › indicator values on the price scale: a tag in the gutter at each overlay's
     // latest value, in the line's colour, so the axis says what the line is at.
     if(_cs('scales.indLabels') === true){
@@ -6423,9 +6472,12 @@ const _lineStyle = (c) => [_col('color', 'Line colour', c || '#a78bfa'),
 const _shapeStyle = (c) => [_col('color', 'Border', c || '#a78bfa'), _col('fillColor', 'Fill', c || '#a78bfa'),
                             _num('fillAlpha', 'Fill opacity %', 16, { min: 0, max: 100 }),
                             _num('w', 'Border width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
-const _textStyle = () => [_col('color', 'Text colour', '#e6e8ef'), _num('fontSize', 'Font size', 12, { min: 8, max: 32 }),
-                          _col('bgColor', 'Background', '#151823'), _chk('showBg', 'Show background', true),
+const _textStyle = (bgDef) => [_col('color', 'Text colour', '#e6e8ef'), _num('fontSize', 'Font size', 12, { min: 8, max: 32 }),
+                          _col('bgColor', 'Background', '#151823'), _chk('showBg', 'Show background', bgDef !== false),
                           _chk('bold', 'Bold', false)];
+/* The words themselves, editable after the fact. First on the Inputs tab, so opening a
+   text drawing's settings lands on the thing you most likely came to change. */
+const _txt = (ph) => ({ k: 'text', label: 'Text', type: 'text', def: '', placeholder: ph || '' });
 const _extendInputs = () => [_chk('extendLeft', 'Extend left', false), _chk('extendRight', 'Extend right', false)];
 const _priceVis = () => [_chk('showLabels', 'Price label', true)];
 
@@ -6484,12 +6536,14 @@ DRAW_SPEC.arrow = { inputs: [], style: [_col('color', 'Colour', '#a78bfa'),
   vis: [_chk('showLabels', 'Price label', false)] };
 
 // --- Text and notes ---------------------------------------------------------
-DRAW_SPEC.text = { inputs: [], style: _textStyle(), vis: [_chk('showLabels', 'Price label', false)] };
-DRAW_SPEC.note = { inputs: [_chk('wrap', 'Wrap long text', true)], style: _textStyle(), vis: [] };
-DRAW_SPEC.callout = { inputs: [_chk('wrap', 'Wrap long text', true)],
+// The Text tool has never drawn a background; its shared style group said otherwise, so
+// honouring the switch would have put a box behind every existing one. It starts off.
+DRAW_SPEC.text = { inputs: [_txt('Your text')], style: _textStyle(false), vis: [_chk('showLabels', 'Price label', false)] };
+DRAW_SPEC.note = { inputs: [_txt('What you want to remember'), _chk('wrap', 'Wrap long text', true)], style: _textStyle(), vis: [] };
+DRAW_SPEC.callout = { inputs: [_txt('Your text'), _chk('wrap', 'Wrap long text', true)],
   style: _textStyle().concat([_col('lineColor', 'Leader line', '#a78bfa')]),
   vis: [_chk('showLeader', 'Leader line', true)] };
-DRAW_SPEC.plabel = { inputs: [], style: _textStyle(),
+DRAW_SPEC.plabel = { inputs: [_txt('Label (the price is added)')], style: _textStyle(),
   vis: [_chk('showLabels', 'Price value', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
 
 // --- batch two -------------------------------------------------------------
@@ -6513,7 +6567,7 @@ for (const t of ['arrowup','arrowdn']) DRAW_SPEC[t] = {
   inputs: [], style: [_col('color','Colour', t === 'arrowup' ? '#089981' : '#f23645'),
                       _num('headSize','Size',11,{min:6,max:28})],
   vis: [_chk('showLabels','Price label',false)] };
-DRAW_SPEC.balloon = { inputs: [_chk('wrap','Wrap long text',true)], style: _textStyle(), vis: [] };
+DRAW_SPEC.balloon = { inputs: [_txt('Your remark'), _chk('wrap','Wrap long text',true)], style: _textStyle(), vis: [] };
 
 
 
@@ -6541,6 +6595,31 @@ function drawOptOf(d, key) {
   if (key === 'color') return drawDefaultColor(d.t);
   return DRAW_STYLE_DEFAULT[key];
 }
+/* What the reader actually CHOSE on this drawing, or undefined. drawOptOf() falls back to
+   the tool's spec default, which is a fixed value; some defaults cannot be fixed -- a
+   note's background follows the theme -- so a painter asks this instead and keeps its own
+   default when the answer is undefined. */
+function drawOptSet(d, key) {
+  const bag = Object.assign({}, d.opts, d.style, d.vis);
+  return bag[key];
+}
+
+/* Break text into lines that fit `maxW` at the font the context already carries. Words
+   only: a single word longer than the box keeps its line rather than being cut mid-word. */
+function _wrapLines(ctx, txt, maxW) {
+  const words = String(txt == null ? '' : txt).split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const lines = [];
+  let cur = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const next = cur + ' ' + words[i];
+    if (ctx.measureText(next).width <= maxW) cur = next;
+    else { lines.push(cur); cur = words[i]; }
+  }
+  lines.push(cur);
+  return lines;
+}
+
 /** Colour for one fib level, honouring an override on the drawing. */
 function fibColorOf(d, lv) {
   const key = 'c' + String(lv).replace('0.', '').replace('.', '') || 'c0';
@@ -6595,7 +6674,9 @@ function openDrawingSettings(tk, i, atX, atY) {
   for (const f of (fields[_setTab] || [])) {
     const v = drawOptOf(d, f.k), bag = bagFor(_setTab);
     h += '<label class="dr-st-row"><span>' + f.label + '</span>';
-    if (f.type === 'color') h += '<input type="color" value="' + v + '" oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.value)">';
+    if (f.type === 'text') h += '<input type="text" class="dr-st-text" value="' + _esc(d.text == null ? '' : d.text) + '" placeholder="' + _esc(f.placeholder || '') + '"'
+      + ' oninput="setDrawText(\'' + tk + '\',' + i + ',this.value)">';
+    else if (f.type === 'color') h += '<input type="color" value="' + v + '" oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.value)">';
     else if (f.type === 'check') h += '<input type="checkbox" ' + (v ? 'checked' : '') + ' onchange="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.checked)">';
     else h += '<input type="number" value="' + v + '"' + (f.min != null ? ' min="' + f.min + '"' : '') + (f.max != null ? ' max="' + f.max + '"' : '')
       + (f.step != null ? ' step="' + f.step + '"' : '') + ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',parseFloat(this.value))">';
@@ -6614,6 +6695,14 @@ function setDrawSettingsTab(t, tk, i) {
   _setTab = t; _setTabExplicit = true;   // honour the click even if the tab is empty
   const r = _styleEl.getBoundingClientRect();
   openDrawingSettings(tk, i, r.left, r.top);
+}
+/* The words on a text drawing live on the drawing itself (d.text), which is why they get
+   their own setter: until this existed they were asked for once, by a prompt at placement,
+   and could never be changed. */
+function setDrawText(tk, i, val) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.text = String(val == null ? '' : val).slice(0, 160);
+  _saveDrawings(); _refreshTicker(tk);
 }
 function setDrawField(tk, i, bag, key, val) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
