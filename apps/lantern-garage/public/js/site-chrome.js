@@ -18,11 +18,16 @@
 (function () {
   "use strict";
 
-  // One Trader entry — Trade/Journal switch via in-page tabs on those pages.
+  // Trader and Journal are both header entries (founder, 2026-09-15). The switch between
+  // them used to be a pair of tabs inside the trader's OWN toolbar, so the journal — which
+  // never carried that strip — had no way back to the charts, and from anywhere else on the
+  // site it was two clicks deep and unnamed. Side by side here, each is one click from every
+  // page and the header's own active marking lights whichever one you are on.
   // Settings lives behind the account (person) icon; Contest returns when launch-ready.
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
+    { href: "/journal.html", label: "Journal" },
     { href: "/work.html", label: "Work" },
     // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
     // fronted duplicates the Trader surface, and its only unique job was the

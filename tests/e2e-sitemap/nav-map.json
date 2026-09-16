@@ -3,9 +3,9 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 32,
-    "reachable": 21,
-    "orphaned": 11,
+    "pages": 33,
+    "reachable": 20,
+    "orphaned": 13,
     "inSitemap": 17
   },
   "graph": {
@@ -13,6 +13,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -22,6 +23,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -34,6 +36,7 @@
     "budget.html": [
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -42,6 +45,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -49,6 +53,7 @@
     "chat.html": [
       "budget.html",
       "explore.html",
+      "journal.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -56,6 +61,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -64,6 +70,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -75,6 +82,7 @@
       "budget.html",
       "chat.html",
       "fallout-radio.html",
+      "journal.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
       "orchestration.html",
@@ -89,6 +97,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "pricing.html",
       "stock-trader.html",
@@ -98,6 +107,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -106,6 +116,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -122,6 +133,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -133,6 +145,7 @@
       "chat.html",
       "explore.html",
       "faq.html",
+      "journal.html",
       "library.html",
       "pricing.html",
       "settings.html",
@@ -143,6 +156,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -151,6 +165,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -160,6 +175,7 @@
       "chat.html",
       "explore.html",
       "ibkr-setup-guide.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -168,6 +184,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -177,10 +194,12 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
+    "shared.html": [],
     "stock-trader.html": [
       "budget.html",
       "chat.html",
@@ -188,15 +207,14 @@
       "journal.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
-      "pricing.html",
       "trader-guide.html",
-      "watch.html",
       "work.html"
     ],
     "system-health.html": [
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -209,12 +227,11 @@
       "chat.html",
       "pricing.html"
     ],
-    "watch.html": [
+    "transparency.html": [
       "budget.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "kalshi-terminal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -223,6 +240,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "settings.html",
       "stock-trader.html",
@@ -233,6 +251,7 @@
       "changelog.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -241,6 +260,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -249,6 +269,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "orchestration.html",
       "stock-trader.html"
@@ -259,6 +280,7 @@
     "budget.html": 1,
     "chat.html": 1,
     "explore.html": 1,
+    "journal.html": 1,
     "knowledgecenter.html": 1,
     "stock-trader.html": 1,
     "work.html": 1,
@@ -271,9 +293,7 @@
     "faq.html": 2,
     "library.html": 2,
     "pricing.html": 2,
-    "journal.html": 2,
     "trader-guide.html": 2,
-    "watch.html": 2,
     "ibkr-setup-guide.html": 3,
     "terms.html": 3
   },
@@ -285,6 +305,7 @@
       "budget.html",
       "chat.html",
       "explore.html",
+      "journal.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
@@ -294,14 +315,12 @@
       "changelog.html",
       "fallout-radio.html",
       "faq.html",
-      "journal.html",
       "kalshi-terminal.html",
       "library.html",
       "orchestration.html",
       "pricing.html",
       "settings.html",
-      "trader-guide.html",
-      "watch.html"
+      "trader-guide.html"
     ],
     "3": [
       "ibkr-setup-guide.html",
@@ -328,7 +347,6 @@
     "stock-trader.html",
     "terms.html",
     "trader-guide.html",
-    "watch.html",
     "work.html"
   ],
   "orphaned": [
@@ -339,7 +357,9 @@
     "entry.html",
     "metrics.html",
     "reset-password.html",
+    "shared.html",
     "system-health.html",
+    "transparency.html",
     "welcome.html",
     "whats-new.html",
     "wide-search.html"
@@ -372,6 +392,7 @@
     "work.html"
   ],
   "inSitemapNotReachable": [
+    "watch.html",
     "welcome.html",
     "whats-new.html"
   ],
@@ -388,6 +409,7 @@
   "sharedNavTargets": [
     "chat.html",
     "stock-trader.html",
+    "journal.html",
     "work.html",
     "knowledgecenter.html",
     "explore.html",

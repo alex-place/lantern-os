@@ -31,11 +31,19 @@ test('the Watch page is gone and old links land on the trader', () => {
   assert.ok(!fs.existsSync(path.join(APP, 'test', 'card-renderer-parity.test.js')), 'the twin-parity test outlived the twin');
 });
 
-test('the trader has one in-page switcher (Trade | Journal) and no Pro overlay or tier bounce', () => {
-  const tabs = slice('<div class="page-tabs"', '</div>');
-  assert.doesNotMatch(tabs, />Watch</);
-  assert.match(tabs, /class="pt on" href="\/stock-trader\.html" aria-current="page">Trade</);
-  assert.match(tabs, /href="\/journal\.html"/);
+test('Trade and Journal are header entries, once each, and there is no Pro overlay or tier bounce', () => {
+  // The switch used to be a pair of tabs inside the trader's own toolbar: the journal had
+  // no way back, and from the rest of the site the journal was unnamed (founder, 2026-09-15).
+  const chrome = read('public', 'js', 'site-chrome.js');
+  const nav = chrome.slice(chrome.indexOf('var NAV_LINKS = ['), chrome.indexOf('];', chrome.indexOf('var NAV_LINKS = [')));
+  assert.match(nav, /\{ href: "\/stock-trader\.html", label: "Trader" \}/);
+  assert.match(nav, /\{ href: "\/journal\.html", label: "Journal" \}/);
+  assert.ok(nav.indexOf('/journal.html') > nav.indexOf('/stock-trader.html'), 'the journal sits beside the trader, after it');
+  assert.doesNotMatch(nav, />Watch</);
+  // and the toolbar's copy is gone, CSS and all
+  assert.ok(!PAGE.includes('class="page-tabs"'), 'the trader toolbar still carries its own switcher');
+  assert.ok(!PAGE.includes('.page-tabs{'), 'dead .page-tabs CSS left in the trader page');
+  assert.ok(!PAGE.includes('class="pt'), 'a leftover .pt tab in the trader page');
   assert.ok(!PAGE.includes('id="tradeLock"'), 'the Pro overlay is still in the page');
   assert.ok(!PAGE.includes('applyTierGate'), 'the tier gate is still in the page');
   assert.ok(!PAGE.includes('stay=1'), 'the escape hatch for the bounce is still in the page');
