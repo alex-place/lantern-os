@@ -28,7 +28,10 @@ function mediaBlock(query) {
 }
 
 test('the desk grid has six columns: rail, left dock, chart, ticket, right dock, rail', () => {
-  assert.match(PAGE, /\.layout\{display:grid;grid-template-columns:44px var\(--col-l\) minmax\(0,1fr\) var\(--col-t\) var\(--col-r\) 44px;/);
+  // The drawing rail is 56px, not 44: it carries a tool icon AND the flyout chevron
+  // beside it (founder, 2026-09-16). trader-chart-width.test.js is what holds that
+  // width down -- 56 is the most the chart budget allows.
+  assert.match(PAGE, /\.layout\{display:grid;grid-template-columns:56px var\(--col-l\) minmax\(0,1fr\) var\(--col-t\) var\(--col-r\) 44px;/);
 });
 
 test('the tablet tier does not replace the six-column template with the old two-column one', () => {
