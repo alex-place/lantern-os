@@ -130,8 +130,9 @@ test('drawings: anchored in a pane\'s units, kept to one pane, hit-tested and dr
   assert.match(PAGE, /_drawPending = \{ tk, t: _drawTool, pts: \[\], pane: a\.pane \|\| null \};/);
   assert.match(PAGE, /if \(_drawPending\.pts\.length && \(_drawPending\.pane \|\| null\) !== \(a\.pane \|\| null\)\) \{ renderTicker\(tk\); return; \}/);
   assert.match(PAGE, /if \(_drawPending\.pane\) obj\.pane = _drawPending\.pane;/);
-  assert.match(PAGE, /_commitDrawing\(tk, pane \? \{ t: 'pen', pts, pane \} : \{ t: 'pen', pts \}\);/);
-  assert.match(PAGE, /_commitDrawing\(tk, pane \? \{ t: tool, pts, pane \} : \{ t: tool, pts \}\);/);
+  // Both commit paths carry the pane: the brush's (any brush -- the id used to be
+  // hardcoded, which is why the highlighter could not be drawn) and the shape's.
+  assert.strictEqual((PAGE.match(/_commitDrawing\(tk, pane \? \{ t: tool, pts, pane \} : \{ t: tool, pts \}\);/g) || []).length, 2);
   assert.match(PAGE, /if \(\(a2\.pane \|\| null\) !== \(_drawPending\.pane \|\| null\)\) return;/);
   // Hit-testing and the handles use the drawing's own scale; a drawing whose pane is off the chart is untouchable.
   assert.strictEqual((PAGE.match(/const pm = d\.pane \? _paneMapper\(data, d\.pane\) : null;/g) || []).length, 2);
