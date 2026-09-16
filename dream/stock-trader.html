@@ -6413,6 +6413,7 @@ function _drawingAnchors(tk, data, idx, pw, ph) {
 function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
   const hit = _hitDrawing(tk, data, xPx, yPx, pw, ph, 9);
   if (!hit) return false;
+  if (drawLocked(tk, hit.i, 'erase it')) return false;   // the eraser and alt-click both come here
   const list = _drawings[tk] || [];
   list.splice(hit.i, 1);
   if (!list.length) delete _drawings[tk];
@@ -6800,7 +6801,16 @@ function setDrawingStyle(tk, i, patch) {
   d.style = Object.assign(drawStyleOf(d), patch);
   _saveDrawings(); _refreshTicker(tk);
 }
+/** A locked drawing is locked against every way of changing it, not just the one gesture
+    the check happened to be written next to. Says so, rather than doing nothing. */
+function drawLocked(tk, i, why) {
+  const d = (_drawings[tk] || [])[i];
+  if (!d || !d.locked) return false;
+  if (typeof _alertToast === 'function') _alertToast('That drawing is locked — unlock it to ' + (why || 'change it') + '.');
+  return true;
+}
 function deleteDrawing(tk, i) {
+  if (drawLocked(tk, i, 'delete it')) return;
   const list = _drawings[tk] || [];
   list.splice(i, 1);
   if (!list.length) delete _drawings[tk];
@@ -7384,8 +7394,9 @@ document.addEventListener('pointerdown', (e) => {
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
   const tk = _canvasTicker(canvas); if (!tk) return;
 
-  // 1. a handle of the already-selected drawing wins over everything
-  if (_selDraw && _selDraw.tk === tk) {
+  // 1. a handle of the already-selected drawing wins over everything -- unless it is
+  //    locked, in which case its handles are as fixed as the rest of it.
+  if (_selDraw && _selDraw.tk === tk && !(_drawings[tk][_selDraw.i] || {}).locked) {
     const anchors = _drawingAnchors(tk, a.data, _selDraw.i, a.pw, a.ph);
     for (let k = 0; k < anchors.length; k++) {
       if (Math.hypot(anchors[k].x - a.xPx, anchors[k].y - a.yPx) <= _HANDLE_R + 4) {
