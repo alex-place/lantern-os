@@ -3729,7 +3729,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           _yMap = yMap || y;                      // the price scale, or the pane's
           // Per-drawing style (colour / width / dash) lives on the object, so it saves with it.
           const _st = (typeof drawStyleOf === 'function') ? drawStyleOf(d) : {};
-          const col = d.color || _st.color || drawDefaultColor(d.t);
+          // ONE source of truth, the same one the toolbar's swatch and the settings dialog
+          // read: the drawing's own colour, else this tool's, else its family's. It used to
+          // read drawStyleOf(), whose shared violet default meant the swatch and the ink
+          // could disagree and the family palette never applied at all.
+          const col = d.color || drawOptOf(d, 'color');
           ctx.save();
           if (ghost) ctx.globalAlpha = 0.55;
           const base = ghost ? 0.55 : 1;
@@ -4303,7 +4307,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               // Each level is a DIFFERENT promise -- target, stop, entry -- so each gets
               // its own colour, the way TradingView does. Painting all three in the
               // drawing's colour made a profit target and a stop-loss look identical.
-              for (const [q, c] of [[tg, tgCol], [st, stCol], [e0, '#b3b9c5']]) {
+              for (const [q, c] of [[tg, tgCol], [st, stCol], [e0, drawOptOf(d, 'color')]]) {
                 ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(x1, q.y); ctx.lineTo(x2, q.y); ctx.stroke();
               }
               ctx.strokeStyle = col;
@@ -6314,12 +6318,15 @@ function _refreshTicker(tk) {
    tracking the mouse while a shape was being dragged. During a drag we repaint just the
    pixels and leave the DOM (and the crosshair) alone; the full rebuild happens once on
    pointerup. */
+function _repaintCanvas(canvas) {
+  const d = canvas && _crossData[canvas.id];
+  if (!d) return false;
+  try { renderChart(canvas, d.bars, d.rMin, d.rMax, chartType, chartTimeframe); return true; }
+  catch (e) { return false; }
+}
 function _repaintChart(tk) {
   const canvas = document.getElementById('chart-' + tk);
-  const d = canvas && _crossData[canvas.id];
-  if (!canvas || !d) { _refreshTicker(tk); return; }
-  try { renderChart(canvas, d.bars, d.rMin, d.rMax, chartType, chartTimeframe); }
-  catch (e) { _refreshTicker(tk); }
+  if (!_repaintCanvas(canvas)) _refreshTicker(tk);
 }
 function selectDrawing(tk, i) { _selDraw = (i == null) ? null : { tk, i }; _refreshTicker(tk); }
 
@@ -6373,7 +6380,7 @@ const DRAW_SPEC = {
     inputs: [_num('account', 'Account size', 10000, { min: 0 }), _num('riskPct', 'Risk %', 1, { min: 0, max: 100, step: 0.1 }),
              _num('lot', 'Lot size', 1, { min: 0 })],
     style: [_col('targetColor', 'Target colour', '#089981'), _col('stopColor', 'Stop colour', '#f23645'),
-            _col('color', 'Lines', '#a78bfa'), _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
+            _col('color', 'Entry line and labels', '#b3b9c5'), _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
     vis: [_chk('showR', 'Risk/reward in R', true), _chk('showPrices', 'Entry / stop / target prices', true),
           _chk('showQty', 'Position size', true)],
   },
@@ -6492,6 +6499,16 @@ DRAW_SPEC.balloon = { inputs: [_chk('wrap','Wrap long text',true)], style: _text
 
 
 
+/* The colour helpers above (_lineStyle, _shapeStyle) carry a generic violet when a tool
+   states no colour of its own -- and that placeholder, not DRAW_CAT_COLOR, is what every
+   line and pattern was painted in. A tool that names its own colour keeps it; the rest
+   take their family's, which is what that table was written for (founder, 2026-09-15). */
+for (const _t of Object.keys(DRAW_SPEC)) {
+  if (_t === '_default') continue;
+  for (const _f of (DRAW_SPEC[_t].style || []))
+    if (_f.k === 'color' && _f.def === DRAW_COLOR) _f.def = drawDefaultColor(_t);
+}
+
 const drawSpecOf = (t) => DRAW_SPEC[t] || DRAW_SPEC._default;
 function drawOptOf(d, key) {
   const spec = drawSpecOf(d.t);
@@ -6501,8 +6518,9 @@ function drawOptOf(d, key) {
   if (bag[key] !== undefined) return bag[key];
   if (f) return f.def;
   // Not in this tool's spec -- fib has per-level colours and no generic `color`, so the
-  // toolbar's swatch and width preview would render blank. Fall back to the shared
-  // default rather than undefined.
+  // toolbar's swatch and width preview would render blank. Fall back to the family's
+  // colour (a fib is teal, a pattern amber) and otherwise to the shared default.
+  if (key === 'color') return drawDefaultColor(d.t);
   return DRAW_STYLE_DEFAULT[key];
 }
 /** Colour for one fib level, honouring an override on the drawing. */
@@ -6627,14 +6645,34 @@ function _barPopup(html, anchorEl) {
   _barPop.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - h - 8)) + 'px';
 }
 
+/* Every colour a tool actually paints with, in the order its settings list them. A fib
+   has seven (one per level), a position has target / stop / entry, a channel has its line
+   and its fill; only a plain line has just the one. */
+function drawColourFields(t) {
+  const spec = drawSpecOf(t);
+  return [].concat(spec.style || [], spec.inputs || [], spec.vis || []).filter(f => f.type === 'color');
+}
 function openColourPop(tk, i, el) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
-  const cur = drawOptOf(d, 'color');
-  _barPopup('<div class="dr-fly-group">Colour</div><div class="sw-grid">'
-    + SWATCHES.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" style="background:' + c + '"'
-        + ' title="' + c + '" onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',\'' + c + '\');showSelBar(\'' + tk + '\',' + i + ')"></button>').join('')
-    + '</div><label class="dr-st-row"><span>Custom</span><input type="color" value="' + cur + '"'
-    + ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',this.value)"></label>', el);
+  const fields = drawColourFields(d.t);
+  const set = (k, v) => 'setDrawField(\'' + tk + '\',' + i + ',\'style\',\'' + k + '\',' + v + ')';
+  // One colour: the swatch grid, the way it has always been.
+  if (fields.length < 2) {
+    const k = (fields[0] && fields[0].k) || 'color', cur = drawOptOf(d, k);
+    _barPopup('<div class="dr-fly-group">Colour</div><div class="sw-grid">'
+      + SWATCHES.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" style="background:' + c + '"'
+          + ' title="' + c + '" onclick="' + set(k, '\'' + c + '\'') + ';showSelBar(\'' + tk + '\',' + i + ')"></button>').join('')
+      + '</div><label class="dr-st-row"><span>Custom</span><input type="color" value="' + cur + '"'
+      + ' oninput="' + set(k, 'this.value') + '"></label>', el);
+    return;
+  }
+  // Several: a row each, because a fib's levels and a position's stop are different
+  // statements — one shared colour would say nothing. The button used to write `color`
+  // on every tool, which these never read, so it moved nothing at all.
+  _barPopup('<div class="dr-fly-group">Colours</div>'
+    + fields.map(f => '<label class="dr-st-row"><span>' + f.label + '</span>'
+        + '<input type="color" value="' + drawOptOf(d, f.k) + '" oninput="' + set(f.k, 'this.value') + '"></label>').join('')
+    + '<div class="dr-fly-why">Each part of this drawing has its own colour.</div>', el);
 }
 function openWidthPop(tk, i, el) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
@@ -7083,7 +7121,12 @@ document.addEventListener('pointerdown', e => {
   const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  _penDrag = { tk: _canvasTicker(canvas), canvas, tool: _drawTool, moved: false, pts: [{ ts: a.ts, price: a.price }], pane: a.pane || null };
+  // Hold the canvas by ID, never by element. The deck rebuilds itself whenever the
+  // watchlist poll reorders it, which REPLACES this canvas; a held element is then
+  // detached, every later move maps off-plot, and the release commits the shape at the
+  // size it had when the deck rebuilt -- a point (founder, 2026-09-15). A rebuilt canvas
+  // keeps its id, so re-resolving each frame rides the rebuild out.
+  _penDrag = { tk: _canvasTicker(canvas), cid: canvas.id, tool: _drawTool, moved: false, pts: [{ ts: a.ts, price: a.price }], pane: a.pane || null };
   // Only the brush claims _drawPending on press. A 2-point tool waits for actual
   // movement (below) — otherwise a press-release with no drag would wipe the click
   // handler's half-placed shape and click-click would silently stop working.
@@ -7091,7 +7134,8 @@ document.addEventListener('pointerdown', e => {
 }, true);
 document.addEventListener('pointermove', e => {
   if (!_penDrag) return;
-  const a = _drawAnchor(_penDrag.canvas, e.clientX, e.clientY); if (!a) return;
+  const cv = document.getElementById(_penDrag.cid); if (!cv) return;   // rebuilt away: wait for it back
+  const a = _drawAnchor(cv, e.clientX, e.clientY); if (!a) return;
   if ((a.pane || null) !== (_penDrag.pane || null)) return;   // the shape stays in the pane it started in
   if (!_penDrag.moved) {
     _penDrag.moved = true;
@@ -7109,7 +7153,9 @@ document.addEventListener('pointermove', e => {
   } else {
     _penDrag.pts[1] = { ts: a.ts, price: a.price };        // rubber-band the second anchor
   }
-  renderTicker(_penDrag.tk);
+  // Pixels only. renderTicker() rewrites the card's DOM, which on a long drag is both the
+  // churn that replaces this canvas under us and what kills the crosshair.
+  if (!_repaintCanvas(cv)) renderTicker(_penDrag.tk);
 }, true);
 document.addEventListener('pointerup', () => {
   if (!_penDrag) return;
