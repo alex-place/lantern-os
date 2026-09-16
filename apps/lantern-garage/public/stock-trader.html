@@ -10703,8 +10703,22 @@ async function flattenAll(btn){
   const totalMV = snapshot.reduce((s,p)=>s+Math.abs(Number(p.market_value)||0),0);
   const mv = totalMV ? ` (~$${totalMV.toLocaleString(undefined,{maximumFractionDigits:0})})` : '';
   if(!window.confirm(`Close ALL ${snapshot.length} open position${snapshot.length===1?'':'s'}${mv}?\n\nThis market-sells everything at once and can't be undone.`)) return;
-  for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
-  _alertToast(`Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
+  // Count what actually closed. flattenPosition returns false when the broker refuses,
+  // and this used to throw that away and report the size of the list -- so a run where
+  // every order was rejected still ended with "Closed 2 positions", which is the last
+  // line the reader sees after the individual failures have scrolled past.
+  const failed = [];
+  let closed = 0;
+  for(const p of snapshot){
+    if(await flattenPosition(p.symbol, p.side, p.qty, true)) closed++;
+    else failed.push(p.symbol);
+  }
+  // No mode claim here: each flatten already reported its own, from the server's answer.
+  // This line used to say "(paper)" unconditionally, which told a live account its real
+  // closes were paper ones.
+  _alertToast(failed.length
+    ? `Closed ${closed} of ${snapshot.length} — ${failed.join(', ')} didn’t go through`
+    : `Closed ${closed} position${closed===1?'':'s'}`);
 }
 /* Even columns (operator, 2026-09-13): the symbol column takes a fixed share of the table,
    the actions column its 1%, and every data column the same slice of what is left. Auto

@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: **"Close all" reported success it never checked, in a mode it never checked.** The loop threw away each flatten's verdict and then announced the size of the list, so a run where every order was rejected still ended with "Closed 2 positions" — the last line the reader sees, after the individual failures have scrolled past. It now counts what actually closed and names the ones still open. The summary also said "(paper)" unconditionally, which told a live account its real closes were paper ones; it no longer claims a mode, because each flatten already reports the one the server gave it.
