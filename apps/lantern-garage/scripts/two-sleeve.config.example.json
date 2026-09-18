@@ -1,0 +1,66 @@
+{
+  "_comment": "Two-sleeve engine config (#3656). Measured design 2026-09-18: stable sleeve claims first at 2 slots @ 4%; race sleeve 4 slots @ 8% with carries kept, the Friday entry skip and fresh-low sizing. Universes = each box live tradelist. Copy to data/lantern-garage/trading/two-sleeve/config.json and point envFile at the box env files.",
+  "userId": "local-owner",
+  "order": [
+    "S",
+    "R"
+  ],
+  "sleeves": [
+    {
+      "id": "S",
+      "app": ".",
+      "envFile": "C:/dev/lantern-os-stable/.env.local",
+      "env": {
+        "TRADER_MAX_CONCURRENT": "2",
+        "TRADER_POSITION_PCT": "4",
+        "TRADER_MAX_POSITION_PCT": "4"
+      },
+      "universe": [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "DIA",
+        "GLD",
+        "TLT",
+        "SMH",
+        "XLK",
+        "SOXL",
+        "SQQQ",
+        "SOXS",
+        "SPXS",
+        "TQQQ",
+        "TNA",
+        "SPXL",
+        "UPRO"
+      ]
+    },
+    {
+      "id": "R",
+      "app": "C:/dev/lantern-race/apps/lantern-garage",
+      "envFile": "C:/dev/lantern-race/.env.local",
+      "env": {
+        "TRADER_MAX_CONCURRENT": "4",
+        "TRADER_POSITION_PCT": "8",
+        "TRADER_MAX_POSITION_PCT": "8",
+        "TRADER_FRESHLOW_SIZE_MULT": "1.5",
+        "TRADER_NO_FRIDAY_ENTRIES": "1"
+      },
+      "universe": [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "DIA",
+        "GLD",
+        "TLT",
+        "SMH",
+        "XLK",
+        "SOXL",
+        "SQQQ",
+        "SOXS",
+        "SPXS",
+        "TNA",
+        "TZA"
+      ]
+    }
+  ]
+}
