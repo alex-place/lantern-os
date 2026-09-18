@@ -74,10 +74,22 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice } = {}
   // MAX_ORDER_NOTIONAL only when equity is unknown, so we never place a huge order
   // while blind.
   const maxPositionPct = Number(process.env.TRADER_MAX_POSITION_PCT) || 5;
+  // STRESS-AWARE CEILING (operator, 2026-09-18). The sizer lifts its cap by the
+  // stress multiplier on stress days (auto-trader _stressCfg: default x1.5 when
+  // the prior VIX close >= 25; <= 1 disables; clamp 2.5). The guard can't know
+  // today's VIX synchronously and does not need to: the ceiling it enforces is
+  // cap x mult — the LARGEST size the sizer can legitimately build. Calm-day
+  // orders are sized to the bare cap by the engine itself; the runaway this gate
+  // exists to catch is bounded either way. MUST MATCH _stressCfg's parse, or the
+  // guard denies what the sizer builds (the 2026-08-25 lesson, other direction).
+  const _rawStressMult = process.env.TRADER_STRESS_MULT;
+  const _stressNum = _rawStressMult === undefined || String(_rawStressMult).trim() === '' ? 1.5 : Number(_rawStressMult);
+  const stressCeilMult = _stressNum > 1 ? Math.min(2.5, _stressNum) : 1;
+  const ceilingPct = maxPositionPct * stressCeilMult;
   const eq = Number(equity) || 0;
   const flatNotional = envInt("MAX_ORDER_NOTIONAL", 2000);
-  const maxNotional = eq > 0 ? eq * (maxPositionPct / 100) : flatNotional;
-  const caps = { maxQty, maxNotional: Math.round(maxNotional), maxPositionPct, equity: eq || null };
+  const maxNotional = eq > 0 ? eq * (ceilingPct / 100) : flatNotional;
+  const caps = { maxQty, maxNotional: Math.round(maxNotional), maxPositionPct, ceilingPct, equity: eq || null };
   const q = Number(qty) || 0;
   // THE CAP HAS TO BIND ON MARKET ORDERS, WHICH IS WHERE THE RISK ACTUALLY GOES IN
   // (operator, 2026-08-25). Until now `notional` was computed from the order's LIMIT
@@ -143,7 +155,7 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice } = {}
   // the account-mode opt-in, and the MAX_ORDER_QTY sanity ceiling — and the trader is
   // longs-only, so this does not open a naked-short path. Buys are untouched.
   const reducing = String(side || "").toLowerCase() === "sell";
-  if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? maxPositionPct + "% of equity — a HARD ceiling, the symbol tilt cannot raise it" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
+  if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? ceilingPct + "% of equity — the HARD ceiling (cap " + maxPositionPct + "% x stress " + stressCeilMult + "); the symbol tilt cannot raise it" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
   if (process.env.TRADER_LIVE !== "1") return deny("TRADER_LIVE=0 — dry run (no real order placed); set TRADER_LIVE=1 to arm");
   if (mode === "unknown") return deny("account mode unknown — refusing to place a real order");
   if (mode === "live" && process.env.TRADER_ALLOW_LIVE_ACCOUNT !== "1") {

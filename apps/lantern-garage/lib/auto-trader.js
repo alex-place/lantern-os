@@ -598,17 +598,26 @@ function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZon
 // SPY session IBS <= 0.3, x2) took holdout return/DD from 32 to 69 and tied
 // the recent hourly half. Absolute drawdown grows with the multiplier — the
 // operator picks the size.
-//   TRADER_STRESS_MULT     multiplier (e.g. 1.5); unset or <= 1 = OFF
-//   TRADER_STRESS_VIX      prior-session VIX close at/above which it applies (default 20)
-//   TRADER_STRESS_SPY_IBS  SPY session IBS at/below which it applies (default 0.3)
+//   TRADER_STRESS_MULT     multiplier (default 1.5 = ON; set <= 1 to disable)
+//   TRADER_STRESS_VIX      prior-session VIX close at/above which it applies (default 25)
+//   TRADER_STRESS_SPY_IBS  SPY session IBS at/below which it also arms (default 0 = leg OFF)
 // Either condition arms it (OR). It scales BOTH the risk target and the
 // notional cap, like the room tier — otherwise the 12% cap binds and nothing
 // changes. Conviction sizing (size_mult) is untouched. Entries only.
+// DEFAULT ON (operator, 2026-09-18). The four-surface sweep (armed_baseline,
+// VIX leg only, x1.5 at prior close >= 25) improves return AND return/DD on
+// ALL FOUR surfaces vs stress-off — h1 0.51->0.56, d-fit 0.36->0.44, h2
+// 1.98->2.26, d-hold 9.05->13.32; 26y return 136%->186% at a SHALLOWER max
+// drawdown (-15.0%->-14.0%). A literature-predicted sign tested once (Nagel
+// 2012; #3433 "VIX-level trigger beats term structure"; #3445 "the panic days
+// are the best trades"), not a mined grid. The SPY-IBS OR-leg defaults OFF
+// because the harness scores only the VIX leg — measure it before arming.
 function _stressCfg() {
-  const mult = Number(process.env.TRADER_STRESS_MULT);
+  const raw = process.env.TRADER_STRESS_MULT;
+  const mult = raw === undefined || String(raw).trim() === '' ? 1.5 : Number(raw);
   return { mult: mult > 1 ? Math.min(2.5, mult) : 1,
-    vix: process.env.TRADER_STRESS_VIX === undefined ? 20 : Number(process.env.TRADER_STRESS_VIX),
-    spyIbsLvl: process.env.TRADER_STRESS_SPY_IBS === undefined ? 0.3 : Number(process.env.TRADER_STRESS_SPY_IBS) };
+    vix: process.env.TRADER_STRESS_VIX === undefined ? 25 : Number(process.env.TRADER_STRESS_VIX),
+    spyIbsLvl: process.env.TRADER_STRESS_SPY_IBS === undefined ? 0 : Number(process.env.TRADER_STRESS_SPY_IBS) };
 }
 // SYMBOL TILT (#3434 stack-sweep lab). Per-symbol size weights chosen on the
 // FIT surfaces only (weight = clamp(fit edge / median edge, 0.5, 1.5)) and
@@ -2846,7 +2855,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // d-fit -40%, h2 -22%, d-hold -44% — on the 26-year holdout 2,866% -> 1,202% of return
     // against a drawdown of 22.1% -> 16.5%. Down-weights are untouched: SPY 0.83 still
     // sizes to 9.96%, GLD/TLT 0.5 to 6%.
-    const _capMult = Math.min(1, _tierMult * _stress.mult * _symMult * _regime);
+    // REVISION (operator, 2026-09-18): STRESS is carved back OUT of the clamp — it
+    // lifts the ceiling to cap x TRADER_STRESS_MULT on stress days only, because
+    // the four-surface sweep shows those are the days the edge pays (d-hold
+    // return/DD 9.05 -> 13.32 at a SHALLOWER drawdown; see _stressCfg). Tier,
+    // tilt and regime remain down-only. trading-guard.js mirrors cap x stress as
+    // its ceiling, so sizer and guard still agree on one number: the largest
+    // legitimate size.
+    const _capMult = Math.min(1, _tierMult * _symMult * _regime) * _stress.mult;
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _capMult, riskPct: c.riskPct * _tierMult * _stress.mult * _symMult * _regime, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
