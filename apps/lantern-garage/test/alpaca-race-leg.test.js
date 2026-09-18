@@ -107,7 +107,7 @@ test('getOrder: normalizes the per-order status the #3379 sweep consumes', async
   await withKeys(async () => {
     routes = { '/v2/orders/abc-123': { id: 'abc-123', status: 'filled', filled_avg_price: '560.79', filled_qty: '203' } };
     const st = await alpaca.getOrder('local-owner', 'abc-123');
-    assert.deepStrictEqual(st, { order_id: 'abc-123', status: 'filled', avgPrice: 560.79, filledQty: 203 });
+    assert.deepStrictEqual(st, { order_id: 'abc-123', status: 'filled', avgPrice: 560.79, filledQty: 203, filledAt: null });
     assert.match(st.status, /fill/i, 'matches the sweep regex');
   });
 });
