@@ -2593,14 +2593,26 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const exOrder = (extended && price > 0)
           ? { ticker: sym, side: 'sell', qty: held, type: 'limit', limitPrice: Math.round(price * 0.998 * 100) / 100, outsideRth: true, acceptWarnings: true }
           : { ticker: sym, side: 'sell', qty: held, type: 'market', acceptWarnings: true };
-        const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
+        // #3660 A: CANCEL FIRST, SELL SECOND. cancelRestingStops already settles -- it
+        // waits (bounded, #3407) until the canceled stop leaves the working book, i.e.
+        // until the broker releases the reserved shares. This call site had the pair
+        // INVERTED: the market sell arrived while the resting stop still held the full
+        // qty, Alpaca rejected it every time, and the position could not leave the book
+        // (2026-09-18: four canceled TLT orders, an 8-minute retry loop, exit_frozen).
+        // Between cancel and sell the position is stopless for ~a second; a failed sell
+        // is re-protected by the next scan pass, exactly as before.
         await cancelRestingStops(bridge, userId, sym);
+        const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         _entryAt.delete(sym); _holdClockAt.delete(sym); _exitAt.set(sym, now);
         _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
         _exitIntent.set(sym, 'signal_exit');
-        logTrade({ event: 'exit_intent', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason: 'signal_exit', status: r && r.status });
+        logTrade({ event: 'exit_intent', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason: 'signal_exit', status: r && r.status,
+          // #3660 B: the WHY is not optional -- this row used to say status:"error"
+          // with no cause while the broker rejection text sat unread in r.reason.
+          error: (r && r.status === 'error' && (r.reason || r.error)) || undefined });
+        if (r && r.status === 'error') console.warn('[Trading] signal_exit ' + sym + ' placement failed: ' + (r.reason || r.error || 'unknown'));
         out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
         _lastOrderAt.set(sym, now);
       } else {
