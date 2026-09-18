@@ -16,7 +16,7 @@ const SLIP = Number(process.env.LAB_SLIP_BP || 5) / 10000;
 const ENTRY_SLIP = Number(process.env.LAB_ENTRY_SLIP_BP || 5) / 10000;
 const LIVE_TRAIL = { arm: 1.5, pct: 2.5 };
 const trailTrig = (g, base) => (g >= 25 ? Math.min(base, 1.25) : g >= 12 ? Math.min(base, 1.75) : g >= 6 ? Math.min(base, 2.25) : base);
-const MONDAY = { thr: 0.30, morningThr: 0.08, stopPct: 0.03, trail: LIVE_TRAIL, be: 0.01, lock: 0.01, exitIbs: 0.6, sizeFrac: 0.12, maxConc: 5, timeoutS: 5, skipHours: new Set([14]), vixUp: 20, weights: null };
+const MONDAY = { thr: 0.30, morningThr: 0.08, stopPct: 0.03, trail: LIVE_TRAIL, be: 0.01, lock: 0.01, exitIbs: 0.6, sizeFrac: 0.12, maxConc: 5, timeoutS: 5, skipHours: new Set([14]), vixUp: 20, stressMult: 1.5, weights: null };
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
@@ -171,7 +171,7 @@ function simulate(barsBySym, syms, cfg, intraday, vix, from, to) {
       for (const c of cands) {
         if (open.size >= o.maxConc) break;
         let frac = o.sizeFrac * (o.weights ? (o.weights[c.sym] || 1) : 1);
-        if (o.vixUp != null && vix && vix.get(c.b.d) >= o.vixUp) frac *= 1.5;
+        if (o.vixUp != null && vix && vix.get(c.b.d) >= o.vixUp) frac *= (o.stressMult || 1.5);
         if (c.idio) frac *= 0.5;
         const full = equity * frac;
         const size = o.scaleIn ? full * o.scaleIn.firstFrac : full;
@@ -259,7 +259,8 @@ function anatomy(trades, from, to, title) {
     exitIbs: num("TRADER_IBS_EXIT", MONDAY.exitIbs) || MONDAY.exitIbs,
     be: env.TRADER_BE_RATCHET ? num("TRADER_BE_RATCHET", 0.01) : null, lock: num("TRADER_BE_LOCK", 0.01),
     sizeFrac: num("TRADER_MAX_POSITION_PCT", 12) / 100, maxConc: num("TRADER_MAX_CONCURRENT", 5),
-    vixUp: num("TRADER_STRESS_MULT", 1) > 1 ? num("TRADER_STRESS_VIX", 20) : null,
+    vixUp: num("TRADER_STRESS_MULT", 1.5) > 1 ? num("TRADER_STRESS_VIX", 25) : null,
+    stressMult: num("TRADER_STRESS_MULT", 1.5),
     weights: Object.keys(weights).length ? weights : null,
     slotOrder: String(env.TRADER_SLOT_ORDER || "").toLowerCase() === "expectancy" ? "expectancy" : "depth",
     noBounce: false, tp: null, giveback: null,
@@ -277,7 +278,7 @@ function anatomy(trades, from, to, title) {
   const h = simulate(hourly, SYMS, ARMED, true, vix), d = simulate(daily, SYMS, ARMED, false, vix);
   const out = {};
   for (const [k, a, z, src] of SURF) { const x = src === "h" ? h : d; const s = score(x.curve, a, z), st = stats(x.trades, a, z); out[k] = { tot: +s.tot.toFixed(4), dd: +s.dd.toFixed(4), ratio: +(s.dd < 0 ? s.tot / -s.dd : 0).toFixed(2), n: st.n, wr: +st.wr.toFixed(3), b: +st.b.toFixed(2) }; }
-  const desc = `IBS ${ARMED.thr}/${ARMED.morningThr} exit ${ARMED.exitIbs} floor ${ARMED.be != null ? ARMED.be : "off"} stop ${ARMED.stopPct} size ${ARMED.sizeFrac} cap ${ARMED.maxConc} stress ${ARMED.vixUp != null ? "VIX>=" + ARMED.vixUp : "off"} tilt ${ARMED.weights ? "on" : "flat"} slot ${ARMED.slotOrder} exit-structure ${ARMED.noBounce ? "LADDER" : ARMED.tp ? "bounce+TP" : "bounce"} decarry ${ARMED.decarry ? "on" : "off"}`;
+  const desc = `IBS ${ARMED.thr}/${ARMED.morningThr} exit ${ARMED.exitIbs} floor ${ARMED.be != null ? ARMED.be : "off"} stop ${ARMED.stopPct} size ${ARMED.sizeFrac} cap ${ARMED.maxConc} stress ${ARMED.vixUp != null ? "x" + ARMED.stressMult + " VIX>=" + ARMED.vixUp : "off"} tilt ${ARMED.weights ? "on" : "flat"} slot ${ARMED.slotOrder} exit-structure ${ARMED.noBounce ? "LADDER" : ARMED.tp ? "bounce+TP" : "bounce"} decarry ${ARMED.decarry ? "on" : "off"}`;
   console.log(`ARMED STACK (${envPath}): ${desc}`);
   console.log("  " + SURF.map(([k]) => `${k} ${pct(out[k].tot, 6)} ÷${String(out[k].ratio).padStart(6)} b ${out[k].b} wr ${(out[k].wr * 100).toFixed(0)}% n ${out[k].n}`).join(" | "));
   if (argv.includes("--json")) console.log(JSON.stringify({ env: envPath, desc, surfaces: out }));

@@ -21,6 +21,10 @@
  * Net: the cap was inert for the order that took the risk and binding on the order
  * that would have shed it.
  *
+ * 2026-09-18: the ceiling became STRESS-AWARE — cap x TRADER_STRESS_MULT
+ * (default 1.5), matching the sizer's stress carve-out. Tilt still cannot
+ * raise it; TRADER_STRESS_MULT=1 restores the bare cap.
+ *
  * All three are fixed now. (1) sells are exempt from a POSITION-SIZE cap outright.
  * (3) a market order is priced against the caller's `refPrice` — the same quote the
  * entry was sized from — and an unpriceable BUY is refused rather than waved through.
@@ -113,7 +117,7 @@ test('a sell that fits under the cap was never the problem, and still passes', (
 const TILT = 'SOXL:1.5,SMH:1.5,QQQ:1.5,IWM:1.02,XLK:1.0,SPY:0.83,DIA:0.71,GLD:0.5,TLT:0.5';
 
 test('a market BUY is capped against the reference price it was sized from', () => {
-  // 2,600 SOXL = $300,742, past even the tilt+stress ceiling of $261,021
+  // 2,600 SOXL = $300,742, past even the stress ceiling of $174,014 (12% x 1.5)
   const g = armed({ TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' },
     { qty: 2600, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
   assert.strictEqual(g.allowed, false, 'a market order must not slip the cap by having no price');
@@ -145,26 +149,31 @@ test('an unpriceable SELL is still allowed — the cap must never trap, priced o
   assert.strictEqual(armed({}, { qty: 1517, price: 0, equity: 966744, side: 'sell' }).allowed, true);
 });
 
-test('the ceiling is HARD — the symbol tilt cannot raise it (operator, 2026-08-25)', () => {
+test('the ceiling is stress-aware: cap x stress — the tilt still cannot raise it', () => {
   const env = { TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' };
-  // 1,517 SOXL = $175,471 = 18% of equity. That is what the sizer used to build, and
-  // what the guard refused. Now neither will: TRADER_MAX_POSITION_PCT is the ceiling
-  // for every symbol regardless of tilt or stress.
+  // 1,517 SOXL = $175,471 = 18.15% of equity — just OVER the 18% stress ceiling.
   const over = armed(env, { qty: 1517, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
-  assert.strictEqual(over.allowed, false, 'tilt 1.5 must not lift the ceiling');
+  assert.strictEqual(over.allowed, false, 'over cap x stress is still refused');
   assert.match(over.reason, /HARD ceiling/);
   assert.strictEqual(over.caps.maxPositionPct, 12);
-  // and the size the clamped sizer now produces clears it
+  assert.strictEqual(over.caps.ceilingPct, 18);
+  // a stress-day size the sizer now legitimately builds (18% minus a share) clears it
+  assert.strictEqual(armed(env, { qty: 1504, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' }).allowed, true);
+  // stress explicitly OFF -> the bare 12% cap governs again
+  const off = armed({ ...env, TRADER_STRESS_MULT: '1' }, { qty: 1504, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' });
+  assert.strictEqual(off.allowed, false, 'stress off -> 12% cap');
+  // and the calm-day 12% size clears under either setting
   assert.strictEqual(armed(env, { qty: 1002, price: 0, refPrice: 115.67, equity: 966744, side: 'buy', symbol: 'SOXL' }).allowed, true);
 });
 
-test('the sizer and the guard agree on one number', () => {
+test('the sizer and the guard agree on one number — now cap x stress', () => {
   const at = require('../lib/auto-trader');
   const equity = 966744, price = 115.67;
-  // the sizer's own clamp: tier x stress x tilt may scale DOWN, never above the cap
-  const capMult = Math.min(1, 1 * 1.5 * 1.5);
+  // the sizer's clamp: tier x tilt x regime scale DOWN only; stress alone lifts
+  const capMult = Math.min(1, 1 * 1.5 * 1) * 1.5;
   const qty = at.sizePosition({ equity, price, positionPct: 12, maxPositionPct: 12 * capMult, riskPct: 0.36 * 1.5 * 1.5, stopDistPct: 3 });
-  assert.ok(qty * price <= equity * 0.12, `sizer produced ${qty} sh = $${Math.round(qty * price)}, over a 12% ceiling`);
+  assert.ok(qty * price <= equity * 0.18, `sizer produced ${qty} sh = $${Math.round(qty * price)}, over the 18% stress ceiling`);
+  assert.ok(qty * price > equity * 0.12, 'a stress-day size sits ABOVE the bare cap now');
   const g = armed({ TRADER_SYMBOL_SIZE_MULT: TILT, TRADER_STRESS_MULT: '1.5' },
     { qty, price: 0, refPrice: price, equity, side: 'buy', symbol: 'SOXL' });
   assert.strictEqual(g.allowed, true, `the guard must accept what the sizer built: ${g.reason}`);
