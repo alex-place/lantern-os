@@ -360,6 +360,11 @@ async function getOrder(userId, orderId) {
     status: String(r.json.status || ''),                    // 'filled' matches /fill/i
     avgPrice: r.json.filled_avg_price != null ? Number(r.json.filled_avg_price) : null,
     filledQty: r.json.filled_qty != null ? Number(r.json.filled_qty) : null,
+    // The broker's own execution time. Without it, the stop-status sweep booked
+    // recovered fills at DISCOVERY time — an IWM stop that filled Wed 14:56 ET was
+    // journaled as "closed Fri 11:27 AM" (the next server boot), and every derived
+    // stat (streak, expectancy, worst-day) inherited the wrong date (#3660 C).
+    filledAt: r.json.filled_at || null,
   };
 }
 

@@ -2004,6 +2004,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const _fillPnl = _round2((_fillPx - entry) * _fillQty);
         const _beHit = _beStopAt.has(sym);   // #3413: ratcheted stop → round trip, not failure
         logTrade({
+          // The trade CLOSED when the broker filled the stop, not when this sweep
+          // discovered it — a fill recovered after downtime must carry the broker's
+          // clock or the journal misdates it by days (#3660 C: IWM filled Wed,
+          // booked "Fri 11:27 AM" = the next boot). logTrade lets a provided ts
+          // win; discovered_at keeps the booking moment observable.
+          ...(_regStatus.filledAt ? { ts: _regStatus.filledAt, discovered_at: new Date().toISOString() } : {}),
           event: 'exit', symbol: sym, qty: _fillQty, entry, exit: _fillPx,
           pnl: _fillPnl, pnl_pct: entry > 0 ? +(((_fillPx - entry) / entry) * 100).toFixed(6) : null,
           reason: `protective_stop (broker GTC stop ${_regStop.px} filled${_beHit ? '; be_ratchet — stop sat at the lock level' : ''})`,

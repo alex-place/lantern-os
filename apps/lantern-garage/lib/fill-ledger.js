@@ -67,8 +67,8 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     // rows on top of the day's already-wrong ones and made the ledger unusable
     // for P&L. A fill older than this process only ever produces noise, so skip
     // it. The id is still REMEMBERED (see idsToRemember) so it cannot resurface.
+    const t = orderTimeMs(o);
     if (sinceMs > 0) {
-      const t = orderTimeMs(o);
       if (t != null && t < sinceMs) continue;
     }
 
@@ -82,6 +82,12 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     const havePnl = entryPx > 0;
 
     out.push({
+      // The BROKER's execution time is the trade's close time — logTrade lets a
+      // provided ts win over its own now(). Without this every row was stamped at
+      // reconciliation time, so a fill the process missed (downtime, feed gap) was
+      // journaled days late and every date-derived stat drifted (#3660 C).
+      // discovered_at keeps the booking moment; absent broker time → now(), as before.
+      ...(t != null ? { ts: new Date(t).toISOString(), discovered_at: new Date().toISOString() } : {}),
       event: 'exit',
       symbol: sym,
       qty,
