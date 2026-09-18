@@ -73,10 +73,14 @@ node apps/lantern-garage/scripts/two-sleeve-runner.js --dry          # a dry ses
 node apps/lantern-garage/scripts/two-sleeve-runner.js                # armed
 ```
 
-The runner takes the account lock as the **armed** holder. A web server on the same account must
-run disarmed (`TRADER_AUTO_EXECUTE=0`, `TRADER_MANAGE_EXITS=0`): it keeps serving the dashboard
-and stands down on the lock. In `--dry` mode the runner holds no armed claim, so an armed server
-keeps the account and the dry runner only observes. Per-sleeve journals and state live under
+An armed runner takes the account lock as the **armed** holder. A web server on the same account
+must run disarmed (`TRADER_AUTO_EXECUTE=0`, `TRADER_MANAGE_EXITS=0`): it keeps serving the
+dashboard and never touches the lock. A `--dry` runner places nothing and therefore never
+contends for the lock: it can shadow an armed server on the same account, or run alone on a
+disarmed one, journaling every order it would have placed as `dry_order`. Set `defaultOwner`
+in the config to the sleeve that should adopt positions already in the account when the engine
+takes over (`"R"` when it inherits race's book), and copy that box's `trader-state.json` to
+`two-sleeve/<id>.state.json` so the sleeve keeps its hold clocks and stop records. Per-sleeve journals and state live under
 `data/lantern-garage/trading/two-sleeve/` (`S.autopilot-trades.jsonl`, `R.autopilot-trades.jsonl`,
 `engine.jsonl`, `heartbeat.json`, `ownership.json`); the transparency page and the ledger scorer
 read the sleeve journals like any autopilot journal.

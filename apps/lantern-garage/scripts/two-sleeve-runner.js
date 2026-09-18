@@ -117,7 +117,11 @@ const { createOwnership } = require(path.join(APP, 'lib', 'two-sleeve', 'ownersh
 
 const ibkrBridge = new TradingAPIBridge();
 const agent = new TraderAgent({ cacheExpiry: parseInt(process.env.TRADER_CACHE_EXPIRY || '60000', 10), pythonTimeout: parseInt(process.env.TRADER_PYTHON_TIMEOUT || '30000', 10) });
-const ownership = createOwnership({ file: path.join(DIR, 'ownership.json'), defaultOwner: (cfg.order || ['S'])[0], onEvent: (ev) => journal(ev) });
+// defaultOwner: the sleeve that ADOPTS positions nobody claimed (pre-existing holdings, a lost
+// registry) and inherits untagged resting orders. Default = the first sleeve in tick order;
+// set it to "R" when the engine takes over an account the race sleeve was already trading.
+const DEFAULT_OWNER = cfg.defaultOwner || (cfg.order || ['S'])[0];
+const ownership = createOwnership({ file: path.join(DIR, 'ownership.json'), defaultOwner: DEFAULT_OWNER, onEvent: (ev) => journal(ev) });
 
 let resolved = null;      // { broker, accountId, facade }
 let engine = null;
@@ -134,7 +138,7 @@ async function ensureEngine() {
   resolved = await brokerFacadeFor(USER, ibkrBridge).catch(() => null);
   if (!resolved || !resolved.accountId) { stats.lastError = 'no broker resolved'; return false; }
   const facade = DRY ? dryFacade(resolved.facade) : resolved.facade;
-  engine = createEngine({ sleeves, order: cfg.order || sleeves.map((s) => s.id), facade, ownership, defaultOwner: (cfg.order || ['S'])[0], journal });
+  engine = createEngine({ sleeves, order: cfg.order || sleeves.map((s) => s.id), facade, ownership, defaultOwner: DEFAULT_OWNER, journal });
   journal({ event: 'engine_start', broker: resolved.broker, accountId: resolved.accountId, order: engine.order, dry: DRY, sleeves: sleeves.map((s) => ({ id: s.id, app: s.app, universe: s.universe ? s.universe.length : 'all', env: s.env })) });
   console.info(`[two-sleeve] ${resolved.broker} ${resolved.accountId} — sleeves ${engine.order.join(' then ')}${DRY ? ' (DRY: no orders)' : ''}`);
   return true;
@@ -153,7 +157,10 @@ async function tick() {
   try {
     if (mh || protectiveOnly) {
       if (await ensureEngine()) {
-        const lock = accountLock.acquire(resolved.accountId, { armed: !DRY });
+        // A dry run places nothing, so it never contends for the account lock: it can shadow
+        // an armed server on the same account, or run alone on a disarmed one. Armed runs
+        // take the lock as the armed holder and stand down if another live process has it.
+        const lock = DRY ? { acquired: true, reason: 'dry run — observing, no lock' } : accountLock.acquire(resolved.accountId, { armed: true });
         if (!lock.acquired) {
           if (!lockNoticed) { lockNoticed = true; console.info(`[two-sleeve] account ${resolved.accountId} managed by another process — standing down (${lock.reason})`); journal({ event: 'lock_refused', reason: lock.reason }); }
         } else {
@@ -178,6 +185,6 @@ async function tick() {
   setTimeout(tick, delay);
 }
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopping = true; try { if (resolved) accountLock.release(resolved.accountId); } catch (_e) {} journal({ event: 'engine_stop', signal: sig }); setTimeout(() => process.exit(0), 200); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopping = true; try { if (resolved && !DRY) accountLock.release(resolved.accountId); } catch (_e) {} journal({ event: 'engine_stop', signal: sig }); setTimeout(() => process.exit(0), 200); });
 console.info(`[two-sleeve] runner pid ${process.pid} — config ${CFG_FILE}${DRY ? ' — DRY RUN' : ''}${ONCE ? ' — single tick' : ''}`);
 tick();
