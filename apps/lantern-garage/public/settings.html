@@ -650,9 +650,10 @@
     const el = $("p-connections");
     if (!profile) return needSignIn(el, "Connections");
     el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p><div class="loading-panel">Checking connections…</div>`;
-    const [ib, al, ref, keys, indeed, mode, bpref] = await Promise.all([
+    const [ib, al, ref, keys, indeed, mode, bpref, ext] = await Promise.all([
       api("/api/trading/ibkr/connection"), api("/api/broker/alpaca/status"), api("/api/referral/link"),
       api("/api/providers/set-key"), api("/api/job/indeed/status"), api("/api/trading/mode"), api("/api/broker/preference"),
+      api("/api/trading/extended-hours"),
     ]);
     const ibLive = ib.body && ib.body.live && ib.body.live.connected;
     const ibCreds = ib.body && ib.body.hasCredentials;
@@ -691,6 +692,13 @@
     // broker is connected. 📈 Stock = signals + your manual buy/sell; 🏆 Champion = the
     // automated diversified ETF-allocation book run on your account.
     const anyBroker = alConn || ibLive;
+    // Extended hours: the autopilot also scans and acts 04:00–09:30 / 16:00–20:00 ET,
+    // via marketable-limit + outside-RTH orders. Regular-hours trading is unaffected
+    // either way, which is why "off" is worded as a limit rather than as a refusal.
+    const curExt = !!(ext.body && ext.body.enabled);
+    const extDesc = (on) => on
+      ? "⏰ On — the autopilot also trades pre-market (04:00–09:30) and after-hours (16:00–20:00 ET), using marketable-limit + outside-RTH orders."
+      : "Regular hours only (09:30–16:00 ET). Extended-session moves are left alone.";
     const modeDesc = (m) => m === "champion"
       ? "🏆 Champion — automated diversified ETF allocation (the day-trader is paused)."
       : m === "stock"
@@ -704,6 +712,11 @@
           <button data-m="off" class="${curMode === "off" ? "on" : ""}" title="The autopilot never touches this account">⏸ Off</button>
           <button data-m="stock" class="${curMode === "stock" ? "on" : ""}" title="Automated intraday signal entries/exits">📈 Intraday</button>
           <button data-m="champion" class="${curMode === "champion" ? "on" : ""}" title="Automated ETF allocation book">🏆 Champion</button>
+        </div></div></div>
+      <div class="row"><div class="rl"><div class="k">Pre-market &amp; after-hours</div><div class="v" id="t-ext-desc">${extDesc(curExt)}</div></div><div class="rc">
+        <div class="seg" id="t-ext">
+          <button data-x="off" class="${curExt ? "" : "on"}" title="Trade the regular session only">Regular hours</button>
+          <button data-x="on" class="${curExt ? "on" : ""}" title="Also trade the pre-market and after-hours sessions">⏰ Extended</button>
         </div></div></div>` : "";
 
     const keyRows = `
@@ -745,6 +758,19 @@
       const m = (o.body && o.body.mode) || b.dataset.m;
       btns.forEach((x) => x.classList.toggle("on", x.dataset.m === m));
       const d = $("t-mode-desc"); if (d) d.textContent = modeDesc(m);
+    });
+    const xSeg = $("t-ext"); if (xSeg) xSeg.querySelectorAll("button[data-x]").forEach((b) => b.onclick = async () => {
+      if (b.classList.contains("on")) return;
+      const btns = [...xSeg.querySelectorAll("button")];
+      btns.forEach((x) => x.disabled = true);
+      // ?set=on|off — explicit, not toggle: two clients flipping a toggle can land on
+      // the opposite of what either of them asked for.
+      const o = await api("/api/trading/extended-hours?set=" + b.dataset.x, { method: "POST" });
+      btns.forEach((x) => x.disabled = false);
+      if (!o.ok) { alert("Couldn't change extended hours — try again."); return; }
+      const on = !!(o.body && o.body.enabled);
+      btns.forEach((x) => x.classList.toggle("on", (x.dataset.x === "on") === on));
+      const d = $("t-ext-desc"); if (d) d.textContent = extDesc(on);
     });
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;

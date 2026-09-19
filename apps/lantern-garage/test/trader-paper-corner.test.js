@@ -44,9 +44,10 @@ test('the chevron turns up while its menu is open, and the menu offers the two s
   assert.match(branch, /<a class="pat-menu-item pick-row" role="menuitem" href="\/settings\.html#connections">/);
   assert.match(branch, /Trading settings…/);
   assert.match(branch, /Broker settings…/);
-  // The dialog tab the first row opens exists, and the broker page is the one the ☰ links.
+  // The dialog tab the first row opens exists. This used to also cross-check the header's
+  // broker pill, which linked to the same page -- the pill went with the ☰ (2026-09-19),
+  // and this menu row is now the way to Settings → Connections from the trader.
   assert.ok(CS.TABS.some((t) => t.id === 'trading'), 'no Trading tab in the settings dialog');
-  assert.match(PAGE, /href="\/settings\.html#connections" class="nav-link" id="brokerBtn"/);
   assert.match(PAGE, /a\.pat-menu-item\{text-decoration:none;color:var\(--text0\)\}/);
 });
 

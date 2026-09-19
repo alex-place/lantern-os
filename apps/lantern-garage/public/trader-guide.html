@@ -25,6 +25,12 @@
     table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
     th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);line-height:1.5;vertical-align:top}
     th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px}
+    /* The shortcut table's left column holds KEYS, not labels, so it opts out of the
+       uppercasing every other table header gets -- Shift is a key, SHIFT is shouting. */
+    kbd{font-family:'IBM Plex Mono',monospace;font-size:12px;background:color-mix(in srgb,var(--border) 45%,transparent);
+      border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:1px 6px;
+      color:var(--text);text-transform:none;letter-spacing:0;white-space:nowrap}
+    #shortcuts th{text-transform:none;letter-spacing:0;font-size:14px;white-space:nowrap;color:var(--text)}
   </style>
 </head>
 <body>
@@ -88,8 +94,14 @@
     <div class="callout">Plan note: paper trading needs the <strong>Pro</strong> plan; the autonomous AI trader is a <strong>Pilot</strong> capability. <a href="/pricing.html">Pricing</a> shows what each plan includes.</div>
   </div>
 
+  <div class="step" id="extended">
+    <h2><span class="num">5</span> Pre-market and after-hours</h2>
+    <p>By default the autopilot trades the regular session only, 09:30–16:00 ET. <strong>Settings → Connections → Pre-market &amp; after-hours → ⏰ Extended</strong> also lets it scan and act 04:00–09:30 and 16:00–20:00 ET, using marketable-limit and outside-RTH orders so entries and exits can still fill.</p>
+    <p class="muted">Extended sessions are thinner: spreads are wider and a given order moves the price more. Regular-hours trading is unaffected either way, so leaving this off costs you nothing except those two windows.</p>
+  </div>
+
   <div class="step" id="stopping">
-    <h2><span class="num">5</span> Turn it off</h2>
+    <h2><span class="num">6</span> Turn it off</h2>
     <ul>
       <li><strong>Pause the autopilot:</strong> Trader switch → <strong>⏸ Off</strong>. Takes effect within ~1 minute. Off is <em>fully hands-off</em>: it won't open <strong>or close</strong> anything — open positions are yours to manage, and their broker-side stops stay in place.</li>
       <li><strong>Disconnect Alpaca:</strong> Settings → Connections → Alpaca → Disconnect. Your keys are deleted from our server; positions and stops remain in your Alpaca account (it was always your account — we never had custody).</li>
@@ -98,7 +110,7 @@
   </div>
 
   <div class="step" id="troubleshooting">
-    <h2><span class="num">6</span> When something seems off</h2>
+    <h2><span class="num">7</span> When something seems off</h2>
     <table>
       <tr><th>Connect fails</th><td>Regenerate the key pair in Alpaca (the <em>Paper</em> section!) and paste both values fresh.</td></tr>
       <tr><th>"It isn't trading"</th><td>Is the Trader switch on? Is the market open? The journal's <em>skip log</em> lists every declined opportunity with its reason — most "not trading" is the trader correctly declining.</td></tr>
@@ -106,6 +118,20 @@
       <tr><th>"Not signed in" flickers</th><td>The server may be restarting — reload in ~30 seconds.</td></tr>
     </table>
     <p class="muted">Want the deep dive — what the signals are, why the stops are wide, what was measured and rejected? See the trader algorithm paper in the docs, or just ask in <a href="/chat.html">chat</a>.</p>
+  </div>
+
+  <div class="step" id="shortcuts">
+    <h2><span class="num">8</span> Keyboard shortcuts</h2>
+    <p>On the trading desk, with no text field focused:</p>
+    <table>
+      <tr><th><kbd>/</kbd></th><td>Jump to a symbol — type to search, Enter to select.</td></tr>
+      <tr><th><kbd>B</kbd> / <kbd>S</kbd></th><td>Open the order ticket to buy / sell the selected symbol.</td></tr>
+      <tr><th><kbd>Shift</kbd>+<kbd>B</kbd> / <kbd>Shift</kbd>+<kbd>S</kbd></th><td>In <strong>Rapid</strong> mode only: send a market order immediately, at the last quantity you used. No ticket, no confirm.</td></tr>
+      <tr><th><kbd>←</kbd> / <kbd>→</kbd></th><td>Move the selection between the charts on screen.</td></tr>
+      <tr><th><kbd>0</kbd>–<kbd>6</kbd></th><td>Chart layout: <kbd>0</kbd> shows them all, <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd>/<kbd>6</kbd> pick that many. (<kbd>5</kbd> isn't a layout.)</td></tr>
+      <tr><th><kbd>Esc</kbd></th><td>Close whatever is open — the ticket, a dialog, a fullscreen chart.</td></tr>
+    </table>
+    <p class="muted">The keys go quiet while you're typing in any input, textarea or dropdown, so searching a symbol never fires a trade.</p>
   </div>
 </main>
 </body>
