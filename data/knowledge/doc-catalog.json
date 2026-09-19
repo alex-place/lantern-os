@@ -3974,5 +3974,18 @@
     "audience": "builder",
     "updated": "2026-08-11",
     "grounding": "web-fetched competitor pricing 2026-08-11 (Danelfin via third-party reviews, medium-confidence) + OSS star counts + internal ledger"
+  },
+  {
+    "path": "docs/two-sleeve-engine.md",
+    "title": "The two-sleeve engine",
+    "category": "trading",
+    "description": "One trader, one engine, one account: the stable and race brains as two sleeves under symbol ownership and per-sleeve env, the engine core (lib/two-sleeve), the replay validation gate, the headless runner (dry/armed), and the paper-trial plan (#3656).",
+    "status": "Reference",
+    "updated": "2026-09-18",
+    "grounding": "Grounded",
+    "action": "keep",
+    "mergeInto": "",
+    "reason": "Design and runbook for the endgoal trader; validated trade-for-trade against the faithful replay.",
+    "audience": "builder"
   }
 ]

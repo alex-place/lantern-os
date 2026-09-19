@@ -6,7 +6,11 @@ Dated working notes: experiments, negative results, and design records, newest f
 These are lab notebooks, not guides — a note records what was true on its date and is
 never revised afterwards. Findings that survive get folded into the docs above.
 
-87 notes.
+88 notes.
+
+## Aug 2026
+
+- **[Auto-Trader Competitive Analysis - Retail AI Trading Software (2026-08-11)](2026-08-11-auto-trader-competitive-analysis.md)** — 2026-08-11
 
 ## Jul 2026
 
