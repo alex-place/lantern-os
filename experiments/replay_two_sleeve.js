@@ -1,19 +1,36 @@
 'use strict';
-// experiments/replay_two_sleeve.js — THE FAITHFUL REPLAY (2026-09-16), teamwork edition (2026-09-18): the canonical harness with
-// TEAMWORK instrumentation: variants from a JSON file (REPLAY_VARIANTS), per-sleeve universe
-// (exS/exR), tick order per variant (order "SR"|"RS" = who claims a shared washout first),
-// per-trade $ pnl, and a per-sleeve mark-to-market DAILY series in the dump so the in-blend
-// correlation / coverage / collisions can be scored exactly rather than from closed trades.
-// Everything else (stops, clock shim, env isolation, judge off, tripwires) is the canonical harness.
+// experiments/replay_two_sleeve.js — THE FAITHFUL REPLAY, engine edition (2026-09-18).
+// The two-sleeve ENGINE CORE (lib/two-sleeve/engine.js + ownership.js) drives this replay
+// exactly as the headless runner drives the live account: same bridge wrapper, same env
+// isolation, same symbol ownership, same tick order. What this file adds is the replay
+// world — cached bars, a pinned clock, a mock account that fills stops on the bar's low,
+// and the measurement (per-trade $ P&L, per-sleeve mark-to-market daily series, collisions).
+// A runtime that changes nothing between here and live is the validation: the engine must
+// reproduce the harness numbers of the 2026-09-18 teamwork sweep (sleeve-teamwork-levers).
+//
+// Carries every harness repair (#1-#7): protective stops placed and swept, Date.now() pinned
+// to the simulated instant, day P&L marked to market, filled stops kept visible to the fill
+// ledger with unique ids per variant, no LLM judge, zero-trade and zero-stop-fill tripwires.
+//
+// Paths: REPLAY_APP_S / REPLAY_APP_R / REPLAY_ENV_S / REPLAY_ENV_R override the box trees.
+// Variants: REPLAY_VARIANTS=<json> ([{name, active:["S","R","M"], S:{env}, R:{env}, M:{env}, order:"SRM", exS:[], exR:[], exM:[]}]).
+// Sleeve M = a second instance of the race brain fed a STRENGTH signal (REPLAY_M_IBS / REPLAY_M_FROM / REPLAY_M_SYMS);
+// REPLAY_FRI_PM_INV / REPLAY_FRI_PM_FROM / REPLAY_FRI_PM_SYMS = the Friday-afternoon inverse-strength rule for sleeve R.
+// Both are signal-engine rules under measurement — the brains take the scan's direction and never re-gate on IBS.
+// Universe: REPLAY_EXCLUDE=SYM,SYM (global). Sessions: REPLAY_DAYS=N (first N). Dumps: REPLAY_DUMP=<prefix>
+// (per-variant trades + .daily.json with the per-sleeve MTM series, collisions, refusals).
 const fs = require("fs"), path = require("path");
 const LONGS = ["SPY", "QQQ", "IWM", "DIA", "GLD", "TLT", "SMH", "XLK", "SOXL", "TNA", "SPXL", "TQQQ", "UPRO"];
 const INV = ["SQQQ", "SOXS", "SPXS", "TZA"];
 const SYMS = [...LONGS, ...INV];
-const CACHE = path.join(process.env.TEMP || "/tmp", "rev60cache");
+// REPLAY_CACHE overrides the bar cache dir (default rev60cache = Jun 5 – Aug 31 2026; rev73cache adds September).
+const CACHE = process.env.REPLAY_CACHE || path.join(process.env.TEMP || "/tmp", "rev60cache");
 const APP_S = process.env.REPLAY_APP_S || "C:/dev/lantern-os-stable/apps/lantern-garage";
 const APP_R = process.env.REPLAY_APP_R || "C:/dev/lantern-race/apps/lantern-garage";
 const ENV_S = process.env.REPLAY_ENV_S || "C:/dev/lantern-os-stable/.env.local";
 const ENV_R = process.env.REPLAY_ENV_R || "C:/dev/lantern-race/.env.local";
+const { createEngine } = require(path.join(__dirname, "..", "apps", "lantern-garage", "lib", "two-sleeve", "engine"));
+const { createOwnership } = require(path.join(__dirname, "..", "apps", "lantern-garage", "lib", "two-sleeve", "ownership"));
 
 const ET = (ms) => new Date(new Date(ms).toLocaleString("en-US", { timeZone: "America/New_York" }));
 const DAY = (ms) => { const d = ET(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -46,7 +63,10 @@ global.Date = class extends _RealDate {
   constructor(...a) { return a.length ? new _RealDate(...a) : new _RealDate(NOW_MS || _RealDate.now()); }
   static now() { return NOW_MS || _RealDate.now(); }
 };
-for (const APP of [APP_S, APP_R]) {
+// Sleeve M (strength/momentum, under measurement) = a SECOND INSTANCE of the race brain: the race lib is
+// copied to a temp app dir so its module-level state (entry clocks, peaks, stop registry) is its own.
+const APP_M = (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-M-")), "apps", "lantern-garage"); fs.cpSync(path.join(APP_R, "lib"), path.join(d, "lib"), { recursive: true }); return d; })();
+for (const APP of [APP_S, APP_R, APP_M]) {
   const mdPath = require.resolve(path.join(APP, "lib", "market-data-yahoo.js"));
   require.cache[mdPath] = { id: mdPath, filename: mdPath, loaded: true, exports: stub };
 }
@@ -56,11 +76,14 @@ process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_S.jsonl"); process.env.TR
 const atS = require(path.join(APP_S, "lib", "auto-trader"));
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_R.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_R.json");
 const atR = require(path.join(APP_R, "lib", "auto-trader"));
-const AT = { S: atS, R: atR };
-const STATE_FILES = { S: path.join(TMP, "state_S.json"), R: path.join(TMP, "state_R.json") };
+process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_M.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_M.json");
+const atM = require(path.join(APP_M, "lib", "auto-trader"));
+const AT = { S: atS, R: atR, M: atM };
+const STATE_FILES = { S: path.join(TMP, "state_S.json"), R: path.join(TMP, "state_R.json"), M: path.join(TMP, "state_M.json") };
+const SLEEVES = ["S", "R", "M"];
 
-// ------------------------------------------------- one account, two owners
-function makeBroker(state, owner, tag) {
+// ------------------------------------------------- one mock account (no ownership here — the engine owns that)
+function makeAccount(state, tag) {
   const priceOf = (sym) => { const b = barsUpTo(sym, 1)[0]; return b ? b.close : 0; };
   const book = (sym, held, px, why) => {
     const pnl = held.qty * (px - held.entry);
@@ -71,7 +94,7 @@ function makeBroker(state, owner, tag) {
     for (const o of [...state.orders]) {
       if (o.orderType !== "STP" || o.status === "Filled") continue;
       if (!(o._placedAt < NOW_MS)) continue;
-      const held = state.pos[o.symbol]; if (!held || held.owner !== o.owner) continue;
+      const held = state.pos[o.symbol]; if (!held) continue;
       const b = barsUpTo(o.symbol, 1)[0]; if (!b) continue;
       const stop = Number(o.stopPrice);
       if (!(stop > 0) || !(Number(b.low) <= stop)) continue;
@@ -82,14 +105,13 @@ function makeBroker(state, owner, tag) {
       state.orders = state.orders.filter((x) => x.symbol !== o.symbol || x === o);
     }
   };
-  const mine = (p) => p.owner === owner;
   return {
     getIBKRAccount: async () => ({ equity: state.equity, mode: "paper" }),
-    getIBKRPositions: async () => { sweepStops(); return Object.entries(state.pos).filter(([, p]) => mine(p)).map(([symbol, p]) => ({
+    getIBKRPositions: async () => { sweepStops(); return Object.entries(state.pos).map(([symbol, p]) => ({
       symbol, qty: p.qty, avg_entry_price: p.entry, current_price: priceOf(symbol),
       market_value: p.qty * priceOf(symbol), unrealized_pl: p.qty * (priceOf(symbol) - p.entry),
     })); },
-    getIBKROpenOrders: async () => { sweepStops(); return state.orders.filter(mine); },
+    getIBKROpenOrders: async () => { sweepStops(); return state.orders; },
     getIBKRDayPnl: async () => {
       const mtm = state.equity + Object.entries(state.pos).reduce((a, [s, p]) => a + p.qty * (priceOf(s) - p.entry), 0);
       const d = DAY(NOW_MS);
@@ -97,44 +119,70 @@ function makeBroker(state, owner, tag) {
       return mtm - state.dayStart.equity;
     },
     getIBKROrderStatus: async () => null,
-    cancelIBKROrder: async (u, id) => { state.orders = state.orders.filter((o) => !(String(o.orderId) === String(id) && mine(o))); return { status: "cancelled" }; },
+    cancelIBKROrder: async (u, id) => { state.orders = state.orders.filter((o) => String(o.orderId) !== String(id)); return { status: "cancelled" }; },
     placeIBKROrder: async (u, o) => {
-      const sym = String(o.ticker).toUpperCase(), px = priceOf(sym);
+      const sym = String(o.ticker).toUpperCase(), px = priceOf(sym), owner = o._owner || "?";
       if (!(px > 0)) return { status: "error", reason: "no price" };
       const held = state.pos[sym];
       if (/stop/i.test(o.type || "")) {
-        if (held && !mine(held)) return { status: "error", reason: "symbol owned by the other sleeve" };
-        state.orders.push({ orderId: tag + owner + "S" + (++state.seq), symbol: sym, side: "sell", orderType: "STP", status: "Submitted", qty: o.qty, stopPrice: o.stopPrice, _placedAt: NOW_MS, owner });
-        return { status: "placed", order_id: tag + owner + "S" + state.seq };
+        const id = tag + owner + "S" + (++state.seq);
+        state.orders.push({ orderId: id, symbol: sym, side: "sell", orderType: "STP", status: "Submitted", qty: o.qty, stopPrice: o.stopPrice, _placedAt: NOW_MS, owner });
+        return { status: "placed", order_id: id };
       }
       const qty = Number(o.qty) || 0;
       if (String(o.side).toLowerCase() === "buy") {
-        if (held && !mine(held)) {
-          state.refused[owner] = (state.refused[owner] || 0) + 1;
-          state.collisions.push({ day: DAY(NOW_MS), ms: NOW_MS, sym, loser: owner, winner: held.owner });
-          return { status: "error", reason: "symbol owned by the other sleeve" };
-        }
+        if (held) return { status: "error", reason: "already held" };   // the engine refuses cross-sleeve buys before this; same-sleeve doubles are the brain's own guard
         state.pos[sym] = { qty, entry: px, owner, at: NOW_MS };
       } else {
-        if (!held || !mine(held)) return { status: "error", reason: held ? "symbol owned by the other sleeve" : "not held" };
+        if (!held) return { status: "error", reason: "not held" };
         book(sym, held, px, "sell");
         delete state.pos[sym];
-        state.orders = state.orders.filter((x) => x.symbol !== sym || !mine(x));
+        state.orders = state.orders.filter((x) => x.symbol !== sym);
       }
       return { status: "placed", order_id: tag + owner + "O" + (++state.seq) };
     },
   };
 }
 
-// ------------------------------------------------- each sleeve's own entry rule (+ its own universe)
-let EXC = { S: new Set(), R: new Set() };
+// ------------------------------------------------- each sleeve's own entry rule (reads the sleeve's env: called after applyEnv)
+// REPLAY_FRI_PM_INV=<ibs> (+ REPLAY_FRI_PM_FROM=<ET minute>, default 780 = 13:00): a SIGNAL-ENGINE rule under
+// measurement (operator 2026-09-18: Friday afternoons fade, inverses drift up). On Fridays from that minute an
+// inverse-family symbol whose session IBS is >= the threshold (STRENGTH, not a washout) is emitted BULLISH for
+// the race sleeve. The brain takes the scan's direction and never re-gates on IBS, so this is where such a rule
+// lives; live it would go in lib/signal-engine/scan.js, not in the brain.
+const FRI_PM_INV = Number(process.env.REPLAY_FRI_PM_INV) || 0;
+const FRI_PM_FROM = Number(process.env.REPLAY_FRI_PM_FROM) || 780;
+const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,SPXS,TZA").split(",").map((s) => s.trim().toUpperCase()));
+// Sleeve M signal (REPLAY_M_IBS, default 0.7; REPLAY_M_FROM ET minute, default 630 = 10:30; REPLAY_M_SYMS, default all):
+// STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
+// (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
+const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
+const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
+const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean));
 function signalsAt(day, m, sleeve) {
   const out = [];
+  if (sleeve === "M") {
+    if (m < M_FROM) return out;
+    for (const s of SYMS) {
+      if (!M_SYMS.has(s)) continue;
+      const a = DATA[s]; if (!a) continue;
+      const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
+      if (sess.length < 3) continue;
+      const hi = Math.max(...sess.map((b) => b.h)), lo = Math.min(...sess.map((b) => b.l));
+      if (!(hi > lo)) continue;
+      const cur = sess[sess.length - 1];
+      const ibs = (cur.c - lo) / (hi - lo);
+      const bullish = ibs >= M_IBS, bearish = ibs <= 1 - M_IBS;
+      out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
+        decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
+    }
+    return out;
+  }
   const thr = sleeve === "S"
     ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (Number(process.env.TRADER_IBS_MAX) || 0.30))
     : (Number(process.env.TRADER_IBS_MAX) || 0.15);
+  const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
-    if (EXC[sleeve].has(s)) continue;
     const a = DATA[s]; if (!a) continue;
     const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
     if (sess.length < 3) continue;
@@ -142,7 +190,8 @@ function signalsAt(day, m, sleeve) {
     if (!(hi > lo)) continue;
     const cur = sess[sess.length - 1];
     const ibs = (cur.c - lo) / (hi - lo);
-    const bullish = ibs <= thr, bearish = ibs >= 0.6;
+    const strength = friPm && FRI_PM_SYMS.has(s) && ibs >= FRI_PM_INV;
+    const bullish = ibs <= thr || strength, bearish = !strength && ibs >= 0.6;
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
   }
@@ -188,63 +237,65 @@ function loadArmed(base, src) {
   ];
   if (process.env.REPLAY_VARIANTS) {
     const list = JSON.parse(fs.readFileSync(process.env.REPLAY_VARIANTS, "utf8"));
-    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [] }]);
+    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [] }]);
     console.log(`  [variants] ${VARIANTS.length} from ${process.env.REPLAY_VARIANTS}: ${VARIANTS.map(([n]) => n).join(" ")}`);
   }
-  const ALL_KEYS = new Set([...Object.keys(BASE_S), ...Object.keys(BASE_R), ...VARIANTS.flatMap(([, v]) => [...Object.keys(v.S), ...Object.keys(v.R)])]);
-  const applyEnv = (map) => { for (const k of ALL_KEYS) delete process.env[k]; for (const [k, v] of Object.entries(map)) process.env[k] = v; };
-  console.log(`\nTWO-SLEEVE TEAMWORK REPLAY — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
+  console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
   console.log(`  ${"variant".padEnd(18)}${"return".padStart(9)}${"trades".padStart(8)}${"WR".padStart(6)}${"avg win".padStart(9)}${"avg loss".padStart(10)}${"payoff".padStart(8)}   maxDD   per-sleeve`);
 
   for (const [name, v] of VARIANTS) {
     const t0 = _RealDate.now();
     const tag = name.replace(/\W+/g, "") + "-";
-    const envFor = { S: { ...BASE_S, ...v.S }, R: { ...BASE_R, ...v.R } };
-    EXC = { S: new Set(v.exS || []), R: new Set(v.exR || []) };
-    const order = (v.order === "RS" ? ["R", "S"] : ["S", "R"]).filter((sl) => v.active.includes(sl));
-    for (const sl of v.active) { try { fs.unlinkSync(STATE_FILES[sl]); } catch (_e) {} applyEnv(envFor[sl]); AT[sl]._resetCooldowns(); AT[sl]._loadState(); }
-    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], refused: {}, realBy: { S: 0, R: 0 }, collisions: [], daily: [] };
-    const bridges = { S: makeBroker(state, "S", tag), R: makeBroker(state, "R", tag) };
-    const census = { S: {}, R: {} };
+    const envFor = { S: { ...BASE_S, ...v.S }, R: { ...BASE_R, ...v.R }, M: { ...BASE_R, ...(v.M || {}) } };
+    const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
+    const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
+    for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
+    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] };
+    const account = makeAccount(state, tag);
+    const rows = [];
+    const engine = createEngine({
+      sleeves: order.map((id) => ({ id, brain: AT[id], env: envFor[id], userId: "replay-" + id, universe: SYMS.filter((s) => !exc[id].has(s)) })),
+      order, facade: account, ownership: createOwnership({ defaultOwner: "S" }),
+      journal: (r) => { if (r.event === "collision") state.collisions.push({ day: DAY(NOW_MS), ms: NOW_MS, sym: r.symbol, loser: r.loser, winner: r.winner }); rows.push(r); },
+    });
+    for (const sl of order) { try { fs.unlinkSync(STATE_FILES[sl]); } catch (_e) {} engine.applyEnv(envFor[sl]); AT[sl]._resetCooldowns(); AT[sl]._loadState(); }
+    engine.restoreEnv();
+    const census = { S: {}, R: {}, M: {} };
     for (const day of days) {
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
         NOW_MS = cur.t;
-        for (const sl of order) {
-          applyEnv(envFor[sl]);
-          try {
-            const r = await AT[sl].runAutoTrade({ signals: signalsAt(day, m, sl) }, { bridge: bridges[sl], userId: "replay-" + sl, now: NOW_MS });
-            for (const s of ((r && r.skipped) || [])) { const k = String(s.why || "?").split(/[—(:]/)[0].trim().slice(0, 26); census[sl][k] = (census[sl][k] || 0) + 1; }
-          } catch (_e) { /* fail-soft */ }
-        }
+        const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0] });
+        for (const sl of order) for (const s of (((res[sl] || {}).skipped) || [])) { const k = String(s.why || "?").split(/[—(:]/)[0].trim().slice(0, 26); census[sl][k] = (census[sl][k] || 0) + 1; }
       }
-      const unreal = { S: 0, R: 0 };
+      const unreal = { S: 0, R: 0, M: 0 };
       for (const [sym, p] of Object.entries(state.pos)) {
         const last = ((DATA[sym] || []).filter((b) => b.d === day).slice(-1)[0]) || { c: p.entry };
-        unreal[p.owner] += p.qty * (last.c - p.entry);
+        unreal[p.owner] = (unreal[p.owner] || 0) + p.qty * (last.c - p.entry);
       }
-      state.curve.push(state.equity + unreal.S + unreal.R);
-      state.daily.push({ day, S: state.realBy.S + unreal.S, R: state.realBy.R + unreal.R, acct: state.equity + unreal.S + unreal.R, openS: Object.values(state.pos).filter((p) => p.owner === "S").length, openR: Object.values(state.pos).filter((p) => p.owner === "R").length });
+      state.curve.push(state.equity + unreal.S + unreal.R + unreal.M);
+      state.daily.push({ day, S: state.realBy.S + unreal.S, R: state.realBy.R + unreal.R, M: state.realBy.M + unreal.M, acct: state.equity + unreal.S + unreal.R + unreal.M, openS: Object.values(state.pos).filter((p) => p.owner === "S").length, openR: Object.values(state.pos).filter((p) => p.owner === "R").length, openM: Object.values(state.pos).filter((p) => p.owner === "M").length });
     }
     for (const sym of Object.keys(state.pos)) {
       const a = (DATA[sym] || []).filter((b) => b.d <= days[days.length - 1]); const last = a[a.length - 1];
       if (last) { const p = state.pos[sym]; const pnl = p.qty * (last.c - p.entry); state.equity += pnl; state.realBy[p.owner] += pnl; state.trades.push({ sym, ret: last.c / p.entry - 1, pnl, day: last.d, why: "end_of_data", owner: p.owner, entry_ms: p.at, exit_ms: last.t }); }
       delete state.pos[sym];
     }
+    const refused = engine.stats.refusedBy;
     if (process.env.REPLAY_DUMP) {
       fs.writeFileSync(process.env.REPLAY_DUMP + "." + name + ".json", JSON.stringify(state.trades));
-      fs.writeFileSync(process.env.REPLAY_DUMP + "." + name + ".daily.json", JSON.stringify({ name, active: v.active, order, exS: v.exS, exR: v.exR, S: v.S, R: v.R, daily: state.daily, refused: state.refused, collisions: state.collisions }));
+      fs.writeFileSync(process.env.REPLAY_DUMP + "." + name + ".daily.json", JSON.stringify({ name, active: v.active, order, exS: v.exS, exR: v.exR, exM: v.exM, S: v.S, R: v.R, M: v.M, daily: state.daily, refused, collisions: state.collisions, engine: engine.stats }));
     }
     const tr = state.trades, w = tr.filter((t) => t.ret > 0), l = tr.filter((t) => t.ret < 0);
     const avg = (a) => (a.length ? a.reduce((s, t) => s + t.ret, 0) / a.length * 100 : 0);
     let pk = -Infinity, dd = 0; for (const e of state.curve) { pk = Math.max(pk, e); dd = Math.max(dd, (pk - e) / pk * 100); }
-    const per = v.active.map((sl) => { const t = tr.filter((x) => x.owner === sl); return `${sl}:${t.length}tr ${(t.reduce((s, x) => s + x.ret, 0) * 100).toFixed(1)}%`; }).join("  ");
+    const per = order.map((sl) => { const t = tr.filter((x) => x.owner === sl); return `${sl}:${t.length}tr ${(t.reduce((s, x) => s + x.ret, 0) * 100).toFixed(1)}%`; }).join("  ");
     const stops = tr.filter((t) => t.why === "stop").length;
-    console.log(`  ${name.padEnd(18)}${((state.equity / 100000 - 1) * 100).toFixed(2).padStart(8)}%${String(tr.length).padStart(8)}${(tr.length ? (w.length / tr.length * 100).toFixed(0) + "%" : "-").padStart(6)}${(avg(w).toFixed(3) + "%").padStart(9)}${(avg(l).toFixed(3) + "%").padStart(10)}${(avg(l) !== 0 ? Math.abs(avg(w) / avg(l)).toFixed(2) : "-").padStart(8)}   ${dd.toFixed(2).padStart(5)}%   ${per}${Object.keys(state.refused).length ? "   refused " + JSON.stringify(state.refused) : ""}   stops ${stops}   ${((_RealDate.now() - t0) / 60000).toFixed(1)}min`);
+    console.log(`  ${name.padEnd(18)}${((state.equity / 100000 - 1) * 100).toFixed(2).padStart(8)}%${String(tr.length).padStart(8)}${(tr.length ? (w.length / tr.length * 100).toFixed(0) + "%" : "-").padStart(6)}${(avg(w).toFixed(3) + "%").padStart(9)}${(avg(l).toFixed(3) + "%").padStart(10)}${(avg(l) !== 0 ? Math.abs(avg(w) / avg(l)).toFixed(2) : "-").padStart(8)}   ${dd.toFixed(2).padStart(5)}%   ${per}${Object.keys(refused).length ? "   refused " + JSON.stringify(refused) : ""}   stops ${stops}   ${((_RealDate.now() - t0) / 60000).toFixed(1)}min`);
     if (!tr.length) console.log("      !! TRIPWIRE: zero trades");
     if (!stops) console.log("      !! TRIPWIRE: zero stop fills");
-    for (const sl of v.active) { const c = Object.entries(census[sl]).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k}:${n}`).join("  "); if (c) console.log(`      gates ${sl}: ${c}`); }
+    for (const sl of order) { const c = Object.entries(census[sl]).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k}:${n}`).join("  "); if (c) console.log(`      gates ${sl}: ${c}`); }
     const h1 = new Set(days.slice(0, Math.floor(days.length / 2)));
     for (const [hn, ht] of [["h1", tr.filter((t) => h1.has(t.day))], ["h2", tr.filter((t) => !h1.has(t.day))]]) {
       const hw = ht.filter((t) => t.ret > 0);
