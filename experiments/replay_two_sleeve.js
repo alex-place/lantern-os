@@ -23,7 +23,8 @@ const fs = require("fs"), path = require("path");
 const LONGS = ["SPY", "QQQ", "IWM", "DIA", "GLD", "TLT", "SMH", "XLK", "SOXL", "TNA", "SPXL", "TQQQ", "UPRO"];
 const INV = ["SQQQ", "SOXS", "SPXS", "TZA"];
 const SYMS = [...LONGS, ...INV];
-const CACHE = path.join(process.env.TEMP || "/tmp", "rev60cache");
+// REPLAY_CACHE overrides the bar cache dir (default rev60cache = Jun 5 – Aug 31 2026; rev73cache adds September).
+const CACHE = process.env.REPLAY_CACHE || path.join(process.env.TEMP || "/tmp", "rev60cache");
 const APP_S = process.env.REPLAY_APP_S || "C:/dev/lantern-os-stable/apps/lantern-garage";
 const APP_R = process.env.REPLAY_APP_R || "C:/dev/lantern-race/apps/lantern-garage";
 const ENV_S = process.env.REPLAY_ENV_S || "C:/dev/lantern-os-stable/.env.local";
