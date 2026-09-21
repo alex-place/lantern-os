@@ -71,13 +71,40 @@ node apps/lantern-garage/test/two-sleeve-engine.test.js
 node apps/lantern-garage/scripts/two-sleeve-runner.js --dry --once   # boot + one tick, no orders
 node apps/lantern-garage/scripts/two-sleeve-runner.js --dry          # a dry session: every order journaled and refused
 node apps/lantern-garage/scripts/two-sleeve-runner.js                # armed
+
+# after-hours smoke of a DRY runner with its clock pinned inside a session: workers boot in
+# their own trees, both brains tick armed behind the dry wall, the journals fill
+TWO_SLEEVE_FAKE_NOW=2026-09-21T18:12:00Z node apps/lantern-garage/scripts/two-sleeve-runner.js --dry --once
 ```
 
 An armed runner takes the account lock as the **armed** holder. A web server on the same account
 must run disarmed (`TRADER_AUTO_EXECUTE=0`, `TRADER_MANAGE_EXITS=0`): it keeps serving the
 dashboard and never touches the lock. A `--dry` runner places nothing and therefore never
 contends for the lock: it can shadow an armed server on the same account, or run alone on a
-disarmed one, journaling every order it would have placed as `dry_order`. Set `defaultOwner`
+disarmed one, journaling every order it would have placed as `dry_order`.
+
+**What a dry run is (2026-09-21).** The brains are armed in-process in every mode; dry-ness lives
+in the facade, which forwards the five reads, refuses and journals the two writes, and exposes
+nothing else (`lib/two-sleeve/runner-support.js`). The first dry session (Monday 2026-09-21,
+race's account) had it the other way round: `--dry` exported `TRADER_AUTO_EXECUTE=0`, both brains
+returned "nothing to do" before reading the account or journaling a skip, and 400 error-free
+ticks produced not one brain row. The plumbing was proven (lock, facade, reconcile, the SQQQ
+stop-out adopted at 09:05 and released at 09:34 after the real fill); the decisions were not.
+A dry day is evidence only if `<id>.autopilot-trades.jsonl` fills with each brain's own skips
+and every `tick` row in `engine.jsonl` carries per-sleeve `signals` / `enters` / `skipped` and
+no `reason`.
+
+**Scans are per sleeve.** Each sleeve's signals come from a forked scan worker
+(`lib/two-sleeve/scan-worker.js`) that loads that sleeve's app tree under that sleeve's env file
+and universe: the stable sleeve scans with this tree's signal engine at stable's thresholds
+(IBS 0.30, P_MIN 0.50, `selective`), the race sleeve with race's own `scan.js` at race's
+(IBS 0.15). Monday's single shared scan ran master's engine under race's env, so the stable sleeve
+never saw the TLT washout (IBS 0.29) that stable's live brain bought at 14:12. `convergence-ev`'s
+`P_MIN` is a module-load constant, which is why this takes a process per sleeve rather than an env
+swap. Each worker reports its thresholds on boot (`scan_worker_ready` in `engine.jsonl`);
+`TWO_SLEEVE_SCAN=shared` keeps the old single in-process scan for smokes only.
+
+Set `defaultOwner`
 in the config to the sleeve that should adopt positions already in the account when the engine
 takes over (`"R"` when it inherits race's book), and copy that box's `trader-state.json` to
 `two-sleeve/<id>.state.json` so the sleeve keeps its hold clocks and stop records. Per-sleeve journals and state live under
@@ -89,7 +116,10 @@ read the sleeve journals like any autopilot journal.
 
 1. The engine-core replay reproduces the sweep numbers on the same 60 sessions (this is the gate
    the ledger row `two-sleeve-engine-v2` scores).
-2. A dry session on a real account: orders journaled, none placed, lock semantics observed.
+2. A dry session on a real account with brain rows in both sleeve journals and per-sleeve signal
+   counts on every tick: orders journaled as `dry_order`, none placed, lock semantics observed.
+   Monday 2026-09-21 does not count (see above); the repaired runner's first full dry day is
+   the gate, scored by the ledger row `two-sleeve-dry-day-2-fidelity`.
 3. Paper for at least three weeks, scored against the ledger row, on a third account or replacing
    race — the operator's call.
 
