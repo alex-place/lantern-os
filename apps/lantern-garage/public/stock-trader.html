@@ -1480,6 +1480,59 @@
   .trade-lock a{display:inline-block;margin:0 6px;padding:9px 18px;border-radius:9px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);color:var(--text0)}
   .trade-lock a.tl-cta{background:var(--blue);border-color:var(--blue);color:#fff}
 </style>
+<style id="mtab-phone">
+  /* ── Phone shell (#mobile-dashboard, 2026-09-19): TradingView's shape on a 375px screen.
+     One full-screen VIEW at a time — watchlist / chart / trade / positions — chosen by the
+     bottom tab bar that /js/mobile-tabbar.js injects, and the views are the page's REAL
+     regions (the right dock, the chart deck, the order ticket, the account panel), not
+     the pre-#3355 `.sidebar` the old segmented control still pointed at. Everything here
+     is scoped to ≤580px; the desktop desk is untouched. ── */
+  @media (max-width:580px){
+    .mobile-view-tabs{ display:none !important; }
+    .layout{ height:calc(100vh - 52px - 56px - env(safe-area-inset-bottom,0px)) !important; padding-top:0 !important; }
+    /* chrome a phone does not carry by default: the drawing rail (toggle from More), the widget rail */
+    .draw-rail{ display:none !important; }
+    body.mv-draw .draw-rail{ display:flex !important; }
+    body.mv-draw .layout.mv-chart{ padding-top:var(--rail-band,50px) !important; }
+    .dock-rail{ display:none !important; }
+    /* one view at a time */
+    .layout .header, .layout .main, .layout .range-strip, .layout .footer, .layout #ticketDock, .layout #dockR, .layout #dockL{ display:none !important; }
+    .layout.mv-chart .header{ display:flex !important; }
+    .layout.mv-chart .main{ display:block !important; flex:1 1 auto; min-height:0; overflow-y:auto; }
+    .layout.mv-chart .range-strip{ display:flex !important; }
+    .layout.mv-chart .cards-grid.grid-fixed{ height:calc(100vh - 52px - 56px - 60px - 43px - 16px - env(safe-area-inset-bottom,0px)); }
+    /* watchlist view = the right dock, in the flow, full height */
+    .layout.mv-watchlist #dockR, body.rightdock-closed .layout.mv-watchlist #dockR{ display:flex !important; position:static !important; height:auto !important;
+      flex:1 1 auto; min-height:0; border:none !important; border-radius:0 !important; box-shadow:none !important; z-index:auto !important; }
+    .layout.mv-watchlist #dockR > .rw-panel:not([hidden]), body.rightdock-closed .layout.mv-watchlist #dockR > .rw-panel:not([hidden]){ display:flex !important; }
+    .layout.mv-watchlist .dock-head{ padding:10px 14px 6px; }
+    .layout.mv-watchlist .dock-title{ font-size:20px; font-weight:700; letter-spacing:0; text-transform:none; }
+    .layout.mv-watchlist .wl-add{ padding:6px 14px 10px; gap:8px; }
+    .layout.mv-watchlist .wl-add-btn{ min-height:38px; font-size:13px; }
+    .layout.mv-watchlist .wl-head{ display:none !important; }
+    /* rows: logo · symbol over $-change · price over %-change · AI chip — the watchlist app row */
+    .layout.mv-watchlist .wl-item{ grid-template-columns:34px minmax(0,1fr) auto 28px; grid-template-areas:"logo sym price ai" "logo sub chg ai";
+      column-gap:10px; row-gap:2px; padding:10px 14px; min-height:58px; border-bottom:1px solid var(--border); }
+    .layout.mv-watchlist .wl-item > .wl-logo, .layout.mv-watchlist .wl-item > .tb-badge{ grid-area:logo; width:30px; height:30px; font-size:10px; }
+    .layout.mv-watchlist .wl-sym{ grid-area:sym; font-size:15px; font-weight:700; color:var(--text0); letter-spacing:0; }
+    .layout.mv-watchlist .wl-abs{ grid-area:sub; justify-self:start; font-size:12px; color:var(--text2); }
+    .layout.mv-watchlist .wl-price{ grid-area:price; font-size:15px; font-weight:600; color:var(--text0); text-align:right; font-variant-numeric:tabular-nums; }
+    .layout.mv-watchlist .wl-chg{ grid-area:chg; text-align:right; font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+    .layout.mv-watchlist .wl-ai{ grid-area:ai; justify-self:end; opacity:.85; }
+    .layout.mv-watchlist .wl-remove{ display:none !important; }
+    .layout.mv-watchlist .wl-item.active{ box-shadow:inset 3px 0 0 var(--accent); }
+    /* the symbol-details block belongs to the chart screen on a phone (TradingView: list here, details on the symbol page) */
+    .layout.mv-watchlist .wl-info, .layout.mv-watchlist .wl-resize{ display:none !important; }
+    /* trade view = the order ticket, in the flow */
+    .layout.mv-trade #ticketDock, body.ticket-closed .layout.mv-trade #ticketDock{ display:flex !important; position:static !important; height:auto !important; flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:16px; box-sizing:border-box; }
+    /* positions view = the account panel, in the flow */
+    .layout.mv-positions .footer{ display:flex !important; flex:1 1 auto; min-height:0; height:auto !important; max-height:none !important; overflow-y:auto; }
+    .layout.mv-positions .footer .footer-resize{ display:none; }
+    .layout.mv-trade #dockTicketBody{ padding-bottom:20px; box-sizing:border-box; }
+    /* the assistant sheet and the order-ticket modal clear the tab bar */
+    .dc-modal, .ot-modal{ padding-bottom:calc(56px + env(safe-area-inset-bottom,0px)); }
+  }
+</style>
 </head>
 <body>
 <div class="layout">
@@ -11394,23 +11447,76 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   /* Mobile view switch (#2501): toggle between the chart deck, the ticker list, and
      the account/positions panel — the three can't share a phone screen. Chart is the
      default; the tab bar only renders on mobile (see .mobile-view-tabs CSS). */
+  const MOBILE_VIEWS = ['watchlist', 'chart', 'trade', 'positions'];
+  function _isPhone() { try { return window.matchMedia('(max-width:580px)').matches; } catch (_e) { return false; } }
   function setMobileView(view) {
+    // Phone shell (2026-09-19): four full-screen views over the page's real regions. The
+    // legacy names ('tickers') and classes (mobile-tickers / mobile-positions) stay so the
+    // older phone rules and their tests keep holding; the bottom tab bar mirrors the state.
+    var alias = { tickers: 'watchlist' };
+    view = alias[view] || view;
+    if (MOBILE_VIEWS.indexOf(view) < 0) view = 'chart';
     var layout = document.querySelector('.layout');
     if (!layout) return;
-    layout.classList.toggle('mobile-tickers',   view === 'tickers');
+    MOBILE_VIEWS.forEach(function (v) { layout.classList.toggle('mv-' + v, v === view); });
+    layout.classList.toggle('mobile-tickers',   view === 'watchlist');
     layout.classList.toggle('mobile-positions', view === 'positions');
     document.querySelectorAll('.mvt-btn').forEach(function (b) {
-      var on = b.getAttribute('data-view') === view;
+      var on = b.getAttribute('data-view') === (view === 'watchlist' ? 'tickers' : view);
       b.classList.toggle('active', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    // Charts just became visible/resized — re-fit them to the pane.
-    if (view === 'chart' && typeof renderCards === 'function') {
-      requestAnimationFrame(function () { try { renderCards(); } catch (e) {} });
+    // the watchlist view shows the right dock's resting panel; the trade view needs the ticket open
+    // the Watchlist tab always lands on the watchlist panel (More → Alerts switches the panel AFTER the view)
+    try { if (view === 'watchlist' && typeof _rwPanel !== 'undefined' && _rwPanel !== 'watchlist' && typeof setRightWidget === 'function') setRightWidget('watchlist'); } catch (_e) {}
+    try { if (view === 'trade' && typeof _ticketOpen !== 'undefined' && !_ticketOpen) { _ticketOpen = true; _saveDocks(); _applyDocks(); } } catch (_e) {}
+    try { if (_isPhone()) { localStorage.setItem('trader.mview', view); if (history.replaceState) history.replaceState(null, '', '#' + view); } } catch (_e) {}
+    if (window.MobileTabbar) window.MobileTabbar.setActive(view === 'trade' ? 'chart' : view);
+    // Charts just became visible/resized — re-fit them to the pane. On a phone the chart
+    // view is ONE full-height chart of the selected symbol (TradingView's symbol screen);
+    // the multi-chart grid lays its canvases out at 300x150 while the view is hidden.
+    if (view === 'chart') {
+      // Deferred a frame: renderChart() skips a canvas whose box is still 0x0, and the grid
+      // built in the same tick as the class switch was. A full rebuild (lastCardOrder = '')
+      // with the selected symbol in slot 0 is what the watchlist tap promises.
+      setTimeout(function () {
+        try {
+          if (_isPhone()) {
+            var sel = document.getElementById('chartLayoutSelect');
+            if (typeof setSlotCount === 'function' && (!sel || sel.value !== '1')) setSlotCount(1);
+            if (typeof chartSlots !== 'undefined' && typeof activeTicker !== 'undefined' && activeTicker && chartSlots[0] !== activeTicker) { chartSlots = [activeTicker]; if (typeof persistSlots === 'function') persistSlots(); }
+          }
+          if (typeof lastCardOrder !== 'undefined') lastCardOrder = '';
+          if (typeof renderCards === 'function') renderCards();
+          setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 300);
+        } catch (e) {}
+      }, 60);
     }
   }
+  // Phone entry points: a watchlist row opens the chart; SELL/BUY and the ticket toggle open
+  // the order ticket as its own view (and the ticket's ✕ returns to the chart).
+  (function () {
+    var _ft = window.focusTicker;
+    if (typeof _ft === 'function') window.focusTicker = function (t) { var r = _ft.apply(this, arguments); try { if (_isPhone() && document.querySelector('.layout.mv-watchlist')) setMobileView('chart'); } catch (_e) {} return r; };
+    var _oot = window.openOrderTicket;
+    if (typeof _oot === 'function') window.openOrderTicket = function () { var r = _oot.apply(this, arguments); try { if (_isPhone()) setMobileView('trade'); } catch (_e) {} return r; };
+    var _ttd = window.toggleTicketDock;
+    if (typeof _ttd === 'function') window.toggleTicketDock = function () { if (_isPhone()) { setMobileView(document.querySelector('.layout.mv-trade') ? 'chart' : 'trade'); return; } return _ttd.apply(this, arguments); };
+    function fromHash() { var h = (location.hash || '').replace('#', ''); return MOBILE_VIEWS.indexOf(h) >= 0 || h === 'tickers' ? h : null; }
+    // After the page's own DOMContentLoaded init (dock state is restored there), so the
+    // opening view is applied on top of it rather than under it.
+    function initMobileView() {
+      if (!_isPhone()) return;
+      var saved = null; try { saved = localStorage.getItem('trader.mview'); } catch (_e) {}
+      setMobileView(fromHash() || saved || 'watchlist');
+      window.addEventListener('hashchange', function () { var v = fromHash(); if (v) setMobileView(v); });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(initMobileView, 0); });
+    else setTimeout(initMobileView, 0);
+  })();
   window.setMobileView = setMobileView;
 </script>
+<script src="/js/mobile-tabbar.js" defer></script>
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/ticker-badges.js"></script>
 <script src="/js/site-chrome.js" defer></script>
