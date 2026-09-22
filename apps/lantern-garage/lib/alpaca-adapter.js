@@ -310,14 +310,17 @@ async function getOpenOrders(userId) {
  *     -> naked-short class, #2213).
  *   - it returns status=open only, so _reconcileFills never saw a FILL — every
  *     exit would book as a mark-priced reconstruction instead of at the fill.
- * This feed merges open orders with the last ~30h of closed ones (covers today
- * plus an overnight GTC fill; older fills are already excluded by the process-
- * start guard in fill-ledger and remembered by id), deduped by order id.
+ * This feed merges open orders with the last WEEK of closed ones, deduped by order
+ * id. Alpaca's `after` filters on SUBMISSION time, not fill time: the first cut asked
+ * for 30h and a GTC stop placed Thursday that filled Monday at the open (race, SQQQ
+ * 2026-09-21) was never in the feed, so the fill was never booked. A week covers any
+ * carry the brain holds (max-hold 5 sessions); fills already booked are remembered
+ * by id in fill-ledger, and pre-boot fills of untracked symbols stay excluded there.
  */
 async function getEngineOrders(userId) {
   const auth = _authFor(userId);
   if (!auth) return [];
-  const after = new Date(Date.now() - 30 * 3600 * 1000).toISOString();
+  const after = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const [open, closed] = await Promise.all([
     _req(auth, 'GET', '/v2/orders?status=open&limit=200'),
     _req(auth, 'GET', `/v2/orders?status=closed&limit=200&after=${encodeURIComponent(after)}`),

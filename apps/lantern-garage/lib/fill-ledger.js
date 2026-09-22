@@ -68,16 +68,24 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     // for P&L. A fill older than this process only ever produces noise, so skip
     // it. The id is still REMEMBERED (see idsToRemember) so it cannot resurface.
     const t = orderTimeMs(o);
-    if (sinceMs > 0) {
-      if (t != null && t < sinceMs) continue;
+    const sym = String(o.symbol || o.ticker || '').toUpperCase();
+    const info = (entryFor && entryFor(sym)) || {};
+    if (sinceMs > 0 && t != null && t < sinceMs) {
+      // ...but a fill of a position this engine is TRACKING is not history: it is the exit it
+      // has been waiting for. Race, SQQQ 2026-09-21: the GTC stop filled at the open while the
+      // server was disarmed; the brain re-armed hours later, dropped its own exit as "older than
+      // the process", and carried the phantom for the rest of the day. Known entry price plus a
+      // fill AFTER the position's open time = ours. An unknown open time stays conservative: a
+      // sell we cannot place after the entry could belong to an earlier round trip.
+      const openedAt = Number(info.openedAt);
+      const tracked = Number(info.avg_entry_price) > 0 && openedAt > 0 && t >= openedAt;
+      if (!tracked) continue;
     }
 
     const qty = Number(o.filledQty);
     const exitPx = Number(o.avgPrice ?? o.avg_price);
     if (!(qty > 0) || !(exitPx > 0)) continue;      // no price -> cannot price the trade honestly
 
-    const sym = String(o.symbol || o.ticker || '').toUpperCase();
-    const info = (entryFor && entryFor(sym)) || {};
     const entryPx = Number(info.avg_entry_price);
     const havePnl = entryPx > 0;
 
