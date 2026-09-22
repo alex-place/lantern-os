@@ -974,7 +974,9 @@ function _reconcileFills(orders) {
       // STP fills without ever passing through closeLong.
       const ex = _excursion.get(sym) || { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null,
         stopDistPct: _stopDistPct.get(sym) ?? null, openedAt: _entryAt.get(sym) ?? null };
-      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), ...ex };
+      // openedAt rides along for the ledger's process-start guard: a pre-boot fill of a
+      // position we are tracking (entry known, filled after it opened) is our exit, not history.
+      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), openedAt: _entryAt.get(sym) ?? null, ...ex };
     }, _PROCESS_START);
     for (const row of rows) {
       // Case-insensitive (#3407): IBKR reports 'Stop', Alpaca reports 'stop'.
@@ -987,6 +989,12 @@ function _reconcileFills(orders) {
       if (_isStopFill && _beStopAt.has(row.symbol)) row.be_ratchet = true;
       logTrade(row);
       done.add(row.symbol);
+      // The position left the book at this fill (race, SQQQ 2026-09-21): drop it from the
+      // last-positions map HERE, not in the sweep. On an empty book the sweep is deferred by
+      // the trust guard, and a fill-closed symbol left in the map is a phantom — it journals
+      // "sweep deferred" every scan and is reconstructed at a stale mark, on top of this row,
+      // the next time the book holds anything.
+      _lastPos.delete(row.symbol); _absentStreak.delete(row.symbol);
       // #3379: a fill row for our registered stop consumes the registry entry —
       // the same-session path (the feed DID show this fill) needs no lookup.
       const _reg = _stopOrders.get(row.symbol);
