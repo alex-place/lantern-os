@@ -171,10 +171,14 @@ test("a filled stop stays visible to the sleeve that placed it after the positio
   const R = stubBrain(() => (phase === 0 ? [{ ticker: "SOXL", side: "buy", qty: 9, type: "MKT" }, { ticker: "SOXL", side: "sell", qty: 9, type: "STOP", stopPrice: 1 }] : []));
   const eng = createEngine({ sleeves: [{ id: "S", brain: S, env: {}, userId: "u" }, { id: "R", brain: R, env: {}, userId: "u" }], order: ["S", "R"], facade, ownership: createOwnership({ file: tmpFile() }) });
   await eng.tick({ signals: [] }, { userId: "u" });
+  phase = 1;
+  // one tick with the position on the book: a fresh claim is released only once the position
+  // has been SEEN held (2026-09-23: a positions read lagging the fill orphaned S's UPRO to R)
+  await eng.tick({ signals: [] }, { userId: "u" });
+  assert.equal(eng.ownership.ownerOf("SOXL"), "R");
   // the stop fills at the broker: the position is gone, the order is still listed as filled
   delete facade.st.pos.SOXL;
   facade.st.orders[0].status = "Filled";
-  phase = 1;
   let res = await eng.tick({ signals: [] }, { userId: "u" });
   assert.equal(eng.ownership.ownerOf("SOXL"), null, "the symbol was released");
   assert.deepEqual(res.R.orders.map((o) => [o.symbol, o.status]), [["SOXL", "Filled"]], "R still sees its own filled stop");
