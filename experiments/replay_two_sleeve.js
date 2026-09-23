@@ -82,6 +82,46 @@ const AT = { S: atS, R: atR, M: atM };
 const STATE_FILES = { S: path.join(TMP, "state_S.json"), R: path.join(TMP, "state_R.json"), M: path.join(TMP, "state_M.json") };
 const SLEEVES = ["S", "R", "M"];
 
+// ------------------------------------------------- END-OF-DAY RULES under measurement (variant.eod, 2026-09-23)
+// Race's live losses 09-08..09-22 were all stop fills, and 58% of the dollars were carries stopped at
+// the next open (SQQQ -815 through a weekend, SOXS -264, TNA -89). The operator's target: keep race's
+// winners at race's size, cut those losses. The race brain has no end-of-day logic, so the rules are
+// applied here to the MOCK BOOK at the day's last bar, as filled market sells the brain's fill ledger
+// then books like any broker fill (tagged to the owning sleeve so it sees them):
+//   flatLosers: true          close any position below its entry at the close (carry only winners)
+//   flatWeekend: "inverse"|"lev"|"all"   close that class on Fridays (no weekend gap on inverse/3x)
+//   trimLev: 0.5              close that fraction of every 3x/inverse position at the close (carry half)
+//   owner: "R" (default)      which sleeve(s) the rules apply to
+const LEV3X = new Set(["SOXL", "TNA", "SPXL", "TQQQ", "UPRO", "SQQQ", "SOXS", "SPXS", "TZA"]);
+function applyEodRules(state, eod, day, tag, ownership) {
+  const isFri = ET(NOW_MS).getDay() === 5;
+  const owners = new Set(String(eod.owner || "R").split(""));
+  for (const [sym, p] of Object.entries(state.pos)) {
+    if (!owners.has(p.owner)) continue;
+    const last = (DATA[sym] || []).filter((b) => b.d === day).slice(-1)[0];
+    if (!last) continue;
+    const px = last.c;
+    const stopO = state.orders.find((o) => o.symbol === sym && /^(STP|Stop)$/.test(String(o.orderType)) && o.status !== "Filled");
+    const stopPx = stopO ? Number(stopO.stopPrice) : NaN;
+    let closeQty = 0, why = null;
+    if (eod.flatLosers && px < p.entry) { closeQty = p.qty; why = "eod_flat_loser"; }
+    else if (eod.flatLosersLev && LEV3X.has(sym) && px < p.entry) { closeQty = p.qty; why = "eod_flat_loser_lev"; }
+    // within one gap of the stop at the close (SQQQ 2026-09-18 closed 0.4% above its stop and opened 2.4% below it)
+    else if (eod.flatNearStop && stopPx > 0 && px <= stopPx * (1 + Number(eod.flatNearStop) / 100)) { closeQty = p.qty; why = "eod_flat_near_stop"; }
+    else if (eod.flatWeekend && isFri && (eod.flatWeekend === "all" || (eod.flatWeekend === "inverse" && INV.includes(sym)) || (eod.flatWeekend === "lev" && LEV3X.has(sym)))) { closeQty = p.qty; why = "eod_flat_weekend"; }
+    else if (eod.trimLev && LEV3X.has(sym)) { closeQty = Math.floor(p.qty * eod.trimLev); why = "eod_trim_lev"; }
+    if (!(closeQty > 0)) continue;
+    const pnl = closeQty * (px - p.entry);
+    state.equity += pnl; state.realBy[p.owner] = (state.realBy[p.owner] || 0) + pnl;
+    state.trades.push({ sym, ret: px / p.entry - 1, pnl, day, why, owner: p.owner, entry_ms: p.at, exit_ms: NOW_MS });
+    const id = tag + p.owner + "E" + (++state.seq);
+    state.orders.push({ orderId: id, symbol: sym, side: "sell", orderType: "MKT", status: "Filled", qty: closeQty, filledQty: closeQty, avgPrice: px, time: NOW_MS, owner: p.owner });
+    if (ownership && ownership.tagOrder) ownership.tagOrder(id, sym, p.owner);
+    if (closeQty >= p.qty) { delete state.pos[sym]; state.orders = state.orders.filter((o) => !(o.symbol === sym && /^(STP|Stop)$/.test(String(o.orderType)) && o.status !== "Filled")); }
+    else { p.qty -= closeQty; for (const o of state.orders) if (o.symbol === sym && /^(STP|Stop)$/.test(String(o.orderType)) && o.status !== "Filled") o.qty = p.qty; }
+  }
+}
+
 // ------------------------------------------------- one mock account (no ownership here — the engine owns that)
 function makeAccount(state, tag) {
   const priceOf = (sym) => { const b = barsUpTo(sym, 1)[0]; return b ? b.close : 0; };
@@ -92,7 +132,7 @@ function makeAccount(state, tag) {
   };
   const sweepStops = () => {
     for (const o of [...state.orders]) {
-      if (o.orderType !== "STP" || o.status === "Filled") continue;
+      if (!/^(STP|Stop)$/.test(String(o.orderType)) || o.status === "Filled") continue;
       if (!(o._placedAt < NOW_MS)) continue;
       const held = state.pos[o.symbol]; if (!held) continue;
       const b = barsUpTo(o.symbol, 1)[0]; if (!b) continue;
@@ -126,7 +166,11 @@ function makeAccount(state, tag) {
       const held = state.pos[sym];
       if (/stop/i.test(o.type || "")) {
         const id = tag + owner + "S" + (++state.seq);
-        state.orders.push({ orderId: id, symbol: sym, side: "sell", orderType: "STP", status: "Submitted", qty: o.qty, stopPrice: o.stopPrice, _placedAt: NOW_MS, owner });
+        // "Stop" is IBKR's spelling and what both brains' stop-fill detection (/^stop$/i on order_type)
+        // recognizes; Alpaca's is "stop". Until 2026-09-23 the mock said "STP", which matched NEITHER,
+        // so a filled stop never armed the post-stop cooldown or counted toward the daily breaker in
+        // any replay to date — both live boxes run both (race since graft #15). Baselines move with this.
+        state.orders.push({ orderId: id, symbol: sym, side: "sell", orderType: "Stop", status: "Submitted", qty: o.qty, stopPrice: o.stopPrice, _placedAt: NOW_MS, owner });
         return { status: "placed", order_id: id };
       }
       const qty = Number(o.qty) || 0;
@@ -237,7 +281,7 @@ function loadArmed(base, src) {
   ];
   if (process.env.REPLAY_VARIANTS) {
     const list = JSON.parse(fs.readFileSync(process.env.REPLAY_VARIANTS, "utf8"));
-    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [] }]);
+    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [], eod: v.eod || null }]);
     console.log(`  [variants] ${VARIANTS.length} from ${process.env.REPLAY_VARIANTS}: ${VARIANTS.map(([n]) => n).join(" ")}`);
   }
   console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
@@ -253,9 +297,10 @@ function loadArmed(base, src) {
     const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] };
     const account = makeAccount(state, tag);
     const rows = [];
+    const ownership = createOwnership({ defaultOwner: "S" });
     const engine = createEngine({
       sleeves: order.map((id) => ({ id, brain: AT[id], env: envFor[id], userId: "replay-" + id, universe: SYMS.filter((s) => !exc[id].has(s)) })),
-      order, facade: account, ownership: createOwnership({ defaultOwner: "S" }),
+      order, facade: account, ownership,
       journal: (r) => { if (r.event === "collision") state.collisions.push({ day: DAY(NOW_MS), ms: NOW_MS, sym: r.symbol, loser: r.loser, winner: r.winner }); rows.push(r); },
     });
     for (const sl of order) { try { fs.unlinkSync(STATE_FILES[sl]); } catch (_e) {} engine.applyEnv(envFor[sl]); AT[sl]._resetCooldowns(); AT[sl]._loadState(); }
@@ -269,6 +314,7 @@ function loadArmed(base, src) {
         const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0] });
         for (const sl of order) for (const s of (((res[sl] || {}).skipped) || [])) { const k = String(s.why || "?").split(/[—(:]/)[0].trim().slice(0, 26); census[sl][k] = (census[sl][k] || 0) + 1; }
       }
+      if (v.eod) applyEodRules(state, v.eod, day, tag, ownership);   // end-of-day rules under measurement, at the day's last bar
       const unreal = { S: 0, R: 0, M: 0 };
       for (const [sym, p] of Object.entries(state.pos)) {
         const last = ((DATA[sym] || []).filter((b) => b.d === day).slice(-1)[0]) || { c: p.entry };
