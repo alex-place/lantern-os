@@ -2918,10 +2918,21 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
     // falling — re-buying the same knife the same/next session is the churn that
     // built the worst backtest days. Barred through the recorded ET date.
-    if (c.stopCooldownDays > 0) {
+    // NOT gated on stopCooldownDays (2026-09-23). The same map carries the breakeven-
+    // ratchet SESSION BAR: #3413 charged "no same-session re-entry after a breakeven
+    // exit" as realism when it validated the ratchet, and #3414 arms it in
+    // _reconcileFills whether or not the N-day cooldown is on — but this, the only
+    // reader, sat inside `if (c.stopCooldownDays > 0)`. Stable runs days=0, so the bar
+    // was written to state and never read: live 2026-09-23 the S sleeve re-bought UPRO
+    // at 14:12:15, 28 minutes after its 13:44:53 breakeven stop fill (the 13:45-13:53
+    // skips were the 45-minute ORDER cooldown). With days=0 the map holds ONLY session
+    // bars, so reading it unconditionally enforces exactly the validated policy.
+    {
       const _cdThrough = _stopCooldownThrough.get(sym);
       if (_cdThrough && _etDate(now) <= _cdThrough) {
-        out.skipped.push({ ...record, why: `post-stop cooldown: stopped out, no re-entry through ${_cdThrough}` });
+        out.skipped.push({ ...record, why: c.stopCooldownDays > 0
+          ? `post-stop cooldown: stopped out, no re-entry through ${_cdThrough}`
+          : `be_ratchet session bar: breakeven exit this session — no re-entry through ${_cdThrough}` });
         continue;
       }
       if (_cdThrough) { _stopCooldownThrough.delete(sym); _saveState(); }   // expired → clean up
