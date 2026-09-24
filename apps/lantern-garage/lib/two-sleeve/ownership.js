@@ -76,12 +76,23 @@ function createOwnership({ file, defaultOwner = 'S', now = () => Date.now(), onE
      * Reconcile the registry with the broker's actual positions: release symbols no longer
      * held, adopt held symbols nobody claimed. Returns { released, adopted }.
      */
-    reconcile(positions) {
+    reconcile(positions, { graceMs = 5 * 60 * 1000 } = {}) {
       const held = new Set((positions || []).filter((p) => Number(p.qty || p.quantity || p.position || 0) !== 0).map((p) => key(p.symbol || p.ticker)));
       const released = [], adopted = [];
-      for (const k of Object.keys(state.symbols)) if (!held.has(k)) { released.push(k); api.release(k, 'position left the book'); }
-      for (const k of held) if (!state.symbols[k]) { state.symbols[k] = { owner: defaultOwner, since: now(), adopted: true }; adopted.push(k); emit({ event: 'ownership_adopt', symbol: k, owner: defaultOwner }); }
-      if (adopted.length) save();
+      let dirty = false;
+      for (const k of Object.keys(state.symbols)) {
+        const r = state.symbols[k];
+        if (held.has(k)) { if (!r.seen) { r.seen = true; dirty = true; } continue; }
+        // A FRESH claim is not "flat" yet. Live 2026-09-23 13:15: S bought UPRO, claimed it, and 242 ms
+        // later its own positions read (the broker had not registered the fill yet) reconciled the
+        // symbol away as "position left the book"; the next tick adopted the orphan to R, which then
+        // re-protected S's position with its own stop. A claim that has never been SEEN held survives
+        // absences for graceMs; once seen, an absence is a real close and releases at once as before.
+        if (!r.seen && (now() - Number(r.since || 0)) < graceMs) continue;
+        released.push(k); api.release(k, 'position left the book');
+      }
+      for (const k of held) if (!state.symbols[k]) { state.symbols[k] = { owner: defaultOwner, since: now(), adopted: true, seen: true }; adopted.push(k); emit({ event: 'ownership_adopt', symbol: k, owner: defaultOwner }); }
+      if (adopted.length || dirty) save();
       return { released, adopted };
     },
     /** Read-only copy of the registry. */
