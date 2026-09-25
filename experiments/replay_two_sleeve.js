@@ -20,8 +20,8 @@
 // Universe: REPLAY_EXCLUDE=SYM,SYM (global). Sessions: REPLAY_DAYS=N (first N). Dumps: REPLAY_DUMP=<prefix>
 // (per-variant trades + .daily.json with the per-sleeve MTM series, collisions, refusals).
 const fs = require("fs"), path = require("path");
-const LONGS = ["SPY", "QQQ", "IWM", "DIA", "GLD", "TLT", "SMH", "XLK", "SOXL", "TNA", "SPXL", "TQQQ", "UPRO"];
-const INV = ["SQQQ", "SOXS", "SPXS", "TZA"];
+const LONGS = String(process.env.REPLAY_LONGS || "SPY,QQQ,IWM,DIA,GLD,TLT,SMH,XLK,SOXL,TNA,SPXL,TQQQ,UPRO").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);   // REPLAY_LONGS / REPLAY_INV widen the universe (2026-09-25); the cache must hold every name
+const INV = String(process.env.REPLAY_INV || "SQQQ,SOXS,SPXS,TZA").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
 const SYMS = [...LONGS, ...INV];
 // REPLAY_CACHE overrides the bar cache dir (default rev60cache = Jun 5 – Aug 31 2026; rev73cache adds September).
 const CACHE = process.env.REPLAY_CACHE || path.join(process.env.TEMP || "/tmp", "rev60cache");
