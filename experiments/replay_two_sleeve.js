@@ -65,7 +65,10 @@ global.Date = class extends _RealDate {
 };
 // Sleeve M (strength/momentum, under measurement) = a SECOND INSTANCE of the race brain: the race lib is
 // copied to a temp app dir so its module-level state (entry clocks, peaks, stop registry) is its own.
-const APP_M = (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-M-")), "apps", "lantern-garage"); fs.cpSync(path.join(APP_R, "lib"), path.join(d, "lib"), { recursive: true }); return d; })();
+// REPLAY_APP_M (2026-09-25): the tree the M sleeve's brain is copied from — the race lib by default (the #3656 design),
+// or the master lib to give a strength entry MOMENTUM exits (ratchet floor + stop, no bounce/weakness exit).
+const M_SRC = process.env.REPLAY_APP_M ? path.resolve(process.env.REPLAY_APP_M) : APP_R;
+const APP_M = (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-M-")), "apps", "lantern-garage"); fs.cpSync(path.join(M_SRC, "lib"), path.join(d, "lib"), { recursive: true }); return d; })();
 for (const APP of [APP_S, APP_R, APP_M]) {
   const mdPath = require.resolve(path.join(APP, "lib", "market-data-yahoo.js"));
   require.cache[mdPath] = { id: mdPath, filename: mdPath, loaded: true, exports: stub };
@@ -204,6 +207,7 @@ const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();   /
 const INV_UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
 const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
 const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
+const M_NO_WEAKNESS = process.env.REPLAY_M_NO_WEAKNESS === "1";   // 2026-09-25: no weakness signal-exit; M exits by ratchet floor / stop / time only
 const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean));
 function signalsAt(day, m, sleeve) {
   const out = [];
@@ -218,7 +222,7 @@ function signalsAt(day, m, sleeve) {
       if (!(hi > lo)) continue;
       const cur = sess[sess.length - 1];
       const ibs = (cur.c - lo) / (hi - lo);
-      const bullish = ibs >= M_IBS, bearish = ibs <= 1 - M_IBS;
+      const bullish = ibs >= M_IBS, bearish = !M_NO_WEAKNESS && ibs <= 1 - M_IBS;
       out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
         decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
     }
