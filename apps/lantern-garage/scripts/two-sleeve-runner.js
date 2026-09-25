@@ -101,6 +101,19 @@ const extendedHours = (ms) => isWeekday(ms) && ((etMin(ms) >= 240 && etMin(ms) <
 
 const journalFile = path.join(DIR, 'engine.jsonl');
 const journal = (row) => { try { fs.appendFileSync(journalFile, JSON.stringify({ ts: new Date().toISOString(), ...row }) + '\n'); } catch (_e) { /* never break a tick */ } };
+// A RUNNER THAT DIES LEAVES NO TRACE (2026-09-25 12:07 ET, pid 16488): the tick loop catches its own
+// errors, so a death is an uncaught exception or an unhandled rejection outside a tick, and the
+// launcher's stdio redirect overwrites the dead process's stderr when it relaunches. Eight minutes
+// without ticks, no record why. Journal the fatal into engine.jsonl before exiting, whatever the
+// log files do; the supervisor relaunches on exit.
+for (const [ev, kind] of [['uncaughtException', 'uncaught_exception'], ['unhandledRejection', 'unhandled_rejection']]) {
+  process.on(ev, (err) => {
+    const text = String((err && err.stack) || err).slice(0, 2000);
+    journal({ event: 'runner_fatal', kind, pid: process.pid, error: text });
+    try { console.error(`[two-sleeve] FATAL (${kind}):`, text); } catch (_e) { /* ignore */ }
+    setTimeout(() => process.exit(70), 250);   // let the append settle; exit code 70 = fatal, for the supervisor's log
+  });
+}
 
 // ---- brains: ARMED in-process in every mode; each with its own journal + state (captured at require time)
 const MODE = envForMode({ dry: DRY, sessionReview: process.env.TRADER_SESSION_REVIEW });
