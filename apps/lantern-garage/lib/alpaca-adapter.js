@@ -220,7 +220,10 @@ async function getPositions(userId) {
   const auth = _authFor(userId);
   if (!auth) return null;
   const r = await _req(auth, 'GET', '/v2/positions');
-  if (!r.ok || !Array.isArray(r.json)) return { positions: [], source: 'alpaca' };
+  // A failed read is NOT a flat book. The two-sleeve engine reconciles symbol ownership from this
+  // list; on 2026-09-25 04:04 ET a three-minute Alpaca outage came back as [] and released every
+  // claim. `unreadable` lets callers tell the two apart; the shape stays the same for everyone else.
+  if (!r.ok || !Array.isArray(r.json)) return { positions: [], source: 'alpaca', unreadable: true, status: r.status || null };
   const positions = r.json.map((p) => ({
     symbol: p.symbol,
     qty: Number(p.qty),

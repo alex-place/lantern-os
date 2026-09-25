@@ -53,12 +53,24 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
   const isStop = (o) => /stop/i.test(String((o && (o.type || o.orderType)) || ''));
   const isBuy = (o) => String((o && o.side) || '').toLowerCase() === 'buy';
 
+  let _tickSnapshotWhy = null;   // set by tick(): why this tick's broker snapshot is unreadable (null = readable)
+  /** Why a positions read must not reconcile the registry, or null when it may. */
+  function snapshotUnreadable(raw, acct) {
+    if (raw == null) return 'positions read returned nothing';
+    if (raw.unreadable === true) return 'positions read failed (adapter marked it unreadable)';
+    if (acct === null || (acct && !(Number(acct.equity) > 0))) return 'account/equity unavailable';
+    return null;
+  }
   function bridgeFor(owner) {
     const other = (sym) => { const w = ownership.ownerOf(sym); return w && w !== owner ? w : null; };
     return {
       getIBKRAccount: (uid) => facade.getIBKRAccount(uid),
       getIBKRPositions: async (uid) => {
-        const raw = (await facade.getIBKRPositions(uid)) || [];
+        const raw = await facade.getIBKRPositions(uid);
+        // An unreadable read — or any read inside a tick whose account snapshot was unreadable —
+        // reconciles nothing and shows the brain an empty list, which the brain already treats as
+        // "unreadable, not closed" (#3277) when it was holding something.
+        if (_tickSnapshotWhy || snapshotUnreadable(raw, undefined)) return [];
         const rows = Array.isArray(raw) ? raw : (raw.positions || []);
         ownership.reconcile(rows);
         return rows.filter((p) => ownership.ownerOf(symOf(p)) === owner);
@@ -108,10 +120,24 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
     const signals = (scan && typeof scan === 'object' && Array.isArray(scan.signals)) ? scan.signals : [];
     const results = {};
     try {
-      const raw = (await facade.getIBKRPositions(userId || (sleeves[0].userId))) || [];
-      const { released, adopted } = ownership.reconcile(Array.isArray(raw) ? raw : (raw.positions || []));
-      if (adopted.length) log({ event: 'ownership_adopted', symbols: adopted, owner: defaultOwner });
-      if (released.length) log({ event: 'ownership_released', symbols: released });
+      // A BROKER OUTAGE READS AS AN EMPTY BOOK (live 2026-09-25 04:04 ET). Alpaca was unavailable
+      // for three ticks; both brains stood down ("account/equity unavailable") but this reconcile
+      // ran on the adapter's failure shape ({ positions: [] }) and released every claim, then
+      // re-adopted the four positions to the default owner when the API came back. Harmless that
+      // night — all four were R's — but an S carry would have been orphaned to R, the UPRO bug of
+      // 09-23 by another door. A read the facade marks unreadable, or one taken while the account
+      // itself is unreadable, never reconciles: a genuinely flat book comes with a healthy account.
+      const uid = userId || (sleeves[0].userId);
+      const acct = facade.getIBKRAccount ? await Promise.resolve(facade.getIBKRAccount(uid)).catch(() => null) : { equity: 1 };
+      const raw = await facade.getIBKRPositions(uid);
+      const why = snapshotUnreadable(raw, acct);
+      _tickSnapshotWhy = why;
+      if (why) log({ event: 'reconcile_skipped', why });
+      else {
+        const { released, adopted } = ownership.reconcile(Array.isArray(raw) ? raw : (raw.positions || []));
+        if (adopted.length) log({ event: 'ownership_adopted', symbols: adopted, owner: defaultOwner });
+        if (released.length) log({ event: 'ownership_released', symbols: released });
+      }
     } catch (e) { log({ event: 'reconcile_error', error: String(e && e.message || e) }); }
     for (const id of seq) {
       const sl = byId[id];
