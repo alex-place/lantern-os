@@ -69,7 +69,10 @@ global.Date = class extends _RealDate {
 // or the master lib to give a strength entry MOMENTUM exits (ratchet floor + stop, no bounce/weakness exit).
 const M_SRC = process.env.REPLAY_APP_M ? path.resolve(process.env.REPLAY_APP_M) : APP_R;
 const APP_M = (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-M-")), "apps", "lantern-garage"); fs.cpSync(path.join(M_SRC, "lib"), path.join(d, "lib"), { recursive: true }); return d; })();
-for (const APP of [APP_S, APP_R, APP_M]) {
+// When R points at the SAME tree as S, require() would hand both sleeves ONE auto-trader module (shared cooldowns,
+// entry clocks, per-scan counters). Copy lib, as for M, so R is its own instance (2026-09-25, additive-sleeve runs).
+const APP_R_EFF = (path.resolve(APP_R) === path.resolve(APP_S)) ? (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-R-")), "apps", "lantern-garage"); fs.cpSync(path.join(APP_R, "lib"), path.join(d, "lib"), { recursive: true }); console.log("  [sleeve R] own copy of " + APP_R + " lib at " + d); return d; })() : APP_R;
+for (const APP of [APP_S, APP_R_EFF, APP_M]) {
   const mdPath = require.resolve(path.join(APP, "lib", "market-data-yahoo.js"));
   require.cache[mdPath] = { id: mdPath, filename: mdPath, loaded: true, exports: stub };
 }
@@ -78,7 +81,7 @@ process.env.TRADER_AUTO_EXECUTE = "1"; process.env.TRADER_MANAGE_EXITS = "1"; pr
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_S.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_S.json");
 const atS = require(path.join(APP_S, "lib", "auto-trader"));
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_R.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_R.json");
-const atR = require(path.join(APP_R, "lib", "auto-trader"));
+const atR = require(path.join(APP_R_EFF, "lib", "auto-trader"));
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_M.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_M.json");
 const atM = require(path.join(APP_M, "lib", "auto-trader"));
 const AT = { S: atS, R: atR, M: atM };
