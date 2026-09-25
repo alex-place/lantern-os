@@ -986,7 +986,10 @@ function _reconcileFills(orders) {
       // #3413: a fill of a RATCHETED stop (sitting at entry after the position
       // was up TRADER_BE_RATCHET) is a round trip, not a thesis failure — mark
       // the row so review/analytics can tell the two apart.
-      if (_isStopFill && _beStopAt.has(row.symbol)) row.be_ratchet = true;
+      // A ratchet round trip is a stop that FILLED at or above entry. The map alone is not proof:
+      // a stale entry from an earlier position labeled a real -2.87% stop-out as be_ratchet on
+      // 2026-09-03 (SOXS, -3,328), so it fed neither the cooldown nor the breaker.
+      if (_isStopFill && _beStopAt.has(row.symbol) && Number(row.exit) >= Number(row.entry) * 0.998) row.be_ratchet = true;
       logTrade(row);
       done.add(row.symbol);
       // The position left the book at this fill (race, SQQQ 2026-09-21): drop it from the
@@ -1021,6 +1024,7 @@ function _reconcileFills(orders) {
           _stopCooldownThrough.set(row.symbol, _etDate(Date.now()));
           _beStopAt.delete(row.symbol);
         } else {
+          _beStopAt.delete(row.symbol);   // a stop fill ends the ratchet either way; never let it mislabel the next position
           if (_cdDays > 0) _stopCooldownThrough.set(row.symbol, _nextTradingDates(_etDate(Date.now()), _cdDays));
           _noteStopFill(Date.now());   // feeds the daily circuit breaker
         }
@@ -2010,7 +2014,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const _fillPx = Number(_regStatus.avgPrice) > 0 ? Number(_regStatus.avgPrice) : mark;
         const _fillQty = Number(_regStatus.filledQty) > 0 ? Number(_regStatus.filledQty) : qty;
         const _fillPnl = _round2((_fillPx - entry) * _fillQty);
-        const _beHit = _beStopAt.has(sym);   // #3413: ratcheted stop → round trip, not failure
+        const _beHit = _beStopAt.has(sym) && _fillPx >= entry * 0.998;   // #3413: ratcheted stop → round trip, not failure — only if it FILLED at or above entry
         logTrade({
           // The trade CLOSED when the broker filled the stop, not when this sweep
           // discovered it — a fill recovered after downtime must carry the broker's
@@ -2033,6 +2037,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           _stopCooldownThrough.set(sym, _etDate(Date.now()));
           _beStopAt.delete(sym);
         } else {
+          _beStopAt.delete(sym);   // a stop fill ends the ratchet either way
           const _cd = cfg().stopCooldownDays;
           if (_cd > 0) _stopCooldownThrough.set(sym, _nextTradingDates(_etDate(Date.now()), _cd));
           _noteStopFill(Date.now());

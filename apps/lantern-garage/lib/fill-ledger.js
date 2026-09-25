@@ -70,6 +70,10 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     const t = orderTimeMs(o);
     const sym = String(o.symbol || o.ticker || '').toUpperCase();
     const info = (entryFor && entryFor(sym)) || {};
+    // A fill that predates the position it would close is not that position's exit (live
+    // 2026-09-25: a 10:00:35 stop fill on a carry the other sleeve owned was booked against
+    // a position this brain opened at 11:17:57). Tracked position, older fill -> skip.
+    if (t != null && Number(info.openedAt) > 0 && t < Number(info.openedAt)) continue;
     if (sinceMs > 0 && t != null && t < sinceMs) {
       // ...but a fill of a position this engine is TRACKING is not history: it is the exit it
       // has been waiting for. Race, SQQQ 2026-09-21: the GTC stop filled at the open while the

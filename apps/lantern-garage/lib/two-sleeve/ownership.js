@@ -38,6 +38,8 @@ function createOwnership({ file, defaultOwner = 'S', now = () => Date.now(), onE
   const api = {
     /** Sleeve that owns a symbol, or null. */
     ownerOf(sym) { const r = state.symbols[key(sym)]; return r ? r.owner : null; },
+    /** When the current owner claimed (or adopted) the symbol, ms since epoch, or null. */
+    sinceOf(sym) { const r = state.symbols[key(sym)]; return r ? Number(r.since) || null : null; },
     /** Sleeve that placed an order id, or null. */
     orderOwner(orderId) { return state.orders[String(orderId)] || null; },
     /** Register a symbol to a sleeve. Returns false (and changes nothing) if another sleeve holds it. */

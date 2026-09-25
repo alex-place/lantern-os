@@ -52,6 +52,8 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
   const idOf = (o) => (o && (o.orderId ?? o.order_id ?? o.id));
   const isStop = (o) => /stop/i.test(String((o && (o.type || o.orderType)) || ''));
   const isBuy = (o) => String((o && o.side) || '').toLowerCase() === 'buy';
+  const isFilled = (o) => /fill/i.test(String((o && o.status) || ''));
+  const fillTimeOf = (o) => { const v = o && (o.filled_at || o.filledAt || o.updated_at || o.updatedAt); const t = v ? Date.parse(v) : NaN; return Number.isFinite(t) ? t : null; };
 
   let _tickSnapshotWhy = null;   // set by tick(): why this tick's broker snapshot is unreadable (null = readable)
   /** Why a positions read must not reconcile the registry, or null when it may. */
@@ -82,7 +84,18 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
         return rows.filter((o) => {
           const oo = ownership.orderOwner(idOf(o));
           if (oo) return oo.owner === owner;
-          const so = ownership.ownerOf(symOf(o));
+          const sym = symOf(o);
+          const so = ownership.ownerOf(sym);
+          // An UNTAGGED order (placed before the engine, or by a process whose tags are gone)
+          // belongs to whoever owns the symbol — unless it is a FILL that predates that owner's
+          // claim. Live 2026-09-25: R's pre-engine TLT stop filled at 10:00:35 and R booked it;
+          // TLT was released, S claimed it at 11:17:57, and S's next read attributed the same
+          // fill to S, which booked a 46-share exit it never held. A fill older than the claim
+          // is nobody's; the default owner keeps unclaimed ones as before.
+          if (so && isFilled(o)) {
+            const ft = fillTimeOf(o), since = ownership.sinceOf(sym);
+            if (ft != null && since != null && ft < since) return false;
+          }
           return so ? so === owner : owner === defaultOwner;
         });
       },
