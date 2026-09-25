@@ -75,6 +75,18 @@ function _isSelf(held) {
   return !!held && held.pid === me.pid && held.host === me.host;
 }
 
+/** True when a pid on THIS host is a running process (signal 0 = existence check; EPERM = alive, not ours). */
+function _pidAlive(pid) {
+  const n = Number(pid);
+  if (!(n > 0)) return true;                     // unknown → assume alive (never evict on a guess)
+  try { process.kill(n, 0); return true; } catch (e) { return !!(e && e.code === 'EPERM'); }
+}
+
+/** A holder on this host whose process no longer exists: its heartbeat age means nothing. */
+function _holderDead(held) {
+  return !!held && held.host === os.hostname() && !_pidAlive(held.pid);
+}
+
 /**
  * Claim management of a broker account for this process.
  * @returns {{acquired:boolean, reason:string, heldBy?:object, staleMs:number}}
@@ -97,21 +109,29 @@ function acquire(accountId, { now = Date.now(), staleMs = DEFAULT_STALE_MS, arme
       // heartbeat. The reverse is never allowed — an exit-only process must never
       // evict the armed trader. Equal rank keeps first-come-first-served, so two
       // armed instances still cannot both drive one account (the original bug).
-      if (age < staleMs && !(armed && !held.armed)) {
+      // A DEAD HOLDER IS STALE NOW, NOT IN FIVE MINUTES (2026-09-25). The two-sleeve runner died
+      // at 12:07 ET; its relaunch found a lock with a fresh heartbeat and a pid that no longer
+      // existed, and the age rule alone would have held the account unmanaged for the rest of the
+      // stale window. On this host the pid is checkable; a holder that is gone is taken over at once.
+      // (A reused pid reads as alive and falls back to the age rule — never evicted on a guess.)
+      const dead = _holderDead(held);
+      if (!dead && age < staleMs && !(armed && !held.armed)) {
         // Someone else owns it and outranks-or-ties us — stand down.
         return { acquired: false, reason: `held by pid ${held.pid}@${held.host} (${Math.round(age / 1000)}s ago)`, heldBy: held, staleMs };
       }
-      // Stale holder (died mid-session), or a disarmed holder being preempted by
-      // the armed trader. Take over rather than leave the account unmanaged —
-      // open positions still need their exits run.
-      const preempt = age < staleMs;
+      // Stale holder (died mid-session), a dead holder, or a disarmed holder being
+      // preempted by the armed trader. Take over rather than leave the account
+      // unmanaged — open positions still need their exits run.
+      const preempt = !dead && age < staleMs;
       const rec = { ...selfId(), accountId, armed, heartbeat: now, tookOverFrom: held.pid };
       fs.writeFileSync(file, JSON.stringify(rec));
       return {
         acquired: true,
-        reason: preempt
-          ? `preempted disarmed pid ${held.pid} (armed trader outranks exit-only)`
-          : `took over from stale pid ${held.pid} (${Math.round(age / 1000)}s stale)`,
+        reason: dead
+          ? `took over from dead pid ${held.pid} (process gone, heartbeat ${Math.round(age / 1000)}s ago)`
+          : preempt
+            ? `preempted disarmed pid ${held.pid} (armed trader outranks exit-only)`
+            : `took over from stale pid ${held.pid} (${Math.round(age / 1000)}s stale)`,
         staleMs,
       };
     }

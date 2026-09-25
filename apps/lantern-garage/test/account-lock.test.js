@@ -21,7 +21,10 @@ process.env.TRADER_LOCK_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "acct-lock-"
 const lock = require("../lib/account-lock");
 
 const ACCT = "DUR193395";
-const OTHER_PROCESS = { pid: process.pid + 12345, host: os.hostname() };
+// A foreign holder that is ALIVE on this host: the test runner's parent process. (A made-up pid
+// reads as a dead holder since 2026-09-25 and is taken over at once — see the dead-holder test.)
+const OTHER_PROCESS = { pid: process.ppid, host: os.hostname() };
+const DEAD_PROCESS = { pid: 2147483000, host: os.hostname() };   // no such process on any Windows or Linux box
 
 /** Hard reset a lock file — release() deliberately refuses to remove a FOREIGN lock,
  *  so tests that seed one must clear it themselves rather than leak it to the next. */
@@ -71,6 +74,16 @@ test("a holder that is merely slow is NOT evicted", () => {
   const r = lock.acquire(ACCT);
   assert.strictEqual(r.acquired, false, "staleMs must comfortably exceed the scan interval");
   assert.ok(lock.DEFAULT_STALE_MS > 60_000, "a 60s scan must never look stale");
+});
+
+test("a holder whose process is GONE is taken over at once, fresh heartbeat or not — the 12:07 relaunch must not wait 5 minutes", () => {
+  lock.release(ACCT);
+  fs.writeFileSync(path.join(lock.LOCK_DIR, ACCT + ".lock.json"),
+    JSON.stringify({ ...DEAD_PROCESS, accountId: ACCT, armed: true, heartbeat: Date.now() - 5_000 }));
+  const r = lock.acquire(ACCT, { armed: true });
+  assert.strictEqual(r.acquired, true, "a dead armed holder must not block the armed relaunch");
+  assert.match(r.reason, /dead pid/);
+  assert.strictEqual(lock.holder(ACCT).pid, process.pid);
 });
 
 // ── ARMED RANK (2026-08-05 incident) ─────────────────────────────────────────
