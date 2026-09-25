@@ -228,7 +228,7 @@ function signalsAt(day, m, sleeve) {
     }
     return out;
   }
-  const thr = sleeve === "S"
+  const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
     ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (Number(process.env.TRADER_IBS_MAX) || 0.30))
     : (Number(process.env.TRADER_IBS_MAX) || 0.15);
   const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
