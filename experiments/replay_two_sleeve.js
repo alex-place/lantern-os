@@ -200,6 +200,8 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // Sleeve M signal (REPLAY_M_IBS, default 0.7; REPLAY_M_FROM ET minute, default 630 = 10:30; REPLAY_M_SYMS, default all):
 // STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
+const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();   // raw | none | selective | top (see signalsAt)
+const INV_UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
 const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
 const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
 const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean));
@@ -235,7 +237,30 @@ function signalsAt(day, m, sleeve) {
     const cur = sess[sess.length - 1];
     const ibs = (cur.c - lo) / (hi - lo);
     const strength = friPm && FRI_PM_SYMS.has(s) && ibs >= FRI_PM_INV;
-    const bullish = ibs <= thr || strength, bearish = !strength && ibs >= 0.6;
+    let bullish = ibs <= thr || strength, bearish = !strength && ibs >= 0.6;
+    // POLARITY (2026-09-25). A BULLISH fire on an inverse wrapper is an economic short and live
+    // it passes lib/signal-engine/scan.js applyPolarity under TRADER_SHORT_EDGE; this harness never
+    // modelled that, so its inverse entries ran under a fifth rule (the wrapper's own IBS only).
+    // REPLAY_POLARITY names the rule: raw (the harness as it was, default), none (SHORT_EDGE=0),
+    // selective (the armed rule: wrapper fell no more than 1.5% from its session open, underlying
+    // not up 0.5%+ from its open; the p_win time penalty is inert here because p_win is fixed), top
+    // (SHORT_EDGE=1: underlying at its session top, IBS >= 1 - thr). Exits (bearish) are untouched.
+    if (bullish && INV_UNDERLYING[s] && POLARITY !== "raw") {
+      if (POLARITY === "none") bullish = false;
+      else {
+        const ua = DATA[INV_UNDERLYING[s]] || [];
+        const us = ua.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
+        if (us.length < 3) bullish = false;
+        else {
+          const uhi = Math.max(...us.map((b) => b.h)), ulo = Math.min(...us.map((b) => b.l)), ucur = us[us.length - 1];
+          const uIbs = uhi > ulo ? (ucur.c - ulo) / (uhi - ulo) : 0.5;
+          const uTape = (ucur.c / us[0].c - 1) * 100;
+          const wrapperDD = (cur.c / sess[0].c - 1) * 100;
+          if (POLARITY === "top") bullish = uIbs >= 1 - thr;
+          else if (POLARITY === "selective") bullish = wrapperDD > -1.5 && uTape < 0.5;
+        }
+      }
+    }
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
   }
