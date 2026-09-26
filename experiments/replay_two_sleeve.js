@@ -206,7 +206,16 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // Sleeve M signal (REPLAY_M_IBS, default 0.7; REPLAY_M_FROM ET minute, default 630 = 10:30; REPLAY_M_SYMS, default all):
 // STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
-const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();   // raw | none | selective | top (see signalsAt)
+const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
+const ADAPTIVE_IBS = (() => { const v = String(process.env.REPLAY_ADAPTIVE_IBS || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
+// SPY session closes in order, and a lookup from an ET day to the close-to-close return over the last N sessions ending the PRIOR session
+const _spyDays = (() => { const a = DATA.SPY || []; const byDay = new Map(); for (const b of a) byDay.set(b.d, b.c); const days = [...byDay.keys()].sort(); return { days, close: byDay }; })();
+function spyTrendPct(day, n) {
+  const i = _spyDays.days.indexOf(day); const j = (i >= 0 ? i : _spyDays.days.findIndex((d) => d > day)) - 1;   // prior session
+  if (j < n) return null;
+  const c1 = _spyDays.close.get(_spyDays.days[j]), c0 = _spyDays.close.get(_spyDays.days[j - n]);
+  return c1 && c0 ? (c1 / c0 - 1) * 100 : null;
+}   // raw | none | selective | top (see signalsAt)
 const INV_UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
 const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
 const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
@@ -232,7 +241,7 @@ function signalsAt(day, m, sleeve) {
     return out;
   }
   const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
-    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (Number(process.env.TRADER_IBS_MAX) || 0.30))
+    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
     : (Number(process.env.TRADER_IBS_MAX) || 0.15);
   const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
