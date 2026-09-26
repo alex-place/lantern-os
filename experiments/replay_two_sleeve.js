@@ -207,6 +207,10 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
 const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
+const ADAPTIVE_ENV = (() => { const v = String(process.env.REPLAY_ADAPTIVE_ENV || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; })();
+const ADAPTIVE_PNL = (() => { const v = String(process.env.REPLAY_ADAPTIVE_PNL || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
+let _curveRef = null;   // the current variant's MTM equity curve (one point per completed session), set by the run loop
+function trailingPnlPct(n) { const c = _curveRef; if (!c || c.length <= n) return null; const a = c[c.length - 1], b = c[c.length - 1 - n]; return b ? (a / b - 1) * 100 : null; }
 const ADAPTIVE_IBS = (() => { const v = String(process.env.REPLAY_ADAPTIVE_IBS || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
 // SPY session closes in order, and a lookup from an ET day to the close-to-close return over the last N sessions ending the PRIOR session
 const _spyDays = (() => { const a = DATA.SPY || []; const byDay = new Map(); for (const b of a) byDay.set(b.d, b.c); const days = [...byDay.keys()].sort(); return { days, close: byDay }; })();
@@ -241,7 +245,7 @@ function signalsAt(day, m, sleeve) {
     return out;
   }
   const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
-    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
+    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
     : (Number(process.env.TRADER_IBS_MAX) || 0.15);
   const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
@@ -335,7 +339,7 @@ function loadArmed(base, src) {
     const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
     const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
     for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
-    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] };
+    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] }; _curveRef = state.curve;
     const account = makeAccount(state, tag);
     const rows = [];
     const ownership = createOwnership({ defaultOwner: "S" });
@@ -348,6 +352,12 @@ function loadArmed(base, src) {
     engine.restoreEnv();
     const census = { S: {}, R: {}, M: {} };
     for (const day of days) {
+      if (ADAPTIVE_ENV && envFor.S) {
+        if (!envFor.S.__adaptiveBase) Object.defineProperty(envFor.S, "__adaptiveBase", { value: Object.fromEntries(Object.keys(ADAPTIVE_ENV.deep).map((k) => [k, envFor.S[k]])), enumerable: false });
+        const t = trailingPnlPct(ADAPTIVE_ENV.n); const isDeep = t != null && t < ADAPTIVE_ENV.x;
+        for (const k of Object.keys(ADAPTIVE_ENV.deep)) { const base = envFor.S.__adaptiveBase[k]; if (isDeep) envFor.S[k] = ADAPTIVE_ENV.deep[k]; else if (base === undefined) delete envFor.S[k]; else envFor.S[k] = base; }
+        if (isDeep) state.adaptiveDeepDays = (state.adaptiveDeepDays || 0) + 1;
+      }
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
