@@ -24,6 +24,7 @@ const { checkMarketStructureShift } = require("./market-structure");
 const tesseract = require("./tesseract");
 const ev = require("./convergence-ev");
 const { targetR } = require("./profiles");
+const adaptiveDepth = require("./adaptive-depth");   // washout depth follows the trailing P&L (shadow-first, 2026-09-26)
 const tradingNews = require("../trading-news"); // directional news sentiment (external anchor)
 
 // Derive a candidate trade direction from zone posture, falling back to RSI
@@ -123,11 +124,23 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
   const _etm = (opts.etMin != null) ? opts.etMin : (() => { const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })); return d.getHours() * 60 + d.getMinutes(); })();
   const _ibsMaxEff = (_mMax > 0 && _etm < 660) ? _mMax : _ibsMax;
   const _ibsMode = String(process.env.TRADER_IBS_MODE || "off");
+  // ADAPTIVE DEPTH (2026-09-26, shadow-first): with TRADER_ADAPTIVE_IBS_PNL set, a washout the
+  // live threshold admits after 11:00 ET while the trader's trailing P&L is negative is journaled
+  // (shadow) or refused (live) unless it is deeper than the deep threshold. See adaptive-depth.js.
+  const _ad = adaptiveDepth.current({ nowMs: opts.nowMs });
+  if (_ad) adaptiveDepth.journalState(_ad, opts.nowMs);
+  const _adaptiveGate = (v) => {
+    const d = adaptiveDepth.decide({ ibs: v, thrLive: _ibsMaxEff, state: _ad, etMin: _etm });
+    if (d.admits && d.wouldBlock) {
+      adaptiveDepth.journalDecision({ symbol: opts.symbol, ibs: v, thrLive: _ibsMaxEff, state: _ad, etMin: _etm, price: opts.price, nowMs: opts.nowMs });
+      if (_ad.mode === "live") return false;
+    }
+    return d.admits;
+  };
   if (_ibsMode === "only") {
-    const v = opts.ibs;
-    return (v != null && v <= _ibsMaxEff) ? "BULLISH" : "NEUTRAL";
+    return _adaptiveGate(opts.ibs) ? "BULLISH" : "NEUTRAL";
   }
-  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMaxEff) return "BULLISH";
+  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMaxEff && _adaptiveGate(opts.ibs)) return "BULLISH";
   const trendDir = opts.trendDir ?? (process.env.ZONE_TREND_DIR === "1");
   const up = trendDir && _isUptrend(opts.closes);
   if (sr.in_zone) {
@@ -614,7 +627,7 @@ async function scanAll(watchlist) {
     // judged and deriveDirection silently falls back to pure mean-reversion.
     // Hoisted: the entry trigger itself, and the ledger records it below.
     const _sessionIbs = sessionIbs(b15);
-    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: _sessionIbs });
+    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: _sessionIbs, symbol: t, price });
     // Polarity: a BULLISH verdict on a negative-sign wrapper is an economic
     // short and must be judged on the UNDERLYING's bars (see applyPolarity).
       // Declared OUTSIDE the polarity block: the scoring site below consumes it.
