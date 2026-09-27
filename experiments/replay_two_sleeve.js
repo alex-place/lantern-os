@@ -207,6 +207,8 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
 const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
+const _parseAdaptiveEnv = (raw) => { const v = String(raw || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; };
+const ADAPTIVE_ENV_R = _parseAdaptiveEnv(process.env.REPLAY_ADAPTIVE_ENV_R);
 const ADAPTIVE_ENV = (() => { const v = String(process.env.REPLAY_ADAPTIVE_ENV || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; })();
 const ADAPTIVE_PNL = (() => { const v = String(process.env.REPLAY_ADAPTIVE_PNL || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
 let _curveRef = null;   // the current variant's MTM equity curve (one point per completed session), set by the run loop
@@ -357,6 +359,11 @@ function loadArmed(base, src) {
         const t = trailingPnlPct(ADAPTIVE_ENV.n); const isDeep = t != null && t < ADAPTIVE_ENV.x;
         for (const k of Object.keys(ADAPTIVE_ENV.deep)) { const base = envFor.S.__adaptiveBase[k]; if (isDeep) envFor.S[k] = ADAPTIVE_ENV.deep[k]; else if (base === undefined) delete envFor.S[k]; else envFor.S[k] = base; }
         if (isDeep) state.adaptiveDeepDays = (state.adaptiveDeepDays || 0) + 1;
+      }
+      if (ADAPTIVE_ENV_R && envFor.R) {
+        if (!envFor.R.__adaptiveBase) Object.defineProperty(envFor.R, "__adaptiveBase", { value: Object.fromEntries(Object.keys(ADAPTIVE_ENV_R.deep).map((k) => [k, envFor.R[k]])), enumerable: false });
+        const tR = trailingPnlPct(ADAPTIVE_ENV_R.n); const deepR = tR != null && tR < ADAPTIVE_ENV_R.x;
+        for (const k of Object.keys(ADAPTIVE_ENV_R.deep)) { const base = envFor.R.__adaptiveBase[k]; if (deepR) envFor.R[k] = ADAPTIVE_ENV_R.deep[k]; else if (base === undefined) delete envFor.R[k]; else envFor.R[k] = base; }
       }
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
