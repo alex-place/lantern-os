@@ -210,6 +210,15 @@ const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
 const _parseAdaptiveEnv = (raw) => { const v = String(raw || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; };
 const ADAPTIVE_ENV_R = _parseAdaptiveEnv(process.env.REPLAY_ADAPTIVE_ENV_R);
 const ADAPTIVE_ENV = (() => { const v = String(process.env.REPLAY_ADAPTIVE_ENV || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; })();
+const ADAPTIVE_SYM = (() => { const v = String(process.env.REPLAY_ADAPTIVE_SYM || "").trim(); if (!v) return null; const [n, x] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0 }; })();
+let _tradesRef = null, _daysRef = null, _dayIdx = -1;   // the current variant's realized trades, the session list, and today's index (set by the run loop)
+function symTrailingPnl(sym, n) {
+  if (!_tradesRef || !_daysRef || _dayIdx < 1) return null;
+  const from = _daysRef[Math.max(0, _dayIdx - n)], to = _daysRef[_dayIdx - 1];
+  let sum = 0, cnt = 0;
+  for (const t of _tradesRef) { if (t.sym === sym && t.day >= from && t.day <= to) { sum += t.pnl; cnt++; } }
+  return cnt ? { sum, cnt } : null;
+}
 const ADAPTIVE_PNL = (() => { const v = String(process.env.REPLAY_ADAPTIVE_PNL || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
 let _curveRef = null;   // the current variant's MTM equity curve (one point per completed session), set by the run loop
 function trailingPnlPct(n) { const c = _curveRef; if (!c || c.length <= n) return null; const a = c[c.length - 1], b = c[c.length - 1 - n]; return b ? (a / b - 1) * 100 : null; }
@@ -251,6 +260,7 @@ function signalsAt(day, m, sleeve) {
     : (Number(process.env.TRADER_IBS_MAX) || 0.15);
   const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
+    if (ADAPTIVE_SYM && sleeve === "S") { const tp = symTrailingPnl(s, ADAPTIVE_SYM.n); if (tp && tp.sum < ADAPTIVE_SYM.x) continue; }
     const a = DATA[s]; if (!a) continue;
     const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
     if (sess.length < 3) continue;
@@ -341,7 +351,7 @@ function loadArmed(base, src) {
     const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
     const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
     for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
-    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] }; _curveRef = state.curve;
+    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] }; _curveRef = state.curve; _tradesRef = state.trades;
     const account = makeAccount(state, tag);
     const rows = [];
     const ownership = createOwnership({ defaultOwner: "S" });
@@ -354,6 +364,7 @@ function loadArmed(base, src) {
     engine.restoreEnv();
     const census = { S: {}, R: {}, M: {} };
     for (const day of days) {
+      _daysRef = days; _dayIdx = days.indexOf(day);
       if (ADAPTIVE_ENV && envFor.S) {
         if (!envFor.S.__adaptiveBase) Object.defineProperty(envFor.S, "__adaptiveBase", { value: Object.fromEntries(Object.keys(ADAPTIVE_ENV.deep).map((k) => [k, envFor.S[k]])), enumerable: false });
         const t = trailingPnlPct(ADAPTIVE_ENV.n); const isDeep = t != null && t < ADAPTIVE_ENV.x;
