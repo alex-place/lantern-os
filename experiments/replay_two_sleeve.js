@@ -144,7 +144,8 @@ function makeAccount(state, tag) {
       const b = barsUpTo(o.symbol, 1)[0]; if (!b) continue;
       const stop = Number(o.stopPrice);
       if (!(stop > 0) || !(Number(b.low) <= stop)) continue;
-      const fillPx = Number(b.high) < stop ? Number(b.high) : stop;
+      const _gf = String(process.env.REPLAY_GAP_FILL || "high").toLowerCase();   // REPLAY_GAP_FILL (2026-09-27): gap-through stop fill = high (default) | mid | close
+      const fillPx = Number(b.high) < stop ? (_gf === "close" ? Number(b.close ?? b.c) : _gf === "mid" ? (Number(b.high) + Number(b.low)) / 2 : Number(b.high)) : stop;
       book(o.symbol, held, fillPx, "stop");
       delete state.pos[o.symbol];
       o.status = "Filled"; o.filledQty = o.qty; o.avgPrice = fillPx; o.time = NOW_MS;
@@ -208,6 +209,35 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
 const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
 const LEV_CONFIRM = process.env.REPLAY_LEV_CONFIRM === "1";
+const PLACEBO = String(process.env.REPLAY_PLACEBO || "").toLowerCase();   // REPLAY_PLACEBO=shuffle|shift (2026-09-27), sleeve S entries only
+let _placeboSeed = (Number(process.env.REPLAY_PLACEBO_SEED) || 1) >>> 0;
+const placeboRand = () => { _placeboSeed = (1664525 * _placeboSeed + 1013904223) >>> 0; return _placeboSeed / 4294967296; };
+let _allDaysCache = null;
+const allDays = () => _allDaysCache || (_allDaysCache = [...new Set(Object.values(DATA).flat().map((b) => b.d))].sort());
+let _inShift = false;
+let _posRef = null;   // the replay account's open positions (set per variant) so shuffle only moves fires that could have entered
+function applyPlacebo(out, day, m, sleeve) {
+  if (!PLACEBO || sleeve !== "S" || _inShift) return out;
+  const setBull = (o, on) => { o.direction = on ? "BULLISH" : (o.direction === "BEARISH" ? "BEARISH" : "NEUTRAL"); o.convergence.decision = (o.direction === "BULLISH" || o.direction === "BEARISH") ? "ENTER" : "SKIP"; };
+  if (PLACEBO === "shuffle") {
+    const held = new Set(Object.keys(_posRef || {}));
+    const bulls = out.filter((o) => o.direction === "BULLISH" && !held.has(o.symbol)); if (!bulls.length) return out;
+    const pool = out.filter((o) => o.direction === "NEUTRAL" && !held.has(o.symbol)); const spare = out.filter((o) => o.direction === "BEARISH" && !held.has(o.symbol));
+    for (const o of bulls) { o.direction = "NEUTRAL"; o.convergence.decision = "SKIP"; }
+    let k = bulls.length;
+    const pick = (arr) => { while (k > 0 && arr.length) { const i = Math.floor(placeboRand() * arr.length); const o = arr.splice(i, 1)[0]; o.direction = "BULLISH"; o.convergence.decision = "ENTER"; k--; } };
+    pick(pool); pick(spare);
+    return out;
+  }
+  if (PLACEBO === "shift") {
+    const days = allDays(); const i = days.indexOf(day); if (i <= 0) return out;
+    _inShift = true; let prev; try { prev = signalsAt(days[i - 1], m, sleeve); } finally { _inShift = false; }
+    const prevBull = new Set(prev.filter((o) => o.direction === "BULLISH").map((o) => o.symbol));
+    for (const o of out) { if (o.direction === "BEARISH") continue; setBull(o, prevBull.has(o.symbol)); }
+    return out;
+  }
+  throw new Error("REPLAY_PLACEBO must be shuffle or shift");
+}
 const LEV_UNDERLYING = { SOXL: "SMH", TNA: "IWM", SPXL: "SPY", UPRO: "SPY", TQQQ: "QQQ", NUGT: "GDX", JNUG: "GDX", UCO: "USO" };
 function underlyingIbsAt(u, day, m) {
   const ua = DATA[u]; if (!ua) return null;
@@ -307,7 +337,7 @@ function signalsAt(day, m, sleeve) {
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
   }
-  return out;
+  return applyPlacebo(out, day, m, sleeve);
 }
 
 function loadArmed(base, src) {
@@ -362,7 +392,7 @@ function loadArmed(base, src) {
     const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
     const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
     for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
-    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] }; _curveRef = state.curve; _tradesRef = state.trades;
+    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] }; _curveRef = state.curve; _posRef = state.pos; _tradesRef = state.trades;
     const account = makeAccount(state, tag);
     const rows = [];
     const ownership = createOwnership({ defaultOwner: "S" });
