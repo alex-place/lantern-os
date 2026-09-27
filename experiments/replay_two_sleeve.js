@@ -207,6 +207,14 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
 const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
+const LEV_CONFIRM = process.env.REPLAY_LEV_CONFIRM === "1";
+const LEV_UNDERLYING = { SOXL: "SMH", TNA: "IWM", SPXL: "SPY", UPRO: "SPY", TQQQ: "QQQ", NUGT: "GDX", JNUG: "GDX", UCO: "USO" };
+function underlyingIbsAt(u, day, m) {
+  const ua = DATA[u]; if (!ua) return null;
+  const us = ua.filter((b) => b.d === day && b.m >= 570 && b.m <= m); if (us.length < 3) return null;
+  const uhi = Math.max(...us.map((b) => b.h)), ulo = Math.min(...us.map((b) => b.l)), uc = us[us.length - 1].c;
+  return uhi > ulo ? (uc - ulo) / (uhi - ulo) : null;
+}
 const _parseAdaptiveEnv = (raw) => { const v = String(raw || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; };
 const ADAPTIVE_ENV_R = _parseAdaptiveEnv(process.env.REPLAY_ADAPTIVE_ENV_R);
 const ADAPTIVE_ENV = (() => { const v = String(process.env.REPLAY_ADAPTIVE_ENV || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; })();
@@ -293,6 +301,9 @@ function signalsAt(day, m, sleeve) {
         }
       }
     }
+    if (bullish && sleeve === "S" && process.env.TRADER_LAB_FRI_FROM_M !== undefined && process.env.TRADER_LAB_FRI_FROM_M !== "" && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5 && m >= Number(process.env.TRADER_LAB_FRI_FROM_M)) bullish = false;   // TRADER_LAB_FRI_FROM_M (2026-09-27)
+    if (bullish && sleeve === "S" && process.env.TRADER_LAB_LEV_FROM_M && ["SOXL", "TNA", "SPXL", "UPRO", "TQQQ"].includes(s) && m < Number(process.env.TRADER_LAB_LEV_FROM_M)) bullish = false;   // TRADER_LAB_LEV_FROM_M (2026-09-27)
+    if (bullish && LEV_CONFIRM && sleeve === "S" && LEV_UNDERLYING[s]) { const uIbs = underlyingIbsAt(LEV_UNDERLYING[s], day, m); if (uIbs == null || uIbs > thr) bullish = false; }   // REPLAY_LEV_CONFIRM (2026-09-27)
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
   }
