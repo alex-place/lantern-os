@@ -1,13 +1,13 @@
 ---
 name: release
-description: Cut a full Unisona release — fold the changelog, bump the version, tag it, let CI build and publish the website + the native Windows desktop app (Unisona-Setup .exe), then rewrite the GitHub Release post for humans with the live URL, the .exe download, a features list, and current pricing. Use whenever the user types `/release` or `!release`, or asks to "cut a release", "ship a version", "release the website and exe", "tag a release", "publish a new version", "make a GitHub release", "do a release post", or "bump and release". Trigger even if they don't say "release" — any request to tag a version and publish a GitHub release with the app + download is this skill. Do NOT use it to hot-deploy master to GCE without a version (that's the deploy runbook), to merge one PR, or to only bump the changelog.
+description: Cut a full Unisona release — fold the changelog, bump the version, tag it, let CI build the release assets + the native Windows desktop app (Unisona-Setup .exe), deploy the website to Railway with scripts/railway-deploy.mjs, then rewrite the GitHub Release post for humans with the live URL, the .exe download, a features list, and current pricing. Use whenever the user types `/release` or `!release`, or asks to "cut a release", "ship a version", "release the website and exe", "tag a release", "publish a new version", "make a GitHub release", "do a release post", or "bump and release". Trigger even if they don't say "release" — any request to tag a version and publish a GitHub release with the app + download is this skill. Do NOT use it to hot-deploy master to GCE without a version (that's the deploy runbook), to merge one PR, or to only bump the changelog.
 ---
 
 # Release
 
 Ship one version of Unisona — the **hosted website** and the **native Windows desktop app** — off a single tag, then turn the machine-made GitHub Release into a real launch post: live URL, the `.exe` download, what's new, the feature set, and current pricing.
 
-This is a **publishing** action. A GitHub Release is public and drives the production auto-deploy. Confirm with the user before pushing the tag, and never invent version numbers, features, or prices — read them from the repo.
+This is a **publishing** action. A GitHub Release is public, and the website deploy (Step 4b) restarts the app that runs users' traders. Confirm with the user before pushing the tag, and never invent version numbers, features, or prices — read them from the repo.
 
 ## The machine you're driving (don't rebuild it)
 
@@ -19,13 +19,16 @@ bump package.json ──▶ auto-tag.yml ──▶ vX.Y.Z tag ──▶ release.
                                                          ├─ github-release → creates the Release, notes from CHANGELOG.MD
                                                          ├─ build-desktop  → Unisona-Setup-*.exe  (Windows, attached)
                                                          └─ deploy-pages   → gh-pages (static site)
-GCE prod (unisona.ai) polls releases/latest ──▶ rolls the new tag  (ops/gce, ~15 min)
+then, BY HAND: node scripts/railway-deploy.mjs --yes ──▶ Railway builds + serves the tag at unisona.ai (~3 min)
+(a published Release does NOT deploy production — see Step 4b)
 ```
 
 Key files: [`.github/workflows/release.yml`](../../../.github/workflows/release.yml),
 [`.github/workflows/auto-tag.yml`](../../../.github/workflows/auto-tag.yml),
 [`scripts/assemble-changelog.js`](../../../scripts/assemble-changelog.js),
-[`ops/gce/README.md`](../../../ops/gce/README.md). Version of truth: root
+[`ops/gce/README.md`](../../../ops/gce/README.md) (the GCE poller: a RETIRED host, kept for history).
+**Production deploy:** [`scripts/railway-deploy.mjs`](../../../scripts/railway-deploy.mjs) +
+[`docs/ops/railway-runbook.md`](../../../docs/ops/railway-runbook.md). Version of truth: root
 [`package.json`](../../../package.json) (`.version`), mirrored to
 `apps/lantern-garage/package.json` + `apps/lantern-garage/version.json` by the assembler.
 
@@ -129,9 +132,29 @@ Lead with the free tier. Link https://unisona.ai/pricing.html and the Patreon pa
 Full changelog: [CHANGELOG.MD](https://github.com/alex-place/lantern-os/blob/v<X.Y.Z>/CHANGELOG.MD)
 ```
 
+## Step 4b — Deploy the website (Railway)
+
+The Release does **not** update unisona.ai. Production is Railway (project `unisona`, service
+`unisona`, environment `production`; the site answers with `x-railway-*` headers) and it runs
+whatever was last uploaded. Ship the tag's commit with the guarded script, from a checkout whose
+`origin/master` includes the merged bump:
+
+```bash
+git fetch origin
+node scripts/railway-deploy.mjs                 # plan: prints the commit that would ship, uploads nothing
+node scripts/railway-deploy.mjs --yes           # ships origin/master (== the tag once the bump merged)
+# or pin it:  node scripts/railway-deploy.mjs --ref "v$V" --yes
+```
+
+It refuses Mon–Fri 09:25–16:05 ET unless `--force` (a deploy restarts the users' trader), checks
+the commit out clean (stops on Git LFS pointer files), writes `build-info.json` so `/api/version`
+names the commit, uploads with `railway up`, and waits for https://unisona.ai/api/version to report
+it (v1.16.0 built and went live in ~2 minutes on 2026-09-27). Needs `railway whoami` logged in and
+git-lfs. Variables are separate from a deploy: `railway variable set …`, then `railway redeploy`.
+
 ## Step 5 — Verify, then report
 
-- **Website shipped:** `curl -s -o /dev/null -w "%{http_code}" https://unisona.ai/` → 200, and confirm the served version advanced (footer / `/version` / `apps/lantern-garage/version.json` on the box). GCE lags the timer (~15 min) — if it hasn't rolled, say so; don't claim it's live before it is.
+- **Website shipped:** `curl -s -o /dev/null -w "%{http_code}" https://unisona.ai/` → 200, and confirm the served version advanced (footer / `/version` / `apps/lantern-garage/version.json` on the box). The site changes only when Step 4b ran — confirm `/api/version` reports the release commit and `/version.json` the new number; don't claim it's live before they do.
 - **Release is correct:** `gh release view "v$V" --web` — title says *Unisona*, the `.exe` is in Assets, features + pricing render.
 - **Report to Alex as a stakeholder** (outcome, not diffs): the version, the one-line what-shipped, the Release URL, and the direct `.exe` download link. Flag anything that didn't land (e.g. desktop job red, GCE not yet rolled).
 
@@ -143,5 +166,5 @@ Full changelog: [CHANGELOG.MD](https://github.com/alex-place/lantern-os/blob/v<X
 - **The tag creates the Release — don't pre-create it.** `softprops/action-gh-release` makes it; if you `gh release create` first, the workflow collides.
 - **Unsigned exe.** SmartScreen will warn. Say so in the notes (don't let a user think it's malware). MSIX/SignPath signing is still pending — see `apps/lantern-garage/desktop/README.md`.
 - **Prerelease flag is automatic** for tags containing a hyphen (`v1.9.0-rc1`) — use that for test releases so they don't become "latest" and trigger the GCE prod roll.
-- **GCE is release-gated, not push-gated.** Only a *published GitHub Release* rolls prod; a bare tag without the Release (e.g. workflow failed) won't. Confirm the Release published before claiming the site updated.
+- **The Release does not deploy production.** unisona.ai is Railway and runs whatever `scripts/railway-deploy.mjs --yes` last uploaded. On 2026-09-27 the v1.16.0 Release published at 16:52 ET and the site stayed on the 09-11 upload (1.15.4) until the deploy script ran at 17:41 ET. Always run Step 4b. The `ops/gce/` release poller describes a retired host.
 - **Empty release = mistake.** No `changelog.d` fragments almost always means you're on the wrong branch or already released; stop and check.
