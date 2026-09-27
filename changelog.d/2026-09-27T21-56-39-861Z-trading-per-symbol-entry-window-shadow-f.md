@@ -1,0 +1,3 @@
+### Added
+
+- trading: per-symbol entry window, shadow-first (default off). TRADER_SYMBOL_ENTRY_BLOCK_ET="SOXL,TNA,SPXL,UPRO,TQQQ:09:30-13:00" keeps the named symbols from entering inside the ET window; TRADER_SYMBOL_ENTRY_BLOCK_MODE=shadow (default) only journals what it would have blocked, live skips the entry. Evidence (ledger lev-index-from-13-oor): the leveraged index wrappers' entries before 13:00 ET were the losing bucket of the armed stack; entering them only from 13:00 beat the armed stack 7-2 on the nine 2024-2026 windows (+5.0pp, lower maxDD) and was never worse on the four 2022/2023 out-of-regime windows.

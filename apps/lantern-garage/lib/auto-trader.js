@@ -680,6 +680,40 @@ function _entryHourBlocked(etMin, spec) {
   if (!spec || !(etMin >= 0)) return null;
   return _parseEtWindows(spec).find((w) => etMin >= w.from && etMin < w.to) || null;
 }
+// PER-SYMBOL ENTRY WINDOW (lab 2026-09-27, shadow-first). The nine-window anatomy of the
+// armed stack: the leveraged INDEX wrappers (SOXL TNA SPXL UPRO TQQQ) lost on their
+// 11:00-13:00 entries and won on their afternoon ones; "leveraged index only from 13:00 ET"
+// beat the armed stack 7-2 in-sample (+5.0pp over nine windows, maxDD lower) and was never
+// worse on the four 2022/2023 out-of-regime windows (+0.02/+0.34/+0.24/+0.74; ledger
+// lev-index-from-13-oor). TRADER_SYMBOL_ENTRY_BLOCK_ET="SOXL,TNA,SPXL,UPRO,TQQQ:09:30-13:00
+// [;SYM,SYM:HH:MM-HH:MM,HH:MM-HH:MM]" - per-name ET windows, half-open, ENTRIES only; unset =
+// off. TRADER_SYMBOL_ENTRY_BLOCK_MODE = shadow (default: journal every entry it would have
+// blocked, let it through) | live (skip the entry). Exits and stops are untouched.
+function _parseSymbolWindows(spec) {
+  const out = new Map();
+  for (const grp of String(spec || '').split(';').map((g) => g.trim()).filter(Boolean)) {
+    const i = grp.indexOf(':'); if (i <= 0) continue;
+    const syms = grp.slice(0, i).split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
+    const wins = _parseEtWindows(grp.slice(i + 1));
+    if (!syms.length || !wins.length) continue;
+    for (const sym of syms) out.set(sym, (out.get(sym) || []).concat(wins));
+  }
+  return out;
+}
+function _symbolEntryBlocked(sym, etMin, spec) {
+  if (!spec || !sym || !(etMin >= 0)) return null;
+  const wins = _parseSymbolWindows(spec).get(String(sym).toUpperCase());
+  return (wins && wins.find((w) => etMin >= w.from && etMin < w.to)) || null;
+}
+const _symbolEntryBlockLogged = new Set();   // sym:etDay:hour - one journal row per name per hour
+function _symbolEntryBlockJournal(sym, etMin, win, mode, now = Date.now()) {
+  const day = new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const key = `${sym}:${day}:${Math.floor(etMin / 60)}`;
+  if (_symbolEntryBlockLogged.has(key)) return false;
+  _symbolEntryBlockLogged.add(key);
+  logTrade({ event: mode === 'live' ? 'symbol_entry_block' : 'symbol_entry_block_shadow', symbol: sym, et_min: etMin, window: win.label, mode, would_block: true });
+  return true;
+}
 // ENTRY CADENCE (#3435). The engine reads the session IBS every scan (~60s) and
 // buys at the first two scans where it crosses the threshold; every lab that
 // validated this stack read it at BAR CLOSES. On 20 sessions of 1-minute data
@@ -2891,6 +2925,19 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         continue;
       }
     }
+    // PER-SYMBOL ENTRY WINDOW (lab 2026-09-27) — see _symbolEntryBlocked. Entries only; shadow by default.
+    if (process.env.TRADER_SYMBOL_ENTRY_BLOCK_ET) {
+      const _seMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
+      const _seb = _symbolEntryBlocked(sym, _seMin, process.env.TRADER_SYMBOL_ENTRY_BLOCK_ET);
+      if (_seb) {
+        const _seMode = String(process.env.TRADER_SYMBOL_ENTRY_BLOCK_MODE || 'shadow').toLowerCase() === 'live' ? 'live' : 'shadow';
+        _symbolEntryBlockJournal(sym, _seMin, _seb, _seMode, now);
+        if (_seMode === 'live') {
+          out.skipped.push({ ...record, why: `symbol_entry_block: ${sym} at ${String(Math.floor(_seMin / 60)).padStart(2, '0')}:${String(_seMin % 60).padStart(2, '0')} ET inside ${_seb.label} — this name may not enter yet (lab 2026-09-27: leveraged index wrappers from 13:00)` });
+          continue;
+        }
+      }
+    }
     // ENTRY CADENCE (#3435) — see _entryCadenceBlocked. Entries only.
     if (Number(process.env.TRADER_ENTRY_CADENCE_MIN) > 0) {
       const _ecMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
@@ -3364,4 +3411,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
 
-module.exports = { _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
