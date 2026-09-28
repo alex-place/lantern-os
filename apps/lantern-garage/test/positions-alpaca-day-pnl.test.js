@@ -29,6 +29,7 @@ function stub(name, exportsObj) {
 }
 let dayPnlCalls = [];
 let dayPnlImpl = null;
+let extraLedgers = [];   // what TRADER_TRADES_LOG_EXTRA would name (2026-09-28)
 stub('alpaca-adapter', {
   getAccount: async () => ({ account_id: 'PA-TEST', equity: 100000, cash: 50000, pnl_today: 321, realized_today: 0, source: 'alpaca' }),
   getPositions: async () => ({ positions: [
@@ -42,6 +43,10 @@ stub('market-data-yahoo', { getQuotes: async () => [] });
 stub('day-pnl', {
   computeDayPnl: async (o) => { dayPnlCalls.push(o); return dayPnlImpl(o); },
   resolveTradesLog: () => ledger,
+  // the route reads the MERGED ledger and names its sources: an account can have more
+  // than one writer (the two-sleeve engine journals each sleeve to its own file)
+  readTradesLedger: () => fs.readFileSync(ledger, 'utf8'),
+  tradesLedgerSources: () => ({ primary: ledger, extras: extraLedgers }),
   resolveBarsDir: () => os.tmpdir(),
   prevCloseFromBarsFactory: () => async () => null,
 });
@@ -82,7 +87,17 @@ test('every Alpaca row carries its Day P&L from lib/day-pnl, and the tile takes 
   assert.match(r.body.account.pnl_basis, /^alpaca: ledger$/);
   assert.strictEqual(dayPnlCalls.length, 1, 'computed once per request');
   assert.deepStrictEqual(dayPnlCalls[0].positions.map((p) => p.symbol), ['SPY', 'TLT'], "the adapter's own rows go in");
-  assert.match(dayPnlCalls[0].ledgerText, /noop/, 'the ledger comes from resolveTradesLog');
+  assert.match(dayPnlCalls[0].ledgerText, /noop/, 'the ledger comes from readTradesLedger');
+});
+
+test('with extra ledgers configured the tile says how many were read', async () => {
+  dayPnlImpl = () => ({ realized_today: 0, realized_booked: 0, unrealized_today: 1, pnl_today: 1, pnl_carry_adjustment: 0, pnl_basis: 'ledger', per_position: [] });
+  extraLedgers = ['S.jsonl', 'R.jsonl'];
+  try {
+    const r = await hit();
+    assert.strictEqual(r.code, 200);
+    assert.match(r.body.account.pnl_basis, /^alpaca: ledger; ledgers: primary \+ 2 extra$/);
+  } finally { extraLedgers = []; }
 });
 
 test('an unreadable ledger keeps the broker figures: no crash, no invented day number', async () => {
