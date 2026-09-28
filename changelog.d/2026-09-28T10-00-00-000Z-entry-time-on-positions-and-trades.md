@@ -1,0 +1,3 @@
+### Added
+
+- trader, journal: **when a position was opened, not just when it closed.** The dashboard's position table has an **Opened** column — time for a position opened today, date and time once it has been carried, with the hold beside it and the full ET timestamp on hover. The journal's trade log gains the same column, first, so a trade reads opened → closed → held, and it sorts. The entry time was already being read out of the ledger to decide whether Day P&L is measured from your fill or from yesterday's close; it was simply thrown away afterwards, and in the journal it was one click deep inside an expanded row. A position the ledger has no entry row for says "not recorded" rather than guessing — the same honesty the Day P&L basis already applies to that case.

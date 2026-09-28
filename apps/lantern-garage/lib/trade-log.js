@@ -23,7 +23,10 @@
 
 const { readExits, preparedRows, rOf, CONFIRMED, computeScorecard, slimStats } = require('./trader-scorecard');
 
-const SORTS = new Set(['ts', 'pnl', 'pnl_pct', 'r', 'symbol', 'qty']);
+// openedAt sorts as an ISO string, which orders correctly, and _sorted already puts
+// a null last in BOTH directions — so trades with no recorded open time never head the
+// list just because they are empty.
+const SORTS = new Set(['ts', 'openedAt', 'pnl', 'pnl_pct', 'r', 'symbol', 'qty']);
 const RESULTS = new Set(['all', 'win', 'loss', 'flat']);
 const MAX_LIMIT = 200;
 

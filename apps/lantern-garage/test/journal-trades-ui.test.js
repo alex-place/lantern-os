@@ -50,7 +50,7 @@ const P = new Function([
   'let jpReplay = null; const jpReplayPanel = () => "";',
   grabDecl('jpNoteOf'), grabFn('jpNoteEditor'),
   grabFn('jpTradeDetail'), grabFn('jpTradeRNote'), grabFn('jpTradeControls'), grabFn('jpTrades'),
-].join('\n') + '\nreturn { jpHeld, jpTrades, jpTradeDetail, jpTradeRNote, open: jpTradeOpen };')();
+].join('\n') + '\nreturn { jpHeld, jpTrades, jpTradeDetail, jpTradeRNote, open: jpTradeOpen, JP_TRADE_COLS };')();
 
 const trade = (o) => Object.assign({
   id: 't1', ts: '2026-09-04T18:00:00.000Z', openedAt: null, heldMs: null,
@@ -81,6 +81,26 @@ test('the table draws a trade', () => {
   assert.match(html, /\$50\.00/);
   assert.match(html, /2\.8%/);
   assert.match(html, /1 trade · 1W \/ 0L/);
+});
+
+test('the table says WHEN a trade was opened, and says so when it cannot', () => {
+  // Entry time was recorded all along and shown only inside an expanded row; the founder
+  // could not see it without clicking every trade (2026-09-28).
+  const open = P.jpTrades(data({ trades: [trade({ openedAt: '2026-09-04T13:32:00.000Z', heldMs: 4 * 3600000 + 28 * 60000 })] }));
+  assert.match(open, /<th scope="col"[^>]*>(?:<button[^>]*>)?Opened/, 'Opened is a column of its own');
+  assert.match(open, /Sep 4/, 'and the row carries the date it was opened');
+  assert.match(open, /4h 28m/, 'the hold still reads beside it');
+  // A row with no recorded open time must say so rather than render an empty cell.
+  assert.match(P.jpTrades(data()), /not recorded/, 'a missing open time is named, not blank');
+});
+
+test('Opened is sortable, because the server can sort by it', () => {
+  // The column is only worth offering if /api/trading/trades honours it — lib/trade-log
+  // has openedAt in SORTS, and the header must therefore be a sort button.
+  const cols = P.JP_TRADE_COLS.find((c) => c.key === 'openedAt');
+  assert.ok(cols, 'no openedAt column');
+  assert.strictEqual(cols.sortable, true);
+  assert.strictEqual(P.JP_TRADE_COLS[0].key, 'openedAt', 'a trade is opened before it is closed');
 });
 
 test('sorting and paging are server-side, because sorting a page is not sorting', () => {
@@ -116,7 +136,9 @@ test('expanding a row costs nothing — the row is already in hand', () => {
 
 test('the detail says what the record does NOT have, rather than leaving it blank', () => {
   const html = P.jpTradeDetail(trade({}));
-  assert.match(html, /Opened[\s\S]*not recorded/);
+  // Opened used to be asserted here. It is a COLUMN now (2026-09-28) and the detail no
+  // longer repeats it — the same "say what is missing" rule is enforced on the table below.
+  assert.doesNotMatch(html, /<span class="k">Opened<\/span>/, 'the detail repeats a column');
   assert.match(html, /Exit reason/);
   assert.match(html, /not recorded for this trade/, 'excursions that were never observed');
   assert.match(html, /no stop recorded to measure against/, 'and an R with no denominator');

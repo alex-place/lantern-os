@@ -40,7 +40,7 @@ async function alpacaDayPnl(account, positions) {
     const bySym = new Map((d.per_position || []).map((x) => [x.symbol, x]));
     for (const p of positions) {
       const x = bySym.get(String(p.symbol).toUpperCase());
-      if (x) { p.day_pnl = x.day_pnl; p.day_basis = x.day_basis; }
+      if (x) { p.day_pnl = x.day_pnl; p.day_basis = x.day_basis; p.entry_ts = x.entry_ts; }
     }
     return true;
   } catch (_e) {
@@ -343,7 +343,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             const _dayBySym = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
             for (const p of ibkrPositions) {
               const _x = _dayBySym.get(String(p.symbol).toUpperCase());
-              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; p.entry_ts = _x.entry_ts; }
             }
           } catch (_e) {
             // FALLBACK MUST SAY SO (#3380). Keeping the broker figures is fine —
@@ -404,7 +404,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             const _opDay = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
             for (const p of opPositions) {
               const _x = _opDay.get(String(p.symbol).toUpperCase());
-              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; p.entry_ts = _x.entry_ts; }
             }
           } catch (_e) { /* ledger unreadable → keep the broker figures */ }
           // Flagged so the UI can never silently present the operator book as
