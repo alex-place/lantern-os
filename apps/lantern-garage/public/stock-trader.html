@@ -692,11 +692,12 @@
   .tp-cols-reset{background:none;border:none;padding:0;cursor:pointer;font:inherit;font-size:11px;color:var(--blue)}
   .tp-cols-reset:hover{text-decoration:underline}
   /* ── Header ── */
-  .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
+  /* The toolbar brand was removed (2026-09-28): "/" serves this page and the shared
+     nav wordmark (.nav-wordmark, site.css) says UnisonaTrader, so a second copy one row
+     down was pure duplication. Its .logo rules went with it. */
   /* Trade | Journal — in-page switcher (the header nav has one Trader entry) */
   /* The Trade | Journal tabs moved to the site header (founder, 2026-09-15), so the
      toolbar keeps only what is about THIS chart. Their CSS went with them. */
-  .logo span{color:var(--text1);font-weight:400}
   /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
      label-over-value pairs — halves the toolbar's height footprint. */
   .hstat{font-family:var(--mono);font-size:12px;display:flex;flex-direction:row;align-items:center;gap:5px;min-width:0;
@@ -1216,7 +1217,6 @@
     /* The toolbar's brand + account readouts (Equity, Day P&L, Positions) duplicate the
        account panel below — hide the duplicates so what's left is what ISN'T shown
        elsewhere: VIX, market trend, and the chart customization controls. */
-    .header .logo,
     .header .badge-paper,
     .header .hstat.acct{ display:none; }
     .header .hstat{ min-width:0; }
@@ -1540,7 +1540,6 @@
 <!-- Header -->
 <h1 class="visually-hidden">Unisona Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
 <div class="header" role="region" aria-label="Trading toolbar">
-  <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
@@ -5669,7 +5668,7 @@ function openOrderPanel(){
   requestAnimationFrame(()=>{ applyGridCols(); renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 function openOrderTicket(ticker, side){
-  if(window.GUEST){ location.href='/auth.html?returnTo=%2Fstock-trader.html'; return; }   // read-only view → send to sign-in
+  if(window.GUEST){ location.href='/auth.html?returnTo=%2F'; return; }   // read-only view → send to sign-in
   otSide = side; otOrderType = 'market';
   setOrderSymbol(ticker);
   openOrderPanel();

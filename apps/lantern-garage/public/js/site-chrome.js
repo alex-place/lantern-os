@@ -26,7 +26,7 @@
   // Settings lives behind the account (person) icon; Contest returns when launch-ready.
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
-    { href: "/stock-trader.html", label: "Trader" },
+    { href: "/", label: "Trader" }, // "/" IS the trader (2026-09-28); /stock-trader.html still resolves
     { href: "/journal.html", label: "Journal" },
     { href: "/work.html", label: "Work" },
     // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
@@ -97,7 +97,6 @@
       "      unisona.ai\n" +
       "    </span>\n" +
       '    <span class="sep">·</span>\n' +
-      '    <a href="/">Home</a>\n    ' +
       links +
       "\n" +
       '    <span class="sep">·</span>\n' +
