@@ -62,7 +62,11 @@
       '<nav class="site-nav">\n' +
       '  <a class="nav-brand" href="/">\n' +
       '    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">\n' +
-      '    <span style="font-size:18px;font-weight:600">unisona.ai</span>\n' +
+      // Wordmark: the trader IS the product now (/ serves stock-trader.html), so the
+      // brand beside the mandala reads UnisonaTrader. Styled in site.css (.nav-wordmark)
+      // rather than inline — a gradient fill needs a @supports fallback that an inline
+      // style attribute can't express.
+      '    <span class="nav-wordmark">Unisona<b>Trader</b></span>\n' +
       "  </a>\n" +
       '  <div class="nav-links">\n    ' +
       links +
