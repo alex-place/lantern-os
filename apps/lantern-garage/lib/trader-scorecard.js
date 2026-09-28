@@ -176,17 +176,105 @@ function forUser(rows, user) {
   return (rows || []).filter((r) => rowUser(r) === want);
 }
 
-/** Read + parse the exit rows from a trades log (fail-soft → []); optional user filter. */
-function readExits(logPath = DEFAULT_LOG, user = null) {
+/**
+ * Every ledger that trades this account (2026-09-28).
+ *
+ * One ledger is the whole record while one process trades the account. The
+ * two-sleeve engine journals each sleeve to its own file, and the server on the
+ * account's port trades nothing — so from the day the engine took over, that
+ * server's journal page stopped: on 2026-09-28 it read "Realized results,
+ * 2026-08-20 to 2026-09-22 … net -$1,234.57, 50 closed trades" while the engine's
+ * closed trades, every one matched to a broker order, sat in its own journals.
+ *
+ *   TRADER_TRADES_LOG_EXTRA   ';'-separated ledger paths, merged with the DEFAULT
+ *                             ledger. Unset = the default ledger alone, as before.
+ *
+ * Only the DEFAULT ledger is extended. A caller that names a path — a test, a
+ * fixture, a preview, an import — reads exactly that file, as it always did.
+ *
+ * ONE FILL, ONE ROW. Every exit row is summed, so a broker order booked by two
+ * ledgers would be counted twice. Rows from different FILES with the same event,
+ * symbol and order id (timestamp + quantity + reason where there is no id) are one
+ * fill. Which row survives is not "whichever file was read first": live 2026-09-25
+ * a stop sold 46 TLT bought at 81.62, and both sleeves booked it — one at its true
+ * -$113.12, the other at +$8.32 against an entry price (78.98) nobody had paid yet.
+ * The row that names a real lot wins: its entry price matches an EARLIER entry row
+ * for that symbol somewhere in the merged book. If that does not separate them the
+ * first one read stays. Rows that repeat inside ONE file are left alone — that is
+ * dedupeRoundTrips' question, with its own rule.
+ *
+ * The merged book is returned in time order, so "the last row wins" and every
+ * first/last date a client derives mean the same thing whichever file a row came
+ * from. An unreadable file contributes nothing and breaks nothing. The array
+ * carries a non-enumerable `ledgers` summary { extras, duplicateFills, corrected }.
+ */
+function extraLogsFor(logPath) {
+  const primary = path.resolve(DEFAULT_LOG);
+  if (path.resolve(String(logPath)) !== primary) return [];
+  return String(process.env.TRADER_TRADES_LOG_EXTRA || '').split(';')
+    .map((p) => p.trim()).filter(Boolean).map((p) => path.resolve(p)).filter((p) => p !== primary);
+}
+function parseLedger(file, want, entries) {
   let text = '';
-  try { text = fs.readFileSync(logPath, 'utf8'); } catch (_e) { return []; }
-  const out = [];
+  try { text = fs.readFileSync(file, 'utf8'); } catch (_e) { return []; }
+  const rows = [];
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     let d; try { d = JSON.parse(line); } catch (_e) { continue; }
-    if (d && d.event === 'exit') out.push(d);
+    if (!d) continue;
+    if (entries && d.event === 'entry' && d.symbol && Number(d.entry) > 0) {
+      const sym = String(d.symbol).toUpperCase();
+      if (!entries.has(sym)) entries.set(sym, []);
+      entries.get(sym).push({ ts: String(d.ts), entry: Number(d.entry) });
+    }
+    if (want(d)) rows.push(d);
   }
-  return forUser(out, user);
+  return rows;
+}
+const withLedgers = (rows, ledgers) => Object.defineProperty(rows, 'ledgers', { value: ledgers, enumerable: false });
+function readRows(logPath, want) {
+  const extras = extraLogsFor(logPath);
+  if (!extras.length) return parseLedger(logPath, want, null);
+
+  const entries = new Map();   // SYMBOL -> every entry row in any ledger: the lots that were really opened
+  const perFile = [logPath, ...extras].map((file) => parseLedger(file, want, entries));
+  const namesRealLot = (r) => {
+    const e = Number(r.entry);
+    if (!(e > 0)) return false;
+    return (entries.get(String(r.symbol || '').toUpperCase()) || [])
+      .some((x) => x.ts < String(r.ts) && Math.abs(x.entry - e) / e < 0.001);
+  };
+  const keyOf = (r) => [r.event, String(r.symbol || '').toUpperCase(),
+    r.order_id ? 'o:' + r.order_id : 't:' + r.ts + ':' + r.qty + ':' + (r.reason || '')].join('|');
+
+  const out = [];
+  const at = new Map();        // key -> index in out, for rows that came from an EARLIER file
+  let duplicateFills = 0;
+  let corrected = 0;
+  for (const rows of perFile) {
+    const fromThisFile = [];
+    for (const r of rows) {
+      const k = keyOf(r);
+      if (!at.has(k)) { fromThisFile.push([k, out.push(r) - 1]); continue; }
+      duplicateFills++;
+      const i = at.get(k);
+      if (!namesRealLot(out[i]) && namesRealLot(r)) { out[i] = r; corrected++; }
+    }
+    for (const [k, i] of fromThisFile) if (!at.has(k)) at.set(k, i);
+  }
+  const sorted = out.map((r, i) => ({ r, i }))
+    .sort((a, b) => (String(a.r.ts) < String(b.r.ts) ? -1 : String(a.r.ts) > String(b.r.ts) ? 1 : a.i - b.i))
+    .map((x) => x.r);
+  return withLedgers(sorted, { extras: extras.length, duplicateFills, corrected });
+}
+function scoped(rows, user) {
+  const out = forUser(rows, user);
+  return rows.ledgers && out !== rows ? withLedgers(out, rows.ledgers) : out;
+}
+
+/** Read + parse the exit rows from a trades log (fail-soft → []); optional user filter. */
+function readExits(logPath = DEFAULT_LOG, user = null) {
+  return scoped(readRows(logPath, (d) => d.event === 'exit'), user);
 }
 
 /**
@@ -200,21 +288,14 @@ function scorecard(logPath = DEFAULT_LOG, user = null) {
     generatedAt: new Date().toISOString(),
     confirmed: computeScorecard(confirmed),   // broker-accepted fills — booked
     all: computeScorecard(exits),             // every exit decision — strategy view
+    ...(exits.ledgers ? { ledgers: exits.ledgers } : {}),   // primary + TRADER_TRADES_LOG_EXTRA, fills booked twice
     note: 'confirmed = broker-accepted fills (booked). all = every exit decision incl. needs_confirmation/dry_run/reconstructed (strategy view, not necessarily real money). Rejected/frozen attempts realize nothing and are excluded from both — see failedAttempts. estimatedTrades are external closes (a protective stop filling, a manual close) valued off the last observed mark, not a broker fill.',
   };
 }
 
 /** Read + parse rows of one event type from a trades log (fail-soft → []); optional user filter. */
 function readEvents(event, logPath = DEFAULT_LOG, user = null) {
-  let text = '';
-  try { text = fs.readFileSync(logPath, 'utf8'); } catch (_e) { return []; }
-  const out = [];
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue;
-    let d; try { d = JSON.parse(line); } catch (_e) { continue; }
-    if (d && d.event === event) out.push(d);
-  }
-  return forUser(out, user);
+  return scoped(readRows(logPath, (d) => d.event === event), user);
 }
 
 // ── Breakdown slices (#3240) — the journal-analytics data layer ───────────────
@@ -482,6 +563,6 @@ function skipBreakdownFromRows(skips) {
 module.exports = {
   computeScorecard, readExits, readEvents, scorecard, breakdown, breakdownFromRows,
   reasonFamily, preparedRows, etParts, slimStats, forUser, rowUser,
-  CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG, HOUSE_USER,
+  CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG, HOUSE_USER, extraLogsFor,
   rBasisOf, rOf, rHistogram, rDistribution,
 };
