@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: Day P&L reads every ledger that trades the account. TRADER_TRADES_LOG_EXTRA names extra trade ledgers (';'-separated) whose entry/exit rows are merged with the primary one, de-duplicated; unset changes nothing. The two-sleeve engine journals each sleeve to its own file, so the server on the account's port saw no entry and no exit for the session: on 2026-09-28 the trader page showed -263 on a +901 day (a position bought that morning was charged the whole move from the prior close, and the engine's realized was not counted). The basis tooltip now names how many ledgers were read.

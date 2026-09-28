@@ -21,7 +21,10 @@ async function alpacaDayPnl(account, positions) {
     const dataDir = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading');
     const d = await dayPnlLib.computeDayPnl({
       positions,
-      ledgerText: fs.readFileSync(dayPnlLib.resolveTradesLog(dataDir), 'utf8'),
+      // every ledger that trades this account (TRADER_TRADES_LOG_EXTRA): the two-sleeve
+      // engine journals its sleeves to their own files, and a server that reads only its
+      // own ledger charges the engine's buys as carried lots and counts none of its exits
+      ledgerText: dayPnlLib.readTradesLedger(dataDir),
       now: Date.now(),
       getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
       getPrevClose: dayPnlLib.prevCloseFromBarsFactory(dayPnlLib.resolveBarsDir(dataDir)),
@@ -32,7 +35,8 @@ async function alpacaDayPnl(account, positions) {
     account.pnl_today = d.pnl_today;
     account.pnl_carry_adjustment = d.pnl_carry_adjustment;
     account.pnl_pct = account.equity ? (d.pnl_today / account.equity) * 100 : 0;
-    account.pnl_basis = 'alpaca: ' + d.pnl_basis;
+    const _src = dayPnlLib.tradesLedgerSources(dataDir);
+    account.pnl_basis = 'alpaca: ' + d.pnl_basis + (_src.extras.length ? '; ledgers: primary + ' + _src.extras.length + ' extra' : '');
     const bySym = new Map((d.per_position || []).map((x) => [x.symbol, x]));
     for (const p of positions) {
       const x = bySym.get(String(p.symbol).toUpperCase());
@@ -315,11 +319,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             // computed against a stale ledger and silently fall back to broker
             // numbers with the wrong meaning.
             const _dataDir = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading');
-            const logPath = dayPnlLib.resolveTradesLog(_dataDir);
             const { computeDayPnl } = dayPnlLib;
             const _d = await computeDayPnl({
               positions: ibkrPositions,
-              ledgerText: fs.readFileSync(logPath, 'utf8'),
+              ledgerText: dayPnlLib.readTradesLedger(_dataDir),   // primary + TRADER_TRADES_LOG_EXTRA (2026-09-28)
               now: Date.now(),
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
               // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
