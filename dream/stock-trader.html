@@ -10383,6 +10383,28 @@ function _tpTarget(p){
     .map((o) => Number(o.limit_price));
   return v.length ? v.sort((x, y) => long ? x - y : y - x)[0] : null;
 }
+/* How long a position has been open, from the ledger's entry row. Coarse on purpose:
+   once a trade is a day old the minutes stopped mattering. */
+function _tpHeldFor(ms){
+  if(!(ms > 0)) return null;
+  const m = Math.round(ms / 60000);
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
+  const d = Math.floor(h / 24);
+  return d + 'd' + (h % 24 ? ' ' + (h % 24) + 'h' : '');
+}
+/* When the position was opened. Null is a real answer here and not a zero: the ledger
+   this account writes may have no entry row for a symbol (a lot opened elsewhere, or
+   before this ledger existed), which is the same unknown-lot state that makes Day P&L
+   fall back to the broker's since-entry figure. Say so rather than guess. */
+function _tpOpenedCell(p){
+  if(!p.entry_ts) return '<td class="tp-dim" title="No entry row for this symbol in the trade ledger — it was opened outside this account\'s ledger, or before it existed. Day P&L falls back to the broker\'s since-entry figure for the same reason.">not recorded</td>';
+  const t = Date.parse(p.entry_ts);
+  const held = Number.isFinite(t) ? _tpHeldFor(Date.now() - t) : null;
+  const full = Number.isFinite(t) ? new Date(t).toLocaleString('en-US',{timeZone:'America/New_York',dateStyle:'medium',timeStyle:'short'}) + ' ET' : String(p.entry_ts);
+  return `<td title="Opened ${full}${held ? ' · held ' + held : ''}">${_fmtOrderTime(p.entry_ts, false)}${held ? `<span class="tp-sub">${held}</span>` : ''}</td>`;
+}
 function _tpPriceCell(px, p, none){
   if (px == null) return `<td class="tp-dim" title="${none}">—</td>`;
   const last = Number(p.current_price) || 0;
@@ -10394,6 +10416,9 @@ const _TP_COLS = [
   { id: 'side', label: 'Side', def: true, cell: (p, x) => `<td class="tp-side ${x.short ? 'short' : 'long'}">${x.short ? 'Short' : 'Long'}</td>` },
   { id: 'qty', label: 'Qty', def: true, cell: (p) => `<td>${p.qty}</td>` },
   { id: 'avg', label: 'Avg fill', def: true, cell: (p) => `<td>$${fmt(p.avg_entry_price,2)}</td>` },
+  { id: 'opened', label: 'Opened', def: true,
+    tip: 'When this position was opened, from the trade ledger — the same entry row that decides whether Day P&L is measured from your fill or from yesterday’s close. Times are ET.',
+    cell: (p) => _tpOpenedCell(p) },
   { id: 'last', label: 'Last', def: true, cell: (p) => `<td>$${fmt(p.current_price,2)}</td>` },
   { id: 'stop', label: 'Stop', def: true,
     tip: 'The resting protective stop for this position, and how far it sits from the last price.',
@@ -10781,12 +10806,14 @@ function renderPositionsTable(positions){
 
 // Broker timestamps arrive in UTC ("2026-06-30 13:33:19+00:00"); show them in ET
 // so they line up with the agent feed. Time-only for today, +date for older.
-function _fmtOrderTime(s){
+function _fmtOrderTime(s, withSeconds){
   if(!s) return '—';
   const d=new Date(String(s).replace(' ','T'));
   if(isNaN(d)) return s;
   const tz={timeZone:'America/New_York'};
-  const time=d.toLocaleTimeString('en-US',{...tz,hour:'numeric',minute:'2-digit',second:'2-digit'});
+  // Seconds identify one fill among several in the same minute, which is what the Orders
+  // tab needs; in the positions table they are noise, so that caller asks for minutes.
+  const time=d.toLocaleTimeString('en-US',{...tz,hour:'numeric',minute:'2-digit',...(withSeconds===false?{}:{second:'2-digit'})});
   const day=d.toLocaleDateString('en-US',tz), today=new Date().toLocaleDateString('en-US',tz);
   return day===today ? time : d.toLocaleDateString('en-US',{...tz,month:'short',day:'numeric'})+' '+time;
 }

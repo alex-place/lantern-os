@@ -1378,6 +1378,10 @@ async function jpRunImport() {
    sorting and is not. Each change is one request that repaints one card: the #3541 rule
    is that the page never reloads to change how it looks, not that it never asks. */
 const JP_TRADE_COLS = [
+  // Opened leads: a trade is opened before it is closed, and the table should read in
+  // that order. It was only ever visible inside an expanded row before (#3558), which
+  // is one click too deep for the first thing you want to know about a trade.
+  { key: 'openedAt', label: 'Opened', sortable: true },
   { key: 'ts', label: 'Closed', sortable: true },
   { key: 'symbol', label: 'Symbol', sortable: true },
   { key: 'qty', label: 'Qty', num: true, sortable: true },
@@ -1974,7 +1978,6 @@ function jpTradeDetail(t) {
     : pct(t.mfe_pct) + ' best \u00b7 ' + pct(t.mae_pct) + ' worst';
   return '<tr class="jp-trade-detail"><td colspan="' + JP_TRADE_COLS.length + '"><div class="jp-detail">'
     + bit('Side', t.side === 'short' ? 'Short' : 'Long')
-    + bit('Opened', t.openedAt ? jpTradeWhen(t.openedAt) : '<span class="jp-dim">not recorded</span>')
     + bit('Exit reason', t.reason ? jpEsc(jpLabelValue(t.reason)) : '<span class="jp-dim">not recorded</span>')
     + bit('While open', excursion)
     + bit('R', t.r != null ? jpR(t.r) : '<span class="jp-dim">no stop recorded to measure against</span>')
@@ -2006,7 +2009,9 @@ function jpTrades(data) {
     const open = jpTradeOpen.has(t.id);
     const cell = (cls, v) => '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</td>';
     return '<tr class="jp-trade' + (open ? ' on' : '') + '" onclick="jpTradeToggle(\'' + jpEsc(t.id).replace(/'/g, '') + '\')">'
-      + cell('', '<span class="jp-dim" aria-hidden="true">' + (open ? '\u25be' : '\u25b8') + '</span> ' + jpEsc(jpTradeWhen(t.ts)))
+      + cell('', '<span class="jp-dim" aria-hidden="true">' + (open ? '\u25be' : '\u25b8') + '</span> '
+          + (t.openedAt ? jpEsc(jpTradeWhen(t.openedAt)) : '<span class="jp-dim">not recorded</span>'))
+      + cell('', jpEsc(jpTradeWhen(t.ts)))
       + cell('', jpEsc(t.symbol) + (t.side === 'short' ? ' <span class="jp-dim">S</span>' : ''))
       + cell('num', t.qty != null ? t.qty : '\u2014')
       + cell('num', t.entry != null ? jpUsd(t.entry) : '\u2014')
