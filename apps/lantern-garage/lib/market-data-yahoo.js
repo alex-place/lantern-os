@@ -206,14 +206,44 @@ async function pmap(items, limit, fn) {
 }
 
 // ── Cache ────────────────────────────────────────────────────────────────────
+// BOUNDED (2026-09-28). This cache never deleted anything: an entry past its TTL was no longer
+// served and was never freed. That is harmless while the keys are a fixed set (one per ticker
+// and timeframe), but two keys name a LIST of tickers (bm:<tf>:<list>, q:<list>), and a list
+// that changes is a new key every time. The auto-trader asks for the bars of its ENTER
+// candidates on every scan: about 20 names x up to MAX_BARS five-minute bars is about 7 MB
+// per scan that nothing could read again 45 seconds later.
+//
+// Measured live 2026-09-28 on the two-sleeve runner: 3,882 MB at tick 503 = 7.7 MB per tick,
+// against V8's 4,144 MB heap limit, i.e. a death every ~530 ticks, which is 10.6 hours of
+// 72-second ticks. A heap-limit abort is not an exception, so the process cannot journal it:
+// such a death leaves no trace. The unexplained mid-session death of 2026-09-25 12:07 ET
+// (1,259 ticks, on the shorter candidate list of that week) fits this rate; it was not proven.
+// Any long-lived server that runs the autonomous loop leaks the same way.
+//
+// Every entry now carries the TTL it was stored under. A sweep on write, at most once per
+// CACHE_SWEEP_MS, drops what has expired; a hard cap drops the oldest first when a burst of
+// distinct keys outruns the sweep. What is still inside its TTL is served exactly as before.
+// Kill: MARKET_DATA_CACHE_SWEEP=0 (nothing is ever freed, as before; read on every write).
 const _cache = new Map();
+const CACHE_MAX_ENTRIES = 200;
+const CACHE_SWEEP_MS = 30000;
+let _lastSweep = 0;
 function cacheGet(key, ttl) {
   const e = _cache.get(key);
   if (e && Date.now() - e.time < ttl) return e.data;
   return null;
 }
-function cacheSet(key, data) {
-  _cache.set(key, { data, time: Date.now() });
+function cacheSweep(now = Date.now()) {
+  _lastSweep = now;
+  for (const [k, e] of _cache) if (now - e.time >= e.ttl) _cache.delete(k);
+  while (_cache.size > CACHE_MAX_ENTRIES) _cache.delete(_cache.keys().next().value);   // Map order = age order
+}
+function cacheSet(key, data, ttl = BARS_TTL) {
+  const now = Date.now();
+  _cache.delete(key);                        // re-insert at the tail, so the Map's order stays the age order
+  _cache.set(key, { data, time: now, ttl: ttl > 0 ? ttl : BARS_TTL });
+  if (process.env.MARKET_DATA_CACHE_SWEEP === '0') return;
+  if (now - _lastSweep >= CACHE_SWEEP_MS || _cache.size > CACHE_MAX_ENTRIES) cacheSweep(now);
 }
 
 // ── Earnings surprise (Tier-2: actual EPS vs consensus) ─────────────────────
@@ -275,7 +305,7 @@ async function getEarningsSurprise(ticker) {
   };
   let out = null;
   try { out = await doFetch(false); } catch (_e) { out = null; }
-  cacheSet(key, out); // cache null too (avoid hammering on a symbol with no data)
+  cacheSet(key, out, 6 * 3600 * 1000); // cache null too (avoid hammering on a symbol with no data)
   return out;
 }
 
@@ -313,7 +343,7 @@ async function getQuotes(tickers) {
       return { ticker, price: 0, chg_pct: 0, is_crypto: isCrypto(ticker) };
     }
   });
-  cacheSet(key, rows);
+  cacheSet(key, rows, QUOTE_TTL);
   return rows;
 }
 
@@ -333,7 +363,7 @@ async function getBars(ticker, timeframe = '5m') {
     const bars = parseBars(result, tf.agg);
     _barArchive.archive(ticker, timeframe, bars);   // Observe: grow the intraday corpus (fail-soft)
     const out = { bars, ticker, timeframe, count: bars.length };
-    cacheSet(key, out);
+    cacheSet(key, out, BARS_TTL);
     return out;
   } catch (e) {
     return { bars: [], ticker, timeframe, count: 0, error: e.message };
@@ -364,7 +394,7 @@ async function getBarsWindow(ticker, timeframe, from, to) {
     const result = await fetchChart(ticker, tf.interval, tf.range, { from, to });
     const bars = parseBars(result, tf.agg);
     const out = { bars, ticker, timeframe, count: bars.length };
-    cacheSet(key, out);
+    cacheSet(key, out, ttl);
     return out;
   } catch (e) {
     // Deliberately not cached: a transient failure must not pin an empty chart in front
@@ -400,7 +430,7 @@ async function getBarsMulti(tickers, timeframe = '5m') {
     if (r && r.ticker) bars[r.ticker] = { bars: r.bars || [], count: (r.bars || []).length };
   }
   const out = { bars, timeframe };
-  cacheSet(key, out);
+  cacheSet(key, out, BARS_TTL);
   return out;
 }
 
@@ -508,7 +538,7 @@ async function getMarketStatus() {
     source: 'yahoo',
     timestamp: new Date().toISOString(),
   };
-  if (gotData) cacheSet(key, out);
+  if (gotData) cacheSet(key, out, QUOTE_TTL);
   return out;
 }
 
@@ -597,7 +627,7 @@ async function getQuoteSummary(ticker) {
   };
   let out = null;
   try { out = await doFetch(false); } catch (_e) { out = null; }
-  cacheSet(key, out); // cache null too — avoid hammering symbols with no summary
+  cacheSet(key, out, 10 * 60 * 1000); // cache null too — avoid hammering symbols with no summary
   return out;
 }
 
@@ -605,4 +635,6 @@ module.exports = {
   getQuotes, getBars, getBarsWindow, getBarsMulti, getMarketStatus, getSymbolStats, validateSymbol,
   getEarningsSurprise, getQuoteSummary,
   isCrypto, tickerToYahoo, isUsEquityMarketOpen, _TF: TF,
+  // the cache's own surface, for its test and for a process that wants to report its size
+  _cache: { get: cacheGet, set: cacheSet, sweep: cacheSweep, size: () => _cache.size, keys: () => [..._cache.keys()], clear: () => { _cache.clear(); _lastSweep = 0; }, MAX: CACHE_MAX_ENTRIES, SWEEP_MS: CACHE_SWEEP_MS },
 };
