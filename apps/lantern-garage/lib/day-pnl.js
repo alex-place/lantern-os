@@ -414,4 +414,81 @@ function resolveBarsDir(repoRootDataDir) {
     : path.join(repoRootDataDir, 'bars');
 }
 
-module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir };
+/**
+ * The ledger TEXT for an account that has more than one writer (2026-09-28).
+ *
+ * resolveTradesLog names ONE file, which is right while one process trades the
+ * account. The two-sleeve engine journals each sleeve to its own file, and the
+ * server on the account's port trades nothing — so its own ledger held no entry
+ * and no exit for the session. Every position read as "carried in" and realized
+ * read $0. Live 2026-09-28 the trader page showed -$263 on a +$901 day: SMH,
+ * bought that morning at 594.32, was charged the whole move from Friday's 606.56
+ * (-$170 against a true +$136), and the engine's +$864 realized was not counted.
+ * The unknown-lot rule (#3353) could not catch it, because the server's ledger
+ * DID hold SMH entries — from weeks earlier, when it still traded.
+ *
+ *   TRADER_TRADES_LOG_EXTRA   ';'-separated ledger paths whose entry/exit rows
+ *                             are merged with the primary ledger. Unset = the
+ *                             primary text, byte for byte, exactly as before.
+ *
+ * Only entry/exit rows are taken from the extra ledgers (they are all that
+ * scanLedger reads). A row already seen is not added twice — same event, symbol
+ * and order id, or timestamp + quantity where there is no id — because
+ * scanLedger SUMS every exit row and a duplicate would double-count. An extra
+ * ledger that cannot be read is skipped: this is reporting, it degrades, it
+ * never breaks the page. With extras configured an unreadable PRIMARY is
+ * tolerated as long as one extra was read; with none readable it throws exactly
+ * as the single-ledger read always did, and the caller falls back to broker
+ * figures.
+ */
+function extraTradesLogs() {
+  const path = require('path');
+  return String(process.env.TRADER_TRADES_LOG_EXTRA || '').split(';')
+    .map((s) => s.trim()).filter(Boolean).map((p) => path.resolve(p));
+}
+function tradesLedgerSources(repoRootDataDir) {
+  const primary = resolveTradesLog(repoRootDataDir);
+  return { primary, extras: extraTradesLogs().filter((p) => p !== primary) };
+}
+function readTradesLedger(repoRootDataDir) {
+  const fs = require('fs');
+  const { primary: primaryPath, extras } = tradesLedgerSources(repoRootDataDir);
+  if (!extras.length) return fs.readFileSync(primaryPath, 'utf8');
+
+  const NL = String.fromCharCode(10);
+  let primary = '';
+  let primaryErr = null;
+  try { primary = fs.readFileSync(primaryPath, 'utf8'); } catch (e) { primaryErr = e; }
+
+  const isTradeLine = (line) => line.indexOf('"entry"') >= 0 || line.indexOf('"exit"') >= 0;
+  const parseTrade = (line) => {
+    if (!isTradeLine(line)) return null;
+    let r; try { r = JSON.parse(line); } catch (_e) { return null; }
+    return r && r.symbol && (r.event === 'entry' || r.event === 'exit') ? r : null;
+  };
+  const keyOf = (r) => [r.event, String(r.symbol).toUpperCase(),
+    r.order_id ? 'o:' + r.order_id : 't:' + r.ts + ':' + r.qty].join('|');
+
+  const seen = new Set();
+  for (const line of primary.split(NL)) { const r = parseTrade(line); if (r) seen.add(keyOf(r)); }
+
+  const added = [];
+  let readAny = false;
+  for (const p of extras) {
+    let text; try { text = fs.readFileSync(p, 'utf8'); } catch (_e) { continue; }
+    readAny = true;
+    for (const line of text.split(NL)) {
+      const r = parseTrade(line);
+      if (!r) continue;
+      const k = keyOf(r);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      added.push(line.trim());
+    }
+  }
+  if (primaryErr && !readAny) throw primaryErr;
+  if (!added.length) return primary;
+  return primary + (primary && !primary.endsWith(NL) ? NL : '') + added.join(NL) + NL;
+}
+
+module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir, extraTradesLogs, tradesLedgerSources, readTradesLedger };
