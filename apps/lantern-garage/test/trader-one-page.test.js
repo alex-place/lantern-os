@@ -36,9 +36,16 @@ test('Trade and Journal are header entries, once each, and there is no Pro overl
   // no way back, and from the rest of the site the journal was unnamed (founder, 2026-09-15).
   const chrome = read('public', 'js', 'site-chrome.js');
   const nav = chrome.slice(chrome.indexOf('var NAV_LINKS = ['), chrome.indexOf('];', chrome.indexOf('var NAV_LINKS = [')));
-  assert.match(nav, /\{ href: "\/stock-trader\.html", label: "Trader" \}/);
+  // The trader stopped being a NAV entry (operator, 2026-09-28): "/" serves
+  // stock-trader.html and the UnisonaTrader brand — which links to "/" — is its single
+  // header entry point, so a "Trader" link beside it was a second control for the very
+  // same page. The header still reaches the trader and the journal once each; only the
+  // trader's control changed from a nav link to the brand.
+  assert.doesNotMatch(nav, /label: "Trader"/, 'the trader is the brand now, not a nav entry');
+  assert.match(chrome, /<a class="nav-brand" href="\/">/, 'the brand must link to "/"');
+  assert.match(chrome, /nav-wordmark">Unisona<b>Trader<\/b>/, 'the brand must read UnisonaTrader');
+  assert.match(read('routes', 'pages.js'), /"\/":\s+"stock-trader\.html"/, '"/" must serve the trader');
   assert.match(nav, /\{ href: "\/journal\.html", label: "Journal" \}/);
-  assert.ok(nav.indexOf('/journal.html') > nav.indexOf('/stock-trader.html'), 'the journal sits beside the trader, after it');
   assert.doesNotMatch(nav, />Watch</);
   // and the toolbar's copy is gone, CSS and all
   assert.ok(!PAGE.includes('class="page-tabs"'), 'the trader toolbar still carries its own switcher');
