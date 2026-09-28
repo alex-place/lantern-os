@@ -215,9 +215,10 @@ const placeboRand = () => { _placeboSeed = (1664525 * _placeboSeed + 1013904223)
 let _allDaysCache = null;
 const allDays = () => _allDaysCache || (_allDaysCache = [...new Set(Object.values(DATA).flat().map((b) => b.d))].sort());
 let _inShift = false;
+const PLACEBO_SLEEVES = new Set(String(process.env.REPLAY_PLACEBO_SLEEVES || "S").split(",").map((x) => x.trim().toUpperCase()).filter(Boolean));   // which sleeves the placebo applies to (default S; S,R for the engine)
 let _posRef = null;   // the replay account's open positions (set per variant) so shuffle only moves fires that could have entered
 function applyPlacebo(out, day, m, sleeve) {
-  if (!PLACEBO || sleeve !== "S" || _inShift) return out;
+  if (!PLACEBO || !PLACEBO_SLEEVES.has(sleeve) || _inShift) return out;
   const setBull = (o, on) => { o.direction = on ? "BULLISH" : (o.direction === "BEARISH" ? "BEARISH" : "NEUTRAL"); o.convergence.decision = (o.direction === "BULLISH" || o.direction === "BEARISH") ? "ENTER" : "SKIP"; };
   if (PLACEBO === "shuffle") {
     const held = new Set(Object.keys(_posRef || {}));
