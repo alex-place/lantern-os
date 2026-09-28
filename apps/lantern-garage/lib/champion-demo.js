@@ -260,8 +260,19 @@ function journalRows(days = 28) {
         ? DEMO_EXIT_WINS[Math.floor(rand() * DEMO_EXIT_WINS.length)]
         : DEMO_EXIT_LOSSES[Math.floor(rand() * DEMO_EXIT_LOSSES.length)];
       const ts = new Date(day.setUTCHours(14 + k * 2, 30, 0, 0)).toISOString();
+      // An OPEN time, now the trade log has an Opened column. Exactly the gap #3558 closed
+      // for Qty: the demo priced its exits but never wrote down the other half, so a guest
+      // saw an empty column on every row of the showroom.
+      //
+      // Derived from the day seed and the slot rather than a fresh rand() draw, so the
+      // per-day texture above is not reshuffled, and capped by the slot so the open never
+      // lands before 09:30 ET -- a demo trade opened in the pre-market would be a worse
+      // lie than no time at all.
+      const maxHoldMin = 60 + k * 120;
+      const heldMin = 25 + ((dayKey + k * 37) % Math.max(1, maxHoldMin - 25));
+      const opened_at = new Date(Date.parse(ts) - heldMin * 60000).toISOString();
       exits.push({
-        ts, event: 'exit', symbol: h.symbol, qty, entry, exit: round2(entry + pnl / qty),
+        ts, opened_at, event: 'exit', symbol: h.symbol, qty, entry, exit: round2(entry + pnl / qty),
         pnl, pnl_pct: pnlPct, reason, status: 'filled', source: 'champion-demo',
         mfe_pct: round2(Math.abs(pnlPct) * (win ? 1 + rand() * 0.4 : rand() * 0.8)),
         mae_pct: round2(-(win ? rand() * 0.9 : Math.abs(pnlPct) * (1 + rand() * 0.3))),

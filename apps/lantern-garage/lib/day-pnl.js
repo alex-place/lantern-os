@@ -179,6 +179,7 @@ function prevCloseFromBarsFactory(barsDir) {
  * One pass over the ledger.
  *   entryTsBySym  sym -> [ms] of TODAY's entry rows (ascending)
  *   lastEntryDay  sym -> ET date of its most recent entry row (any day)
+ *   lastEntryTs   sym -> ISO ts of that SAME row — when the position was opened
  *   exits         today's exit rows, normalized
  *   realizedFull  Σ pnl over today's exit rows — the broker sense of realized
  *
@@ -207,6 +208,7 @@ function scanLedger(text, now) {
   const today = etDay(now);
   const entryTsBySym = new Map();
   const lastEntryDay = new Map();
+  const lastEntryTs = new Map();
   const exits = [];
   let realizedFull = 0;
   let anyExit = false;
@@ -218,7 +220,11 @@ function scanLedger(text, now) {
     const sym = String(r.symbol).toUpperCase();
 
     if (r.event === 'entry') {
+      // Set together, from the same row, under the same last-row-wins rule: the day
+      // decides the P&L basis and the timestamp is displayed beside it, so the two
+      // must never describe different entries.
       lastEntryDay.set(sym, etDay(r.ts));
+      lastEntryTs.set(sym, r.ts);
       if (etDay(r.ts) === today) {
         if (!entryTsBySym.has(sym)) entryTsBySym.set(sym, []);
         entryTsBySym.get(sym).push(Date.parse(r.ts));
@@ -240,7 +246,7 @@ function scanLedger(text, now) {
     });
   }
   for (const arr of entryTsBySym.values()) arr.sort((a, b) => a - b);
-  return { entryTsBySym, lastEntryDay, exits, realizedFull, anyExit };
+  return { entryTsBySym, lastEntryDay, lastEntryTs, exits, realizedFull, anyExit };
 }
 
 /** A closed lot was opened today iff a today-entry for it preceded the exit. */
@@ -261,7 +267,7 @@ function exitOpenedToday(entryTsBySym, exit) {
 async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now(), getQuotes, getPrevClose } = {}) {
   const today = etDay(now);
   const live = sessionTradedToday(now);
-  const { entryTsBySym, lastEntryDay, exits, realizedFull, anyExit } = scanLedger(ledgerText, now);
+  const { entryTsBySym, lastEntryDay, lastEntryTs, exits, realizedFull, anyExit } = scanLedger(ledgerText, now);
 
   const carriedPos = positions.filter((p) => lastEntryDay.get(String(p.symbol).toUpperCase()) !== today);
   const carriedExits = exits.filter((e) => !exitOpenedToday(entryTsBySym, e));
@@ -356,7 +362,15 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
       else if (isUnknownLot) { basis = 'since_entry_unknown_lot'; unknownLot = true; }
     }
     unreal += contrib;
-    perPosition.push({ symbol: sym, day_pnl: Math.round(contrib * 100) / 100, day_basis: basis });
+    // entry_ts rides along with the basis that was decided from it. Null for an
+    // unknown lot — the ledger has no entry row, so there is no time to report and the
+    // dashboard says "not recorded" rather than inventing one.
+    perPosition.push({
+      symbol: sym,
+      day_pnl: Math.round(contrib * 100) / 100,
+      day_basis: basis,
+      entry_ts: lastEntryTs.get(sym) || null,
+    });
   }
 
   const round = (n) => Math.round(n * 100) / 100;
