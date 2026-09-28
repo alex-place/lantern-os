@@ -1,0 +1,3 @@
+### Fixed
+
+- journal: the scorecard and the track record read every ledger that trades the account. TRADER_TRADES_LOG_EXTRA (';'-separated) is merged with the default ledger; a named path is still read alone and unset changes nothing. A broker order booked by two ledgers counts once, keeping the row whose entry price matches an earlier entry in the merged book, and the scorecard reports how many ledgers it read and how many fills were booked twice. From the day the two-sleeve engine took over the account, the server on the account's port showed 'Realized results, 2026-08-20 to 2026-09-22, 50 closed trades, net -1,234.57' while the engine's closed trades sat in its own journals; on the live ledgers the record is 65 trades, net -212.16, through 2026-09-28.
