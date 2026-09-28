@@ -103,3 +103,48 @@ test('the attributed totals are untouched by carrying the timestamp', async () =
   assert.ok(Math.abs(carried.unrealized_today - todaysMove) < 0.01,
     'carried must still be measured from prevClose: got ' + carried.unrealized_today);
 });
+
+// ── the column that renders it ───────────────────────────────────────────────────
+// Three unknowns reach this cell and only one of them is about the ledger. Saying
+// "no entry row in the trade ledger" on a box whose SERVER simply has not taken this
+// change yet would be a lie about the reader's own data — and the race box is exactly
+// that case, since it takes public files only.
+const fs = require('node:fs');
+const path = require('node:path');
+const PAGE = fs.readFileSync(path.join(__dirname, '..', 'public', 'stock-trader.html'), 'utf8').replace(/\r\n/g, '\n');
+const grab = (name) => {
+  const a = PAGE.indexOf('function ' + name + '(');
+  assert.ok(a > 0, name + ' not found');
+  return PAGE.slice(a, PAGE.indexOf('\n}\n', a) + 3);
+};
+const openedCell = new Function('_fmtOrderTime',
+  grab('_tpHeldFor') + grab('_tpOpenedCell') + '\nreturn _tpOpenedCell;')(() => '10:30 AM');
+
+test('a position with no open time is not blamed on the ledger when the SERVER is old', () => {
+  const old = openedCell({ symbol: 'SPY' });                  // key absent entirely
+  assert.match(old, /does not report open times yet/);
+  assert.doesNotMatch(old, /entry row/, 'an old server is not a ledger gap');
+
+  const unknownLot = openedCell({ symbol: 'SPY', entry_ts: null });   // key present, null
+  assert.match(unknownLot, /not recorded/);
+  assert.match(unknownLot, /No entry row for this symbol/, 'a real unknown lot says which it is');
+
+  assert.notStrictEqual(old, unknownLot, 'the two unknowns must not render identically');
+});
+
+test('a position with an open time shows it, with how long it has been held', () => {
+  const html = openedCell({ symbol: 'SPY', entry_ts: new Date(Date.now() - 95 * 60000).toISOString() });
+  assert.match(html, /10:30 AM/, 'the ET time');
+  assert.match(html, /1h 35m/, 'and the hold beside it');
+  assert.match(html, /title="Opened /, 'with the full timestamp on hover');
+});
+
+test('the hold reads as time, and an impossible one is absent rather than zero', () => {
+  const held = new Function(grab('_tpHeldFor') + '\nreturn _tpHeldFor;')();
+  assert.strictEqual(held(45 * 60000), '45m');
+  assert.strictEqual(held(2 * 3600000), '2h');
+  assert.strictEqual(held(3.5 * 3600000), '3h 30m');
+  assert.strictEqual(held(50 * 3600000), '2d 2h');
+  assert.strictEqual(held(0), null);
+  assert.strictEqual(held(-5), null, 'a position held backwards in time is a broken record');
+});
