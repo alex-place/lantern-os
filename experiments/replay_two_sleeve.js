@@ -115,6 +115,7 @@ function applyEodRules(state, eod, day, tag, ownership) {
     // within one gap of the stop at the close (SQQQ 2026-09-18 closed 0.4% above its stop and opened 2.4% below it)
     else if (eod.flatNearStop && stopPx > 0 && px <= stopPx * (1 + Number(eod.flatNearStop) / 100)) { closeQty = p.qty; why = "eod_flat_near_stop"; }
     else if (eod.flatWeekend && isFri && (eod.flatWeekend === "all" || (eod.flatWeekend === "inverse" && INV.includes(sym)) || (eod.flatWeekend === "lev" && LEV3X.has(sym)))) { closeQty = p.qty; why = "eod_flat_weekend"; }
+    else if (eod.flatLev && LEV3X.has(sym)) { closeQty = p.qty; why = "eod_decarry_lev"; }   // eod.flatLev (2026-09-27): the stable decarry, every close
     else if (eod.trimLev && LEV3X.has(sym)) { closeQty = Math.floor(p.qty * eod.trimLev); why = "eod_trim_lev"; }
     if (!(closeQty > 0)) continue;
     const pnl = closeQty * (px - p.entry);
@@ -296,7 +297,7 @@ function signalsAt(day, m, sleeve) {
   }
   const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
     ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
-    : (Number(process.env.TRADER_IBS_MAX) || 0.15);
+    : ((sleeve === "R" && m < 660 && process.env.TRADER_LAB_R_MORNING) ? Number(process.env.TRADER_LAB_R_MORNING) : (Number(process.env.TRADER_IBS_MAX) || 0.15));   // TRADER_LAB_R_MORNING (2026-09-27): stable-style morning depth for R
   const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
     if (ADAPTIVE_SYM && sleeve === "S") { const tp = symTrailingPnl(s, ADAPTIVE_SYM.n); if (tp && tp.sum < ADAPTIVE_SYM.x) continue; }
@@ -334,6 +335,8 @@ function signalsAt(day, m, sleeve) {
     }
     if (bullish && sleeve === "S" && process.env.TRADER_LAB_FRI_FROM_M !== undefined && process.env.TRADER_LAB_FRI_FROM_M !== "" && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5 && m >= Number(process.env.TRADER_LAB_FRI_FROM_M)) bullish = false;   // TRADER_LAB_FRI_FROM_M (2026-09-27)
     if (bullish && sleeve === "S" && process.env.TRADER_LAB_LEV_FROM_M && ["SOXL", "TNA", "SPXL", "UPRO", "TQQQ"].includes(s) && m < Number(process.env.TRADER_LAB_LEV_FROM_M)) bullish = false;   // TRADER_LAB_LEV_FROM_M (2026-09-27)
+    if (bullish && sleeve === "R" && process.env.TRADER_LAB_R_CADENCE) { const _N = Number(process.env.TRADER_LAB_R_CADENCE), _r = m % _N; if (_r !== 0 && _r < _N - 15) bullish = false; }   // the boundary bar and the three bars before it: the race brain's scan persistence/confirmation completes AT the boundary   // boundary bar + the bar before it, so the race brain's 2-scan confirmation can complete at the boundary   // TRADER_LAB_R_CADENCE (2026-09-27): R decides only on the boundary bar
+    if (bullish && sleeve === "R" && process.env.TRADER_LAB_R_LATE_BLOCK && m >= Number(process.env.TRADER_LAB_R_LATE_BLOCK)) bullish = false;   // TRADER_LAB_R_LATE_BLOCK (2026-09-27): no late R entries
     if (bullish && LEV_CONFIRM && sleeve === "S" && LEV_UNDERLYING[s]) { const uIbs = underlyingIbsAt(LEV_UNDERLYING[s], day, m); if (uIbs == null || uIbs > thr) bullish = false; }   // REPLAY_LEV_CONFIRM (2026-09-27)
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
