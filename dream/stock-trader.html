@@ -10399,6 +10399,11 @@ function _tpHeldFor(ms){
    before this ledger existed), which is the same unknown-lot state that makes Day P&L
    fall back to the broker's since-entry figure. Say so rather than guess. */
 function _tpOpenedCell(p){
+  // Two different unknowns, and only one of them is about the ledger. A server that
+  // predates entry_ts omits the KEY; a current one always sends it, null included (there
+  // is a test pinning that). Blaming the ledger on a box whose server simply has not
+  // taken this change yet would be a lie about the reader's own data.
+  if(p.entry_ts === undefined) return '<td class="tp-dim" title="This server does not report open times yet.">&mdash;</td>';
   if(!p.entry_ts) return '<td class="tp-dim" title="No entry row for this symbol in the trade ledger — it was opened outside this account\'s ledger, or before it existed. Day P&L falls back to the broker\'s since-entry figure for the same reason.">not recorded</td>';
   const t = Date.parse(p.entry_ts);
   const held = Number.isFinite(t) ? _tpHeldFor(Date.now() - t) : null;
