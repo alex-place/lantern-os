@@ -338,6 +338,13 @@ function signalsAt(day, m, sleeve) {
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
   }
+  if (sleeve === "S" && process.env.TRADER_LAB_BREADTH_MAX) {
+    const max = Number(process.env.TRADER_LAB_BREADTH_MAX);
+    const levOnly = process.env.TRADER_LAB_BREADTH_LEV_ONLY === "1";
+    const LEVS = new Set(["SOXL", "TNA", "SPXL", "UPRO", "TQQQ", "NUGT", "JNUG", "UCO"]);
+    const breadth = out.filter((o) => o.direction === "BULLISH" && !INV_UNDERLYING[o.symbol]).length;   // long names in washout right now
+    if (breadth > max) for (const o of out) { if (o.direction === "BULLISH" && (!levOnly || LEVS.has(o.symbol))) { o.direction = "NEUTRAL"; o.convergence.decision = "SKIP"; o.decision_context.breadth_veto = breadth; } }
+  }
   return applyPlacebo(out, day, m, sleeve);
 }
 
