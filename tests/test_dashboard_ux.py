@@ -43,7 +43,11 @@ def test_landing_page_is_clean_sales_page() -> None:
 
 def test_landing_page_links_to_full_journal() -> None:
     html = read("apps/lantern-garage/public/index.html")
-    assert "dream-journal" in html
+    # The surface is journal.html; "dream-journal" was the pre-#2751 name and had been
+    # matching only incidentally. Assert the route the card actually points at. The card
+    # is labelled as needing an account on purpose: /journal.html is not in auth-gate's
+    # PUBLIC list, so a signed-out click bounces to sign-in.
+    assert "journal.html" in html
 
 
 def test_landing_page_has_server_status() -> None:
