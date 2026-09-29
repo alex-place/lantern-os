@@ -168,7 +168,16 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           catalyst: (sig && sig.catalyst) || '',
         };
       }
-      sendJson(res, { zones: reshaped }, 200);
+      // Publish the gate the engine actually acts on. Without it a reader has no way
+      // to tell whether an EV of 0.78 R is marginal or comfortable, and the landing
+      // page would have to hardcode the bar — which then silently drifts the day
+      // someone retunes EV_MIN. Read from the module that owns the decision.
+      var gate = null;
+      try {
+        var evmod = require('../../lib/signal-engine/convergence-ev');
+        gate = { ev_min: evmod.EV_MIN, p_min: evmod.P_MIN };
+      } catch (e) { /* engine module unavailable — omit rather than guess */ }
+      sendJson(res, gate ? { zones: reshaped, gate: gate } : { zones: reshaped }, 200);
     } catch (error) {
       console.error('[Trading] /zones error:', error.message);
       sendJson(res, { zones: {}, error: error.message }, 500);

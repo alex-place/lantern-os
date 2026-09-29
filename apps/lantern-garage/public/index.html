@@ -500,6 +500,8 @@
   }
 
   /* ── Hero verdict ───────────────────────────────────────────────────────────── */
+  var GATE = null;
+
   function renderHero(symbol, sig) {
     var conv = sig.convergence || {}, plan = sig.plan || {};
     var up = String(sig.direction || '').toUpperCase() === 'BULLISH';
@@ -556,6 +558,24 @@
         Math.abs(Math.round(ev * 100)).toLocaleString('en-US') + (ev < 0 ? ' against you' : '') +
         ' on average — the same estimate as above, against a fixed ' +
         (isFinite(Number(conv.target_r)) ? Number(conv.target_r) : 2) + ' R target.'));
+      // "Is 0.78 good?" is the first question anyone asks, and R-multiples give no
+      // intuition for it: 0.78 looks small because it is under 1, when it actually
+      // means +78% of the sum risked. Anchor it to the bar the engine itself acts on,
+      // read live from /zones so retuning EV_MIN can never leave this sentence lying.
+      if (GATE && isFinite(Number(GATE.ev_min))) {
+        var bar = Number(GATE.ev_min);
+        var mult = bar > 0 ? ev / bar : null;
+        var scale = el('p', 'hint');
+        scale.appendChild(el('b', null, 'Is that good?'));
+        scale.appendChild(document.createTextNode(
+          ' Anything above zero is an edge in the model’s view, and the engine only acts above +' +
+          fmt(bar, 2) + ' R' +
+          (mult && mult >= 1.2 ? ' — this is about ' + (mult >= 10 ? Math.round(mult) : mult.toFixed(1)) +
+             '× that bar.' : mult && mult >= 1 ? ' — this clears it.' : ' — this is below it.')));
+        evHint.appendChild(document.createElement('br'));
+        evHint.appendChild(scale.firstChild);          // the bold "Is that good?"
+        evHint.appendChild(scale.firstChild);          // and its sentence
+      }
       meters.appendChild(meter('Expected value', fmt(ev, 2) + ' R', (ev / 2) * 100, ev > 0 ? 'up' : 'down', evHint));
     }
     card.appendChild(meters);
@@ -746,7 +766,7 @@
 
   /* ── Load ───────────────────────────────────────────────────────────────────── */
   get('/api/trading/zones')
-    .then(function (d) { renderBook((d && d.zones) || {}); })
+    .then(function (d) { GATE = (d && d.gate) || null; renderBook((d && d.zones) || {}); })
     .catch(function (e) {
       fail(byId('hero-card'), 'the engine', e);
       fail(byId('book'), 'the engine', e);
