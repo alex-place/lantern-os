@@ -1,0 +1,3 @@
+### Fixed
+
+- Trader: the market-data cache frees what it can no longer serve. It never deleted an entry, and the auto-trader asks for the bars of its entry candidates on every scan under a key that names the list, so every change in that list left about 7 MB behind for good. The armed two-sleeve runner grew 7.7 MB per tick (3,882 MB at tick 503, measured live 2026-09-28) toward the 4,144 MB heap limit: a death every ~530 ticks, which the unexplained mid-session runner death of 2026-09-25 12:07 ET fits. Every entry now carries its TTL, a sweep on write drops the expired, a hard cap of 200 entries backs it up; kill switch MARKET_DATA_CACHE_SWEEP=0.
