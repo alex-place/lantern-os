@@ -25,75 +25,102 @@
   <script src="/js/signal-palette.js"></script>
   <style>
     /* ── UnisonaHome ─────────────────────────────────────────────────────────────
-       Structure borrowed from TradingView: a dark brand band, then a light canvas
-       that overlaps it, then a steady "section header + grid" rhythm. Dense inside
-       cards, generous between sections.
+       Structure after TradingView: a dark brand band, a light canvas that overlaps
+       it, then a section-header + grid rhythm. Every chart on this page is drawn
+       from real bars (/api/trading/bars) and every number from the live scan
+       (/api/trading/zones) — nothing is sampled, seeded or decorative-with-fake-data.
 
-       HONESTY RULES BAKED INTO THIS PAGE (docs/CONVERGANCE-SIGMA0-BRIEFING.md):
-       - Every number is fetched live. Nothing is seeded, nothing is sampled.
-       - The scoring engine is NOT described as AI: it is deterministic technical
-         analysis plus a hand-weighted linear model. The word "AI" is used only for
-         the assistant, which really is a language model.
-       - No performance figures, no timestamps, no refresh-cadence claims, and the
-         `position` field on the public payload is never rendered (it would publish
-         operator position sizes to anonymous visitors). */
+       The scoring engine is never called AI: it is deterministic technical analysis
+       plus a hand-weighted linear model. "AI" appears only where a language model is
+       genuinely involved. The `position` field on the public payload is never
+       rendered — it would publish operator position sizes to anonymous visitors. */
 
-    /* Rail: fluid, not capped — cards grow instead of columns multiplying. */
     .wrap { padding: 0 16px; }
     @media (min-width: 769px)  { .wrap { padding: 0 24px; } }
     @media (min-width: 1280px) { .wrap { padding: 0 40px; } }
     @media (min-width: 1600px) { .wrap { padding: 0 72px; } }
     .prose { max-width: 72ch; }
 
-    /* ── The dark brand band: dark in BOTH themes ──────────────────────────────
-       Pinned locally rather than duplicated as a second rule set, so every shared
-       component works unchanged inside it. --up/--down are band-local because the
-       AA-tuned light-theme --green (#00735c) measures ~2.3:1 on this background. */
+    /* ── Dark brand band — dark in BOTH themes ───────────────────────────────────
+       Palette pinned locally so shared components work unchanged inside it.
+       --up/--down are band-local: the AA-tuned light --green (#00735c) measures
+       ~2.3:1 on this background. */
     .band {
       --bg:#0a0e17; --surface:#111827; --surface2:#1a2332; --border:#1f2937;
-      --text:#f3f4f6; --muted:#9ca3af; --accent-strong:#06b6d4; --accent-strong-hover:#0e7490;
+      --text:#f3f4f6; --muted:#9ca3af; --accent-strong:#22d3ee; --accent-strong-hover:#0e7490;
       --up:#34d399; --down:#ff5f6d;
-      background: var(--bg); color: var(--text); padding: 40px 0 72px;
+      position: relative; overflow: hidden; isolation: isolate;
+      background: var(--bg); color: var(--text); padding: 44px 0 84px;
     }
-    .band-inner { display: grid; gap: 32px; align-items: center; }
-    @media (min-width: 1024px) { .band-inner { grid-template-columns: 1.1fr 1fr; gap: 40px; } }
+    /* Depth, drawn not imported: two soft lights + a faint engineering grid. */
+    .band::before {
+      content: ''; position: absolute; inset: -20% -10% auto -10%; height: 150%; z-index: -2;
+      background:
+        radial-gradient(60% 55% at 78% 18%, rgba(34,211,238,.20), transparent 70%),
+        radial-gradient(45% 45% at 12% 8%, rgba(99,102,241,.16), transparent 72%);
+    }
+    .band::after {
+      content: ''; position: absolute; inset: 0; z-index: -1; opacity: .5;
+      background-image:
+        linear-gradient(to right, rgba(148,163,184,.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148,163,184,.07) 1px, transparent 1px);
+      background-size: 56px 56px;
+      -webkit-mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
+      mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
+    }
+    .band-inner { display: grid; gap: 32px; align-items: center; position: relative; }
+    @media (min-width: 1024px) { .band-inner { grid-template-columns: 1fr 1.05fr; gap: 48px; } }
 
-    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 14px; }
-    .band h1 { font-size: 32px; line-height: 1.14; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 16px; }
-    @media (min-width: 561px)  { .band h1 { font-size: 40px; letter-spacing: -0.015em; } }
-    @media (min-width: 1024px) { .band h1 { font-size: 56px; line-height: 1.1; } }
-    .subhead { font-size: 16px; line-height: 1.6; color: var(--muted); margin: 0 0 24px; max-width: 60ch; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700;
+               letter-spacing: .14em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 16px; }
+    .eyebrow .led { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-strong);
+                    box-shadow: 0 0 0 4px rgba(34,211,238,.16); }
+    .band h1 { font-size: 34px; line-height: 1.12; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 16px; }
+    @media (min-width: 561px)  { .band h1 { font-size: 44px; } }
+    @media (min-width: 1024px) { .band h1 { font-size: 56px; line-height: 1.08; } }
+    .band h1 .grad {
+      background-image: linear-gradient(96deg, #22d3ee 0%, #818cf8 52%, #fbbf24 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .subhead { font-size: 16px; line-height: 1.6; color: var(--muted); margin: 0 0 26px; max-width: 58ch; }
     @media (min-width: 561px) { .subhead { font-size: 18px; } }
     .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-    .cta {
-      display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 28px;
-      border-radius: 12px; background: var(--accent-strong); color: #04121a; font-size: 16px; font-weight: 700;
-      text-decoration: none;
-    }
-    .cta:hover { background: var(--accent-strong-hover); color: #fff; }
-    .cta-ghost { display: inline-flex; align-items: center; height: 48px; padding: 0 20px; border-radius: 12px;
-                 border: 1px solid var(--border); color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; }
-    .cta-ghost:hover { border-color: var(--muted); }
-    .honesty { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 18px 0 0; max-width: 62ch; }
+    .cta { display: inline-flex; align-items: center; justify-content: center; height: 50px; padding: 0 28px;
+           border-radius: 12px; background: var(--accent-strong); color: #04121a; font-size: 16px; font-weight: 700;
+           text-decoration: none; box-shadow: 0 8px 24px -10px rgba(34,211,238,.7); }
+    .cta:hover { background: #67e8f9; }
+    .cta-ghost { display: inline-flex; align-items: center; height: 50px; padding: 0 20px; border-radius: 12px;
+                 border: 1px solid #2b3648; color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; }
+    .cta-ghost:hover { border-color: var(--muted); background: rgba(255,255,255,.03); }
+    .honesty { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 20px 0 0; max-width: 62ch; }
 
-    /* Live verdict card inside the band */
-    .verdict { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: var(--surface); }
-    .verdict-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-    .badge { width: 28px; height: 28px; border-radius: 50%; background: var(--surface2); display: inline-flex;
+    /* ── The live verdict card (the hero graphic) ─────────────────────────────── */
+    .vcard { border: 1px solid #22304a; border-radius: 18px; background: rgba(17,24,39,.82);
+             backdrop-filter: blur(6px); padding: 16px; box-shadow: 0 30px 70px -30px rgba(0,0,0,.9); }
+    .vhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .badge { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); display: inline-flex;
              align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: 0 0 auto; }
-    .sym { font-size: 16px; font-weight: 600; }
-    .tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 3px 8px; border-radius: 6px; background: var(--surface2); color: var(--muted); }
-    .tag.enter { color: var(--up); }
-    .tag.skip  { color: var(--down); }
-    .kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
-    .kv > div { min-width: 0; }
-    .k { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-    .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; margin-top: 2px; }
-    .v.up { color: var(--up); } .v.down { color: var(--down); }
-    .why { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; line-height: 1.5; color: var(--muted); }
-    .why code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text); }
+    .sym { font-size: 17px; font-weight: 700; letter-spacing: .01em; }
+    .chip { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: var(--surface2); color: var(--text); }
+    .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 8px; border-radius: 6px; background: var(--surface2); }
+    .tag.enter { color: var(--up); } .tag.skip { color: var(--down); }
+    .vhead .spacer { flex: 1 1 auto; }
 
-    /* ── Light canvas overlapping the band ─────────────────────────────────────── */
+    .chartbox { position: relative; border-radius: 12px; overflow: hidden; background: rgba(10,14,23,.5); }
+    .chartbox svg { display: block; width: 100%; height: auto; }
+    .lvl-label { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; }
+
+    .meters { margin-top: 14px; display: grid; gap: 10px; }
+    .meter .mrow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .meter .mk { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .meter .mv { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums lining-nums; }
+    .track { margin-top: 5px; height: 6px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
+    .fill { height: 100%; border-radius: 999px; background: var(--accent-strong); }
+    .fill.up { background: var(--up); } .fill.down { background: var(--down); }
+    .vwhy { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+    .vwhy code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--text); }
+
+    /* ── Light canvas ─────────────────────────────────────────────────────────── */
     .canvas { background: var(--bg); border-radius: 28px 28px 0 0; margin-top: -28px; position: relative; padding-top: 48px; }
     section.sec { margin-bottom: 56px; }
     @media (min-width: 769px) { section.sec { margin-bottom: 96px; } }
@@ -103,39 +130,47 @@
     .sec-head a { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; }
     .sec-head a:hover h2 { color: var(--accent-strong); }
     .sec-head .sub { font-size: 12px; color: var(--muted); }
-    .sec-head .spacer { flex: 1 1 auto; }
     .caret { width: 9px; height: 16px; flex: 0 0 auto; }
 
-    /* One card recipe everywhere: transparent, bordered, no lift. */
     .card { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: transparent; }
     .card:hover { border-color: var(--muted); }
     a.card { display: block; text-decoration: none; color: var(--text); }
     a.card:hover { background: var(--surface); }
     .card h3 { font-size: 16px; line-height: 1.5; font-weight: 600; margin: 0 0 4px; }
     .card .csub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
-    .card p { font-size: 14px; line-height: 1.57; margin: 0; color: var(--text); }
     .grid { display: grid; gap: 16px; }
     @media (min-width: 561px)  { .grid { gap: 20px; grid-template-columns: repeat(2, minmax(0,1fr)); } }
-    @media (min-width: 1024px) { .grid.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
-    @media (min-width: 1024px) { .grid.g4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
-    .grid.g1 { grid-template-columns: 1fr; }
+    @media (min-width: 1024px) { .grid.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+                                 .grid.g4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
 
-    /* Row lists — fixed density, no relaxing on mobile. */
-    .row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--text); }
+    /* Rows — fixed density, sparkline in the middle. */
+    .row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; border-radius: 8px;
+           text-decoration: none; color: var(--text); }
     .row:hover { background: var(--surface2); }
     .row .grow { flex: 1 1 auto; min-width: 0; }
     .row .l1 { display: flex; align-items: center; gap: 8px; }
     .row .l2 { margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .spark { width: 84px; height: 30px; flex: 0 0 auto; }
+    @media (max-width: 400px) { .spark { display: none; } }
     .num { text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
     .num .px { font-size: 16px; font-weight: 600; }
     .num .ch { font-size: 12px; font-weight: 600; margin-top: 2px; }
     .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
-    .chip { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: var(--surface2); color: var(--text); }
+
+    /* Pipeline — the decision path, drawn instead of described in three equal paragraphs. */
+    .pipe { display: grid; gap: 14px; }
+    @media (min-width: 900px) { .pipe { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; } }
+    .step { border: 1px solid var(--border); border-radius: 16px; padding: 18px; background: transparent; }
+    .step .glyph { width: 40px; height: 40px; margin-bottom: 12px; color: var(--accent-strong); }
+    .step h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+    .step p { font-size: 13.5px; line-height: 1.55; color: var(--muted); margin: 0; }
+    .arrow { display: none; align-self: center; color: var(--border); }
+    @media (min-width: 900px) { .arrow { display: block; width: 24px; } }
 
     .pulse { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border);
-            border-radius: 999px; background: transparent; font-size: 12px; white-space: nowrap; }
-    .pill .k { text-transform: none; letter-spacing: 0; font-size: 12px; }
+            border-radius: 999px; font-size: 12px; white-space: nowrap; }
+    .pill .k { color: var(--muted); }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
     .dot.on { background: var(--green); }
 
@@ -143,7 +178,6 @@
               color: var(--accent-strong); text-decoration: none; }
     .inlink:hover { color: var(--accent-strong-hover); }
 
-    /* News rows */
     .nrow { display: block; padding: 12px; border-radius: 10px; text-decoration: none; color: inherit; }
     .nrow:hover { background: var(--surface2); }
     .nrow .nh { font-size: 15px; line-height: 1.4; font-weight: 600; }
@@ -154,6 +188,10 @@
     .rule { border: 0; border-top: 1px solid var(--border); margin: 0 0 20px; }
     .disc { font-size: 12px; line-height: 1.6; color: var(--muted); }
     .motto { text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .08em; margin: 28px 0 0; text-transform: uppercase; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .fill { transition: width .6s cubic-bezier(.22,1,.36,1); }
+    }
   </style>
 </head>
 <body>
@@ -167,26 +205,26 @@
 
 <main id="main-content">
 
-  <!-- ── 1. The engine, live and unpaywalled ── -->
+  <!-- ── Hero ── -->
   <div class="band">
     <div class="wrap band-inner">
       <div>
-        <p class="eyebrow">The engine</p>
-        <h1>Automated trading that shows its work.</h1>
+        <p class="eyebrow"><span class="led"></span> Live engine · unpaywalled</p>
+        <h1>Automated trading that <span class="grad">shows its work</span>.</h1>
         <p class="subhead">
-          Every symbol on the watchlist gets scored, and the whole verdict is published —
-          direction, a win probability, expected value in R, the stop and both targets. When
-          the engine turns a trade down, you get the rule that vetoed it.
+          Every symbol on the watchlist is scored and the whole verdict published —
+          direction, win probability, expected value in R, the stop and both targets.
+          When the engine turns a trade down, you get the rule that vetoed it.
         </p>
         <div class="cta-row">
           <a class="cta" href="/stock-trader.html">Open the terminal</a>
           <a class="cta-ghost home-chat" href="/chat.html">Ask the assistant</a>
         </div>
         <p class="honesty">
-          Straight answer on what this is: the scoring is deterministic technical analysis with a
-          hand-weighted linear model — arithmetic, not a language model, and not something that
-          learns. The AI here is the assistant. The engine places nothing on its own: automated
-          execution is off unless an operator arms it.
+          Straight answer on what this is: the scoring is deterministic technical analysis
+          with a hand-weighted linear model — arithmetic, not a language model, and not
+          something that learns. The AI here is the assistant. The engine places nothing on
+          its own.
         </p>
       </div>
       <div id="hero-card"><div class="state">Reading the engine…</div></div>
@@ -195,7 +233,7 @@
 
   <div class="canvas">
 
-    <!-- ── 2. The engine's book ── -->
+    <!-- ── The engine's book ── -->
     <section class="sec wrap" aria-labelledby="book-h">
       <div class="sec-head">
         <a href="/stock-trader.html">
@@ -207,40 +245,51 @@
       <div class="grid g3" id="book"></div>
     </section>
 
-    <!-- ── 3. How the decision is made ── -->
+    <!-- ── The decision path ── -->
     <section class="sec wrap" aria-labelledby="how-h">
       <div class="sec-head"><h2 id="how-h">How the decision is made</h2></div>
-      <div class="grid g3">
-        <div class="card">
-          <h3>Measured evidence, not vibes</h3>
-          <p>Support and resistance zones with touch counts, RSI, MACD, candle pattern, one-minute
-             market structure, volume ratio and ATR — all computed in-process from live market bars.</p>
+      <div class="pipe">
+        <div class="step">
+          <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 40h40M8 40V26M16 40V18M24 40V30M32 40V12M40 40V22"/>
+          </svg>
+          <h3>Measured evidence</h3>
+          <p>Support and resistance zones with touch counts, RSI, MACD, candle pattern,
+             one-minute structure, volume ratio and ATR — computed from live bars.</p>
         </div>
-        <div class="card">
-          <h3>A number, not an opinion</h3>
-          <p>That evidence goes through a linear model that outputs a win probability and an expected
-             value in R, then a decision: enter, or skip. The arithmetic is fixed and the same for
-             every symbol.</p>
+        <svg class="arrow" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M0 6h20m0 0-5-5m5 5-5 5"/></svg>
+        <div class="step">
+          <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="24" cy="24" r="15"/><path d="M24 14v10l7 4"/>
+          </svg>
+          <h3>A fixed calculation</h3>
+          <p>The evidence goes through a linear model with published weights. Same
+             arithmetic for every symbol, every pass — no discretion, nothing learned
+             between runs.</p>
         </div>
-        <div class="card">
-          <h3>The declines are published too</h3>
-          <p>A setup can score well and still be refused — a trend-alignment filter turns down
-             candidates that are not with the regime. Those refusals carry the rule that fired,
-             and they sit on this page next to the accepted ones.</p>
+        <svg class="arrow" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M0 6h20m0 0-5-5m5 5-5 5"/></svg>
+        <div class="step">
+          <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10 24l9 9 19-19"/><path d="M6 38h36" opacity=".35"/>
+          </svg>
+          <h3>Enter — or refuse</h3>
+          <p>Out comes a win probability, an expected value in R and a verdict. A good
+             score can still be refused by a regime filter, and that refusal is published
+             with the rule that fired.</p>
         </div>
       </div>
     </section>
 
-    <!-- ── 4. The part that really is AI ── -->
+    <!-- ── The part that really is AI ── -->
     <section class="sec wrap" aria-labelledby="ai-h">
       <div class="sec-head"><h2 id="ai-h">Ask it about any of this</h2></div>
       <div class="grid">
         <div>
           <p class="prose" style="font-size:16px;line-height:1.6;margin:0 0 4px">
-            The assistant is the part of Unisona that genuinely is AI — a language model wired to the
-            same market tools the engine uses. Ask it what the current read on a symbol is and it calls
-            the tool, shows you the call, and answers from the result rather than from memory. Every
-            answer names the model that produced it.
+            The assistant is the part of Unisona that genuinely is AI — a language model
+            wired to the same market tools the engine uses. Ask what the current read on a
+            symbol is and it calls the tool, shows you the call, and answers from the
+            result rather than from memory. Every answer names the model that produced it.
           </p>
           <a class="inlink" href="/chat.html">Open the assistant
             <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
@@ -248,39 +297,37 @@
         </div>
         <div class="card">
           <h3>Where the line sits</h3>
-          <p style="color:var(--muted)">The assistant reads the engine and explains it. It does not
-             score the setups and it does not place trades — the two are deliberately separate, so a
-             model having a bad day cannot move a number the engine computed.</p>
+          <p style="color:var(--muted);font-size:14px;line-height:1.57;margin:0">
+            The assistant reads the engine and explains it. It does not score the setups
+            and it does not place trades — the two are deliberately separate, so a model
+            having a bad day cannot move a number the engine computed.</p>
         </div>
       </div>
     </section>
 
-    <!-- ── 5. If you ever turn it on ── -->
+    <!-- ── Rungs ── -->
     <section class="sec wrap" aria-labelledby="rungs-h">
       <div class="sec-head"><h2 id="rungs-h">If you ever turn it on</h2></div>
       <div class="grid g3">
         <div class="card">
-          <p class="eyebrow" style="color:var(--muted)">Free — no account</p>
+          <p class="csub" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Free — no account</p>
           <h3>Read the engine</h3>
-          <p style="color:var(--muted)">Every scored setup, every decline and every reason, signed out.
-             That is this page, and the terminal behind it.</p>
+          <p style="color:var(--muted);font-size:14px;margin:0">Every scored setup, every decline and every reason, signed out. This page, and the terminal behind it.</p>
         </div>
         <div class="card">
-          <p class="eyebrow" style="color:var(--muted)">Your own keys</p>
+          <p class="csub" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Your own keys</p>
           <h3>Paper trading</h3>
-          <p style="color:var(--muted)">Connect your own broker paper account and the terminal trades
-             it — real orders and real fills against no real money.</p>
+          <p style="color:var(--muted);font-size:14px;margin:0">Connect your own broker paper account and the terminal trades it — real orders and real fills against no real money.</p>
         </div>
         <div class="card">
-          <p class="eyebrow" style="color:var(--muted)">Deliberate</p>
+          <p class="csub" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Deliberate</p>
           <h3>Off by default</h3>
-          <p style="color:var(--muted)">Connecting a broker starts nothing. The autopilot is off for
-             every account until a strategy is chosen, and pausing it never liquidates what you hold.</p>
+          <p style="color:var(--muted);font-size:14px;margin:0">Connecting a broker starts nothing. The autopilot is off for every account until a strategy is chosen, and pausing never liquidates what you hold.</p>
         </div>
       </div>
     </section>
 
-    <!-- ── 6. Markets ── -->
+    <!-- ── Markets ── -->
     <section class="sec wrap" aria-labelledby="mkt-h">
       <div class="sec-head">
         <a href="/stock-trader.html">
@@ -293,7 +340,7 @@
       <div class="grid" id="mkt"></div>
     </section>
 
-    <!-- ── 7. News ── -->
+    <!-- ── News ── -->
     <section class="sec wrap" aria-labelledby="news-h">
       <div class="sec-head">
         <h2 id="news-h">Market news</h2>
@@ -302,26 +349,26 @@
       <div class="card" id="news" style="padding:4px"></div>
     </section>
 
-    <!-- ── 8. The rest ── -->
+    <!-- ── The rest ── -->
     <section class="sec wrap" aria-labelledby="rest-h">
       <div class="sec-head"><h2 id="rest-h">The rest of Unisona</h2></div>
       <div class="grid g4">
-        <a class="card" href="/chat.html"><h3>Assistant</h3><p style="color:var(--muted);font-size:13px">Real tool calls, real sources, and the model named on every answer.</p></a>
-        <a class="card" href="/stock-trader.html"><h3>Terminal</h3><p style="color:var(--muted);font-size:13px">Charts, watchlist, the engine's signals, and your account panel.</p></a>
-        <a class="card" href="/pricing.html"><h3>Plans</h3><p style="color:var(--muted);font-size:13px">What is free, what is not, and exactly what each tier unlocks.</p></a>
-        <a class="card" href="/journal.html"><h3>Journal <span class="chip">account</span></h3><p style="color:var(--muted);font-size:13px">Every trade scored — streaks, symbol stats and the monthly report card. Needs an account.</p></a>
-        <a class="card" href="/knowledgecenter.html"><h3>Guide</h3><p style="color:var(--muted);font-size:13px">What this is and how to use it, start to finish.</p></a>
+        <a class="card" href="/chat.html"><h3>Assistant</h3><p style="color:var(--muted);font-size:13px;margin:0">Real tool calls, real sources, and the model named on every answer.</p></a>
+        <a class="card" href="/stock-trader.html"><h3>Terminal</h3><p style="color:var(--muted);font-size:13px;margin:0">Charts, watchlist, the engine's signals, and your account panel.</p></a>
+        <a class="card" href="/journal.html"><h3>Journal <span class="chip">account</span></h3><p style="color:var(--muted);font-size:13px;margin:0">Every trade scored — streaks, symbol stats and the monthly report card.</p></a>
+        <a class="card" href="/pricing.html"><h3>Plans</h3><p style="color:var(--muted);font-size:13px;margin:0">What is free, what is not, and exactly what each tier unlocks.</p></a>
       </div>
     </section>
 
-    <!-- ── 9. Disclaimer ── -->
+    <!-- ── Disclaimer ── -->
     <section class="sec wrap">
       <hr class="rule">
       <p class="disc prose">
-        unisona.ai publishes the output of a deterministic scoring engine and a research assistant.
-        Nothing here is investment advice, a recommendation, or an offer, and no figure on this page
-        is a performance claim. Direction reads and win probabilities are the engine's classification
-        of current market structure, not a forecast, and they change as the market does.
+        unisona.ai publishes the output of a deterministic scoring engine and a research
+        assistant. Nothing here is investment advice, a recommendation, or an offer, and no
+        figure on this page is a performance claim. Direction reads and win probabilities are
+        the engine's classification of current market structure, not a forecast, and they
+        change as the market does.
       </p>
       <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
     </section>
@@ -339,13 +386,13 @@
 (function () {
   'use strict';
   var byId = function (id) { return document.getElementById(id); };
+  var SVGNS = 'http://www.w3.org/2000/svg';
   var MINUS = '−';
 
   function fmt(v, d) {
     var n = Number(v);
     if (!isFinite(n)) return null;
-    var s = n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-    return s.replace('-', MINUS);
+    return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }).replace('-', MINUS);
   }
   function pct(v) {
     var n = Number(v);
@@ -374,86 +421,169 @@
     if (text != null) e.textContent = text;
     return e;
   }
+  function svg(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
   function fail(box, what, err) {
     box.innerHTML = '';
     box.appendChild(el('div', 'state err', 'Could not load ' + what + ' (' + err.message + ').'));
   }
   function badge(sym) { return el('span', 'badge', String(sym).slice(0, 2)); }
 
-  /* ── The engine ──────────────────────────────────────────────────────────── */
-  function verdictCard(sym, sig, inBand) {
-    var conv = sig.convergence || {};
-    var plan = sig.plan || {};
-    var card = el('div', 'verdict');
+  /* ── Chart drawing ──────────────────────────────────────────────────────────
+     Plain SVG from real closes. `extra` lets the caller force levels (stop and
+     targets) into the y-domain so the whole trade plan is visible at once. */
+  function scale(values, extra, h, pad) {
+    var all = values.concat(extra || []).filter(function (n) { return isFinite(n); });
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    if (hi === lo) { hi = lo + 1; }
+    return function (v) { return pad + (h - 2 * pad) * (1 - (v - lo) / (hi - lo)); };
+  }
+  function linePath(values, y, w) {
+    var step = values.length > 1 ? w / (values.length - 1) : w;
+    return values.map(function (v, i) { return (i ? 'L' : 'M') + (i * step).toFixed(2) + ' ' + y(v).toFixed(2); }).join(' ');
+  }
 
-    var head = el('div', 'verdict-head');
-    head.appendChild(badge(sym));
-    head.appendChild(el('span', 'sym', sym));
+  function sparkline(closes, up) {
+    var W = 84, H = 30;
+    var s = svg('svg', { class: 'spark', viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    var y = scale(closes, [], H, 3);
+    var d = linePath(closes, y, W);
+    var id = 'sg' + Math.round(closes[0] * 1000) + closes.length;
+    var defs = svg('defs', {});
+    var grad = svg('linearGradient', { id: id, x1: '0', y1: '0', x2: '0', y2: '1' });
+    var c = up ? 'var(--green)' : 'var(--red)';
+    var a = svg('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '.28' });
+    var b = svg('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0' });
+    grad.appendChild(a); grad.appendChild(b); defs.appendChild(grad); s.appendChild(defs);
+    s.appendChild(svg('path', { d: d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z', fill: 'url(#' + id + ')' }));
+    s.appendChild(svg('path', { d: d, fill: 'none', stroke: c, 'stroke-width': '1.6', 'stroke-linejoin': 'round' }));
+    return s;
+  }
+
+  /* The hero chart: the price track with the engine's own levels drawn on it. */
+  function planChart(closes, plan, entry, up) {
+    var W = 560, H = 210, PAD = 14;
+    var levels = [];
+    ['stop', 'target1', 'target2'].forEach(function (k) {
+      if (isFinite(Number(plan[k]))) levels.push({ k: k, v: Number(plan[k]) });
+    });
+    var s = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', role: 'img',
+                         'aria-label': 'Price with the engine stop and targets marked' });
+    var y = scale(closes, levels.map(function (l) { return l.v; }).concat(isFinite(entry) ? [entry] : []), H, PAD);
+    var d = linePath(closes, y, W);
+    var c = up ? 'var(--up)' : 'var(--down)';
+
+    var defs = svg('defs', {});
+    var grad = svg('linearGradient', { id: 'heroGrad', x1: '0', y1: '0', x2: '0', y2: '1' });
+    grad.appendChild(svg('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '.30' }));
+    grad.appendChild(svg('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0' }));
+    defs.appendChild(grad); s.appendChild(defs);
+
+    s.appendChild(svg('path', { d: d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z', fill: 'url(#heroGrad)' }));
+    s.appendChild(svg('path', { d: d, fill: 'none', stroke: c, 'stroke-width': '2', 'stroke-linejoin': 'round' }));
+
+    levels.forEach(function (l) {
+      var yy = y(l.v);
+      var stroke = l.k === 'stop' ? 'var(--down)' : 'var(--up)';
+      s.appendChild(svg('line', { x1: 0, x2: W, y1: yy, y2: yy, stroke: stroke, 'stroke-width': '1',
+                                  'stroke-dasharray': '4 4', 'stroke-opacity': '.85' }));
+      var label = svg('text', { x: 6, y: yy - 4, fill: stroke, class: 'lvl-label' });
+      label.textContent = (l.k === 'stop' ? 'STOP ' : l.k === 'target1' ? 'T1 ' : 'T2 ') + fmt(l.v, 2);
+      s.appendChild(label);
+    });
+    return s;
+  }
+
+  /* ── Hero verdict ───────────────────────────────────────────────────────────── */
+  function renderHero(symbol, sig) {
+    var conv = sig.convergence || {}, plan = sig.plan || {};
+    var up = String(sig.direction || '').toUpperCase() === 'BULLISH';
+    var box = byId('hero-card');
+    box.innerHTML = '';
+    var card = el('div', 'vcard');
+
+    var head = el('div', 'vhead');
+    head.appendChild(badge(symbol));
+    head.appendChild(el('span', 'sym', symbol));
     if (sig.direction) head.appendChild(el('span', 'chip', sig.direction));
-    if (conv.decision) {
-      head.appendChild(el('span', 'tag ' + (conv.decision === 'ENTER' ? 'enter' : 'skip'), conv.decision));
-    }
+    head.appendChild(el('span', 'spacer'));
+    if (conv.decision) head.appendChild(el('span', 'tag ' + (conv.decision === 'ENTER' ? 'enter' : 'skip'), conv.decision));
     card.appendChild(head);
 
-    var kv = el('div', 'kv');
-    function pair(k, v, cls) {
-      var d = el('div');
-      d.appendChild(el('div', 'k', k));
-      d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
-      kv.appendChild(d);
+    var chart = el('div', 'chartbox');
+    chart.appendChild(el('div', 'state', 'Loading price…'));
+    card.appendChild(chart);
+
+    var meters = el('div', 'meters');
+    function meter(label, value, widthPct, cls) {
+      var m = el('div', 'meter');
+      var row = el('div', 'mrow');
+      row.appendChild(el('span', 'mk', label));
+      row.appendChild(el('span', 'mv' + (cls ? ' ' + cls : ''), value));
+      m.appendChild(row);
+      var t = el('div', 'track'), f = el('div', 'fill' + (cls ? ' ' + cls : ''));
+      f.style.width = Math.max(0, Math.min(100, widthPct)) + '%';
+      t.appendChild(f); m.appendChild(t);
+      return m;
     }
-    if (isFinite(Number(conv.p_win))) pair('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%');
-    if (isFinite(Number(conv.ev_r)))  pair('Expected value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
-    if (isFinite(Number(plan.stop)))    pair('Stop', fmt(plan.stop, 2));
-    if (isFinite(Number(plan.target1))) pair('Target 1', fmt(plan.target1, 2));
-    if (isFinite(Number(plan.target2))) pair('Target 2', fmt(plan.target2, 2));
-    if (isFinite(Number(sig.confidence))) pair('Confidence', Number(sig.confidence) + '/100');
-    card.appendChild(kv);
+    if (isFinite(Number(conv.p_win))) {
+      meters.appendChild(meter('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%', Number(conv.p_win) * 100));
+    }
+    if (isFinite(Number(conv.ev_r))) {
+      var ev = Number(conv.ev_r);
+      meters.appendChild(meter('Expected value', fmt(ev, 2) + ' R', (ev / 2) * 100, ev > 0 ? 'up' : 'down'));
+    }
+    card.appendChild(meters);
 
     var whyText = conv.skip_reason || sig.reasons;
     if (whyText) {
-      var why = el('div', 'why');
-      why.appendChild(document.createTextNode(conv.skip_reason ? 'Turned down by: ' : 'Why: '));
-      var code = el('code', null, String(whyText));
-      why.appendChild(code);
+      var why = el('div', 'vwhy');
+      why.appendChild(document.createTextNode(conv.skip_reason ? 'Turned down by ' : 'Why: '));
+      why.appendChild(el('code', null, String(whyText)));
       card.appendChild(why);
     }
-    return card;
+    box.appendChild(card);
+
+    /* Draw the price track behind the plan once the bars land. */
+    get('/api/trading/bars?ticker=' + encodeURIComponent(symbol) + '&timeframe=5m&limit=120')
+      .then(function (d) {
+        var closes = (d.bars || []).map(function (b) { return Number(b.close); }).filter(isFinite);
+        chart.innerHTML = '';
+        if (closes.length < 2) { chart.appendChild(el('div', 'state', 'No recent bars for ' + symbol + '.')); return; }
+        chart.appendChild(planChart(closes, plan, Number(sig.entry_price), up));
+      })
+      .catch(function (e) { chart.innerHTML = ''; chart.appendChild(el('div', 'state err', 'Chart unavailable (' + e.message + ').')); });
   }
 
-  function renderEngine(zones) {
-    var syms = Object.keys(zones);
+  /* ── The book ───────────────────────────────────────────────────────────────── */
+  function renderBook(zones) {
     var entered = [], skipped = [], unscored = [];
-    syms.forEach(function (s) {
+    Object.keys(zones).forEach(function (s) {
       var sig = (zones[s] || {}).last_signal || {};
-      var d = (sig.convergence || {}).decision;
-      if (d === 'ENTER') entered.push([s, sig]);
-      else if (d) skipped.push([s, sig]);
+      var dec = (sig.convergence || {}).decision;
+      if (dec === 'ENTER') entered.push([s, sig]);
+      else if (dec) skipped.push([s, sig]);
       else unscored.push(s);
     });
 
-    /* Hero: lead with a decline when there is one — the refusal, with its rule, is
-       the most checkable thing on the page. Otherwise the first accepted setup. */
-    var heroPick = skipped[0] || entered[0];
-    var hero = byId('hero-card');
-    hero.innerHTML = '';
-    if (heroPick) {
-      hero.appendChild(verdictCard(heroPick[0], heroPick[1], true));
-    } else {
-      hero.appendChild(el('div', 'state', 'The engine has not scored anything on this pass.'));
-    }
+    /* Lead with a refusal when there is one: a published decline, with the rule that
+       produced it, is the most checkable thing on the page. */
+    var pick = skipped[0] || entered[0];
+    if (pick) renderHero(pick[0], pick[1]);
+    else { byId('hero-card').innerHTML = ''; byId('hero-card').appendChild(el('div', 'state', 'The engine has not scored anything on this pass.')); }
 
-    /* Book: three columns — accepted, turned down, not scored. */
     var book = byId('book');
     book.innerHTML = '';
-    function column(title, sub, list, renderRow) {
+    function column(title, sub, list, rowFn) {
       var c = el('div', 'card');
       c.appendChild(el('h3', null, title));
       c.appendChild(el('p', 'csub', sub));
       if (!list.length) { c.appendChild(el('div', 'state', 'None on this pass.')); return c; }
-      list.slice(0, 6).forEach(function (item) { c.appendChild(renderRow(item)); });
-      var a = el('a', 'inlink', 'See these in the terminal');
-      a.href = '/stock-trader.html';
+      list.slice(0, 6).forEach(function (it) { c.appendChild(rowFn(it)); });
+      var a = el('a', 'inlink', 'See these in the terminal'); a.href = '/stock-trader.html';
       c.appendChild(a);
       return c;
     }
@@ -461,8 +591,7 @@
       var sig = e[1], conv = sig.convergence || {};
       var r = el('div', 'row');
       r.appendChild(badge(e[0]));
-      var g = el('div', 'grow');
-      var l1 = el('div', 'l1');
+      var g = el('div', 'grow'), l1 = el('div', 'l1');
       l1.appendChild(el('span', 'sym', e[0]));
       if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
       g.appendChild(l1);
@@ -478,33 +607,30 @@
       var sig = e[1], conv = sig.convergence || {};
       var r = el('div', 'row');
       r.appendChild(badge(e[0]));
-      var g = el('div', 'grow');
-      var l1 = el('div', 'l1');
+      var g = el('div', 'grow'), l1 = el('div', 'l1');
       l1.appendChild(el('span', 'sym', e[0]));
       if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
       g.appendChild(l1);
       var reason = String(conv.skip_reason || 'no reason recorded');
-      g.appendChild(el('div', 'l2', reason.length > 58 ? reason.slice(0, 58) + '…' : reason));
+      g.appendChild(el('div', 'l2', reason.length > 56 ? reason.slice(0, 56) + '…' : reason));
       r.appendChild(g);
       return r;
     }));
     book.appendChild(column('Not scored', 'Watched, but no setup on this pass.', unscored, function (s) {
       var r = el('div', 'row');
       r.appendChild(badge(s));
-      var g = el('div', 'grow');
-      var l1 = el('div', 'l1');
+      var g = el('div', 'grow'), l1 = el('div', 'l1');
       l1.appendChild(el('span', 'sym', s));
       g.appendChild(l1);
       g.appendChild(el('div', 'l2', 'no qualifying setup'));
       r.appendChild(g);
       return r;
     }));
-
     byId('book-sub').textContent =
       entered.length + ' accepted · ' + skipped.length + ' turned down · ' + unscored.length + ' not scored';
   }
 
-  /* ── Markets ─────────────────────────────────────────────────────────────── */
+  /* ── Markets ────────────────────────────────────────────────────────────────── */
   function renderPulse(m) {
     var box = byId('pulse');
     box.innerHTML = '';
@@ -527,37 +653,48 @@
     box.innerHTML = '';
     if (!rows.length) { box.appendChild(el('div', 'state', 'No tickers are being tracked yet.')); return; }
     var sorted = rows.slice().sort(function (a, b) { return Math.abs(Number(b.chg_pct) || 0) - Math.abs(Number(a.chg_pct) || 0); });
-    function listCard(title, sub, list) {
+
+    function listCard(title, sub, list, withSpark) {
       var c = el('div', 'card');
       c.appendChild(el('h3', null, title));
       c.appendChild(el('p', 'csub', sub));
       list.forEach(function (r) {
-        var a = el('a', 'row');
-        a.href = '/stock-trader.html';
+        var a = el('a', 'row'); a.href = '/stock-trader.html';
         a.appendChild(badge(r.ticker));
-        var g = el('div', 'grow');
-        var l1 = el('div', 'l1');
+        var g = el('div', 'grow'), l1 = el('div', 'l1');
         l1.appendChild(el('span', 'sym', r.ticker));
         if (r.session && r.session !== 'regular') l1.appendChild(el('span', 'chip', r.session));
         g.appendChild(l1);
         a.appendChild(g);
+        var slot = el('span');
+        a.appendChild(slot);
         var n = el('div', 'num');
         n.appendChild(el('div', 'px', r.price != null ? fmt(r.price, Number(r.price) < 10 ? 4 : 2) : '—'));
         n.appendChild(el('div', 'ch ' + dirCls(r.chg_pct), pct(r.chg_pct)));
         a.appendChild(n);
         c.appendChild(a);
+
+        /* Sparklines are progressive enhancement: one light request each, and if it
+           fails the row simply stays a row. */
+        if (withSpark) {
+          get('/api/trading/bars?ticker=' + encodeURIComponent(r.ticker) + '&timeframe=5m&limit=40')
+            .then(function (d) {
+              var closes = (d.bars || []).map(function (b) { return Number(b.close); }).filter(isFinite);
+              if (closes.length > 1) slot.replaceWith(sparkline(closes, Number(r.chg_pct) >= 0));
+            })
+            .catch(function () {});
+        }
       });
-      var link = el('a', 'inlink', 'Open any of these in the terminal');
-      link.href = '/stock-trader.html';
+      var link = el('a', 'inlink', 'Open any of these in the terminal'); link.href = '/stock-trader.html';
       c.appendChild(link);
       return c;
     }
-    box.appendChild(listCard('Movers', 'Largest absolute move on the watchlist.', sorted.slice(0, 6)));
-    box.appendChild(listCard('The rest of the watchlist', 'Everything else being tracked.', sorted.slice(6, 12)));
+    box.appendChild(listCard('Movers', 'Largest absolute move on the watchlist.', sorted.slice(0, 6), true));
+    box.appendChild(listCard('The rest of the watchlist', 'Everything else being tracked.', sorted.slice(6, 12), false));
     byId('mkt-sub').textContent = rows.length + ' tracked';
   }
 
-  /* ── News ────────────────────────────────────────────────────────────────── */
+  /* ── News ───────────────────────────────────────────────────────────────────── */
   function renderNews(records) {
     var box = byId('news');
     box.innerHTML = '';
@@ -579,9 +716,9 @@
     byId('news-sub').textContent = records.length + ' recent stories';
   }
 
-  /* ── Load ────────────────────────────────────────────────────────────────── */
+  /* ── Load ───────────────────────────────────────────────────────────────────── */
   get('/api/trading/zones')
-    .then(function (d) { renderEngine((d && d.zones) || {}); })
+    .then(function (d) { renderBook((d && d.zones) || {}); })
     .catch(function (e) {
       fail(byId('hero-card'), 'the engine', e);
       fail(byId('book'), 'the engine', e);
@@ -595,7 +732,7 @@
       .catch(function (e) { fail(byId('mkt'), 'live prices', e); byId('mkt-sub').textContent = ''; });
   }
   loadMarket();
-  setInterval(loadMarket, 30000);
+  setInterval(loadMarket, 60000);
 
   get('/api/trading/news/recent?limit=12')
     .then(function (d) { renderNews((d && d.records) || []); })

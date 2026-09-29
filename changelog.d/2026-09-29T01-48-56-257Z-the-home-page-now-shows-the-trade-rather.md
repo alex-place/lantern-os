@@ -1,0 +1,3 @@
+### Added
+
+- The home page now shows the trade rather than only describing it: the hero draws the live price track with the engine's own stop and both targets marked on it, win probability and expected value read as meters instead of numbers in a table, the watchlist rows carry real sparklines, and the decision path is a drawn three-step pipeline instead of three equal paragraphs. This is backed by a new light endpoint, GET /api/trading/bars?ticker=&limit=, returning one symbol's tail — 14 KB where the existing bars-multi is 8.7 MB for the whole watchlist with no filter, which is why the page had no charts before.
