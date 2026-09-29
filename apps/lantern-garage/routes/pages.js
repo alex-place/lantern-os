@@ -21,16 +21,12 @@ const PUBLIC_PAGES = {
   // destination (#2610). The Stripe checkout buttons still require auth server-side.
   "/pricing.html":        "pricing.html",
   "/reset-password.html": "reset-password.html",
-  // Home IS the trader (operator, 2026-09-28). The stock trader is the product people
-  // come for, so "/" serves it directly instead of the chat-hero landing — one less hop
-  // from open-the-site to see-your-positions. The old landing is NOT deleted: it still
-  // answers on /index.html, and every in-app "Home" link points at "/", so both resolve.
-  // NOTE: "/" is served from this map, which does NOT pass through the cloud
-  // hosted-surface gate (that lives in routes/surfaces.js and only matches bare
-  // "<name>.html" paths) — so home keeps working under LANTERN_TENANCY=cloud even though
-  // stock-trader.html is local-only there. If trading is ever meant to be part of the
-  // hosted product, add it to HOSTED_SURFACES so "/" and "/stock-trader.html" agree.
-  "/":                    "stock-trader.html",
+  // "/" is UnisonaHome (operator, 2026-09-28): a real landing that opens with a live
+  // market strip echoing the trader's layout, then scrolls into financial news and the
+  // rest of the product. The full terminal is one click away at /stock-trader.html — it
+  // briefly WAS "/" itself, but a home page that is only the terminal left no room for
+  // news or anything else.
+  "/":                    "index.html",
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",
   // Paper-trading contest leaderboard (#2552) — public READ (anyone can watch the

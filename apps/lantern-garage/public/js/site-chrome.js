@@ -26,6 +26,7 @@
   // Settings lives behind the account (person) icon; Contest returns when launch-ready.
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
+    { href: "/stock-trader.html", label: "Trader" },
     { href: "/journal.html", label: "Journal" },
     { href: "/work.html", label: "Work" },
     // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
@@ -61,11 +62,12 @@
       '<nav class="site-nav">\n' +
       '  <a class="nav-brand" href="/">\n' +
       '    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">\n' +
-      // Wordmark: the trader IS the product now (/ serves stock-trader.html), so the
-      // brand beside the mandala reads UnisonaTrader. Styled in site.css (.nav-wordmark)
-      // rather than inline — a gradient fill needs a @supports fallback that an inline
+      // Wordmark: the SITE's brand, not one surface's. "/" is UnisonaHome and the
+      // terminal lives at /stock-trader.html, so this reads "Unisona" — naming either
+      // surface here would be wrong on the other. Styled in site.css (.nav-wordmark)
+      // rather than inline: the gradient fill needs a @supports fallback that an inline
       // style attribute can't express.
-      '    <span class="nav-wordmark">Unisona<b>Trader</b></span>\n' +
+      '    <span class="nav-wordmark">Unisona</span>\n' +
       "  </a>\n" +
       '  <div class="nav-links">\n    ' +
       links +

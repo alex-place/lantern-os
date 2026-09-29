@@ -5,10 +5,9 @@
  * ticket, alerts, assistant chat, drawing tools, transparency, guide, settings, theme).
  * Nothing renders above 580px, so desktop layouts are untouched.
  *
- * Pages: the trader — served at BOTH "/" (the home page since 2026-09-28) and the legacy
- * /stock-trader.html — where the tabs switch views in place through window.setMobileView;
+ * Pages: stock-trader.html (the tabs switch views in place through window.setMobileView),
  * journal.html and transparency.html (the tabs navigate; the trader views deep-link as
- * /#watchlist etc.). Load with <script src="/js/mobile-tabbar.js" defer>.
+ * /stock-trader.html#watchlist etc.). Load with <script src="/js/mobile-tabbar.js" defer>.
  *
  * API: window.MobileTabbar = { setActive(view), openSheet(), closeSheet(), isPhone() }.
  */
@@ -51,10 +50,7 @@
     '@media (prefers-reduced-motion:reduce){.mtab-sheet{transition:none}}'
   ].join('\n');
 
-  // "/" serves stock-trader.html (routes/pages.js, 2026-09-28), so home counts as the
-  // trader page: otherwise setMobileView() is skipped here and every tab tap navigates
-  // away to the duplicate URL instead of switching the view in place.
-  var onTrader = /\/stock-trader\.html$/.test(location.pathname) || location.pathname === '/';
+  var onTrader = /\/stock-trader\.html$/.test(location.pathname);
   var onJournal = /\/journal\.html$/.test(location.pathname);
   var bar = null, sheet = null, sheetBg = null, styleEl = null, active = null;
 
@@ -65,10 +61,10 @@
     if (view === 'more') { openSheet(); return; }
     if (view === 'journal') { if (!onJournal) location.href = '/journal.html'; return; }
     if (onTrader && typeof window.setMobileView === 'function') { window.setMobileView(view); return; }
-    location.href = '/#' + view;
+    location.href = '/stock-trader.html#' + view;
   }
   function traderAction(fn, hash) {
-    return function () { closeSheet(); if (onTrader && typeof fn === 'function') fn(); else location.href = '/#' + hash; };
+    return function () { closeSheet(); if (onTrader && typeof fn === 'function') fn(); else location.href = '/stock-trader.html#' + hash; };
   }
 
   function sheetItems() {
