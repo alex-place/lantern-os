@@ -533,7 +533,15 @@
       return m;
     }
     if (isFinite(Number(conv.p_win))) {
-      meters.appendChild(meter('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%', Number(conv.p_win) * 100));
+      // Stating this as "win probability" alone invites reading it as a measured hit
+      // rate. It is the model's score for THIS setup from current structure; we hold no
+      // published track record to calibrate it against, so the copy says so.
+      var pHint = el('p', 'hint');
+      pHint.appendChild(el('b', null, 'The engine’s estimate for this setup'));
+      pHint.appendChild(document.createTextNode(
+        ' — scored from current market structure, not a measured win rate and not a forecast.'));
+      meters.appendChild(meter('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%',
+                               Number(conv.p_win) * 100, null, pHint));
     }
     if (isFinite(Number(conv.ev_r))) {
       var ev = Number(conv.ev_r);
@@ -545,7 +553,9 @@
       evHint.appendChild(el('b', null, '1 R = what you would lose if the stop hit.'));
       evHint.appendChild(document.createTextNode(
         ' So for every $100 you put at risk, this setup is worth about $' +
-        Math.abs(Math.round(ev * 100)).toLocaleString('en-US') + (ev < 0 ? ' against you' : '') + ' on average.'));
+        Math.abs(Math.round(ev * 100)).toLocaleString('en-US') + (ev < 0 ? ' against you' : '') +
+        ' on average — the same estimate as above, against a fixed ' +
+        (isFinite(Number(conv.target_r)) ? Number(conv.target_r) : 2) + ' R target.'));
       meters.appendChild(meter('Expected value', fmt(ev, 2) + ' R', (ev / 2) * 100, ev > 0 ? 'up' : 'down', evHint));
     }
     card.appendChild(meters);
