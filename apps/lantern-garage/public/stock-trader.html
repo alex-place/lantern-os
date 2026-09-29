@@ -1525,6 +1525,10 @@
     .layout.mv-watchlist .wl-info, .layout.mv-watchlist .wl-resize{ display:none !important; }
     /* trade view = the order ticket, in the flow */
     .layout.mv-trade #ticketDock, body.ticket-closed .layout.mv-trade #ticketDock{ display:flex !important; position:static !important; height:auto !important; flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:16px; box-sizing:border-box; }
+    /* ...but `ticket-closed` on a phone means "the reader collapsed the column", which
+       this view is right to override. `trade-locked` means "this reader may not trade",
+       which it is not: a gated reader got the whole 375px ticket here. */
+    body.trade-locked .layout.mv-trade #ticketDock{ display:none !important; }
     /* positions view = the account panel, in the flow */
     .layout.mv-positions .footer{ display:flex !important; flex:1 1 auto; min-height:0; height:auto !important; max-height:none !important; overflow-y:auto; }
     .layout.mv-positions .footer .footer-resize{ display:none; }
@@ -5669,7 +5673,10 @@ function openOrderPanel(){
   requestAnimationFrame(()=>{ applyGridCols(); renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 function openOrderTicket(ticker, side){
-  if(window.GUEST){ location.href='/auth.html?returnTo=%2Fstock-trader.html'; return; }   // read-only view → send to sign-in
+  // Was GUEST-only, and sent everyone to the sign-in page — including a reader who was
+  // already signed in and only lacked the tier, for whom sign-in is a dead end. It now
+  // asks the same gate the rail buttons do, so all three refusals land on the right page.
+  if(_gateBlocked('ticket')) return;
   otSide = side; otOrderType = 'market';
   setOrderSymbol(ticker);
   openOrderPanel();
@@ -9687,18 +9694,68 @@ let _leftOpen = _lsGet('trader.leftOpen', _deskNarrow ? '0' : '1') !== '0';
 let _rightOpen = true;
 let _ticketOpen = _lsGet('trader.ticketOpen', '1') !== '0';
 
+/* ── Who may use the trading panels (founder, 2026-09-28) ──────────────────────
+   The order ticket and the chat were open for everyone, including a logged-out
+   visitor: 320px + 359px of a 1600px screen spent on panels they cannot use.
+   body.guest hid the per-card BUY/SELL buttons and the #otBg overlay, but never the
+   docked ticket COLUMN — which is where the ticket lives now — nor the chat.
+
+   Three refusals, because "log in" is the wrong instruction for two of them, and
+   'unknown' is not a refusal at all: the broker answer arrives with the first
+   positions poll, and gating on the wait would blink the ticket shut on every load
+   for the one reader who IS entitled to it. */
+let _brokerOk = null;                    // null until /api/trading/positions answers
+const _GATE_DEST = {
+  signin:  '/auth.html?returnTo=%2Fstock-trader.html',
+  upgrade: '/pricing.html',              // they are signed in; sign-in would be a dead end
+  broker:  '/settings.html#connections',
+};
+function _tradeGate() {
+  if (window.GUEST === undefined) return 'unknown';
+  if (window.GUEST) return window.AUTHED ? 'upgrade' : 'signin';
+  return _brokerOk === null ? 'unknown' : (_brokerOk ? 'ok' : 'broker');
+}
+const _canTrade = () => { const g = _tradeGate(); return g === 'ok' || g === 'unknown'; };
+/* The chat needs an account, not a broker: signed in with no broker is a perfectly
+   good reason to ask the assistant about a market. Unknown is allowed, for the same
+   no-blink reason as above. */
+const _chatAllowed = () => window.AUTHED !== false;
+/* A gated button is not disabled and does not sit there doing nothing — doing nothing
+   is how a control teaches its reader that the page is broken. It goes to the one page
+   that would let them use it. */
+function _gateBlocked(which) {
+  const g = which === 'chat'
+    ? (window.AUTHED === false ? 'signin' : null)
+    : (_canTrade() ? null : _tradeGate());
+  if (!g || !_GATE_DEST[g]) return false;
+  location.href = _GATE_DEST[g];
+  return true;
+}
+/* Called when an ANSWER lands (session, then broker), not on a timer: the panels
+   settle once, as soon as the page knows enough to be sure. */
+function _refreshTradeGate() { try { _applyDocks(); } catch (_e) {} }
+
 function _applyDocks() {
-  document.body.classList.toggle('leftdock-closed', !_leftOpen);
+  // Derived, never written back: _ticketOpen / _leftOpen stay the reader's own choice,
+  // so both panels return exactly as they left them once they qualify.
+  const ticketShown = _ticketOpen && _canTrade();
+  const chatShown   = _leftOpen && _chatAllowed();
+  document.body.classList.toggle('leftdock-closed', !chatShown);
   document.body.classList.toggle('rightdock-closed', !_rightOpen);
-  document.body.classList.toggle('ticket-closed', !_ticketOpen);
+  document.body.classList.toggle('ticket-closed', !ticketShown);
+  // Closed-because-collapsed and closed-because-not-allowed are different facts, and the
+  // phone's trade view is entitled to override only the first.
+  document.body.classList.toggle('trade-locked', !_canTrade());
   for (const n of RW_PANELS) {
     const panel = document.getElementById('rwp-' + n), tab = document.getElementById('rtab-' + n);
     const on = _rightOpen && n === _rwPanel;
     if (panel) { if (on) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', ''); }
     if (tab) tab.setAttribute('aria-selected', on ? 'true' : 'false');
   }
-  const ct = document.getElementById('ltab-chat'); if (ct) ct.setAttribute('aria-pressed', _leftOpen ? 'true' : 'false');
-  const tt = document.getElementById('rtab-ticket'); if (tt) tt.setAttribute('aria-pressed', (_rightOpen && _ticketOpen) ? 'true' : 'false');
+  // The tabs report what is ON SCREEN, not what the stored preference says — a tab
+  // pressed-in beside a panel that is not there is the page contradicting itself.
+  const ct = document.getElementById('ltab-chat'); if (ct) ct.setAttribute('aria-pressed', chatShown ? 'true' : 'false');
+  const tt = document.getElementById('rtab-ticket'); if (tt) tt.setAttribute('aria-pressed', (_rightOpen && ticketShown) ? 'true' : 'false');
   if (_rwPanel === 'alerts' && _rightOpen && typeof loadAlerts === 'function') loadAlerts();
   // Pixel-sized deck tracks: a column change has to re-tile or the charts keep the old geometry.
   if (typeof applyGridCols === 'function') applyGridCols();
@@ -9722,9 +9779,10 @@ function setRightWidget(name) {
 /* Kept as a deliberate no-op: the column cannot be closed, but leaving the function
    defined means any remaining caller fails harmlessly instead of throwing. */
 function closeRightWidget() { /* the right column is permanent -- see _rightOpen */ }
-function toggleLeftDock() { _leftOpen = !_leftOpen; _saveDocks(); _applyDocks(); }
+function toggleLeftDock() { if (_gateBlocked('chat')) return; _leftOpen = !_leftOpen; _saveDocks(); _applyDocks(); }
 function closeLeftDock() { _leftOpen = false; _saveDocks(); _applyDocks(); }
 function toggleTicketDock() {
+  if (_gateBlocked('ticket')) return;
   // Reopening the ticket must also reopen the column it lives in, or the button lies.
   if (!_ticketOpen && !_rightOpen) _rightOpen = true;
   _ticketOpen = !_ticketOpen; _saveDocks(); _applyDocks();
@@ -10922,7 +10980,12 @@ async function loadPortfolio(){
     if (r.redirected || !/json/i.test(_ct)) { _accountDegraded('session'); return; }
     const d  = await r.json();
     if (d && (d.error === 'auth_required' || d.error === 'forbidden')) { _accountDegraded('session'); return; }
-    if (d && d.available === false) { _accountDegraded('backend', d.reason); return; }
+    // `available:false` is this endpoint's own "no broker connected" signal (#2725) —
+    // the one it was given so callers could say "connect a broker" instead of reading an
+    // empty {account:{}} as a real $0 book. The ticket gate reads it rather than asking
+    // the broker endpoints again.
+    if (d && d.available === false) { _brokerOk = false; _refreshTradeGate(); _accountDegraded('backend', d.reason); return; }
+    _brokerOk = true; _refreshTradeGate();
     const a  = d.account||{};
     _accountFresh(a);
     // Day P&L: the SERVER figure is authoritative (2026-08-10). It is realized
@@ -11304,6 +11367,11 @@ async function detectGuestMode(){
     authed = !!(s && s.authenticated);
     window.GUEST = !(s && (s.role === 'admin' || ent.trade === true));
   }catch(e){ window.GUEST = true; }
+  // Signed-in-ness is its own fact, separate from the trade entitlement: a supporter is
+  // a GUEST for trading purposes but is emphatically not logged out, and telling them to
+  // sign in would be nonsense. The chat gate and the 'upgrade' refusal both read this.
+  window.AUTHED = authed;
+  _refreshTradeGate();
   if(window.GUEST){
     document.body.classList.add('guest');
     // View-only (operator, 2026-09-13): the same charts, watchlist and signals, without
@@ -11382,7 +11450,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
      and closing the chat left its 360px of space behind. Drive the column instead --
      that is the thing on screen. */
   window.dcToggle=function(force){
-    const openNow = typeof force==='boolean' ? force : !_leftOpen;
+    // Opening is gated; closing is always allowed, or a reader could be stuck with a
+    // panel they are not entitled to and no way to shut it.
+    const wantsOpen = typeof force==='boolean' ? force : !_leftOpen;
+    if (wantsOpen && _gateBlocked('chat')) return;
+    const openNow = wantsOpen;
     _leftOpen = openNow; _saveDocks(); _applyDocks();
     document.body.classList.toggle('dc-open', openNow);
     if(modal) modal.setAttribute('aria-hidden', openNow?'false':'true');
@@ -11533,7 +11605,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     var _oot = window.openOrderTicket;
     if (typeof _oot === 'function') window.openOrderTicket = function () { var r = _oot.apply(this, arguments); try { if (_isPhone()) setMobileView('trade'); } catch (_e) {} return r; };
     var _ttd = window.toggleTicketDock;
-    if (typeof _ttd === 'function') window.toggleTicketDock = function () { if (_isPhone()) { setMobileView(document.querySelector('.layout.mv-trade') ? 'chart' : 'trade'); return; } return _ttd.apply(this, arguments); };
+    // The phone path switches VIEW rather than toggling the column, so it has to ask the
+    // gate itself — delegating happens too late, and the tap would otherwise open the
+    // trade view for a reader who cannot trade.
+    if (typeof _ttd === 'function') window.toggleTicketDock = function () {
+      if (_isPhone()) {
+        if (typeof _gateBlocked === 'function' && _gateBlocked('ticket')) return;
+        setMobileView(document.querySelector('.layout.mv-trade') ? 'chart' : 'trade');
+        return;
+      }
+      return _ttd.apply(this, arguments);
+    };
     function fromHash() { var h = (location.hash || '').replace('#', ''); return MOBILE_VIEWS.indexOf(h) >= 0 || h === 'tickers' ? h : null; }
     // After the page's own DOMContentLoaded init (dock state is restored there), so the
     // opening view is applied on top of it rather than under it.

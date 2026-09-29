@@ -54,7 +54,13 @@ test("setMobileView keeps its old vocabulary and the paper-corner contract, and 
   // phone entry points: a watchlist row opens the chart; SELL/BUY and the ticket toggle open the ticket view
   assert.match(TRADER, /window\.focusTicker = function \(t\) \{[^\n]*setMobileView\('chart'\)/);
   assert.match(TRADER, /window\.openOrderTicket = function \(\) \{[^\n]*setMobileView\('trade'\)/);
-  assert.match(TRADER, /window\.toggleTicketDock = function \(\) \{ if \(_isPhone\(\)\) \{ setMobileView\(document\.querySelector\('\.layout\.mv-trade'\) \? 'chart' : 'trade'\); return; \}/);
+  // The phone tap switches VIEW rather than toggling the column — and since 2026-09-28 it
+  // asks the trade gate FIRST, because switching view was a way past it (a reader with no
+  // broker got the whole 375px ticket in the trade view).
+  const ttd = TRADER.slice(TRADER.indexOf('var _ttd = window.toggleTicketDock;'), TRADER.indexOf('function fromHash()'));
+  assert.match(ttd, /_gateBlocked\('ticket'\)/, 'the phone path must ask the gate');
+  assert.match(ttd, /setMobileView\(document\.querySelector\('\.layout\.mv-trade'\) \? 'chart' : 'trade'\);/, 'and still switch view when allowed');
+  assert.ok(ttd.indexOf('_gateBlocked') < ttd.indexOf('setMobileView'), 'gate before view');
   // deep links + the remembered view; watchlist is the phone's home, like TradingView
   assert.match(TRADER, /setMobileView\(fromHash\(\) \|\| saved \|\| 'watchlist'\);/);
   assert.match(TRADER, /window\.addEventListener\('hashchange'/);
