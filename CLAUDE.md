@@ -247,8 +247,7 @@ v0.3 `csf_file` writer, and the lossy v0.7 symbolic *text* compressors) so they
 can't be called by mistake. Existing on-disk archives still open **read-only**
 via [`src/csf/legacy.py`](src/csf/legacy.py). The `src/csf/v07/` lattice
 primitives (the Tesseract "storage face" — `quantum_dust`, `qutrit_delta`) and
-the Status-Cube container are kept. See `caad/README.md` for the CADD layer built
-on top of CSF.
+the Status-Cube container are kept.
 
 ### Cloud vs local
 
