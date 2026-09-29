@@ -139,6 +139,19 @@ jobs:
           node tests/test_pdf_route_entitlement.js
           node tests/test_secure_cookie_guard.js
           node apps/lantern-garage/test/user-provider-keys.test.js
+          # Repaired 2026-09-29 (they had never run in CI and had rotted): security
+          # scanners and gates first, then the hermetic unit suites.
+          node tests/test_oauth_state_secret.js
+          node tests/test_insecure_tls.js
+          node tests/test_tool_capability_manifest.js
+          node tests/test-git-helpers-shell-free.js
+          node tests/test_grounding_policy.js
+          node tests/test_convergence_agent.js
+          node tests/test_dream_chat_routing.js
+          node tests/test_orchestration_research_queue.js
+          node tests/test_kalshi_suggest_emit.js
+          node --test tests/test_kalshi_realtime_dashboard.js
+          node tests/test_agent_slot_manager.js
 
       # The whole apps/lantern-garage/test suite, globbed rather than listed.
       # Until 2026-08-18 this job named five files by hand and the other 300 in that

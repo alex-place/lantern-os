@@ -308,10 +308,10 @@ curl -X POST http://127.0.0.1:8772/api/tools/queue_status \
 
 ### Integration Test
 
-Run the CI/CD validation workflow:
+The MCP and OAuth server suites (`tests/test_mcp_server.py`, `tests/test_oauth_server.py`)
+run in CI's full pytest job (`.github/workflows/ci.yml`) on every push and PR. Locally:
 ```bash
-# Triggers automatically on master push
-# Or manually: GitHub Actions → Validate System Integration → Run workflow
+python -m pytest tests/test_mcp_server.py tests/test_oauth_server.py -q
 ```
 
 ## Troubleshooting
@@ -426,7 +426,7 @@ For issues with:
 - **OAuth implementation:** Check `src/mcp_server/server_oauth.py`
 - **Tool registration:** Check `src/mcp_server/server.py`
 - **Tunnel routing:** Check `~/.cloudflared/config.yml`
-- **CI/CD validation:** Run `.github/workflows/validate-system-integration.yml`
+- **CI/CD validation:** the pytest job in `.github/workflows/ci.yml`
 
 ## References
 
