@@ -17,10 +17,23 @@ delete process.env.TRADER_STRESS_VIX;
 delete process.env.TRADER_STRESS_SPY_IBS;
 const at = require('../lib/auto-trader');
 
-test('OFF by default: no multiplier whatever the tape does', () => {
-  assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 40, spyIbs: 0.05 }), { mult: 1, why: null });
+test('ON by default: x1.5 when the prior VIX close >= 25; the SPY-IBS leg is off', () => {
+  assert.deepStrictEqual(at._stressCfg(), { mult: 1.5, vix: 25, spyIbsLvl: 0 });
+  assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 40, spyIbs: 0.9 }), { mult: 1.5, why: 'VIX 40.0 >= 25' });
+  assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 24.9, spyIbs: 0.05 }), { mult: 1, why: null },
+    'below the VIX line nothing arms — the SPY-IBS leg defaults OFF (unmeasured by the harness)');
   assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 40, spyIbs: 0.05 }, { mult: 1, vix: 20, spyIbsLvl: 0.3 }), { mult: 1, why: null });
   assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 40 }, { mult: 0.5, vix: 20, spyIbsLvl: 0.3 }), { mult: 1, why: null }, 'a multiplier <= 1 is off');
+});
+
+test('TRADER_STRESS_MULT=1 (or 0) is the explicit off switch', () => {
+  for (const off of ['1', '0']) {
+    process.env.TRADER_STRESS_MULT = off;
+    try {
+      assert.strictEqual(at._stressCfg().mult, 1, `mult env \'${off}\' must read as OFF`);
+      assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 80, spyIbs: 0.01 }, at._stressCfg()), { mult: 1, why: null });
+    } finally { delete process.env.TRADER_STRESS_MULT; }
+  }
 });
 
 test('VIX condition: prior close at/above the threshold arms it; below does not', () => {
@@ -37,10 +50,10 @@ test('SPY session IBS condition, and both at once (OR, one multiplier, both reas
   assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 25, spyIbs: 0.1 }, cfg), { mult: 2, why: 'VIX 25.0 >= 20 & SPY IBS 0.10 <= 0.3' });
 });
 
-test('env parsing: multiplier clamped to 2.5, thresholds default 20 / 0.3, a condition can be disabled with 0', () => {
+test('env parsing: multiplier clamped to 2.5, thresholds default 25 / 0 (SPY leg off)', () => {
   process.env.TRADER_STRESS_MULT = '9';
   try {
-    assert.deepStrictEqual(at._stressCfg(), { mult: 2.5, vix: 20, spyIbsLvl: 0.3 });
+    assert.deepStrictEqual(at._stressCfg(), { mult: 2.5, vix: 25, spyIbsLvl: 0 });
     process.env.TRADER_STRESS_VIX = '0';
     assert.deepStrictEqual(at._stressMultiplier({ vixPrior: 80, spyIbs: 0.9 }, at._stressCfg()), { mult: 1, why: null }, 'VIX leg disabled');
   } finally { delete process.env.TRADER_STRESS_MULT; delete process.env.TRADER_STRESS_VIX; }
