@@ -385,7 +385,7 @@ const routes = [
   require("./routes/creator-calibration"),
   require("./routes/research"), // open-video learning flywheel status
 
-  require("./routes/pdfs"), // PDF document listing for Knowledge Center
+  require("./routes/pdfs"), // PDF upload for chat attachments
   require("./routes/documents"), // .docx upload → LLM rewrite → return new version
   require("./routes/docmode"), // Document Mode — versioned collaborative doc editor
   require("./routes/features"),

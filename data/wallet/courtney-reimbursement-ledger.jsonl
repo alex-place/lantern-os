@@ -1,2 +1,0 @@
-# Courtney Reimbursement Ledger
-# Format: {"date": "ISO8601", "type": "cost_funded|reimbursement_due|payment_received", "amount_usd": 0.00, "description": "...", "evidence": "..."}

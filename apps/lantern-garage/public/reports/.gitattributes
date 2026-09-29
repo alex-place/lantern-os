@@ -1,3 +1,0 @@
-# Served report PDFs are committed as raw blobs (the repo's LFS endpoint
-# rejects pointer pushes), so exempt them from the root *.pdf LFS rule.
-*.pdf -filter -diff merge=binary
