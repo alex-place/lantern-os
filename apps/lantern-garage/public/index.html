@@ -5,139 +5,327 @@
   <meta charset="utf-8">
   <meta name="loop-stage" content="observe">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#06b6d4">
+  <meta name="theme-color" content="#0a0e17">
   <link rel="manifest" href="/manifest.json">
-  <title>Unisona — markets, news, and your terminal</title>
+  <title>Unisona — automated trading that shows its work</title>
   <script>
-    /* Theme bootstrap - set before first paint to avoid a flash of the wrong theme. */
+    /* Theme bootstrap before first paint. Always writes an explicit value: the old
+       "set the attribute only when dark" form left it ABSENT in light mode, which
+       silently disabled every html[data-theme="light"] rule in the codebase. */
     (function () {
       try {
         var stored = localStorage.getItem('lantern-theme');
         var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         var isDark = stored ? stored === 'dark' : prefersDark;
-        if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
       } catch (e) {}
     })();
   </script>
   <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/signal-palette.js"></script>
   <style>
-    /* UnisonaHome -------------------------------------------------------------
-       The landing opens with a live market strip that echoes the trader's own
-       layout, then scrolls into market news and the rest of the product. Every
-       number here is fetched live; nothing is seeded with sample data, so a
-       failed request renders an explicit error row rather than a plausible fake
-       (docs/CONVERGANCE-SIGMA0-BRIEFING.md - the external reality rule). */
-    .home-main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 64px; }
-    .sec { margin-bottom: 34px; }
-    .sec-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; flex-wrap: wrap; }
-    .sec-head h2 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: -0.2px; }
-    .sec-head .sub { color: var(--muted); font-size: 12.5px; }
+    /* ── UnisonaHome ─────────────────────────────────────────────────────────────
+       Structure borrowed from TradingView: a dark brand band, then a light canvas
+       that overlaps it, then a steady "section header + grid" rhythm. Dense inside
+       cards, generous between sections.
+
+       HONESTY RULES BAKED INTO THIS PAGE (docs/CONVERGANCE-SIGMA0-BRIEFING.md):
+       - Every number is fetched live. Nothing is seeded, nothing is sampled.
+       - The scoring engine is NOT described as AI: it is deterministic technical
+         analysis plus a hand-weighted linear model. The word "AI" is used only for
+         the assistant, which really is a language model.
+       - No performance figures, no timestamps, no refresh-cadence claims, and the
+         `position` field on the public payload is never rendered (it would publish
+         operator position sizes to anonymous visitors). */
+
+    /* Rail: fluid, not capped — cards grow instead of columns multiplying. */
+    .wrap { padding: 0 16px; }
+    @media (min-width: 769px)  { .wrap { padding: 0 24px; } }
+    @media (min-width: 1280px) { .wrap { padding: 0 40px; } }
+    @media (min-width: 1600px) { .wrap { padding: 0 72px; } }
+    .prose { max-width: 72ch; }
+
+    /* ── The dark brand band: dark in BOTH themes ──────────────────────────────
+       Pinned locally rather than duplicated as a second rule set, so every shared
+       component works unchanged inside it. --up/--down are band-local because the
+       AA-tuned light-theme --green (#00735c) measures ~2.3:1 on this background. */
+    .band {
+      --bg:#0a0e17; --surface:#111827; --surface2:#1a2332; --border:#1f2937;
+      --text:#f3f4f6; --muted:#9ca3af; --accent-strong:#06b6d4; --accent-strong-hover:#0e7490;
+      --up:#34d399; --down:#ff5f6d;
+      background: var(--bg); color: var(--text); padding: 40px 0 72px;
+    }
+    .band-inner { display: grid; gap: 32px; align-items: center; }
+    @media (min-width: 1024px) { .band-inner { grid-template-columns: 1.1fr 1fr; gap: 40px; } }
+
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 14px; }
+    .band h1 { font-size: 32px; line-height: 1.14; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 16px; }
+    @media (min-width: 561px)  { .band h1 { font-size: 40px; letter-spacing: -0.015em; } }
+    @media (min-width: 1024px) { .band h1 { font-size: 56px; line-height: 1.1; } }
+    .subhead { font-size: 16px; line-height: 1.6; color: var(--muted); margin: 0 0 24px; max-width: 60ch; }
+    @media (min-width: 561px) { .subhead { font-size: 18px; } }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .cta {
+      display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 28px;
+      border-radius: 12px; background: var(--accent-strong); color: #04121a; font-size: 16px; font-weight: 700;
+      text-decoration: none;
+    }
+    .cta:hover { background: var(--accent-strong-hover); color: #fff; }
+    .cta-ghost { display: inline-flex; align-items: center; height: 48px; padding: 0 20px; border-radius: 12px;
+                 border: 1px solid var(--border); color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; }
+    .cta-ghost:hover { border-color: var(--muted); }
+    .honesty { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 18px 0 0; max-width: 62ch; }
+
+    /* Live verdict card inside the band */
+    .verdict { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: var(--surface); }
+    .verdict-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .badge { width: 28px; height: 28px; border-radius: 50%; background: var(--surface2); display: inline-flex;
+             align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: 0 0 auto; }
+    .sym { font-size: 16px; font-weight: 600; }
+    .tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 3px 8px; border-radius: 6px; background: var(--surface2); color: var(--muted); }
+    .tag.enter { color: var(--up); }
+    .tag.skip  { color: var(--down); }
+    .kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+    .kv > div { min-width: 0; }
+    .k { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; margin-top: 2px; }
+    .v.up { color: var(--up); } .v.down { color: var(--down); }
+    .why { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; line-height: 1.5; color: var(--muted); }
+    .why code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text); }
+
+    /* ── Light canvas overlapping the band ─────────────────────────────────────── */
+    .canvas { background: var(--bg); border-radius: 28px 28px 0 0; margin-top: -28px; position: relative; padding-top: 48px; }
+    section.sec { margin-bottom: 56px; }
+    @media (min-width: 769px) { section.sec { margin-bottom: 96px; } }
+    .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .sec-head h2 { font-size: 24px; line-height: 1.33; font-weight: 700; letter-spacing: -0.2px; margin: 0; }
+    @media (min-width: 561px) { .sec-head h2 { font-size: 28px; } }
+    .sec-head a { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; }
+    .sec-head a:hover h2 { color: var(--accent-strong); }
+    .sec-head .sub { font-size: 12px; color: var(--muted); }
     .sec-head .spacer { flex: 1 1 auto; }
+    .caret { width: 9px; height: 16px; flex: 0 0 auto; }
 
-    /* Market pulse: the trader toolbar readouts, condensed. */
-    .pulse { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    /* One card recipe everywhere: transparent, bordered, no lift. */
+    .card { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: transparent; }
+    .card:hover { border-color: var(--muted); }
+    a.card { display: block; text-decoration: none; color: var(--text); }
+    a.card:hover { background: var(--surface); }
+    .card h3 { font-size: 16px; line-height: 1.5; font-weight: 600; margin: 0 0 4px; }
+    .card .csub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+    .card p { font-size: 14px; line-height: 1.57; margin: 0; color: var(--text); }
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 561px)  { .grid { gap: 20px; grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (min-width: 1024px) { .grid.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    @media (min-width: 1024px) { .grid.g4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+    .grid.g1 { grid-template-columns: 1fr; }
+
+    /* Row lists — fixed density, no relaxing on mobile. */
+    .row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--text); }
+    .row:hover { background: var(--surface2); }
+    .row .grow { flex: 1 1 auto; min-width: 0; }
+    .row .l1 { display: flex; align-items: center; gap: 8px; }
+    .row .l2 { margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .num { text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+    .num .px { font-size: 16px; font-weight: 600; }
+    .num .ch { font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
+    .chip { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: var(--surface2); color: var(--text); }
+
+    .pulse { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border);
-            border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--text); white-space: nowrap; }
-    .pill .k { color: var(--muted); }
+            border-radius: 999px; background: transparent; font-size: 12px; white-space: nowrap; }
+    .pill .k { text-transform: none; letter-spacing: 0; font-size: 12px; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
-    .dot.open { background: var(--green); }
+    .dot.on { background: var(--green); }
 
-    /* Ticker tiles */
-    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
-    .tile { display: block; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
-            padding: 11px 12px; text-decoration: none; color: var(--text); transition: border-color .15s, transform .15s; }
-    .tile:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .tile .sym { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
-    .tile .px { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; margin-top: 4px; }
-    .tile .chg { font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 600; margin-top: 2px; }
-    .up { color: var(--green); }
-    .down { color: var(--red); }
-    .flat { color: var(--muted); }
-    .tile .ses { font-size: 10.5px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+    .inlink { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 15px; font-weight: 600;
+              color: var(--accent-strong); text-decoration: none; }
+    .inlink:hover { color: var(--accent-strong-hover); }
 
-    /* News */
-    .news-list { display: grid; gap: 2px; }
-    .n { display: block; padding: 11px 12px; border: 1px solid transparent; border-radius: 10px;
-         text-decoration: none; color: inherit; }
-    .n:hover { background: var(--surface); border-color: var(--border); }
-    .n-head { font-size: 14px; font-weight: 600; line-height: 1.35; }
-    .n-meta { margin-top: 5px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .chip { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; padding: 2px 6px; border-radius: 5px;
-            background: var(--surface2); color: var(--on-tint-accent); }
-    .sent { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--surface2); color: var(--muted); }
-    .sent.bull { color: var(--green); }
-    .sent.bear { color: var(--red); }
+    /* News rows */
+    .nrow { display: block; padding: 12px; border-radius: 10px; text-decoration: none; color: inherit; }
+    .nrow:hover { background: var(--surface2); }
+    .nrow .nh { font-size: 15px; line-height: 1.4; font-weight: 600; }
+    .nrow .nm { margin-top: 5px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
-    /* Shared states - a failure says so instead of showing nothing. */
     .state { padding: 14px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 13px; }
     .state.err { border-color: var(--red); color: var(--red); }
-
-    /* The rest of the product */
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-    .card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 14px;
-            text-decoration: none; color: var(--text); transition: border-color .15s, transform .15s; }
-    .card:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .card h3 { margin: 0 0 5px; font-size: 14px; font-weight: 700; }
-    .card p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
-    .motto { text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .08em; margin: 30px 0 0; text-transform: uppercase; }
-
-    .btn-open { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px;
-                background: var(--accent-strong); color: #fff; text-decoration: none; font-size: 12.5px; font-weight: 600; }
-    .btn-open:hover { background: var(--accent-strong-hover); }
-    @media (max-width: 560px) {
-      .home-main { padding: 14px 12px 48px; }
-      .tiles { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
-    }
+    .rule { border: 0; border-top: 1px solid var(--border); margin: 0 0 20px; }
+    .disc { font-size: 12px; line-height: 1.6; color: var(--muted); }
+    .motto { text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .08em; margin: 28px 0 0; text-transform: uppercase; }
   </style>
 </head>
 <body>
 <script>
-  /* #2554: capture a referral code from ?ref= and persist it so it survives the
-     auth redirect and reaches the register POST. The first referrer wins. */
+  /* #2554: capture a referral code from ?ref= so it survives the auth redirect. */
   (function(){try{
     var m=new URLSearchParams(location.search).get('ref');
     if(m && /^[a-z0-9]{6,16}$/.test(m) && !localStorage.getItem('unisona_ref')) localStorage.setItem('unisona_ref', m);
   }catch(e){}})();
 </script>
 
-<!-- Header + footer are injected by the global site-chrome.js, so this page wears the
-     same chrome as every other surface. -->
+<main id="main-content">
 
-<main class="home-main" id="main-content">
-
-  <!-- 1. Markets: the trader layout, condensed -->
-  <section class="sec" aria-labelledby="mkt-h">
-    <div class="sec-head">
-      <h2 id="mkt-h">Markets</h2>
-      <span class="sub" id="mkt-sub">loading live prices…</span>
-      <span class="spacer"></span>
-      <a class="btn-open" href="/stock-trader.html">Open the trader →</a>
+  <!-- ── 1. The engine, live and unpaywalled ── -->
+  <div class="band">
+    <div class="wrap band-inner">
+      <div>
+        <p class="eyebrow">The engine</p>
+        <h1>Automated trading that shows its work.</h1>
+        <p class="subhead">
+          Every symbol on the watchlist gets scored, and the whole verdict is published —
+          direction, a win probability, expected value in R, the stop and both targets. When
+          the engine turns a trade down, you get the rule that vetoed it.
+        </p>
+        <div class="cta-row">
+          <a class="cta" href="/stock-trader.html">Open the terminal</a>
+          <a class="cta-ghost" href="/chat.html">Ask the assistant</a>
+        </div>
+        <p class="honesty">
+          Straight answer on what this is: the scoring is deterministic technical analysis with a
+          hand-weighted linear model — arithmetic, not a language model, and not something that
+          learns. The AI here is the assistant. The engine places nothing on its own: automated
+          execution is off unless an operator arms it.
+        </p>
+      </div>
+      <div id="hero-card"><div class="state">Reading the engine…</div></div>
     </div>
-    <div class="pulse" id="pulse" aria-live="polite"></div>
-    <div class="tiles" id="tiles"></div>
-  </section>
+  </div>
 
-  <!-- 2. Financial news -->
-  <section class="sec" aria-labelledby="news-h">
-    <div class="sec-head">
-      <h2 id="news-h">Market news</h2>
-      <span class="sub" id="news-sub">loading…</span>
-    </div>
-    <div class="news-list" id="news"></div>
-  </section>
+  <div class="canvas">
 
-  <!-- 3. Everything else -->
-  <section class="sec" aria-labelledby="more-h">
-    <div class="sec-head"><h2 id="more-h">The rest of Unisona</h2></div>
-    <div class="cards">
-      <a class="card" href="/chat.html"><h3>Chat</h3><p>Ask about a chart, a position, or anything else — with tools, memory, and sources.</p></a>
-      <a class="card" href="/stock-trader.html"><h3>Trader</h3><p>The full terminal: charts, watchlist, signals, and your account panel.</p></a>
-      <a class="card" href="/journal.html"><h3>Journal</h3><p>Every trade, scored — streaks, symbol stats, and the monthly report card.</p></a>
-      <a class="card" href="/knowledgecenter.html"><h3>Guide</h3><p>What this is and how to use it, start to finish.</p></a>
-    </div>
-    <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
-  </section>
+    <!-- ── 2. The engine's book ── -->
+    <section class="sec wrap" aria-labelledby="book-h">
+      <div class="sec-head">
+        <a href="/stock-trader.html">
+          <h2 id="book-h">The engine's book</h2>
+          <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
+        </a>
+        <span class="sub" id="book-sub">scoring…</span>
+      </div>
+      <div class="grid g3" id="book"></div>
+    </section>
 
+    <!-- ── 3. How the decision is made ── -->
+    <section class="sec wrap" aria-labelledby="how-h">
+      <div class="sec-head"><h2 id="how-h">How the decision is made</h2></div>
+      <div class="grid g3">
+        <div class="card">
+          <h3>Measured evidence, not vibes</h3>
+          <p>Support and resistance zones with touch counts, RSI, MACD, candle pattern, one-minute
+             market structure, volume ratio and ATR — all computed in-process from live market bars.</p>
+        </div>
+        <div class="card">
+          <h3>A number, not an opinion</h3>
+          <p>That evidence goes through a linear model that outputs a win probability and an expected
+             value in R, then a decision: enter, or skip. The arithmetic is fixed and the same for
+             every symbol.</p>
+        </div>
+        <div class="card">
+          <h3>The declines are published too</h3>
+          <p>A setup can score well and still be refused — a trend-alignment filter turns down
+             candidates that are not with the regime. Those refusals carry the rule that fired,
+             and they sit on this page next to the accepted ones.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 4. The part that really is AI ── -->
+    <section class="sec wrap" aria-labelledby="ai-h">
+      <div class="sec-head"><h2 id="ai-h">Ask it about any of this</h2></div>
+      <div class="grid">
+        <div>
+          <p class="prose" style="font-size:16px;line-height:1.6;margin:0 0 4px">
+            The assistant is the part of Unisona that genuinely is AI — a language model wired to the
+            same market tools the engine uses. Ask it what the current read on a symbol is and it calls
+            the tool, shows you the call, and answers from the result rather than from memory. Every
+            answer names the model that produced it.
+          </p>
+          <a class="inlink" href="/chat.html">Open the assistant
+            <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
+          </a>
+        </div>
+        <div class="card">
+          <h3>Where the line sits</h3>
+          <p style="color:var(--muted)">The assistant reads the engine and explains it. It does not
+             score the setups and it does not place trades — the two are deliberately separate, so a
+             model having a bad day cannot move a number the engine computed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5. If you ever turn it on ── -->
+    <section class="sec wrap" aria-labelledby="rungs-h">
+      <div class="sec-head"><h2 id="rungs-h">If you ever turn it on</h2></div>
+      <div class="grid g3">
+        <div class="card">
+          <p class="eyebrow" style="color:var(--muted)">Free — no account</p>
+          <h3>Read the engine</h3>
+          <p style="color:var(--muted)">Every scored setup, every decline and every reason, signed out.
+             That is this page, and the terminal behind it.</p>
+        </div>
+        <div class="card">
+          <p class="eyebrow" style="color:var(--muted)">Your own keys</p>
+          <h3>Paper trading</h3>
+          <p style="color:var(--muted)">Connect your own broker paper account and the terminal trades
+             it — real orders and real fills against no real money.</p>
+        </div>
+        <div class="card">
+          <p class="eyebrow" style="color:var(--muted)">Deliberate</p>
+          <h3>Off by default</h3>
+          <p style="color:var(--muted)">Connecting a broker starts nothing. The autopilot is off for
+             every account until a strategy is chosen, and pausing it never liquidates what you hold.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 6. Markets ── -->
+    <section class="sec wrap" aria-labelledby="mkt-h">
+      <div class="sec-head">
+        <a href="/stock-trader.html">
+          <h2 id="mkt-h">Markets</h2>
+          <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
+        </a>
+        <span class="sub" id="mkt-sub">loading…</span>
+      </div>
+      <div class="pulse" id="pulse" aria-live="polite"></div>
+      <div class="grid" id="mkt"></div>
+    </section>
+
+    <!-- ── 7. News ── -->
+    <section class="sec wrap" aria-labelledby="news-h">
+      <div class="sec-head">
+        <h2 id="news-h">Market news</h2>
+        <span class="sub" id="news-sub">loading…</span>
+      </div>
+      <div class="card" id="news" style="padding:4px"></div>
+    </section>
+
+    <!-- ── 8. The rest ── -->
+    <section class="sec wrap" aria-labelledby="rest-h">
+      <div class="sec-head"><h2 id="rest-h">The rest of Unisona</h2></div>
+      <div class="grid g4">
+        <a class="card" href="/chat.html"><h3>Assistant</h3><p style="color:var(--muted);font-size:13px">Real tool calls, real sources, and the model named on every answer.</p></a>
+        <a class="card" href="/stock-trader.html"><h3>Terminal</h3><p style="color:var(--muted);font-size:13px">Charts, watchlist, the engine's signals, and your account panel.</p></a>
+        <a class="card" href="/pricing.html"><h3>Plans</h3><p style="color:var(--muted);font-size:13px">What is free, what is not, and exactly what each tier unlocks.</p></a>
+        <a class="card" href="/knowledgecenter.html"><h3>Guide</h3><p style="color:var(--muted);font-size:13px">What this is and how to use it, start to finish.</p></a>
+      </div>
+    </section>
+
+    <!-- ── 9. Disclaimer ── -->
+    <section class="sec wrap">
+      <hr class="rule">
+      <p class="disc prose">
+        Unisona publishes the output of a deterministic scoring engine and a research assistant.
+        Nothing here is investment advice, a recommendation, or an offer, and no figure on this page
+        is a performance claim. Direction reads and win probabilities are the engine's classification
+        of current market structure, not a forecast, and they change as the market does.
+      </p>
+      <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
+    </section>
+
+  </div>
 </main>
 
 <script src="/js/theme-toggle.js" defer></script>
@@ -150,18 +338,20 @@
 (function () {
   'use strict';
   var byId = function (id) { return document.getElementById(id); };
+  var MINUS = '−';
 
-  function num(v, d) {
+  function fmt(v, d) {
     var n = Number(v);
     if (!isFinite(n)) return null;
-    return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    var s = n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    return s.replace('-', MINUS);
   }
-  function dirClass(chg) { return chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat'); }
-  function signed(chg) {
-    var n = Number(chg);
+  function pct(v) {
+    var n = Number(v);
     if (!isFinite(n)) return '—';
-    return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
+    return (n > 0 ? '+' : n < 0 ? MINUS : '') + Math.abs(n).toFixed(2) + '%';
   }
+  function dirCls(v) { return v > 0 ? 'up' : v < 0 ? 'down' : 'flat'; }
   function ago(iso) {
     var t = Date.parse(iso);
     if (!isFinite(t)) return '';
@@ -177,131 +367,238 @@
       return r.json();
     });
   }
-  function fail(el, what, err) {
-    el.innerHTML = '';
-    var d = document.createElement('div');
-    d.className = 'state err';
-    d.textContent = 'Could not load ' + what + ' (' + err.message + ').';
-    el.appendChild(d);
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
   }
-  function empty(el, msg) {
-    el.innerHTML = '';
-    var d = document.createElement('div');
-    d.className = 'state';
-    d.textContent = msg;
-    el.appendChild(d);
+  function fail(box, what, err) {
+    box.innerHTML = '';
+    box.appendChild(el('div', 'state err', 'Could not load ' + what + ' (' + err.message + ').'));
+  }
+  function badge(sym) { return el('span', 'badge', String(sym).slice(0, 2)); }
+
+  /* ── The engine ──────────────────────────────────────────────────────────── */
+  function verdictCard(sym, sig, inBand) {
+    var conv = sig.convergence || {};
+    var plan = sig.plan || {};
+    var card = el('div', 'verdict');
+
+    var head = el('div', 'verdict-head');
+    head.appendChild(badge(sym));
+    head.appendChild(el('span', 'sym', sym));
+    if (sig.direction) head.appendChild(el('span', 'chip', sig.direction));
+    if (conv.decision) {
+      head.appendChild(el('span', 'tag ' + (conv.decision === 'ENTER' ? 'enter' : 'skip'), conv.decision));
+    }
+    card.appendChild(head);
+
+    var kv = el('div', 'kv');
+    function pair(k, v, cls) {
+      var d = el('div');
+      d.appendChild(el('div', 'k', k));
+      d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
+      kv.appendChild(d);
+    }
+    if (isFinite(Number(conv.p_win))) pair('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%');
+    if (isFinite(Number(conv.ev_r)))  pair('Expected value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
+    if (isFinite(Number(plan.stop)))    pair('Stop', fmt(plan.stop, 2));
+    if (isFinite(Number(plan.target1))) pair('Target 1', fmt(plan.target1, 2));
+    if (isFinite(Number(plan.target2))) pair('Target 2', fmt(plan.target2, 2));
+    if (isFinite(Number(sig.confidence))) pair('Confidence', Number(sig.confidence) + '/100');
+    card.appendChild(kv);
+
+    var whyText = conv.skip_reason || sig.reasons;
+    if (whyText) {
+      var why = el('div', 'why');
+      why.appendChild(document.createTextNode(conv.skip_reason ? 'Turned down by: ' : 'Why: '));
+      var code = el('code', null, String(whyText));
+      why.appendChild(code);
+      card.appendChild(why);
+    }
+    return card;
   }
 
-  function pill(parts) {
-    var s = document.createElement('span');
-    s.className = 'pill';
-    parts.forEach(function (p) {
-      var e = document.createElement('span');
-      if (p.cls) e.className = p.cls;
-      if (p.text != null) e.textContent = p.text;
-      s.appendChild(e);
+  function renderEngine(zones) {
+    var syms = Object.keys(zones);
+    var entered = [], skipped = [], unscored = [];
+    syms.forEach(function (s) {
+      var sig = (zones[s] || {}).last_signal || {};
+      var d = (sig.convergence || {}).decision;
+      if (d === 'ENTER') entered.push([s, sig]);
+      else if (d) skipped.push([s, sig]);
+      else unscored.push(s);
     });
-    return s;
+
+    /* Hero: lead with a decline when there is one — the refusal, with its rule, is
+       the most checkable thing on the page. Otherwise the first accepted setup. */
+    var heroPick = skipped[0] || entered[0];
+    var hero = byId('hero-card');
+    hero.innerHTML = '';
+    if (heroPick) {
+      hero.appendChild(verdictCard(heroPick[0], heroPick[1], true));
+    } else {
+      hero.appendChild(el('div', 'state', 'The engine has not scored anything on this pass.'));
+    }
+
+    /* Book: three columns — accepted, turned down, not scored. */
+    var book = byId('book');
+    book.innerHTML = '';
+    function column(title, sub, list, renderRow) {
+      var c = el('div', 'card');
+      c.appendChild(el('h3', null, title));
+      c.appendChild(el('p', 'csub', sub));
+      if (!list.length) { c.appendChild(el('div', 'state', 'None on this pass.')); return c; }
+      list.slice(0, 6).forEach(function (item) { c.appendChild(renderRow(item)); });
+      var a = el('a', 'inlink', 'See these in the terminal');
+      a.href = '/stock-trader.html';
+      c.appendChild(a);
+      return c;
+    }
+    book.appendChild(column('Accepted', 'Scored, and cleared every gate.', entered, function (e) {
+      var sig = e[1], conv = sig.convergence || {};
+      var r = el('div', 'row');
+      r.appendChild(badge(e[0]));
+      var g = el('div', 'grow');
+      var l1 = el('div', 'l1');
+      l1.appendChild(el('span', 'sym', e[0]));
+      if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
+      g.appendChild(l1);
+      g.appendChild(el('div', 'l2', isFinite(Number(conv.p_win)) ? (Number(conv.p_win) * 100).toFixed(1) + '% win probability' : ''));
+      r.appendChild(g);
+      var n = el('div', 'num');
+      n.appendChild(el('div', 'px ' + (Number(conv.ev_r) > 0 ? 'up' : 'down'), fmt(conv.ev_r, 2) + ' R'));
+      n.appendChild(el('div', 'ch flat', 'expected'));
+      r.appendChild(n);
+      return r;
+    }));
+    book.appendChild(column('Turned down', 'Scored, then refused — with the rule that fired.', skipped, function (e) {
+      var sig = e[1], conv = sig.convergence || {};
+      var r = el('div', 'row');
+      r.appendChild(badge(e[0]));
+      var g = el('div', 'grow');
+      var l1 = el('div', 'l1');
+      l1.appendChild(el('span', 'sym', e[0]));
+      if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
+      g.appendChild(l1);
+      var reason = String(conv.skip_reason || 'no reason recorded');
+      g.appendChild(el('div', 'l2', reason.length > 58 ? reason.slice(0, 58) + '…' : reason));
+      r.appendChild(g);
+      return r;
+    }));
+    book.appendChild(column('Not scored', 'Watched, but no setup on this pass.', unscored, function (s) {
+      var r = el('div', 'row');
+      r.appendChild(badge(s));
+      var g = el('div', 'grow');
+      var l1 = el('div', 'l1');
+      l1.appendChild(el('span', 'sym', s));
+      g.appendChild(l1);
+      g.appendChild(el('div', 'l2', 'no qualifying setup'));
+      r.appendChild(g);
+      return r;
+    }));
+
+    byId('book-sub').textContent =
+      entered.length + ' accepted · ' + skipped.length + ' turned down · ' + unscored.length + ' not scored';
   }
 
+  /* ── Markets ─────────────────────────────────────────────────────────────── */
   function renderPulse(m) {
     var box = byId('pulse');
     box.innerHTML = '';
+    function pill(parts) {
+      var s = el('span', 'pill');
+      parts.forEach(function (p) { s.appendChild(el('span', p.cls || null, p.text)); });
+      box.appendChild(s);
+    }
     var open = !!m.market_open;
-    box.appendChild(pill([
-      { cls: 'dot' + (open ? ' open' : '') },
-      { text: open ? 'Market open' : 'Market closed' }
-    ]));
-    if (m.vix != null) {
-      box.appendChild(pill([{ cls: 'k', text: 'VIX' }, { text: num(m.vix, 2) + (m.vix_regime ? ' · ' + m.vix_regime : '') }]));
-    }
-    if (m.market) box.appendChild(pill([{ cls: 'k', text: 'Trend' }, { text: String(m.market) }]));
-    if (m.spy_1d != null) box.appendChild(pill([{ cls: 'k', text: 'SPY 1D' }, { cls: dirClass(m.spy_1d), text: signed(m.spy_1d) }]));
-    if (m.spy_5d != null) box.appendChild(pill([{ cls: 'k', text: 'SPY 5D' }, { cls: dirClass(m.spy_5d), text: signed(m.spy_5d) }]));
-    if (m.source) box.appendChild(pill([{ cls: 'k', text: 'via' }, { text: String(m.source) }]));
+    pill([{ cls: 'dot' + (open ? ' on' : '') }, { text: open ? 'Market open' : 'Market closed' }]);
+    if (m.vix != null) pill([{ cls: 'k', text: 'VIX' }, { text: fmt(m.vix, 2) + (m.vix_regime ? ' · ' + m.vix_regime : '') }]);
+    if (m.market) pill([{ cls: 'k', text: 'Trend' }, { text: String(m.market) }]);
+    if (m.spy_1d != null) pill([{ cls: 'k', text: 'SPY 1D' }, { cls: dirCls(m.spy_1d), text: pct(m.spy_1d) }]);
+    if (m.spy_5d != null) pill([{ cls: 'k', text: 'SPY 5D' }, { cls: dirCls(m.spy_5d), text: pct(m.spy_5d) }]);
+    if (m.source) pill([{ cls: 'k', text: 'via' }, { text: String(m.source) }]);
   }
 
-  function renderTiles(rows) {
-    var box = byId('tiles');
+  function renderMarkets(rows) {
+    var box = byId('mkt');
     box.innerHTML = '';
-    if (!rows.length) {
-      empty(box, 'No tickers are being tracked yet.');
-      byId('mkt-sub').textContent = '';
-      return;
+    if (!rows.length) { box.appendChild(el('div', 'state', 'No tickers are being tracked yet.')); return; }
+    var sorted = rows.slice().sort(function (a, b) { return Math.abs(Number(b.chg_pct) || 0) - Math.abs(Number(a.chg_pct) || 0); });
+    function listCard(title, sub, list) {
+      var c = el('div', 'card');
+      c.appendChild(el('h3', null, title));
+      c.appendChild(el('p', 'csub', sub));
+      list.forEach(function (r) {
+        var a = el('a', 'row');
+        a.href = '/stock-trader.html';
+        a.appendChild(badge(r.ticker));
+        var g = el('div', 'grow');
+        var l1 = el('div', 'l1');
+        l1.appendChild(el('span', 'sym', r.ticker));
+        if (r.session && r.session !== 'regular') l1.appendChild(el('span', 'chip', r.session));
+        g.appendChild(l1);
+        a.appendChild(g);
+        var n = el('div', 'num');
+        n.appendChild(el('div', 'px', r.price != null ? fmt(r.price, Number(r.price) < 10 ? 4 : 2) : '—'));
+        n.appendChild(el('div', 'ch ' + dirCls(r.chg_pct), pct(r.chg_pct)));
+        a.appendChild(n);
+        c.appendChild(a);
+      });
+      var link = el('a', 'inlink', 'Open any of these in the terminal');
+      link.href = '/stock-trader.html';
+      c.appendChild(link);
+      return c;
     }
-    rows.slice(0, 12).forEach(function (r) {
-      var a = document.createElement('a');
-      a.className = 'tile';
-      a.href = '/stock-trader.html';
-      a.setAttribute('aria-label', r.ticker + ' ' + (r.price != null ? r.price : 'no price') + ', ' + signed(r.chg_pct));
-
-      var sym = document.createElement('div'); sym.className = 'sym'; sym.textContent = r.ticker;
-      var px = document.createElement('div'); px.className = 'px';
-      px.textContent = r.price != null ? num(r.price, Number(r.price) < 10 ? 4 : 2) : '—';
-      var ch = document.createElement('div'); ch.className = 'chg ' + dirClass(r.chg_pct); ch.textContent = signed(r.chg_pct);
-      a.appendChild(sym); a.appendChild(px); a.appendChild(ch);
-      if (r.session && r.session !== 'regular') {
-        var s = document.createElement('div'); s.className = 'ses'; s.textContent = r.session;
-        a.appendChild(s);
-      }
-      box.appendChild(a);
-    });
-    byId('mkt-sub').textContent = rows.length + ' tracked · updates every 30s';
+    box.appendChild(listCard('Movers', 'Largest absolute move on the watchlist.', sorted.slice(0, 6)));
+    box.appendChild(listCard('The rest of the watchlist', 'Everything else being tracked.', sorted.slice(6, 12)));
+    byId('mkt-sub').textContent = rows.length + ' tracked';
   }
 
+  /* ── News ────────────────────────────────────────────────────────────────── */
   function renderNews(records) {
     var box = byId('news');
     box.innerHTML = '';
-    if (!records.length) {
-      empty(box, 'No market news has been collected yet.');
-      byId('news-sub').textContent = '';
-      return;
-    }
+    if (!records.length) { box.appendChild(el('div', 'state', 'No market news has been collected yet.')); return; }
     records.forEach(function (n) {
-      var a = document.createElement('a');
-      a.className = 'n';
+      var a = el('a', 'nrow');
       if (n.url) { a.href = n.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
-
-      var h = document.createElement('div'); h.className = 'n-head';
-      h.textContent = n.headline || n.text || '(untitled)';
-      a.appendChild(h);
-
-      var meta = document.createElement('div'); meta.className = 'n-meta';
-      function add(txt, klass) {
-        var e = document.createElement('span');
-        if (klass) e.className = klass;
-        e.textContent = txt;
-        meta.appendChild(e);
-      }
-      if (n.source) add(n.source);
-      if (n.published) add(ago(n.published));
-      (n.symbols || []).slice(0, 4).forEach(function (s) { add(s, 'chip'); });
+      a.appendChild(el('div', 'nh', n.headline || n.text || '(untitled)'));
+      var m = el('div', 'nm');
+      if (n.source) m.appendChild(el('span', null, n.source));
+      if (n.published) m.appendChild(el('span', null, ago(n.published)));
+      (n.symbols || []).slice(0, 4).forEach(function (s) { m.appendChild(el('span', 'chip', s)); });
       if (n.direction && n.direction !== 'neutral') {
-        add(n.direction, 'sent ' + (n.direction === 'bullish' ? 'bull' : (n.direction === 'bearish' ? 'bear' : '')));
+        m.appendChild(el('span', 'chip ' + (n.direction === 'bullish' ? 'up' : 'down'), n.direction));
       }
-      if (isFinite(Number(n.impact))) add('impact ' + Number(n.impact), 'sent');
-      a.appendChild(meta);
+      a.appendChild(m);
       box.appendChild(a);
     });
     byId('news-sub').textContent = records.length + ' recent stories';
   }
 
+  /* ── Load ────────────────────────────────────────────────────────────────── */
+  get('/api/trading/zones')
+    .then(function (d) { renderEngine((d && d.zones) || {}); })
+    .catch(function (e) {
+      fail(byId('hero-card'), 'the engine', e);
+      fail(byId('book'), 'the engine', e);
+      byId('book-sub').textContent = '';
+    });
+
   function loadMarket() {
     get('/api/trading/market-status').then(renderPulse).catch(function (e) { fail(byId('pulse'), 'market status', e); });
     get('/api/trading/watchlist-prices')
-      .then(function (d) { renderTiles(Array.isArray(d) ? d : (d.prices || [])); })
-      .catch(function (e) { fail(byId('tiles'), 'live prices', e); byId('mkt-sub').textContent = ''; });
+      .then(function (d) { renderMarkets(Array.isArray(d) ? d : (d.prices || [])); })
+      .catch(function (e) { fail(byId('mkt'), 'live prices', e); byId('mkt-sub').textContent = ''; });
   }
-  function loadNews() {
-    get('/api/trading/news/recent?limit=14')
-      .then(function (d) { renderNews((d && d.records) || []); })
-      .catch(function (e) { fail(byId('news'), 'market news', e); byId('news-sub').textContent = ''; });
-  }
-
   loadMarket();
-  loadNews();
-  /* Prices only - the news feed moves far slower and is a shared collector. */
   setInterval(loadMarket, 30000);
+
+  get('/api/trading/news/recent?limit=12')
+    .then(function (d) { renderNews((d && d.records) || []); })
+    .catch(function (e) { fail(byId('news'), 'market news', e); byId('news-sub').textContent = ''; });
 })();
 </script>
 </body>

@@ -1,0 +1,3 @@
+### Changed
+
+- Rebuilt the home page in a TradingView-style layout — dark brand band, overlapping light canvas, and a steady section-header-plus-grid rhythm — led by the trading engine rather than a chat hero. The hero renders a LIVE verdict straight from the public scan: direction, win probability, expected value in R, stop and both targets, and when the engine refuses a setup it prints the rule that vetoed it. Below that, the engine's book splits every scored symbol into accepted, turned down (with the rule) and not scored. Deliberately NOT called AI: the scorer is deterministic technical analysis plus a hand-weighted linear model, so the word AI is used only for the assistant, which really is one.
