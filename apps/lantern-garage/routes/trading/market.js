@@ -40,7 +40,7 @@ async function alpacaDayPnl(account, positions) {
     const bySym = new Map((d.per_position || []).map((x) => [x.symbol, x]));
     for (const p of positions) {
       const x = bySym.get(String(p.symbol).toUpperCase());
-      if (x) { p.day_pnl = x.day_pnl; p.day_basis = x.day_basis; p.entry_ts = x.entry_ts; }
+      if (x) { p.day_pnl = x.day_pnl; p.day_basis = x.day_basis; }
     }
     return true;
   } catch (_e) {
@@ -168,7 +168,16 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           catalyst: (sig && sig.catalyst) || '',
         };
       }
-      sendJson(res, { zones: reshaped }, 200);
+      // Publish the gate the engine actually acts on. Without it a reader has no way
+      // to tell whether an EV of 0.78 R is marginal or comfortable, and the landing
+      // page would have to hardcode the bar — which then silently drifts the day
+      // someone retunes EV_MIN. Read from the module that owns the decision.
+      var gate = null;
+      try {
+        var evmod = require('../../lib/signal-engine/convergence-ev');
+        gate = { ev_min: evmod.EV_MIN, p_min: evmod.P_MIN };
+      } catch (e) { /* engine module unavailable — omit rather than guess */ }
+      sendJson(res, gate ? { zones: reshaped, gate: gate } : { zones: reshaped }, 200);
     } catch (error) {
       console.error('[Trading] /zones error:', error.message);
       sendJson(res, { zones: {}, error: error.message }, 500);
@@ -189,6 +198,40 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     } catch (error) {
       console.error('[Trading] /watchlist-prices error:', error.message);
       sendJson(res, [], 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/bars?ticker=SPY&timeframe=5m&limit=80
+  // ONE symbol, tail-limited. /bars-multi below fetches the entire watchlist in a
+  // single call and weighs ~9 MB with no symbol or limit filter, which makes it
+  // unusable anywhere a page just wants a sparkline. This returns the last `limit`
+  // bars for one ticker so the landing page can draw real charts without pulling
+  // the whole book.
+  if (url.pathname === '/api/trading/bars' && req.method === 'GET') {
+    if (!traderAgent) {
+      sendJson(res, { bars: [] }, 503);
+      return true;
+    }
+    const ALLOWED_TF = new Set(['1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1mo']);
+    const tfParam = url.searchParams.get('timeframe') || '5m';
+    const timeframe = ALLOWED_TF.has(tfParam) ? tfParam : '5m';
+    // Strict shape: this value reaches an upstream market-data request, so it is
+    // validated rather than sanitised.
+    const ticker = String(url.searchParams.get('ticker') || '').toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9.\-]{0,9}$/.test(ticker)) {
+      sendJson(res, { error: 'bad_ticker', bars: [] }, 400);
+      return true;
+    }
+    const limRaw = Number(url.searchParams.get('limit'));
+    const limit = Math.min(300, Math.max(10, Number.isFinite(limRaw) ? Math.trunc(limRaw) : 80));
+    try {
+      const result = await traderAgent.getBars(ticker, timeframe);
+      const all = Array.isArray(result) ? result : ((result && result.bars) || []);
+      sendJson(res, { ticker, timeframe, bars: all.slice(-limit) }, 200);
+    } catch (error) {
+      console.error('[Trading] /bars error:', error.message);
+      sendJson(res, { ticker, timeframe, bars: [], error: error.message }, 500);
     }
     return true;
   }
@@ -343,7 +386,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             const _dayBySym = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
             for (const p of ibkrPositions) {
               const _x = _dayBySym.get(String(p.symbol).toUpperCase());
-              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; p.entry_ts = _x.entry_ts; }
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
             }
           } catch (_e) {
             // FALLBACK MUST SAY SO (#3380). Keeping the broker figures is fine —
@@ -404,7 +447,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             const _opDay = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
             for (const p of opPositions) {
               const _x = _opDay.get(String(p.symbol).toUpperCase());
-              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; p.entry_ts = _x.entry_ts; }
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
             }
           } catch (_e) { /* ledger unreadable → keep the broker figures */ }
           // Flagged so the UI can never silently present the operator book as

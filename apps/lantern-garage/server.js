@@ -156,7 +156,8 @@ const { requireEntitlement, isAdmin, requireAuth, requireRole } = require("./lib
 const PUBLIC_TRADING_READS = new Set([
   "/api/trading/watchlist",         // GET → server default watchlist (not per-user)
   "/api/trading/watchlist-prices",  // live quotes
-  "/api/trading/bars-multi",        // OHLCV for the charts
+  "/api/trading/bars-multi",        // OHLCV for the charts (whole watchlist, heavy)
+  "/api/trading/bars",              // OHLCV for ONE symbol, tail-limited (landing-page charts)
   "/api/trading/market-status",     // VIX / regime / SPY trend / session
   "/api/trading/zones",             // S/R zones (derived from bars)
   "/api/trading/symbols/search",    // symbol-search popup (broker asset universe)
