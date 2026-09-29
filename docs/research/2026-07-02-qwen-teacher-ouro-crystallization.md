@@ -17,7 +17,7 @@ student **without any cloud teacher** — using the verified-capable local **Qwe
 as the teacher instead of a frontier Anthropic model?
 
 Motivation: the existing Σ₀ trace-distillation flywheel
-([SIGMA0-CONTINUAL-TRAINING.md](../SIGMA0-CONTINUAL-TRAINING.md)) already turns
+(`SIGMA0-CONTINUAL-TRAINING.md`) already turns
 execution-verified solutions into a better Ouro adapter, but its teacher
 (`gen_sigma0_traces.py`) was hardwired to the **Anthropic cloud API**. That couples the
 flywheel to a paid external dependency and to network availability — friction the
@@ -134,9 +134,9 @@ of the run.
 
 ## Related
 
-- [SIGMA0-CONTINUAL-TRAINING.md](../SIGMA0-CONTINUAL-TRAINING.md) — the flywheel this extends
+- `SIGMA0-CONTINUAL-TRAINING.md` — the flywheel this extends
 - [SIGMA0-OURO-CODER.md](../SIGMA0-OURO-CODER.md) — the looped student
-- [SIGMA0-CONVERGENCE-ADAPTER.md](../SIGMA0-CONVERGENCE-ADAPTER.md) — the "unverified traces
+- `SIGMA0-CONVERGENCE-ADAPTER.md` — the "unverified traces
   train hallucination" rule
 </content>
 </invoke>

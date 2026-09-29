@@ -106,7 +106,7 @@ recipe needs work; **none win** → stop updating weights, improve retrieval/too
 cheapest test of whether weight updates earn their keep at all.
 
 > **Harness spec (2026-07-07):** the concrete cloud-L4 runbook is
-> [docs/SIGMA-THETA-ABC-HARNESS-SPEC.md](../SIGMA-THETA-ABC-HARNESS-SPEC.md). The Σ_θ release gate
+> `docs/SIGMA-THETA-ABC-HARNESS-SPEC.md`. The Σ_θ release gate
 > (§8.1.2, 7 conditions) and the A/B/C decision tree are **implemented and self-tested with no GPU**
 > in `experiments/sigma_theta_abc/harness.py --self-test` (CI: `tests/test_sigma_theta_gate.py`) —
 > a planted reward-hack, forgetting regression, instability, and over-budget drift are each rejected.

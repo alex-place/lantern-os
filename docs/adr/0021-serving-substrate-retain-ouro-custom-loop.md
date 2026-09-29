@@ -14,12 +14,12 @@ HuggingFace `transformers`, emulating the Ollama wire protocol on `:11434`
 ([SERVING-ARCHITECTURE-2026.md](../SERVING-ARCHITECTURE-2026.md); FAST cached mode default,
 DEEP native Q-exit opt-in ~1 s/token). The K1 spec already fixes the honest baseline:
 Ouro-1.4B scores **pass@1 = 0.1 on HumanEval at ~284 s/problem** — a weak-but-interchangeable
-kernel, not a strong model ([SIGMA0-K1-KERNEL-SPEC.md §0](../SIGMA0-K1-KERNEL-SPEC.md)).
+kernel, not a strong model (SIGMA0-K1-KERNEL-SPEC.md §0).
 
 The question forcing this ADR: as we invest further in serving, do we (a) port to a
 production engine (vLLM/SGLang/llama.cpp/TGI), (b) swap the base model, or (c) keep the
 custom loop? A web-grounded SOTA sweep (mid-2026, 4 lenses, adversarially verified — see
-[research memo](../research/2026-07-04-serving-design-sota.md)) answers it. All claims below
+research memo) answers it. All claims below
 are **VERIFIED** (an agent opened the cited source).
 
 **Serving stacks.** No production engine serves adaptive-depth/looped models natively in
@@ -117,7 +117,7 @@ from the debunk — the measurement STARS (ICML 2026) says actually matters for 
 ## Evidence
 
 Web-grounded sweep + adversarial verify (933k tokens, 180 tool calls, all serving-stack claims
-double-fetched, 0 refuted): [research memo](../research/2026-07-04-serving-design-sota.md).
+double-fetched, 0 refuted): research memo.
 Primary sources: vLLM `ouro.py` (PR #27794), Ouro card (huggingface.co/ByteDance/Ouro-1.4B),
 vLLM #37668 / RFC #33118, SGLang `return_hidden_states`, Qwen3.5 (artificialanalysis.ai),
 arXiv 2606.02628 (mid-layer probe AUROC), Huginn (arXiv 2502.05171), STARS (arXiv 2605.26733).

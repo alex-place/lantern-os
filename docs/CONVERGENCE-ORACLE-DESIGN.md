@@ -25,7 +25,7 @@ status: design — the cosmology seed ships; the full answerability contract is 
 
 Deep Thought's "42" is not a joke in this codebase — it is the **named failure mode**. The
 Σ₀ collapse certificate calls it *"the σ=0 / 42-state collapse"*
-([RESEARCH-CANON](RESEARCH-CANON.md) [01]): an ungrounded self-referential reasoner collapses
+(RESEARCH-CANON [01]): an ungrounded self-referential reasoner collapses
 onto a single confident fixed point that has lost contact with the question. A machine that
 always returns one scalar, with high confidence, having stopped listening — that is the
 degenerate attractor the whole convergence loop exists to avoid.
@@ -273,7 +273,7 @@ Move-4 calibration ledger. **[GAP** — none of this experiment-selection is bui
 gains an **active term: reachable-by-action-left-unattempted** — a frontier unknown that an
 affordable experiment could have resolved, left un-run, is now a failure. The Oracle is penalized
 for *not pushing* the boundary, not only for mis-drawing it. This is the plus-ultra of the
-[AGI blueprint](AGI-CONVERGENCE-BLUEPRINT.md) made concrete: rent the ceiling-bound inference
+AGI blueprint made concrete: rent the ceiling-bound inference
 (frontier models), **own the ceiling-breaking action** (fresh verified ground truth on surfaces we
 can act on). The Oracle is where those meet — and the only honest way "shatter the ceiling of what
 is known" is true: not by knowing the unknowable, but by *acting to make the unknowable known
@@ -347,7 +347,7 @@ addition.
 ## Sources (in-repo, verified on disk 2026-07-21)
 - Seed: [`src/convergence/oracle.py`](../src/convergence/oracle.py) · [`apps/lantern-garage/lib/convergence-oracle.js`](../apps/lantern-garage/lib/convergence-oracle.js) · [`apps/lantern-garage/test/convergence-oracle.test.js`](../apps/lantern-garage/test/convergence-oracle.test.js)
 - Move 1: council four-way verdict — [`apps/lantern-garage/lib/council-review.js`](../apps/lantern-garage/lib/council-review.js)
-- Move 2: [`docs/convergence-io/DILATION.md`](convergence-io/DILATION.md) · [`apps/lantern-garage/lib/grounding-policy.js`](../apps/lantern-garage/lib/grounding-policy.js) · [`docs/SIGMA0-GROUNDING-LEDGER.md`](SIGMA0-GROUNDING-LEDGER.md)
+- Move 2: [`docs/convergence-io/DILATION.md`](convergence-io/DILATION.md) · [`apps/lantern-garage/lib/grounding-policy.js`](../apps/lantern-garage/lib/grounding-policy.js) · `docs/SIGMA0-GROUNDING-LEDGER.md`
 - Move 3: [`src/convergence/grounding.py`](../src/convergence/grounding.py) · confidence-basis (#2803)
 - Move 4: [`apps/lantern-garage/lib/grounding-calibration.js`](../apps/lantern-garage/lib/grounding-calibration.js) (#1011)
 - Frame: [`docs/SIGMA0-COLLAPSE-CERTIFICATE.md`](SIGMA0-COLLAPSE-CERTIFICATE.md) (the σ=0 / 42-state collapse) · [`docs/research/question-machine.md`](research/question-machine.md)

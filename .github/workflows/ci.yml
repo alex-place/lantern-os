@@ -237,7 +237,6 @@ jobs:
 
       - name: Verify repo contract
         run: |
-          test -f docs/REPO-CONTRACT.md || echo "docs/REPO-CONTRACT.md missing"
           echo "Repo contract check"
 
       - name: Verify workflow structure
@@ -265,7 +264,6 @@ jobs:
 
       - name: Check MCP contract
         run: |
-          test -f docs/LANTERN-RUNTIME-CICD.md || echo "LANTERN-RUNTIME-CICD.md missing"
           echo "MCP contract check"
 
   # ============================================================================

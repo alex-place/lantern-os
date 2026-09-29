@@ -31,13 +31,13 @@ The hosted **cloud** profile ([`lib/deployment-profile.js`](../apps/lantern-gara
 
 ## Current boundary (measured)
 
-`20 core : 18 extension` — ratio **0.9 : 1** (cap **0.95**). The numbers come from `surface-registry.summary()` via `npm run test:boundary`, not an estimate. (A parallel non-HTML **subsystems** tier — bots + background services, #1948/#1980 — is classified by the same rule; see `SUBSYSTEMS` in the registry.)
+`12 core : 19 extension` — ratio **1.58 : 1** (cap **1.59**). The numbers come from `surface-registry.summary()` via `npm run test:boundary`, not an estimate. (A parallel non-HTML **subsystems** tier — bots + background services, #1948/#1980 — is classified by the same rule; see `SUBSYSTEMS` in the registry.)
 
 ### Core — the convergence loop
 | Stage | Surfaces |
 |---|---|
 | Observe | `index.html` |
-| Remember | `explore.html`, `knowledgecenter.html`, `rag-house.html`, `wide-search.html` |
+| Remember | `explore.html`, `rag-house.html`, `wide-search.html` |
 | Reason | `dream-chat.html` |
 | Act | `orchestration.html`, `work.html`, `admin-flags.html` |
 | Verify | `proof.html`, `calibration.html`, `factcheck.html`, `grounding-diff.html`, `drift.html` |

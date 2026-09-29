@@ -133,7 +133,7 @@ generative members stamp **v0.9** (same gating as solid). Measured: a 16 MiB `sh
 member + siblings archives to **~3.5 KB** — a description-length win for recipe-bearing
 (lawful/simulated) data, explicitly *not* an entropy claim. Frontier ladder (slice-addressable
 reads, registered scientific generators, corpus tiers):
-[`research/2026-07-21-csf-cosmological-frontier.md`](research/2026-07-21-csf-cosmological-frontier.md).
+`research/2026-07-21-csf-cosmological-frontier.md`.
 
 ### 2.2.3 Slice reads — `read_slice(archive, path, offset, length)` (F1b)
 

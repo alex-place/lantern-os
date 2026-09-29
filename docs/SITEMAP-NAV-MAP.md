@@ -28,7 +28,6 @@ flowchart TD
     orch["orchestration.html"]
     trader["stock-trader.html"]
     work["work.html"]
-    kc["knowledgecenter.html<br/><i>Docs</i>"]
   end
 
   subgraph d2 ["depth 2"]
@@ -52,9 +51,7 @@ flowchart TD
   index --> orch
   index --> trader
   index --> work
-  index --> kc
 
-  explore --> kc
   explore --> kalshi
   explore --> settings
   explore --> radio
@@ -68,27 +65,18 @@ flowchart TD
   trader --> options
   trader --> pricing
   trader --> chat
-  kalshi --> kc
   kalshi --> settings
   kalshi --> create
   options --> pricing
   settings --> pricing
   radio --> explore
 
-  kc --> faq
-  kc --> changelog
-  kc --> whatsnew
-  kc --> chat
   faq --> pricing
   whatsnew --> changelog
 
-  classDef kcStyle fill:#f9a825,stroke:#e65100,color:#000
-  class kc kcStyle
 ```
 
-Knowledge Center (highlighted) sits at depth 1 as **Docs** in the shared nav. Before [#3107](https://github.com/alex-place/lantern-os/issues/3107) it had exactly one real inbound nav edge — the `quick-links` footer of `explore.html` — which left it at depth 2, and one deleted link away from being fully orphaned. Promoting it also pulled `faq`, `changelog`, and `whats-new` up from depth 3 to 2, since they hang off the Knowledge Center.
-
-The spec pins this with `maxKnowledgeCenterDepth: 1`, so the entry cannot silently slip back behind another page.
+The Knowledge Center that sat at depth 1 here was retired on 2026-09-29: `/knowledgecenter.html` and `/library.html` now redirect to the FAQ, and the changelog it used to link sits in the shared footer. For the current graph, regenerate `tests/e2e-sitemap/nav-map.json` with `npm run navmap`.
 
 `explore.html` gave up its top-nav slot on 2026-08-01 (operator call — the dashboard it fronted duplicates the Trader surface). It stays click-reachable via the global footer, at depth 3.
 
@@ -117,7 +105,7 @@ The 11 that remain are **not** all problems — most are orphaned correctly:
 ### Recommended next actions
 
 1. **`contest.html` and `terms.html` — link them.** Both are public by design. `terms.html` belongs in the shared footer (a legal page reachable only from the login screen is a compliance smell); `contest.html` deserves an entry from the trader or Explore.
-2. **`wide-search.html` — decide.** It is a working Remember-stage surface with no entry point. Either give it a home (Knowledge Center or Explore) or retire it like the other 13. This one needs a product call, not a mechanical one.
+2. **`wide-search.html` — decide.** It is a working Remember-stage surface with no entry point. Either give it a home (Explore) or retire it like the other 13. This one needs a product call, not a mechanical one.
 3. **The four internal dashboards — confirm they fail closed.** `accounts` and `admin-flags` are gated in `PROTECTED_PAGES`. `metrics.html` and `system-health.html` are **not** in that map, so verify their gating before assuming it. Add `noindex` to all four.
 4. **`welcome.html` — remove from `sitemap.xml`.** It is a post-signup landing entered by redirect; advertising it to crawlers points them at a page that assumes state they don't have.
 

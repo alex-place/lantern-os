@@ -24,7 +24,6 @@ const ALL_PAGES = [
   '/entry.html',
   '/flourishing.html',
   '/hff.html',
-  '/knowledgecenter.html',
   '/observer-mesh-cube.html',
   '/outreach.html',
   '/pricing.html',

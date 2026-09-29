@@ -75,7 +75,7 @@ this transition (`cond_rank` / `a(Σ) < 5e-2` firing).
 The same instrumentation that *constrains* GRC also *supplies its control signal*: the χ²-calibrated **NIS
 canary** spikes at collapse onset, and anisotropy `a(Σ)` / abscissa `α` give a per-token "stop looping"
 signal — a *measured* depth ceiling instead of a fixed `T`. This is the same exit gate as
-[`2026-06-29-sigma0-nested-adaptive-reason.md`](2026-06-29-sigma0-nested-adaptive-reason.md). "Entropy" in
+`2026-06-29-sigma0-nested-adaptive-reason.md`. "Entropy" in
 the Σ₀ corpus means covariance **anisotropy**, not Shannon code length — do not conflate them.
 
 External: DeepMind ["Language Modeling Is Compression"](https://arxiv.org/abs/2309.10668) (3.2M transformer

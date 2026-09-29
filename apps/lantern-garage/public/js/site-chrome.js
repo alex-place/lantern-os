@@ -32,13 +32,8 @@
     // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
     // fronted duplicates the Trader surface, and its only unique job was the
     // quick-links footer. /explore.html still resolves; it just isn't nav-level.
-    // The Knowledge Center takes the freed slot: before #3107 it had no depth-1
-    // entry at all, leaving the docs surface two clicks deep and effectively
-    // undiscoverable from the home page. Labelled "Guide" (was "Docs", #3332):
-    // the page is a beginner walkthrough of what unisona is and how to use it
-    // now, not a documentation index, and "Docs" sent people looking for API
-    // reference. The href is unchanged, so every existing link still resolves.
-    { href: "/knowledgecenter.html", label: "Guide" },
+    // The Knowledge Center ("Guide") that later took the freed slot was retired
+    // (operator, 2026-09-29); /knowledgecenter.html now redirects to the FAQ.
   ];
 
   // Footer-only entries: real surfaces that don't earn a slot in the top nav but
@@ -52,6 +47,9 @@
     { href: "/create.html", label: "Create" },
     { href: "/explore.html", label: "Explore" },
     { href: "/budget.html", label: "Budget" },
+    // Changelog was reachable only through the retired Knowledge Center (2026-09-29);
+    // the footer keeps the release notes one click from every page.
+    { href: "/changelog.html", label: "Changelog" },
   ];
 
   function navHtml() {

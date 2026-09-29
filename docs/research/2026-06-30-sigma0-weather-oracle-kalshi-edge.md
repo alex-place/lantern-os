@@ -13,7 +13,7 @@ Kalshi **KXHIGHNY** settles on the **NWS Daily Climatological Report for Central
 Park (KNYC)**. The prediction target and the settlement source are the *same
 external measurement* — which makes this the cleanest Σ₀-grounded application we
 have. It closes the one open red-team gap in the collapse machinery,
-[ANTI-COLLAPSE-HARDENING.md](../ANTI-COLLAPSE-HARDENING.md) **G1**
+`ANTI-COLLAPSE-HARDENING.md` **G1**
 (observation-channel poisoning: the NIS canary trusting an unauthenticated `y`),
 *by construction* — the observation the belief-loop consumes IS the authenticated
 settlement value.
@@ -119,4 +119,4 @@ Live/measured: [NCEI KNYC normals](https://www.ncei.noaa.gov/access/services/dat
 [NWS forecast OKX 34,45](https://api.weather.gov/gridpoints/OKX/34,45/forecast),
 live [Kalshi KXHIGHNY](https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXHIGHNY&status=open).
 Method: [conformal UQ for AI weather (2606.19642)](https://arxiv.org/abs/2606.19642),
-[collapse certificate](../SIGMA0-COLLAPSE-CERTIFICATE.md), [G1](../ANTI-COLLAPSE-HARDENING.md).
+[collapse certificate](../SIGMA0-COLLAPSE-CERTIFICATE.md), G1.

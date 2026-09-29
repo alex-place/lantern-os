@@ -32,10 +32,8 @@ const PUBLIC_PAGES = {
   // Paper-trading contest leaderboard (#2552) — public READ (anyone can watch the
   // board); joining/start/stop are auth-gated server-side in routes/trading/champion.js.
   "/contest.html":        "contest.html",
-  "/knowledgecenter.html":"knowledgecenter.html",
-  "/library.html":"library.html",     // reference library: the technical docs, moved off the guide (#3503)
-  // The FAQ is a pre-signup help page — the Knowledge Center hero links it under
-  // "no account or API key required", and it's exactly what a prospect reads before
+  // The FAQ is a pre-signup help page — it answers "no account or API key
+  // required", and it's exactly what a prospect reads before
   // deciding to sign up. Gating it 302'd guests to /auth.html, contradicting that
   // promise (#3161) — same bounce that got pricing un-gated in #2610.
   "/faq.html":            "faq.html",
@@ -93,7 +91,11 @@ const REDIRECTS = {
   "/proof.html": "/",
   "/demo.html": "/stock-trader.html",       // public demo-account spectator → the live trader
   "/kalshi-screener.html": "/kalshi-terminal.html",
-  "/rag-house.html": "/knowledgecenter.html", // RAG document house → the docs surface
+  "/rag-house.html": "/faq.html", // RAG document house → help (the docs surfaces were retired)
+  // Knowledge Center + reference library retired (operator, 2026-09-29): 302 to the
+  // FAQ so old links, bookmarks and search results land on the help page, not a 404.
+  "/knowledgecenter.html": "/faq.html",
+  "/library.html": "/faq.html",
   "/agent-leaderboard.html": "/orchestration.html", // agent observability → fleet view
   "/agent-status.html": "/orchestration.html",
   "/systems.html": "/system-health.html",   // renamed for clarity (#3109)

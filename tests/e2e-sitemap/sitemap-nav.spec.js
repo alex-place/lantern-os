@@ -33,9 +33,6 @@ const BASELINE = {
   maxOrphans: 11,
   minReachable: 18,
   maxInSitemapNotReachable: 2,
-  // #3107 fixed: Knowledge Center now has a depth-1 nav entry ("Docs"). Locked
-  // at 1 so it cannot silently slip back behind another page.
-  maxKnowledgeCenterDepth: 1,
 };
 
 /** Click a link and wait for the resulting navigation to settle. */
@@ -68,50 +65,6 @@ test.describe('sitemap — navigability as a user experiences it', () => {
       expect(pageName(page.url()), `clicking the ${target} nav link should land on it`).toBe(target);
       await expect(page.locator('body')).toBeVisible();
     }
-  });
-
-  /**
-   * #3107 regression guard. Knowledge Center now has a depth-1 "Docs" entry in
-   * the shared nav (site-chrome.js NAV_LINKS). Before the fix its only inbound
-   * nav link was the quick-links footer of explore.html, at depth 2.
-   *
-   * The walk is data-driven, so it follows whatever the current shortest path
-   * is; the depth assertion is what actually pins the fix in place.
-   */
-  test('knowledge center is reachable by clicking from home', async ({ page }) => {
-    const path = navMap.knowledgeCenterPath;
-    expect(path, 'knowledge center must be click-reachable from the home page').not.toBeNull();
-
-    expect(
-      navMap.depth['knowledgecenter.html'],
-      'knowledge center must keep a top-level nav entry, not slip behind another page',
-    ).toBeLessThanOrEqual(BASELINE.maxKnowledgeCenterDepth);
-
-    await page.goto('/');
-    for (const step of path.slice(1)) {
-      await clickThrough(page, `a[href$="${step}"]`);
-      expect(pageName(page.url())).toBe(step);
-    }
-
-    expect(pageName(page.url())).toBe('knowledgecenter.html');
-    // Reaching the page is not enough — it has to have actually rendered docs.
-    await expect(page.locator('body')).toContainText(/\S/);
-  });
-
-  test('knowledge center renders its document catalog', async ({ page }) => {
-    const path = navMap.knowledgeCenterPath;
-    await page.goto('/');
-    for (const step of path.slice(1)) {
-      await clickThrough(page, `a[href$="${step}"]`);
-    }
-
-    // The catalog is populated client-side; wait for content rather than a fixed sleep.
-    await expect
-      .poll(async () => (await page.locator('body').innerText()).length, {
-        message: 'knowledge center should render catalog content',
-        timeout: 20_000,
-      })
-      .toBeGreaterThan(200);
   });
 
   test('every sitemap URL is actually served', async ({ page }) => {
@@ -148,7 +101,9 @@ test.describe('sitemap — navigability as a user experiences it', () => {
     '/proof.html': 'index.html',
     '/demo.html': 'stock-trader.html',
     '/kalshi-screener.html': 'kalshi-terminal.html',
-    '/rag-house.html': 'knowledgecenter.html',
+    '/rag-house.html': 'faq.html',
+    '/knowledgecenter.html': 'faq.html', // Knowledge Center retired 2026-09-29
+    '/library.html': 'faq.html',
     '/agent-leaderboard.html': 'orchestration.html',
     '/agent-status.html': 'orchestration.html',
     '/systems.html': 'system-health.html',

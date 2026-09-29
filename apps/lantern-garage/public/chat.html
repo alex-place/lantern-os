@@ -55,7 +55,7 @@
   body[data-patreon-role="founder"] .admin-only { display:none !important; }
   body[data-patreon-role="admin"] .admin-only { display:initial; }
 
-  /* ── Journal attachment ("+") → Knowledge Center ── */
+  /* ── Journal attachment ("+") ── */
   .input-container { position: relative; }
   .attach-btn {
     background: none;
@@ -805,10 +805,10 @@
 })();
 </script>
 <script>
-/* ── Journal attachments → Knowledge Center ──
+/* ── Journal attachments ──
    Reuses the existing PDF ingest endpoint (/api/pdfs/upload). The uploaded
-   file lands in data/ingest and appears in the Knowledge Center; a confirmation
-   is shown inline in the conversation. No new ingestion pipeline. */
+   file lands in data/ingest; a confirmation is shown inline in the
+   conversation. No new ingestion pipeline. */
 (function () {
   const base = (typeof serverBase !== 'undefined' && serverBase) ? serverBase : window.location.origin;
   const menu = document.getElementById('attach-menu');
@@ -829,7 +829,7 @@
     if (typeof hideEmptyState === 'function') hideEmptyState();
     const row = document.createElement('div');
     row.className = 'msg-row agent';
-    row.innerHTML = '<div class="msg-label">Knowledge Center</div><div class="bubble" style="font-size:13px">' + html + '</div>';
+    row.innerHTML = '<div class="msg-label">Upload</div><div class="bubble" style="font-size:13px">' + html + '</div>';
     messages.appendChild(row);
     if (typeof scrollToBottom === 'function') scrollToBottom();
     else messages.scrollTop = messages.scrollHeight;
@@ -850,8 +850,7 @@
         const saved = data.saved.map(esc).join(', ');
         const failed = (data.errors || []).length
           ? '<br><span style="opacity:.7">Skipped: ' + data.errors.map(e => esc(e.filename)).join(', ') + '</span>' : '';
-        bubble.innerHTML = '✓ Uploaded <b>' + saved + '</b><br>Added to your Knowledge Center — '
-          + '<a href="/knowledgecenter.html" style="color:var(--accent)">view &amp; search</a>' + failed;
+        bubble.innerHTML = '✓ Uploaded <b>' + saved + '</b>' + failed;
       } else {
         bubble.innerHTML = '✗ Upload failed: ' + esc((data && data.error) || 'unknown error');
       }
@@ -972,7 +971,7 @@
       if (!presetInstruction && typed.trim() && el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
       processDocx(file, instruction);
     },
-    // PDFs (and any other file) attach as LLM-readable context — no Knowledge Center detour.
+    // PDFs (and any other file) attach as LLM-readable context.
     dropPdf(file) { this.addFiles([file]); },
   };
 

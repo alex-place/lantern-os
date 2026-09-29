@@ -57,7 +57,7 @@ Every feature strengthens one stage of that loop. Nothing else ships.
 | Mission word | What it means | Instrument | Honest current state |
 |---|---|---|---|
 | **Maximum useful work** | verified-correct answers per session, per dollar | [eval leaderboard](data/eval/leaderboard.jsonl) + [benchmarks registry](docs/BENCHMARKS.md); precision-of-claimed-solve | Delivered today by the routed **system** (verified cascade: 8.3× cost cut measured); the local kernel is the floor (0.277 golden, raw) and grows via distillation ([#2882](https://github.com/alex-place/lantern-os/issues/2882), [#2911](https://github.com/alex-place/lantern-os/issues/2911)) |
-| **Ordinary hardware** | the reference 8GB box, CPU-viable serving | RAM-fit envelope + [ADR-0026](docs/adr/0026-ternary-serving-artifact-distillation-target.md) ternary target | ≤3B Q4 local core + ΔRAM=0 depth escalation ([architecture decision](docs/research/2026-07-23-sigma0-serving-architecture-decision.md)) |
+| **Ordinary hardware** | the reference 8GB box, CPU-viable serving | RAM-fit envelope + [ADR-0026](docs/adr/0026-ternary-serving-artifact-distillation-target.md) ternary target | ≤3B Q4 local core + ΔRAM=0 depth escalation |
 | **Private** | local-first state, opt-in providers, no telemetry | [Privacy & security](#privacy--security) | Holds today; local-only honest-halt mode proposed ([#2918](https://github.com/alex-place/lantern-os/issues/2918)) |
 | **Reliable** | it says "done" only when verified; honest-halt otherwise | Σ₀ grounding verdict on the serve path; convergence records | Verdict wired opt-in (PR [#2891](https://github.com/alex-place/lantern-os/pull/2891)); never fabricates `grounded=true` |
 | **Simply works, wherever** | install → first verified answer, unattended; web + desktop; offline-capable | [greenpath gate](docs/GREENPATH-GATE.md) + desktop launcher ([ADR-0014](docs/adr/0014-unisona-desktop-launcher.md)) | Weakest measured axis — now tracked ([#2917](https://github.com/alex-place/lantern-os/issues/2917)) |
@@ -112,11 +112,11 @@ Capabilities, organized by the loop stage they strengthen:
 | **Verify** | Σ₀ verification + convergence records · fact-check button + grounding-diff viewer · drift canaries · council exec-verify · WCAG 2.1 AA on all surfaces · autonomous Playwright test fleet |
 | **Converge** | Decision journal + calibration scoring · [external benchmarks registry](docs/BENCHMARKS.md) · PCSF provider leaderboard · CI convergence gates |
 
-**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `chat.html` (the chat — primary UI; legacy `dream-chat.html` redirects) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `orchestration.html` (operator settings).
+**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `chat.html` (the chat — primary UI; legacy `dream-chat.html` redirects) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `orchestration.html` (operator settings).
 
 **Chat commands** (deterministic, server-routed — no model in the loop): `!work #<issue>` runs the observable autowork pipeline on a GitHub issue (research → plan → patch → tests → draft PR, rendered live as a walk of the loop) · `!review #<PR>` reviews a pull request's diff in-chat with Approve / Discard · `!prs` lists open pull requests.
 
-**Current release: `1.10.0` (2026-07-14)** — see [CHANGELOG.MD](CHANGELOG.MD) and the in-app [What's New](apps/lantern-garage/public/whats-new.html). In flight: the v1.11 polish pass ([open issues](https://github.com/alex-place/lantern-os/issues)). Historical milestone writeup: [Unisona 1.8 — "one front door"](docs/UNISONA-1.8.md).
+**Current release: `1.10.0` (2026-07-14)** — see [CHANGELOG.MD](CHANGELOG.MD) and the in-app [What's New](apps/lantern-garage/public/whats-new.html). In flight: the v1.11 polish pass ([open issues](https://github.com/alex-place/lantern-os/issues)).
 
 ---
 
@@ -164,7 +164,7 @@ unisona.ai is built on **Σ₀ (Sigma-Zero)** — a framework for verifying that
 - The five Σ₀ routing/feedback paradoxes identified in 2026-06 (agent-selection hard loop, unbounded provider retries, stale route cache, silent memory truncation, ignored escalation gates) are all fixed with measurement loops and feedback gates, verified under stress testing.
 - Verification surfaces are user-facing: fact-check button, grounding-diff viewer, drift canaries, and confidence-scored convergence records.
 
-Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[AGI convergence blueprint](docs/AGI-CONVERGENCE-BLUEPRINT.md)** · **[collapse certificate](docs/SIGMA0-COLLAPSE-CERTIFICATE.md)** · **[Oracle design](docs/CONVERGENCE-ORACLE-DESIGN.md)** · **[grounding ledger](docs/SIGMA0-GROUNDING-LEDGER.md)** · **[anti-collapse hardening](docs/ANTI-COLLAPSE-HARDENING.md)** · **[research canon](docs/RESEARCH-CANON.md)**.
+Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[collapse certificate](docs/SIGMA0-COLLAPSE-CERTIFICATE.md)** · **[Oracle design](docs/CONVERGENCE-ORACLE-DESIGN.md)**.
 
 ## Privacy & security
 
@@ -209,8 +209,8 @@ npm run test:auth
 | **Agents / contributors** | [CLAUDE.md](CLAUDE.md) · [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [QUICKSTART.md](QUICKSTART.md) |
 | **Members / product** | [unisona.ai chat product definition](docs/KEYSTONE-PRODUCT.md) · [Dream Journal quickstart](docs/DREAM-JOURNAL-QUICKSTART.md) · [Explore feed](docs/EXPLORE-FEED.md) |
 | **Architects** | [Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md) (start here) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) · [ADR index](docs/adr/README.md) · [CSF format spec](docs/CSF-FORMAT-SPECIFICATION.md) · [PCSF](docs/convergence-io/PCSF.md) · [convergence-core mapping](docs/convergence-core-mapping.md) |
-| **Traders / analysts** | [Trading API reference](docs/trading-api-reference.md) · [Kalshi API spec](docs/KALSHI-API-SPEC.md) · [Sharpe certificate](docs/UNISONA-SHARPE-CERTIFICATE.md) · [survivorship study](experiments/survivorship_momentum/FINDINGS.md) · [market-data vendors](docs/research/2026-07-18-market-data-vendors-survivorship.md) · [experiments/](experiments/) |
-| **Operators / deploy** | [PROVIDERS.md](PROVIDERS.md) · [Cloudflare tunnel deployment](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) · [repo contract](docs/archive/REPO-CONTRACT.md) · [CHANGELOG.MD](CHANGELOG.MD) |
+| **Traders / analysts** | [Trading API reference](docs/trading-api-reference.md) · [Kalshi API spec](docs/KALSHI-API-SPEC.md) · [Sharpe certificate](docs/UNISONA-SHARPE-CERTIFICATE.md) · [experiments/](experiments/) |
+| **Operators / deploy** | [PROVIDERS.md](PROVIDERS.md) · [Cloudflare tunnel deployment](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) · [CHANGELOG.MD](CHANGELOG.MD) |
 
 Something broken? Search or file a [GitHub issue](https://github.com/alex-place/lantern-os/issues) (labels: `bug`, `p0`, `p1`, `convergence`).
 

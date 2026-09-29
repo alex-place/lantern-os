@@ -51,7 +51,7 @@ was measured with **point-in-time S&P 500 membership** (fja05680) and delisted-i
 prices, closing the survivorship hole that inflates naive runs. Records:
 `experiments/survivorship_momentum/free_data/results_measured.json`; method + data-source
 reality in `experiments/survivorship_momentum/FINDINGS.md` and
-[docs/research/2026-07-18-market-data-vendors-survivorship.md](research/2026-07-18-market-data-vendors-survivorship.md).
+`docs/research/2026-07-18-market-data-vendors-survivorship.md`.
 
 - **Survivorship bias is large and one-directional.** A hand-picked-winners run printed
   +33,937% (Sharpe 1.19); a benign-window survivor-heavy run (2014–2026) gave 0.755 — still

@@ -3,41 +3,41 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 33,
-    "reachable": 20,
+    "pages": 31,
+    "reachable": 18,
     "orphaned": 13,
-    "inSitemap": 17
+    "inSitemap": 15
   },
   "graph": {
     "accounts.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "admin-flags.html": [
       "auth.html",
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "auth.html": [
       "chat.html",
-      "knowledgecenter.html",
+      "faq.html",
       "terms.html"
     ],
     "budget.html": [
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -46,12 +46,12 @@
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "chat.html": [
       "budget.html",
+      "changelog.html",
       "explore.html",
       "journal.html",
       "stock-trader.html",
@@ -59,19 +59,19 @@
     ],
     "contest.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "create.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -80,11 +80,11 @@
     ],
     "explore.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "fallout-radio.html",
       "journal.html",
       "kalshi-terminal.html",
-      "knowledgecenter.html",
       "orchestration.html",
       "settings.html",
       "stock-trader.html",
@@ -95,126 +95,104 @@
     ],
     "faq.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "pricing.html",
       "stock-trader.html",
       "work.html"
     ],
     "ibkr-setup-guide.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "index.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
+      "pricing.html",
       "stock-trader.html",
       "work.html"
     ],
     "journal.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "kalshi-terminal.html": [
       "budget.html",
-      "chat.html",
-      "explore.html",
-      "journal.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "knowledgecenter.html": [
-      "auth.html",
-      "budget.html",
       "changelog.html",
       "chat.html",
       "explore.html",
-      "faq.html",
       "journal.html",
-      "library.html",
-      "pricing.html",
-      "settings.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "library.html": [
-      "budget.html",
-      "chat.html",
-      "explore.html",
-      "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "metrics.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "orchestration.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "ibkr-setup-guide.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "pricing.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "reset-password.html": [],
     "settings.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "shared.html": [],
     "stock-trader.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "trader-guide.html",
       "work.html"
     ],
     "system-health.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -228,19 +206,20 @@
     ],
     "transparency.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "welcome.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
+      "faq.html",
       "journal.html",
-      "knowledgecenter.html",
       "settings.html",
       "stock-trader.html",
       "work.html"
@@ -251,25 +230,24 @@
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "wide-search.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "work.html": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
       "orchestration.html",
       "stock-trader.html"
     ]
@@ -277,24 +255,22 @@
   "depth": {
     "index.html": 0,
     "budget.html": 1,
+    "changelog.html": 1,
     "chat.html": 1,
     "explore.html": 1,
     "journal.html": 1,
-    "knowledgecenter.html": 1,
+    "pricing.html": 1,
     "stock-trader.html": 1,
     "work.html": 1,
     "fallout-radio.html": 2,
     "kalshi-terminal.html": 2,
     "orchestration.html": 2,
     "settings.html": 2,
-    "auth.html": 2,
-    "changelog.html": 2,
-    "faq.html": 2,
-    "library.html": 2,
-    "pricing.html": 2,
     "trader-guide.html": 2,
     "ibkr-setup-guide.html": 3,
-    "terms.html": 3
+    "auth.html": 3,
+    "faq.html": 4,
+    "terms.html": 4
   },
   "byDepth": {
     "0": [
@@ -302,27 +278,27 @@
     ],
     "1": [
       "budget.html",
+      "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
-      "knowledgecenter.html",
+      "pricing.html",
       "stock-trader.html",
       "work.html"
     ],
     "2": [
-      "auth.html",
-      "changelog.html",
       "fallout-radio.html",
-      "faq.html",
       "kalshi-terminal.html",
-      "library.html",
       "orchestration.html",
-      "pricing.html",
       "settings.html",
       "trader-guide.html"
     ],
     "3": [
-      "ibkr-setup-guide.html",
+      "auth.html",
+      "ibkr-setup-guide.html"
+    ],
+    "4": [
+      "faq.html",
       "terms.html"
     ]
   },
@@ -338,8 +314,6 @@
     "index.html",
     "journal.html",
     "kalshi-terminal.html",
-    "knowledgecenter.html",
-    "library.html",
     "orchestration.html",
     "pricing.html",
     "settings.html",
@@ -372,8 +346,6 @@
     "faq.html",
     "ibkr-setup-guide.html",
     "kalshi-terminal.html",
-    "knowledgecenter.html",
-    "library.html",
     "orchestration.html",
     "pricing.html",
     "stock-trader.html",
@@ -395,24 +367,15 @@
     "welcome.html",
     "whats-new.html"
   ],
-  "knowledgeCenterPath": [
-    "index.html",
-    "knowledgecenter.html"
-  ],
-  "excludedEdges": [
-    {
-      "from": "chat.html",
-      "to": "knowledgecenter.html"
-    }
-  ],
+  "excludedEdges": [],
   "sharedNavTargets": [
     "chat.html",
     "stock-trader.html",
     "journal.html",
     "work.html",
-    "knowledgecenter.html",
     "explore.html",
-    "budget.html"
+    "budget.html",
+    "changelog.html"
   ],
   "navConfigHidden": [
     "create.html"

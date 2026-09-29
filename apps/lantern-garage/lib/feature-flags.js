@@ -42,7 +42,6 @@ const NAV_PAGES = [
   { path: "/stock-trader.html",  label: "Trader" },
   { path: "/create.html",            label: "Create" },
   { path: "/explore.html",           label: "Explore" },
-  { path: "/knowledgecenter.html",   label: "Help" },
 ];
 
 /**
