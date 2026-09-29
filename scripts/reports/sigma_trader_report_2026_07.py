@@ -1,6 +1,6 @@
 """Sigma Trader Report - July 2026 -- THE JULY LEAP (comet-leap, for-everyone edition).
 
-Builds apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf: the
+Builds reports/sigma-trader-report-2026-07.pdf (local-only, never served or committed): the
 monthly report on unisona.ai's Champion trader, written for EVERY user - free or
 paid, plan or no plan, market-fluent or brand new. House COMET LEAP style
 (Lantern Preferred Visual System v0.1: arc-of-past -> node-of-now -> projected
@@ -32,7 +32,9 @@ from reportlab.platypus import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "apps" / "lantern-garage" / "public" / "reports" / "sigma-trader-report-2026-07.pdf"
+# Not under public/: the report carries the book's balance, and the trading record is not
+# published (operator decision 2026-08-11; public/reports removed 2026-09-29).
+OUT = ROOT / "reports" / "sigma-trader-report-2026-07.pdf"
 
 # COMET LEAP palette (style profile colors_named, on dark marble)
 NIGHT = colors.HexColor("#0F1518")

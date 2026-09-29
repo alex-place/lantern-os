@@ -581,3 +581,22 @@ apps/lantern-garage/data/lantern-garage/trading/*-state.json
 # Yahoo still serves and defeating the module's entire purpose.
 data/lantern-garage/trading/bars/
 apps/lantern-garage/data/lantern-garage/trading/bars/
+
+# ─── Personal, financial and runtime data: never tracked (2026-09-29 cleanup) ───
+# The repository is PUBLIC. These paths hold user data, business financials or
+# files the running server rewrites; they were tracked by accident and removed.
+# Keep them ignored so autowork's untracked-file sweep can't commit them again.
+data/profiles/
+data/conversations/
+data/csf_memory/raw.jsonl
+data/dollhouse/memory/
+data/wallet/*.jsonl
+data/wallet/local-cash-wallet.json
+data/wallet/invoices/INV-*
+data/traction/events.jsonl
+data/trading/prediction-ledger.jsonl
+data/chat-usage/
+data/oracle/active-loop-runs.jsonl
+data/pr-watcher/
+data/queue/supervisor-events.jsonl
+data/csf_archives/

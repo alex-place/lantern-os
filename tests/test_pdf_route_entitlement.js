@@ -1,5 +1,6 @@
 /**
- * Regression: /api/pdfs DELETE + upload must be gated behind an entitlement (#866).
+ * Regression: /api/pdfs/upload must be gated behind an entitlement (#866); the old
+ * DELETE endpoint must stay removed.
  * The mutating endpoints used to apply NO auth check, so the research pool could be
  * deleted/poisoned without an entitled session.
  *
@@ -53,8 +54,9 @@ const blocked = (code) => code === 302 || code === 403;
   assert.strictEqual(hasEntitlement(req({ user: { id: "pdf-admin", role: "admin" } }), "pdf_admin"), true);
   ok("admin role passes pdf_admin entitlement implicitly");
 
-  // ── route integration: unentitled mutation is blocked ──
-  // seed an ingest file that a successful DELETE would remove
+  // ── route integration ──
+  // DELETE /api/pdfs was removed with the Knowledge Center library (2026-09-29); the
+  // route must no longer handle it, so nothing can delete from the ingest pool.
   const ingest = path.join(tmp, "data", "ingest");
   fs.mkdirSync(ingest, { recursive: true });
   fs.writeFileSync(path.join(ingest, "secret.pdf"), "%PDF-1.4 dummy");
@@ -62,10 +64,9 @@ const blocked = (code) => code === 302 || code === 403;
   res = fakeRes();
   const delReq = req(undefined); delReq.method = "DELETE";
   let handled = await pdfRoutes(delReq, res, urlOf("/api/pdfs", "filename=secret.pdf"), deps);
-  assert.strictEqual(handled, true, "DELETE handled");
-  assert.ok(blocked(res.statusCode), "unentitled DELETE blocked (302/403)");
-  assert.ok(fs.existsSync(path.join(ingest, "secret.pdf")), "file NOT deleted by a blocked request");
-  ok("unentitled DELETE /api/pdfs is blocked and deletes nothing");
+  assert.strictEqual(handled, false, "DELETE /api/pdfs is no longer handled");
+  assert.ok(fs.existsSync(path.join(ingest, "secret.pdf")), "file NOT deleted");
+  ok("DELETE /api/pdfs is gone and deletes nothing");
 
   res = fakeRes();
   const upReq = req(undefined); upReq.method = "POST"; upReq.headers = { "content-type": "multipart/form-data; boundary=x" };

@@ -36,7 +36,7 @@ gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d
 |-------|-------|
 | GCP project | `project-2f747c41-d0f3-4de9-b48` (number `843848914143`) |
 | VM | `lantern-app`, zone `us-central1-a`, `e2-medium`, Debian 12, 30 GB pd-balanced |
-| External IP | `104.197.219.106` (ephemeral — reserve a static IP if it must persist) |
+| External IP | `<vm-external-ip>` (ephemeral — reserve a static IP if it must persist) |
 | App service | systemd `lantern.service` → `node server.js` in `/opt/lantern-os/apps/lantern-garage`, binds `0.0.0.0:8080` |
 | Tunnel service (lantern-os.net) | systemd `cloudflared` → tunnel `lantern-cloud` (`c666a37e-b03f-43a6-ad68-aa0455a7b246`), Cloudflare account `967f7517…` |
 | Tunnel service (unisona.ai) | systemd `cloudflared-unisona` → tunnel `unisona.ai` (`1b1c2acf-4af9-45a0-9597-019d4a874a58`), Cloudflare account `ff492ab2…` — added 2026-07-10 (see [unisona.ai cutover](#unisonaai-tunnel-cutover-2026-07-10)) |
@@ -67,7 +67,7 @@ gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d
 
 ## Vertex (keyless)
 
-The VM's default compute SA `843848914143-compute@developer.gserviceaccount.com` is
+The VM's default compute SA `<service-account-email>` is
 granted `roles/aiplatform.user` and runs with `--scopes=cloud-platform`, so Gemini
 reaches Vertex through the metadata server — no key files. Enabled by these env vars
 (see drop-ins below): `GEMINI_USE_VERTEX=1`, `VERTEX_PROJECT=project-2f747c41-d0f3-4de9-b48`,
@@ -133,7 +133,7 @@ mailer does not error — it appends to `data/mail-outbox.jsonl` and the signup 
 sudo tee /etc/systemd/system/lantern.service.d/mail.conf >/dev/null <<EOF
 [Service]
 Environment="RESEND_API_KEY=re_..."
-Environment="MAIL_FROM=unisona.ai <no-reply@unisona.ai>"
+Environment="MAIL_FROM=unisona.ai <<operator-email>>"
 Environment="PUBLIC_BASE_URL=https://unisona.ai"
 EOF
 sudo chmod 600 /etc/systemd/system/lantern.service.d/mail.conf
@@ -357,7 +357,7 @@ curl -s https://unisona.ai/api/providers/status | python3 -m json.tool | head -3
 ## Provisioning from scratch
 
 If the VM is lost, recreate it: create an `e2-medium` Debian-12 instance with
-`--service-account=843848914143-compute@developer.gserviceaccount.com --scopes=cloud-platform`,
+`--service-account=<service-account-email> --scopes=cloud-platform`,
 a startup script that installs Node 20 + git, clones `master`
 (`GIT_LFS_SKIP_SMUDGE=1`), `npm install`, and installs `lantern.service`. Then:
 grant `roles/aiplatform.user` to the SA, recreate the five env drop-ins, install **both**
