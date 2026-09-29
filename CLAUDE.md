@@ -31,8 +31,6 @@ These documents are non-negotiable for safe, compliant contributions.
 
 **START HERE:** [!CONVERGANCE Σ₀ BRIEFING](docs/CONVERGANCE-SIGMA0-BRIEFING.md) — immutable North Star.
 
-**THEN:** [Research Canon](docs/RESEARCH-CANON.md) — living references organized by Convergence 12 component.
-
 **THEN:** [Convergence Core Mapping](docs/convergence-core-mapping.md) — how existing code aligns with architecture.
 
 **BENCHMARKS:** [docs/BENCHMARKS.md](docs/BENCHMARKS.md) — the maintained registry of every *external* mark we run (HumanEval, SWE-bench, LongMemEval, …). Update it in the same PR whenever a harness or measured result changes.

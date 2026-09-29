@@ -6,7 +6,7 @@ runnable demo [`experiments/question_machine_demo.py`](../../experiments/questio
 This is the math core (the bidirectional loop + the CAP/NAP seam-arbiter), **not** the
 full product — the external Act-stage channels it would ask *through* are still the open
 gap (see §7). Companion to the [Collapse Certificate](../SIGMA0-COLLAPSE-CERTIFICATE.md)
-and [Theorem C3](../SIGMA0-C3-NONCOLLAPSE-NORMAL.md).
+and Theorem C3.
 
 ---
 
@@ -76,7 +76,7 @@ constraint-dominance invariant.
 
 When the forward and backward passes **agree**, the seam → 0 and the machine has nothing left
 to ask *itself*. But **two mirrors agreeing can be jointly wrong** — a smoother converging on a
-self-consistent, ungrounded trajectory is the higher-order collapse the [C3](../SIGMA0-C3-NONCOLLAPSE-NORMAL.md)
+self-consistent, ungrounded trajectory is the higher-order collapse the C3
 work warns about. Consolidation makes the trajectory **coherent, not correct.**
 
 The escape is the **external terminal condition**. *Tested:* at the consolidated optimum the

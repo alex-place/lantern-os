@@ -4,8 +4,8 @@
 **Type:** Research note — structured counterexample + impossibility lemma + shipped guard.
 **Status:** [derived — proofs note Lemma 3] + [measured — this note, against SHIPPED code paths].
 **Loop stage:** Converge (hardens the unified control law before it is wired into production).
-**Slate:** [`2026-07-21-owned-math-conjectures.md`](2026-07-21-owned-math-conjectures.md) §M7 ·
-**Proof:** [`2026-07-21-owned-math-proofs.md`](2026-07-21-owned-math-proofs.md) Lemma 3 ·
+**Slate:** `2026-07-21-owned-math-conjectures.md` §M7 ·
+**Proof:** `2026-07-21-owned-math-proofs.md` Lemma 3 ·
 **Target:** [`converge-control.js`](../../apps/lantern-garage/lib/converge-control.js) (#2857, PR #2909) +
 [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) ·
 **Machine check:** [`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
@@ -80,7 +80,7 @@ is a *pair*, which is what makes it an impossibility rather than a tuning gap:
 The G/L estimator reads magnitude, not provenance; the influx bit is a disjunction; the rising
 bit is the same arithmetic. Identical signal *histories* ⇒ any deterministic causal policy
 (arbitrary memory allowed) acts identically ⇒ it is either unsound on L or vacuous on G.
-That is **Lemma 3** ([proofs note](2026-07-21-owned-math-proofs.md)); the kill criterion for
+That is **Lemma 3** (proofs note); the kill criterion for
 the lemma and the reason it survives charitable readings are stated there.
 
 The attack is cheap in practice: **any ambient evidence stream** — a subscribed feed, tool

@@ -40,7 +40,7 @@ the verified convergence ledger (#2797). What was missing is the **loop that run
 until it's solved or honestly can't be** — and the honest per-step verifier that gates each turn.
 
 Web-grounded 2026 (design of record:
-[docs/research/2026-07-22-spiral-verified-cascade-design.md](../research/2026-07-22-spiral-verified-cascade-design.md)):
+`docs/research/2026-07-22-spiral-verified-cascade-design.md`):
 per-step cascade routing is a named frontier — Policy-Guided Stepwise Model Routing (arXiv 2605.06116),
 Cluster-Route-Escalate (2606.27457), escalation decision theory (2605.06350) — including the property we
 need: for verifiable-outcome tasks, on a failed verify you *escalate inheriting the prior attempt's
@@ -69,7 +69,7 @@ Build order, de-risked, most value first:
   Distillation). The "own weights" bet, gated on Phase-0 evidence.
   *[Amended in effect by the operator size envelope, 2026-07-23: the product/cheap tier is
   **≤3B / ≤4GB / CPU-viable**; 7B+ is escalation-tier only. See
-  [research/2026-07-23-sigma0-llm-design.md](../research/2026-07-23-sigma0-llm-design.md) §2 and
+  `research/2026-07-23-sigma0-llm-design.md` §2 and
   ADR-0031. This note records that later operator decision; the ADR's decision text is unchanged.]*
 - **Phase 2 — the from-scratch tiny recursive core** (growing memory + rotational anti-collapse as
   trainable modules). Gated on Phase-1 evidence. The ambitious, highest-risk piece — never built first.

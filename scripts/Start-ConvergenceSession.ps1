@@ -47,7 +47,6 @@ function Invoke-SurfaceVerification {
         @{ Path = "/dream-chat.html";  Name = "Journal"    },
         @{ Path = "/flourishing";       Name = "Dashboard"  },
         @{ Path = "/rag-house.html";    Name = "RAG House"  },
-        @{ Path = "/knowledgecenter.html"; Name = "Help"    },
         @{ Path = "/changelog.html";    Name = "Changelog"  },
         @{ Path = "/three-doors-game.html"; Name = "Explore" },
         @{ Path = "/agent-status.html"; Name = "System"     }

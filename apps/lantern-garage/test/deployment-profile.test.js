@@ -19,7 +19,7 @@ function cloud() { process.env.LANTERN_TENANCY = "cloud"; }
 
 const HOSTED = ["index.html", "dream-chat.html", "explore.html", "faq.html"];
 const LOCAL_ONLY = ["kalshi-terminal.html", "trading.html", "work.html", "admin-flags.html",
-  "create.html", "orchestration.html", "knowledgecenter.html"];
+  "create.html", "orchestration.html"];
 
 check("local profile is the default and serves EVERY surface (no regression)", () => {
   local();

@@ -16,9 +16,9 @@ Convergence-Core object so the project stops carrying two design threads.
 > X3 BitNet-sparsity match below is a population coincidence, not a shared mechanism. X1
 > (round-trip) and X2 (wavefront minimality) were never run. Evidence:
 > [`research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md`](research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md) ·
-> [`KEYSTONE-IP-AND-BUILDOUT.md`](KEYSTONE-IP-AND-BUILDOUT.md) §3.1. What *survived* and where
+> `KEYSTONE-IP-AND-BUILDOUT.md` §3.1. What *survived* and where
 > it is applied across CSF / Convergence-IO / chat / trade / explore:
-> [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md).
+> `research/2026-07-21-tesseract-application-map.md`.
 
 **Grounding contract (External Reality Rule).** Every load-bearing claim is tagged
 **[implemented]** (code exists and runs), **[grounded]** (external peer literature supports
@@ -26,7 +26,7 @@ it), or **[hypothesis — to be measured]**. Metaphor is labelled as metaphor.
 
 **Reads first:** [`CONVERGANCE-SIGMA0-BRIEFING.md`](CONVERGANCE-SIGMA0-BRIEFING.md) (immutable North Star) ·
 [`CSF-FORMAT-SPECIFICATION.md`](CSF-FORMAT-SPECIFICATION.md) ·
-[`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md) ·
+`research/2026-06-19-convergence-tesseract-spiral.md` ·
 [`convergence-core-mapping.md`](convergence-core-mapping.md)
 
 ---
@@ -74,7 +74,7 @@ Two threads grew up separately in the repo:
   engine, v0.8 CSF-Pack, v1 segmented. Framed as **storage**.
 - **The Tesseract** — a 4-cube reasoning geometry: the Status-Cube (belief × observer × state)
   × a depth axis, with an inference trajectory that contracts to a fixed point
-  ([`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)).
+  (`research/2026-06-19-convergence-tesseract-spiral.md`).
   Framed as **geometry / reasoning**.
 
 The North Star forbids exactly this: *"One loop. Four objects. Everything else is
@@ -316,11 +316,11 @@ Tracked by the comet leap P2 plan (removed 2026-07-16; superseded by [research/2
 1. **This doc** becomes the single design reference for the `3**12` lattice.
 2. [`CSF-FORMAT-SPECIFICATION.md`](CSF-FORMAT-SPECIFICATION.md) gains a "lattice view" pointer
    (qutrit_delta = the storage face).
-3. [`RESEARCH-CANON.md`](RESEARCH-CANON.md) gains the external anchors above under the right
+3. `RESEARCH-CANON.md` gains the external anchors above under the right
    components.
 4. [`convergence-core-mapping.md`](convergence-core-mapping.md) reclassifies CSF from
    "implementation-detail leak" to "storage face of the lattice."
-5. [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
+5. `research/2026-06-19-convergence-tesseract-spiral.md`
    gains the STARS citation (closes its non-normal gap) and a cross-link here.
 6. ``skills/convergence-mathematical-foundations``
    gains a "3¹² Convergence Lattice" section.

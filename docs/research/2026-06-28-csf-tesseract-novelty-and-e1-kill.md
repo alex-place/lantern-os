@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-28
 **Type:** Review + external validation + experiment (E1/E2 run) + salvage
-**Status:** Closed. This note **closes** the "higher-dimensional / tesseract / lapse compression" research branch with evidence, and records the one piece worth carrying forward. No new subsystem. Supersedes the open kill-tables in [`2026-06-20-lapse-tesseract.md`](2026-06-20-lapse-tesseract.md) §6 (E1/E2) and [`2026-06-19-convergence-tesseract-spiral.md`](2026-06-19-convergence-tesseract-spiral.md) §6 (E2).
+**Status:** Closed. This note **closes** the "higher-dimensional / tesseract / lapse compression" research branch with evidence, and records the one piece worth carrying forward. No new subsystem. Supersedes the open kill-tables in `2026-06-20-lapse-tesseract.md` §6 (E1/E2) and `2026-06-19-convergence-tesseract-spiral.md` §6 (E2).
 
 **Grounding contract — External Reality Rule.** Every load-bearing claim is tagged **[implemented]**, **[measured — this note]**, **[grounded]** (external peer literature, verified URL), or **[killed]** (a falsifiable claim run and refuted). Metaphor is labelled metaphor.
 

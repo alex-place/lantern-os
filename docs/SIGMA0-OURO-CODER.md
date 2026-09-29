@@ -289,7 +289,7 @@ the from-scratch program (G0–G3, budget gates) follows operator approval.
 
 **Honesty-axis twin.** Where this whitepaper owns the *coding/math* axis (an exec-test verifier
 gates each step), its counterpart on the *truthfulness* axis is
-[AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md](AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md) — a hidden-state
+`AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md` — a hidden-state
 honesty probe used as a held-out verifier over self-minted convergence data. Same thesis: the
 verifier, not scale, is the source of generalization.
 

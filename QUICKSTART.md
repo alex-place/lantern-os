@@ -114,7 +114,7 @@ Once it's running on `http://127.0.0.1:4177`:
 |---|---|---|
 | **Home** | `/` | The landing page with links to everything |
 | **Chat** | `/chat.html` | Talk to unisona.ai — your main way in (legacy `/dream-chat.html` redirects) |
-| **Help** | `/knowledgecenter.html` | Guides, docs, and your saved PDFs |
+| **Help** | `/faq.html` | Frequently asked questions |
 | **Trader** | `/stock-trader.html` | Markets & prediction-market terminal *(needs an account)* |
 | **Create** | `/create.html` | Image and content tools *(needs an account)* |
 | **Explore** | `/explore.html` | Games, the flourishing dashboard, and more |
@@ -290,7 +290,7 @@ npm run test:api --prefix apps/lantern-garage
 
 ## Go deeper
 
-- **[Help & Knowledge Center](https://lantern-os.net/knowledgecenter.html)** — friendly guides and every doc in one place
+- **[Help & FAQ](https://lantern-os.net/faq.html)** — answers to the common questions
 - **[PROVIDERS.md](PROVIDERS.md)** — all the AI providers and how to configure them
 - **[AGENTS.md](AGENTS.md)** — how the AI agent workflow and contribution lanes work
 - **[SECURITY.md](SECURITY.md)** — the security model and how to report a problem

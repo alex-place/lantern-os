@@ -73,7 +73,7 @@ the strictest, **measurable** bar. Drop the default only when, for **N = 3
 consecutive rollover stages** at `KEYSTONE_ROLLOVER_MODE=default`:
 
 1. **Quality:** Gate B PASS every stage (accuracy > 0.34 cold floor; target trending
-   toward the grounded bar in [SIGMA0-K1-KERNEL-SPEC §3](SIGMA0-K1-KERNEL-SPEC.md)).
+   toward the grounded bar in SIGMA0-K1-KERNEL-SPEC §3).
 2. **Cost:** Gate F PASS every stage (bytes-per-correct ≤ baseline).
 3. **Autonomy:** Claude **escalation rate < Y%** (default Y = 10%) of landed work
    items — i.e. the kernel finished the work itself ≥ 90% of the time. Escalations
@@ -90,7 +90,7 @@ Until all three hold, `anthropic` stays in the chain as fallback.
   fleet; it does not add a parallel agent stack (that would violate the convergence
   constraint).
 - **State-ABI shim / kernel internals** (component 6, `StateABIShim`) are tracked in
-  [SIGMA0-K1-KERNEL-SPEC](SIGMA0-K1-KERNEL-SPEC.md), not here. This doc is about
+  SIGMA0-K1-KERNEL-SPEC, not here. This doc is about
   *routing + promotion*, not the kernel's internals.
 
 ## See also
@@ -101,5 +101,5 @@ Until all three hold, `anthropic` stays in the chain as fallback.
   fleet gating [#896](https://github.com/alex-place/lantern-os/issues/896) ·
   fallback-as-convergence [#897](https://github.com/alex-place/lantern-os/issues/897) ·
   dashboard [#898](https://github.com/alex-place/lantern-os/issues/898)
-- [SIGMA0-K1-KERNEL-SPEC.md](SIGMA0-K1-KERNEL-SPEC.md) — kernel gates A–F, components
+- `SIGMA0-K1-KERNEL-SPEC.md` — kernel gates A–F, components
 - [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the North Star

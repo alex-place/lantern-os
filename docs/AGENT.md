@@ -11,7 +11,7 @@
 > disagree, the code wins — fix the doc.
 
 **Status:** Living spec. Supersedes the napkin framing; consolidates
-[`docs/research/2026-06-19-convergence-core-agent-spine.md`](research/2026-06-19-convergence-core-agent-spine.md)
+`docs/research/2026-06-19-convergence-core-agent-spine.md`
 into the top-level statement of what the agent *is*.
 
 **Canon this builds on:**
@@ -19,7 +19,7 @@ into the top-level statement of what the agent *is*.
 [`docs/CONVERGANCE-SIGMA0-BRIEFING.md`](CONVERGANCE-SIGMA0-BRIEFING.md) ·
 [`docs/convergence-core-mapping.md`](convergence-core-mapping.md) ·
 [`docs/SIGMA0-COLLAPSE-CERTIFICATE.md`](SIGMA0-COLLAPSE-CERTIFICATE.md) ·
-[`docs/research/2026-06-19-convergence-core-agent-spine.md`](research/2026-06-19-convergence-core-agent-spine.md) ·
+`docs/research/2026-06-19-convergence-core-agent-spine.md` ·
 [`PROVIDERS.md`](../PROVIDERS.md) ·
 [`docs/PATREON-OAUTH.md`](PATREON-OAUTH.md)
 

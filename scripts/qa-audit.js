@@ -29,7 +29,6 @@ const PAGES = [
   '/flourishing.html',
   '/hff.html',
   '/hff/',
-  '/knowledgecenter.html',
   '/observer-mesh-cube.html',
   '/outreach.html',
   '/pricing.html',

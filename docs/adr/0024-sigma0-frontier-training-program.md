@@ -14,7 +14,7 @@ superseded-by: none
 - Status: **Proposed** (requires Alex's explicit acceptance; agents may not flip this)
 - Loop stage: Reason (the trained model is the reasoner) + Verify (honesty-native abstention; certificate quantities as training-time abort criteria)
 - Relates to: [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) (continual-learning rules — see reconciliation below), [ADR-0011](0011-proprietary-sigma0-base-model.md) (own Σ₀ base), [ADR-0015](0015-qwen-teacher-verified-distillation.md) (verified distillation), [ADR-0021](0021-serving-substrate-retain-ouro-custom-loop.md) (serving substrate)
-- Briefs: [SIGMA0-FRONTIER-TRAIN-BRIEF.md](../SIGMA0-FRONTIER-TRAIN-BRIEF.md) (this program) · [SIGMA0-MODEL-DESIGN.md](../SIGMA0-MODEL-DESIGN.md) (appendix) (serving layer / distillation target)
+- Briefs: `SIGMA0-FRONTIER-TRAIN-BRIEF.md` (this program) · `SIGMA0-MODEL-DESIGN.md` (appendix) (serving layer / distillation target)
 
 > **Note (2026-07-06):** originally merged as "ADR-0023" (PR #2158), one minute after
 > [0023-default-profile-foregrounds-the-loop.md](0023-default-profile-foregrounds-the-loop.md)
@@ -108,13 +108,13 @@ contract **train frontier → distill to the ≤8GB local serving artifact**:
   is measured and bounded.*
 - **Phase 3 — FRONTIER tier.** ~~Scale per D1, only through the prior gates.~~
   **RETIRED to research-option by operator decision (Alex, 2026-07-22).** Grounding: the
-  [frontier build+test survey](../research/2026-07-22-frontier-build-test-survey.md) (G10) —
+  frontier build+test survey (G10) —
   no lab at any budget trains small frontier models from scratch (even Meta codistills;
   DeepSeek-V4 consolidates its flagship via on-policy distillation), recipe/data beat ~15×
   parameters within one generation (Qwen3.6-27B dense > 397B flagship on coding), and
   post-training is now 15–25% of frontier compute — the stage a mid-size player can contend
   in. From-scratch pretraining may only be revisited if the post-training program (the v1.10
-  phase map in [AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md](../AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md))
+  phase map in `AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md`)
   produces evidence that a pretraining-level intervention is *necessary* — not merely
   desirable — and the honesty objective is proven trainable at small scale first.
 
@@ -166,7 +166,7 @@ D1 tiers and cluster shape; dense-recurrent vs MoE-UT (D2); the exact objective 
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| Operator directive: frontier training in scope, budget a decision input | Operator statement 2026-07-06; recorded in [SIGMA0-FRONTIER-TRAIN-BRIEF.md](../SIGMA0-FRONTIER-TRAIN-BRIEF.md) | High | operator |
+| Operator directive: frontier training in scope, budget a decision input | Operator statement 2026-07-06; recorded in `SIGMA0-FRONTIER-TRAIN-BRIEF.md` | High | operator |
 | 0-1-scored evals reward guessing → hallucination persists | Kalai et al., arXiv:2509.04664 | High | external paper |
 | Honesty post-training exists; honesty-native *pretraining* does not | TruthRL arXiv:2509.25760; R-Tuning arXiv:2311.09677; 7 verified searches 2026-07-06 (brief §survey) | Medium-High | external survey |
 | Honesty trainable + measurable small (golden 0.958 / confab 10%) | `experiments/sigma0_ouro_honesty_eval.py` — **RETRACTED as headline by E1**: substantially gloss leakage | **Open** (was High) | in-repo eval |

@@ -162,7 +162,7 @@ safety mechanism.** This is the same thing machine-learning researchers call
 **What's left.** Both halves of [#768] are now closed (in-regime). Theorem 1's
 **contraction** for non-normal *drift* (the §1 cross-term) — whether an ungrounded
 system collapses vs. diverges — is resolved by the spectral (Riesz) dichotomy
-([SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md), 2026-06-26):
+(`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`, 2026-06-26):
 split by `A`'s own spectrum so the cross-term vanishes by invariance; the active
 block contracts (Lyapunov) and the slow block's abscissa sign gives collapse-vs-
 diverge, no third fate. The anti-collapse *freeze* claim is likewise proven for all
@@ -311,8 +311,8 @@ CLAUDE.md loop — every stage has a place here, its own research base, and its 
 **Certificate role:** the evidence input `u` in `ẋ = f(x,u,θ)` — every guarantee below is
 conditional on this stage delivering fresh truth; R8 (anytime-valid) governs when observation may
 *stop*. **Research base:** bounded-context externalized state for indefinite horizons (InfiAgent /
-Self-GC 2607.00692 / AgentFold — [conv-engine note](research/2026-07-22-sigma0-math-convergence-engine.md));
-the current frontier generation pretrains on *agentic execution traces* (DeepSeek-V4, [survey §1b](research/2026-07-22-frontier-build-test-survey.md)).
+Self-GC 2607.00692 / AgentFold — conv-engine note);
+the current frontier generation pretrains on *agentic execution traces* (DeepSeek-V4, survey §1b).
 **In-repo:** the verified-event miners (1,842 PR/ledger records; sessions pending Vertex);
 arXiv corpus + patent harvester. **Open:** [#2852](https://github.com/alex-place/lantern-os/issues/2852).
 
@@ -349,7 +349,7 @@ ILC re-parameterizing the cheap tier (US6686716B1 = the VTD flywheel's servo pre
 cheaper, #2800). **Open:** [#2855](https://github.com/alex-place/lantern-os/issues/2855) allocator.
 **Shipped 2026-07-23:** the stop-on-stall/loop-detection, pass-terminates, bidirectional-tiering
 + whole-answer-confidence quick wins landed in the harness (PR #2862, from the
-[backlog](research/2026-07-22-cross-domain-incremental-backlog.md)); the Phase-0 runner gained the
+backlog); the Phase-0 runner gained the
 honest-labeling frontier preflight (PR #2863).
 
 ### VERIFY — the certificate's home (Part I lives here)
@@ -778,10 +778,10 @@ normality was used) via a Frobenius reverse-triangle bound, so the conclusion ho
 all `A`. *Distinct from this:* Theorem 1's **contraction** for non-normal `A` (whether the
 ungrounded drift collapses vs. diverges — the §1 cross-term) is the *drift* question — now
 also closed in-regime via the spectral dichotomy
-([SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md), [#768]); C3 is the
-*rescue*, not the *drift*. [Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md)
+(`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`, [#768]); C3 is the
+*rescue*, not the *drift*. Theorem C3
 chains the lemmas — `L2′ ∧ L3 ∧ L4 ∧ L5 ⇒ P(permanent freeze) = 0` — where
-[L2](SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md) is closed-form proven and L4/L5 are
+L2 is closed-form proven and L4/L5 are
 machine-checked (`tests/test_cio_sde.py::test_c3_no_consecutive_freeze`,
 `::test_l4_floor_lifts_anisotropy`, `::test_l4_floor_scale_equivariant`,
 `::test_g13_no_zero_rank_bump`; sweep `experiments/prove_c3_noncollapse.py` — 3000
@@ -816,14 +816,14 @@ raises `‖x‖` and so `cond_grad`).
 
 **What is and isn't claimed.** Re-exciting directions that have gone flat keeps the
 system off the null manifold. There is now a companion theorem —
-[Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md) — that Σ₀⁻¹ *prevents permanent freeze*
+Theorem C3 — that Σ₀⁻¹ *prevents permanent freeze*
 (the gate cannot fire on two consecutive steps) for **all `A`, normal and non-normal**:
 the alignment hypothesis L1 was removable (L2′, a Frobenius reverse-triangle bound — at
 `cond_flat` Σ≈μI, so *any* rank-`m` bump lifts anisotropy). The 900-run distribution
 ([#658]) is now corroboration, not the primary support. The companion *drift* question —
 Theorem 1's **contraction** for non-normal `A` (the §1 cross-term, [#768]), a different claim
 from C3's anti-freeze — is now also closed in-regime via the spectral dichotomy
-([SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md)).
+(`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`).
 
 **Empirical evidence (MEASURED, [#658] — landed 2026-06-19).**
 `experiments/sigma0_regime_sweep.py` runs forced-collapse rollouts with and without
@@ -983,7 +983,7 @@ re-deriving it. The LLM literature has the *event-triggered* side only — FLARE
 (arXiv:2305.06983) and DRAGIN (arXiv:2403.10081) trigger retrieval reactively on uncertainty —
 plus naive fixed-interval retrieval; a cadence *derived from measured loop dynamics* appears
 to be an open lane, tracked with the Phase-1/2 real-model plan in [#2690] and composed in
-[SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md) §2.
+`SIGMA0-GROUNDING-LEDGER.md` §2.
 
 **Honest limits.** The additive-anchor model is a simplification — real grounding enters
 as tokens through attention, not as a clean latent displacement. The qualitative
@@ -1828,7 +1828,7 @@ is holdout theater, the same collapse it exists to prevent, one level up.
    level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
    remaining empirical gap, unchanged: this validates the PROTOCOL, not real training. The L4
    run is now fully specified as a self-contained handoff —
-   [SIGMA0-EB-L4-RUNBOOK.md](SIGMA0-EB-L4-RUNBOOK.md): inventory, task partition, the
+   `SIGMA0-EB-L4-RUNBOOK.md`: inventory, task partition, the
    eval→7-metric glue contract, teeth recipes, pre-registered verdicts incl. the Roelofs rule,
    and a cost-approval gate.)*
 5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
@@ -1956,7 +1956,7 @@ outside check resolves it (the fabricated-arXiv confession that opens this file)
 ### 10.1 The freshness law, measured on code (2026-07-21)
 
 §8.4.1 measures the freshness law in simulation. On 2026-07-21 the same law appeared on a live code
-surface — the way the survivorship study (see the [AGI blueprint](AGI-CONVERGENCE-BLUEPRINT.md)) is
+surface — the way the survivorship study (see the AGI blueprint) is
 a real-market instance of the same discipline, not a new theorem:
 
 The autowork patch-retry loop re-showed the model **its own failed diff** on each attempt. The model
@@ -2023,7 +2023,7 @@ steering* are built and measured.]**
 - **arXiv:2404.00781** — Elsayed & Mahmood, *Addressing Loss of Plasticity and Catastrophic Forgetting in Continual Learning* (UPGD) — the weight-perturbation σ; σ=0 = frozen / no plasticity (§7.1).
 - **arXiv:2503.01595** — *STAR: Stability-Inducing Weight Perturbation for Continual Learning* — worst-case weight perturbation for stability (§7.1).
 - **arXiv:2509.22764** — Kang et al., *In-Context Learning can Perform Continual Learning Like Humans* — continual learning in-context (zero parameter updates), beats gradient-based CL; the `σ_weights=0` escape (§7.1).
-- **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into [`RESEARCH-CANON.md`](RESEARCH-CANON.md) [11].
+- **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into `RESEARCH-CANON.md` [11].
 - **arXiv:2310.01798** — Huang, Chen, Mishra, Zheng, Yu, Song & Zhou, *Large Language Models Cannot Self-Correct Reasoning Yet* (ICLR 2024) — the **inference-time twin** of §7's collapse claim: intrinsic self-correction *without external feedback* degrades reasoning (GPT-4 95.5→91.5 on GSM8K). The model-collapse citations above are the *training-time* version of the same "no contact with outside reality → degradation" mechanism; this is the same law one timescale down, and the escape (external feedback) matches §7's grounding. Title/authors/venue verified against arXiv 2026-07-07.
 - **arXiv:2406.15927** — Kossen et al., *Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs* (2024) — a **linear probe on a single generation's hidden state** predicting semantic entropy; nearest prior for §7.3's confabulation-detection honesty layer. The §7.2 rule "bind every honesty signal to an external check" is the product-form guard around exactly this internal signal. Verified against arXiv 2026-07-07.
 - W. P. M. H. Heemels, K. H. Johansson & P. Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012; **arXiv:1803.08980** — Lyapunov event-triggered stabilization with a known convergence rate. The mature prior-art field for §3.1's schedule consequence (intervention timing from a certified decay rate). Verified 2026-07-17.
@@ -2134,7 +2134,7 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-07-07 | §8's "a fixed holdout gives O(1) gates" | **n-graded, not O(1)** (measured 32 seeds); fresh-flow strictly dominates (22× at n=50); Thresholdout is the formal third road | [§8.4](#84-the-load-bearing-open-problem--holdout-theater-review-hit-3-the-sharpest) |
 | 2026-07-07 | §8.2 checkpoint "fates" as first stated | corrected per external review hit #1 | [§8.2](#82-the-fates-corrected-review-hit-1) |
 | 2026-07-17 | §8.6 "no prior art for internal-state checkpoint monitors" | **stale** — the detection lane is occupied (2601.16874, 2602.10144, 2604.19884); only the *incremental* ΔAUC design may remain unique | §8.6 item 5 |
-| 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | [grounding ledger](research/2026-07-22-grounding-ledger-and-patent-landscape.md) |
+| 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | grounding ledger |
 | 2026-07-22 | R3 (M1) filed as if the *inequality itself* might be novel | **scope shrunk on audit** — martingale core classical (Doob/CEE), diagnostic use taken (2512.02914); only the *enforced-runtime-gate* form promoted ✓ at ~70% | [#2860](https://github.com/alex-place/lantern-os/issues/2860) |
 | 2026-07-22 | R9 (basin determinism) filed broad | **scope shrunk on audit** — four adjacent lanes occupied; only *semantic-intent basin identity as objective + product contract* promoted ✓ at ~55–60%, flagged killable on second round | [#2861](https://github.com/alex-place/lantern-os/issues/2861) |
 | 2026-07-23 | R9 round-2 kill-or-confirm | **CONFIRMED, boundary sharpened** — objective half clean (2603.22871 input-specific contraction, 2410.23391 descriptive-only; ~65%); product half narrowed by verified semantic caching 2602.13165 + TAR@N metrics 2408.04667/2512.07795 — the surviving contract is exact-key evidence-receipted serving with the no-free-movement alarm (~50%) | [#2874](https://github.com/alex-place/lantern-os/issues/2874) |
@@ -2206,7 +2206,7 @@ for produced results and Appendix A for the original design sketch.*
 > isolates the σ-axis (σ=0 freezes, σ>0 explores); suite now **34 passed, 0 xfail**.
 >
 > **Maintenance log — 2026-06-25 (§3 closed for normal A).** The §3 sufficiency claim is
-> now PROVEN for **normal `A`** — [Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md), chaining
+> now PROVEN for **normal `A`** — Theorem C3, chaining
 > `L1(normal) ∧ L2 ∧ L3 ∧ L4 ∧ L5 ⇒ P(permanent freeze) = 0`. Closing it surfaced (and
 > fixed) two real defects in the shipped `AntiCollapseOperator`: (1) the bump magnitude
 > `strength·p` was **scale-blind** while L2's threshold `Δ ∝ μ` — fixed with a μ-aware
@@ -2233,7 +2233,7 @@ for produced results and Appendix A for the original design sketch.*
 > §7 (L2′) and the L2 doc gains the alignment-free strengthening. **The contraction half**
 > (Theorem 1's drift for non-normal `A`, the §1 cross-term — a different claim) was the last
 > gap; it was **closed later the same day** via the spectral dichotomy (see the Closed block
-> above and [SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md)), so **all of
+> above and `SIGMA0-T1-NONNORMAL-DICHOTOMY.md`), so **all of
 > [#768] is now closed in-regime.** **(2) The 8 orphan
 > failures fixed.** They were tests of collapse-machinery *behavior* (freeze, projection,
 > NIS-canary-on-snap) running under the #1138 observe-only default, which suppresses the
@@ -2415,7 +2415,7 @@ for produced results and Appendix A for the original design sketch.*
 - **Theorem 1's *contraction* for non-normal drift `A`** ([#768]) — **now CLOSED in-regime.**
   The §1 cross-term (`P_M A P_N ≠ 0` for non-normal `A`) breaks the symmetric-split energy
   proof, and the small-gain / pseudospectral gates (§1.2.1) only over-reject. The fix is the
-  **spectral (Riesz) dichotomy** ([SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md)):
+  **spectral (Riesz) dichotomy** (`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`):
   split by `A`'s OWN spectrum so the cross-term vanishes by invariance; the active block
   contracts within a certified Lyapunov envelope; the slow block's abscissa sign gives the
   collapse-vs-diverge fate, no third option. Shipped as `dichotomy_certificate`
@@ -2423,8 +2423,8 @@ for produced results and Appendix A for the original design sketch.*
   machine-checked by a 600-matrix sweep (0 failures, worst invariance residual 6.7e-13) and
   3 suite tests. For normal `A` it reduces to Theorem 1 exactly, so T1 is its special case.
 
-- **§3 sufficiency *theorem* — now closed for ALL `A`** (2026-06-26). [Theorem
-  C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md) proves Σ₀⁻¹ prevents permanent freeze: first for
+- **§3 sufficiency *theorem* — now closed for ALL `A`** (2026-06-26). Theorem
+  C3 proves Σ₀⁻¹ prevents permanent freeze: first for
   normal `A` (landed 2026-06-25), then for **non-normal `A` too** once L2′ (§7 of the C3
   doc) showed the alignment hypothesis L1 was removable — *any* rank-`m` bump lifts
   anisotropy at `cond_flat` (Σ≈μI) by a Frobenius reverse-triangle bound. The 900-run
@@ -2439,7 +2439,7 @@ for produced results and Appendix A for the original design sketch.*
 - [#657] — **§4 residual CLOSED.** The engine no longer self-observes; `forward_step` runs a Kalman predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration stays consistent (NIS≈m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS — the canary fires under collapse. `test_surprise_monitor_integration` flipped `xfail` → hard pass (30 passed). *This was the last open technical gap in the Σ₀ machinery.*
 - [#659] — **§4 decision CLOSED (RETIRED).** `p_gate`/`p_unbounded` formally retired, superseded by the `surprise.py` NIS canary; never implemented in `collapse.py` and will not be.
 
-**Anti-collapse hardening (epic [#764]) — landed (verified 2026-06-21).** The full CSF-grounded defense-in-depth plan lives in [ANTI-COLLAPSE-HARDENING.md](ANTI-COLLAPSE-HARDENING.md). The code-verified bugs are now **resolved** (issues closed; fixes confirmed in source): [#765] (PCSF circuit-breaker `AttributeError` → true EMA on the declared `latency_ema_ms`, plus QUOTA_HIT recovery timer + half-open backoff in `src/convergence_io/pcsf.py`), [#766] (instrument→actuator loop **closed** — `loop_lm.generate()`'s `canary` path folds per-token self-repeat / n-gram echo / argmax-margin into `sigma0_proximity` and adapts `rep_penalty`/q as collapse nears), [#767] (memory confidence laundering + hash-chain ledgers). The proven-region wideners for non-normal `A` ([#768]: Lyapunov-SDP + pseudospectral-abscissa gates) **landed** as `stability_gates()` (§1.2.1). These extend the proven region of §1; they do **not** make the system globally uncollapsible — and the §3 *sufficiency theorem* (a closed-form proof that Σ₀⁻¹ always prevents collapse) remains the one genuine open frontier, distinct from #768's now-landed gates.
+**Anti-collapse hardening (epic [#764]) — landed (verified 2026-06-21).** The full CSF-grounded defense-in-depth plan lives in `ANTI-COLLAPSE-HARDENING.md`. The code-verified bugs are now **resolved** (issues closed; fixes confirmed in source): [#765] (PCSF circuit-breaker `AttributeError` → true EMA on the declared `latency_ema_ms`, plus QUOTA_HIT recovery timer + half-open backoff in `src/convergence_io/pcsf.py`), [#766] (instrument→actuator loop **closed** — `loop_lm.generate()`'s `canary` path folds per-token self-repeat / n-gram echo / argmax-margin into `sigma0_proximity` and adapts `rep_penalty`/q as collapse nears), [#767] (memory confidence laundering + hash-chain ledgers). The proven-region wideners for non-normal `A` ([#768]: Lyapunov-SDP + pseudospectral-abscissa gates) **landed** as `stability_gates()` (§1.2.1). These extend the proven region of §1; they do **not** make the system globally uncollapsible — and the §3 *sufficiency theorem* (a closed-form proof that Σ₀⁻¹ always prevents collapse) remains the one genuine open frontier, distinct from #768's now-landed gates.
 
 **Resolved (landed 2026-06-17):**
 - [#661] — **§2 / Appendix A defect.** `_collapse_state`'s "log-barrier" was a misnamed multiplicative shrink that flipped sign for `strength > 0.217`. **Fixed:** the term is dropped; collapse is now the clean orthogonal projection `x* = P x` (non-expansive, smooth). The `log_barrier_strength` parameter was removed. Regression: `test_collapse_is_nonexpansive_projection`. *Flagged in external review 2026-06-16.*
@@ -2476,7 +2476,7 @@ for produced results and Appendix A for the original design sketch.*
 > "no prior art surfaced" no longer holds — the detection lane is occupied (arXiv:2601.16874,
 > 2602.10144, 2604.19884); corrected in place, per this document's own discipline. **(3) The
 > three thin still-open corners** are now tracked as issues and composed in a new companion doc,
-> [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md) (*grounding has a price, a schedule,
+> `SIGMA0-GROUNDING-LEDGER.md` (*grounding has a price, a schedule,
 > and a budget*): [#2690] schedule (self-triggered grounding), [#2691] budget
 > (Thresholdout-gated promotion — the real A/B/C run), [#2692] price (freshness-law
 > falsification: re-drawable noise vs re-drawn truth). The companion is deliberately a *ledger*,

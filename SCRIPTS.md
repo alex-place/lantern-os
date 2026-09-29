@@ -8,8 +8,7 @@ updated: 2026-07-16
 
 One-stop reference for every runnable script in the repo. Skip the archaeology next time.
 
-**Regenerated 2026-07-16** from the Python scripts audit
-([docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md](docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md), Appendix D + §3) — #2537.
+**Regenerated 2026-07-16** from the Python scripts audit (#2537; the audit doc itself is in git history).
 The previous inventory referenced `archive/` and `lantern-discord/` directories that no longer exist.
 
 **This file is load-bearing:** the sprawl tripwire (#2542) blocks any *new* `.py` outside
@@ -249,6 +248,4 @@ python src/convergence_io_engine.py health
 node scripts/sprawl-tripwire.mjs --base origin/master
 node scripts/check-md-links.mjs
 ```
-
-Full provenance for every `.py` in the repo: [docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md](docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md).
 

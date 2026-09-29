@@ -28,12 +28,10 @@ const ROOT_PAGE = 'index.html';
 /**
  * Links we deliberately do not treat as navigation.
  *
- * chat.html's Knowledge Center link lives inside a post-upload confirmation
- * string ("Added to your Knowledge Center — view & search"). It only renders
- * after a successful PDF upload, so counting it would make KC look one click
- * closer to the home page than a user can actually get. See #3107.
+ * None today. (The chat post-upload link to the Knowledge Center was the only
+ * entry; the Knowledge Center was retired 2026-09-29.) Shape: { from, to }.
  */
-const NON_NAV_EDGES = [{ from: 'chat.html', to: 'knowledgecenter.html' }];
+const NON_NAV_EDGES = [];
 
 const isExcluded = (from, to) =>
   NON_NAV_EDGES.some((e) => e.from === from && e.to === to);
@@ -218,8 +216,6 @@ const map = {
   reachableNotInSitemap: reachable.filter((p) => !sitemap.includes(p)),
   // Worse: advertised to crawlers but unreachable by clicking. Dead-end SEO.
   inSitemapNotReachable: sitemap.filter((p) => !reachable.includes(p)),
-  // The click path the spec walks to prove Knowledge Center is reachable (#3107).
-  knowledgeCenterPath: shortestPath(graph, depth, ROOT_PAGE, 'knowledgecenter.html'),
   excludedEdges: NON_NAV_EDGES,
   sharedNavTargets: SHARED_NAV,
   // Surfaces present in NAV_LINKS/FOOTER_EXTRA_LINKS but hidden by nav-config, so not
@@ -235,7 +231,6 @@ process.stdout.write(
     `nav-map -> ${path.relative(REPO_ROOT, OUT_FILE)}`,
     `  pages ${map.totals.pages} | reachable ${map.totals.reachable} | orphaned ${map.totals.orphaned}`,
     `  sitemap ${map.totals.inSitemap} | reachable-not-in-sitemap ${map.reachableNotInSitemap.length} | in-sitemap-not-reachable ${map.inSitemapNotReachable.length}`,
-    `  knowledge center: ${map.knowledgeCenterPath ? map.knowledgeCenterPath.join(' -> ') : 'UNREACHABLE'}`,
     '',
   ].join('\n'),
 );

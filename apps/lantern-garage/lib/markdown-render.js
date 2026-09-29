@@ -331,7 +331,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
   <meta name="theme-color" content="#06b6d4">
   <script>
     /* Theme bootstrap before first paint — follows the site's saved light/dark
-       choice instead of forcing dark, matching index.html / the Knowledge Center. */
+       choice instead of forcing dark, matching index.html. */
     (function () {
       try {
         var stored = localStorage.getItem('lantern-theme');
@@ -434,7 +434,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
     <a href="/stock-trader.html">Trader</a>
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html" class="active">Help</a>
+    <a href="/faq.html">Help</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -461,7 +461,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
     <a href="/stock-trader.html">Trader</a>
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
+    <a href="/faq.html">Help</a>
   </div>
 </footer>
 
