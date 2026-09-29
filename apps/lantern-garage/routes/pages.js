@@ -21,6 +21,11 @@ const PUBLIC_PAGES = {
   // destination (#2610). The Stripe checkout buttons still require auth server-side.
   "/pricing.html":        "pricing.html",
   "/reset-password.html": "reset-password.html",
+  // "/" is UnisonaHome (operator, 2026-09-28): a real landing that opens with a live
+  // market strip echoing the trader's layout, then scrolls into financial news and the
+  // rest of the product. The full terminal is one click away at /stock-trader.html — it
+  // briefly WAS "/" itself, but a home page that is only the terminal left no room for
+  // news or anything else.
   "/":                    "index.html",
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",

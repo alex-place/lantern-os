@@ -62,7 +62,12 @@
       '<nav class="site-nav">\n' +
       '  <a class="nav-brand" href="/">\n' +
       '    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">\n' +
-      '    <span style="font-size:18px;font-weight:600">unisona.ai</span>\n' +
+      // Wordmark: the SITE's brand, not one surface's. "/" is UnisonaHome and the
+      // terminal lives at /stock-trader.html, so this reads "Unisona" — naming either
+      // surface here would be wrong on the other. Styled in site.css (.nav-wordmark)
+      // rather than inline: the gradient fill needs a @supports fallback that an inline
+      // style attribute can't express.
+      '    <span class="nav-wordmark">Unisona</span>\n' +
       "  </a>\n" +
       '  <div class="nav-links">\n    ' +
       links +
