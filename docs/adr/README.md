@@ -6,6 +6,8 @@ updated: 2026-07-03
 
 # Architecture Decision Records (ADRs)
 
+> **Moved 2026-09-29:** research code and data that ADRs cite and that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 This directory holds the **canonical, append-only log of architectural decisions** for
 unisona.ai. An ADR captures *one* decision: the context that forced it, the choice made,
 its status, and the consequences we accept by making it.

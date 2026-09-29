@@ -2,7 +2,7 @@
 
 **Status: BUILT + TESTED (2026-06-25).** Core in [`src/cio_sde/question.py`](../../src/cio_sde/question.py);
 5 machine-checked tests in [`tests/test_question_machine.py`](../../tests/test_question_machine.py);
-runnable demo [`experiments/question_machine_demo.py`](../../experiments/question_machine_demo.py).
+runnable demo [`experiments/question_machine_demo.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/question_machine_demo.py).
 This is the math core (the bidirectional loop + the CAP/NAP seam-arbiter), **not** the
 full product — the external Act-stage channels it would ask *through* are still the open
 gap (see §7). Companion to the [Collapse Certificate](../SIGMA0-COLLAPSE-CERTIFICATE.md)

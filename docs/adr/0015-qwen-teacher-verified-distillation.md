@@ -23,7 +23,7 @@ superseded-by: none
 Proposed — awaiting approval from Alex Place. **This ADR does not start a training run.**
 It records *how* a Qwen→Ouro teacher/student path is allowed to exist at all under Σ₀, and
 authorizes only the offline, no-GPU **proposer + verify** front half
-([`scripts/qwen_teacher_crystallize.py`](../../scripts/qwen_teacher_crystallize.py) scaffold).
+([`scripts/qwen_teacher_crystallize.py`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/qwen_teacher_crystallize.py) scaffold).
 The train/eval/promote back half stays gated on this ADR's approval and on
 [ADR-0010](0010-verify-gated-continual-learning-last-resort.md).
 
@@ -45,7 +45,7 @@ Two repo facts constrain the literal reading:
    The only sanctioned training signal is *externally-verified-correct experience* (code that
    passed tests; claims that are grounded). A soft-label teacher→student copy has no verification
    step, so it fails the **External Reality Rule** ("nothing accepted without evidence"). The
-   existing flywheel ([`scripts/continual_ouro_pipeline.py`](../../scripts/continual_ouro_pipeline.py))
+   existing flywheel ([`scripts/continual_ouro_pipeline.py`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/continual_ouro_pipeline.py))
    is built exactly this way: *harvest → execution-verify → train → eval → promote*, and its
    `#1198` distillation branch only ingests cloud-teacher solutions that **already passed the repo
    tests at capture time**.
@@ -99,7 +99,7 @@ implement it as an extension of the existing flywheel — not as a new subsystem
 
 6. **Decontamination + secret-scrub are mandatory front-gates.** Prompts and rows pass the
    existing 13-gram decontamination vs HumanEval + MBPP
-   ([`scripts/decontaminate_training.py`](../../scripts/decontaminate_training.py)) and the
+   ([`scripts/decontaminate_training.py`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/decontaminate_training.py)) and the
    secret-scrub regexes from `pr_crystallize.py`, before CSF packing. Public benchmarks stay
    read-only targets (ADR-0010 rule).
 
@@ -167,12 +167,12 @@ running it on the GPU box under ADR-0010.
 | Qwen retired from the local coder lane (still Ollama-pullable, not registry-managed) | `docs/SIGMA0-MODEL-ADAPTER.md`; `test/local-model-registry.test.js` (`!chain.includes("qwen2.5-coder")`) | High | this repo |
 | Qwen2.5-Coder-7B fits the 8 GB box (~4.7 GB @ Q4_K_M) | `local-model-registry.js` capability-first comments | Med | repo notes |
 | ADR-0010 permits training only on externally-verified-correct experience | [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) | High | repo ADR |
-| A verified flywheel already exists: harvest → exec-verify → train → eval → promote | [`scripts/continual_ouro_pipeline.py:5-23`](../../scripts/continual_ouro_pipeline.py) | High | this repo |
-| Execution-verify is the ground-truth gate (only a green subprocess counts) | [`continual_ouro_pipeline.py:86-153`](../../scripts/continual_ouro_pipeline.py) | High | this repo |
-| Prior verified-distillation branch only ingests already-test-passed cloud solutions (#1198) | [`continual_ouro_pipeline.py:109-141`](../../scripts/continual_ouro_pipeline.py) | High | this repo |
-| Promotion is a pure eval gate (beat incumbent pass@1 by margin) logged as a Convergence Record | [`continual_ouro_pipeline.py:202-283`](../../scripts/continual_ouro_pipeline.py) | High | this repo |
+| A verified flywheel already exists: harvest → exec-verify → train → eval → promote | [`scripts/continual_ouro_pipeline.py:5-23`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/continual_ouro_pipeline.py) | High | this repo |
+| Execution-verify is the ground-truth gate (only a green subprocess counts) | [`continual_ouro_pipeline.py:86-153`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/continual_ouro_pipeline.py) | High | this repo |
+| Prior verified-distillation branch only ingests already-test-passed cloud solutions (#1198) | [`continual_ouro_pipeline.py:109-141`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/continual_ouro_pipeline.py) | High | this repo |
+| Promotion is a pure eval gate (beat incumbent pass@1 by margin) logged as a Convergence Record | [`continual_ouro_pipeline.py:202-283`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/continual_ouro_pipeline.py) | High | this repo |
 | Ouro-1.4B QLoRA trains on the 8 GB 3070 (~45 s/step); 7.6 B PLT cannot (needs ≥24 GB, #1829) | [[crystallization-grounding-corpus]]; [[unisona-local-model-plan]] | High | repo research |
-| 13-gram decontamination vs HumanEval+MBPP exists and is auditable | [`scripts/decontaminate_training.py`](../../scripts/decontaminate_training.py) | High | this repo |
+| 13-gram decontamination vs HumanEval+MBPP exists and is auditable | [`scripts/decontaminate_training.py`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/decontaminate_training.py) | High | this repo |
 | Secret-scrub regexes exist for training-row extraction | `scripts/pr_crystallize.py:75-85` | High | this repo |
 | The "unisona update" surface is the registry `verified` flip + adapter swap | [`local-model-registry.js`](../../apps/lantern-garage/lib/local-model-registry.js); ADR-0011 | High | this repo |
 | Σ₀ council exists and runs on real decisions | #1598, [[dogfood-loop-reliable-and-council-wired]] | High | this repo |

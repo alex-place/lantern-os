@@ -6,8 +6,8 @@ index it imports, with two corollaries that unify M2, M5 and M7 under one law.
 **Loop stage:** Remember/Verify allocation (which claim gets re-grounded next) — Converge.
 **Issue:** [#2926](https://github.com/alex-place/lantern-os/issues/2926) ·
 **Slate:** `2026-07-21-owned-math-conjectures.md` §M8 ·
-**Artifact:** [`owned_math_m8_whittle_freshness.py`](../../experiments/owned_math_m8_whittle_freshness.py)
-→ [`results JSON`](../../experiments/results/owned_math_m8_whittle_freshness.json) ·
+**Artifact:** [`owned_math_m8_whittle_freshness.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/owned_math_m8_whittle_freshness.py)
+→ [`results JSON`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/results/owned_math_m8_whittle_freshness.json) ·
 **Product:** `whittleFreshnessIndex()` in
 [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) (pure, unwired, tested)
 

@@ -1,5 +1,7 @@
 # arXiv Recent-Research Corpus
 
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 **Loop stage:** Remember. Gives the chat assistant a local, always-current body of
 **post-cutoff** AI/LLM research so it can answer model/LLM questions with papers published
 *after* the model's training cutoff — and cite them by arXiv id.

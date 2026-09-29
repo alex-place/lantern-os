@@ -189,7 +189,7 @@ The CADD layer (`caad/`) was archived 2026-07-24 (see docs/ARCHIVE-LEDGER.md).
 | **MCP server** | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | FastAPI + SSE; tools `queue_status`, `task_intake`, `dispatch_work`, `boot_check`, `list_skills`, `get_status` (`server.py:11-16`). Act/observe bridge for orchestrators. |
 | **Trading terminal** | `public/kalshi-terminal.html` + [`routes/trading.js`](../apps/lantern-garage/routes/trading.js) | Swipe-deck UI over 60+ REST endpoints; live data via `kalshi-collector` snapshot, not UI-direct calls. Act + first closed loop slice. |
 | **Explore feed** | `public/explore.html` + [`routes/explore.js`](../apps/lantern-garage/routes/explore.js) + [`lib/explore-feed.js`](../apps/lantern-garage/lib/explore-feed.js) | Single-pane content feed ranked by `rankCandidates(cards,"explore")` — a **2nd, non-LLM consumer of the PCSF leaderboard** (§5). Click/dismiss → `recordModelOutcome` reorders it. Reason + Converge. See [EXPLORE-FEED.md](EXPLORE-FEED.md). |
-| **Σ₀ / Ouro serving** | [`src/sigma0/`](../src/sigma0/) (`loop_lm.py`, `provider_node.py`, `quantized_cache.py`, `decode_canary.py`) | The local interchangeable model; served behind Ollama. Reason. |
+| **Σ₀ / Ouro serving** | [`src/sigma0/`](../src/sigma0/) (`loop_lm.py`, `quantized_cache.py`, `decode_canary.py`, `ram_guard.py`) | The local interchangeable model; served behind Ollama. Reason. |
 | **Self-improvement / training** | `scripts/ouro_*`, `src/training/`, `data/self-improvement/` | LoRA/adapter training jobs; experience capture. Converge. |
 | **Orchestration / autowork / fleet** | `lib/autowork-worktree.js`, `lib/swarm-orchestrator.js`, monoworkstream git hooks | Per-issue worktree-isolated agents; one PR lane per agent prefix. Act. |
 | **Skills** | [`skills/`](../skills/) (17 dirs) | Capability contracts. **Only `dream_journal`, `lucid_dreaming`, `archive_curator`, `voice_curator`, `job_application` have real implementations** — the rest are design contracts only (per [CLAUDE.md](../CLAUDE.md)). |
@@ -223,13 +223,12 @@ Named honestly so they become follow-up issues, not surprises:
    the fallback chain — config implies capability the code doesn't yet have.
 5. **~270 `lib/` modules, framework-free routing.** Powerful and dependency-light, but discovery and
    ordering are manual; no central route registry beyond the array in `server.js`.
-6. **Unwired Creator-Suite pipeline experiments (preserved, not junk).** Five `lib/` modules are
-   referenced by nothing in the live path — `render-pipeline-v2.js` (documented "unused/aspirational"
-   in [FACECAM_DETECTION.md](FACECAM_DETECTION.md)), `scoring-engine-v2.js`, `sigma0-v10-ml-weights.js`,
-   `test-pipeline.js` (a manual debugger), and `layout-debug.js` (a QA overlay). They are
-   *intentionally* kept shorts/video research (commit "Preserve Sigma0 video pipeline and shorts
-   research work"); the live media path uses `facecam-v3.js` + `video-pipeline-*.js`. Flagged here so
-   they are a conscious keep-or-retire founder decision, not silently deleted as dead code.
+6. **Creator-Suite pipeline experiments moved out (2026-09-29).** The unwired shorts/video research
+   modules (`render-pipeline-v2.js`, `scoring-engine-v2.js`, `spectral-analyzer.js`, `sigma0-v10-ml-weights.js`,
+   `test-pipeline.js`, `video-pipeline-debugger.js`, `layout-debug.js`, `retention-engine.js`,
+   `recurrence-novelty.js`) now live with their history in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo,
+   per the founder's keep-or-retire decision (repo cleanup, item 9). The live media path is `facecam-v3.js` +
+   `video-pipeline-*.js`.
 
 Each of these is a candidate ADR or follow-up issue spawned from this writeup.
 

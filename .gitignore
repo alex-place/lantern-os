@@ -245,9 +245,6 @@ archive/**/worktrees/**
 !apps/lantern-garage/lib/facecam-v3.js
 !apps/lantern-garage/lib/caption-engine-v3.js
 !apps/lantern-garage/lib/variant-engine-v2.js
-!apps/lantern-garage/lib/spectral-analyzer.js
-!apps/lantern-garage/lib/scoring-engine-v2.js
-!apps/lantern-garage/lib/render-pipeline-v2.js
 !apps/lantern-garage/lib/highlight_detector.py
 
 # IDE / tool artifacts

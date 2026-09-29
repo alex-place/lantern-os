@@ -6,6 +6,8 @@ updated: 2026-07-22
 
 # Σ — The Convergence Certificate
 
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 *A computable stability certificate for convergence dynamics, and an honest
 account of why an ungrounded self-improving system tends to collapse or diverge.*
 

@@ -8,8 +8,8 @@
 **Proof:** `2026-07-21-owned-math-proofs.md` Lemma 3 ·
 **Target:** [`converge-control.js`](../../apps/lantern-garage/lib/converge-control.js) (#2857, PR #2909) +
 [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) ·
-**Machine check:** [`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
-→ [`results JSON`](../../experiments/results/owned_math_m7_composition_counterexample.json)
+**Machine check:** [`owned_math_m7_composition_counterexample.js`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/owned_math_m7_composition_counterexample.js)
+→ [`results JSON`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/results/owned_math_m7_composition_counterexample.json)
 
 ---
 
