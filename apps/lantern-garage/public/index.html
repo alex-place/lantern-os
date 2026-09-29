@@ -434,6 +434,28 @@
   }
   function badge(sym) { return el('span', 'badge', String(sym).slice(0, 2)); }
 
+  /* The engine writes skip reasons for machines: "regime_filter: not trend-aligned
+     (need price>SMA50 & MACD hist>0)". That is precise and unreadable. Translate the
+     ones we know into plain English and keep the exact rule on `title`, so nothing is
+     hidden from anyone who wants it. An unknown reason is shown verbatim — better a
+     reader meets jargon than that a refusal goes unpublished. */
+  var SKIP_PLAIN = [
+    {
+      match: /regime_filter/i,
+      short: 'the trend is against it',
+      long: 'The engine only buys dips in names that are already trending up — price above its ' +
+            '50-period average, with momentum positive. This one is not, so the setup was refused ' +
+            'even though it scored well.'
+    }
+  ];
+  function explainSkip(raw) {
+    var s = String(raw || '');
+    for (var i = 0; i < SKIP_PLAIN.length; i++) {
+      if (SKIP_PLAIN[i].match.test(s)) return { short: SKIP_PLAIN[i].short, long: SKIP_PLAIN[i].long, rule: s };
+    }
+    return { short: s, long: s, rule: s };
+  }
+
   /* ── Chart drawing ──────────────────────────────────────────────────────────
      Plain SVG from real closes. `extra` lets the caller force levels (stop and
      targets) into the y-domain so the whole trade plan is visible at once. */
@@ -580,12 +602,18 @@
     }
     card.appendChild(meters);
 
-    var whyText = conv.skip_reason || sig.reasons;
-    if (whyText) {
+    if (conv.skip_reason) {
+      var ex = explainSkip(conv.skip_reason);
       var why = el('div', 'vwhy');
-      why.appendChild(document.createTextNode(conv.skip_reason ? 'Turned down by ' : 'Why: '));
-      why.appendChild(el('code', null, String(whyText)));
+      why.title = ex.rule;                       // the exact rule stays one hover away
+      why.appendChild(el('b', null, 'Turned down — ' + ex.short + '.'));
+      why.appendChild(document.createTextNode(' ' + ex.long));
       card.appendChild(why);
+    } else if (sig.reasons) {
+      var w2 = el('div', 'vwhy');
+      w2.appendChild(el('b', null, 'Why: '));
+      w2.appendChild(document.createTextNode(String(sig.reasons)));
+      card.appendChild(w2);
     }
     box.appendChild(card);
 
@@ -659,8 +687,10 @@
       l1.appendChild(el('span', 'sym', e[0]));
       if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
       g.appendChild(l1);
-      var reason = String(conv.skip_reason || 'no reason recorded');
-      g.appendChild(el('div', 'l2', reason.length > 56 ? reason.slice(0, 56) + '…' : reason));
+      var ex2 = explainSkip(conv.skip_reason || 'no reason recorded');
+      var l2 = el('div', 'l2', ex2.short);
+      l2.title = ex2.rule;
+      g.appendChild(l2);
       r.appendChild(g);
       return r;
     }));
