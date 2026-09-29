@@ -779,7 +779,16 @@ function _cadenceReentryExempt(sym, nowMs) {
   if (!ea) return false;
   return _etDateStr(ea) === _etDateStr(nowMs);   // same ET session only
 }
-let _cadenceDecided = { day: null, boundary: null };   // the boundary whose decision was SPENT (an entry placed), per process
+// A SPENT BAR SURVIVES A RESTART (2026-09-29). This mark lived in memory only. On 2026-09-29 three
+// merges to master between 13:54 and 14:12 ET rolled the armed stable server three times in twenty
+// minutes. At 14:07:22 it bought IWM and refused TNA in the same scan ("entry_cadence: 14:07 ET
+// already decided this bar - next decision 15:00"). The 14:16 restart wiped the mark, and at
+// 14:17:09 the fresh process read its first scan as the late first decision of a bar nobody had
+// decided and bought 3,074 TNA ($178k): an entry the armed rule forbids, and with the 15:00 block
+// behind it one that would not have been taken at all. It happened to make +$908. The mark is now
+// saved with the rest of the state the moment it is set and restored on load; the gate already
+// ignores a mark from another session (it compares the ET day), so nothing carries overnight.
+let _cadenceDecided = { day: null, boundary: null };   // the boundary whose decision was SPENT (an entry placed)
 let _pendingCadence = { day: null, boundary: null };   // the boundary this scan is deciding for; promoted only when an entry places
 // THE BAR'S DECISION IS SPENT WHEN THE WINDOW CLOSES, NOT ON THE FIRST FILL
 // (2026-08-25). Spending it on the first placement let whichever symbol happened
@@ -794,6 +803,7 @@ function _markCadenceDecided() {
   if (_pendingCadence.since != null && _pendingCadence.win != null
       && _pendingCadence.since < _pendingCadence.win) return;   // still inside the decision window — let the rest compete
   _cadenceDecided = { day: _pendingCadence.day, boundary: _pendingCadence.boundary };
+  _saveState();   // a restart inside this bar must find it spent
 }
 
 // THE SESSION IBS OF A SIGNAL (2026-08-25). scan.js builds the signal with the
@@ -1111,6 +1121,7 @@ function _saveState() {
       beStopAt: Object.fromEntries(_beStopAt),       // #3413: the ratchet must not un-ratchet on restart
       limitShadow: Object.fromEntries(_limitShadow), // #3424: a restart mid-session must not lose the day's shadow
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
+      cadenceDecided: { day: _cadenceDecided.day, boundary: _cadenceDecided.boundary },   // a spent entry bar survives restarts
       // A restart DURING a dropout must not hand back a clean slate and let the
       // doubling through on the next scan (#3282).
       lastConfirmedHold: Object.fromEntries(_lastConfirmedHold),
@@ -1143,6 +1154,9 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.beStopAt || {})) _beStopAt.set(k, v);       // #3413
     for (const [k, v] of Object.entries(o.limitShadow || {})) _limitShadow.set(k, v); // #3424
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
+    if (o.cadenceDecided && o.cadenceDecided.day && Number.isFinite(Number(o.cadenceDecided.boundary)) && o.cadenceDecided.boundary !== null) {
+      _cadenceDecided = { day: String(o.cadenceDecided.day), boundary: Number(o.cadenceDecided.boundary) };
+    }
     for (const [k, v] of Object.entries(o.lastConfirmedHold || {})) {
       const t = Number(v);
       if (Number.isFinite(t)) _lastConfirmedHold.set(k, t);
@@ -3425,6 +3439,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
