@@ -1,0 +1,134 @@
+'use strict';
+/**
+ * step-floor-by-symbol.test.js — TRADER_STEP_FLOOR_BY_SYMBOL (lab, 2026-09-28).
+ *
+ * The stepped profit floor used one step size for every name. Split by the volatility
+ * class of the name, the wider 1.5% floor earned its gain in the volatile names and cost
+ * the quiet ones (ledger row floor-by-volatility-class), so the step can now be set per
+ * name. These pin: unset = unchanged; a listed name steps at its own size; an unlisted
+ * name keeps the base; the knob sizes the step and never switches the floor on by itself;
+ * bad values fall back to the base.
+ */
+const { test } = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'stepfloor-sym-'));
+const LOG = path.join(DIR, 'trades.jsonl');
+const STATE = path.join(DIR, 'state.json');
+process.env.TRADER_TRADES_LOG = LOG;
+process.env.TRADER_STATE_FILE = STATE;
+process.env.TRADER_MANAGE_EXITS = '1';
+process.env.TRADER_AUTO_EXECUTE = '1';
+process.env.TRADER_EXIT_MIN_SESSION_MIN = '0';
+// hermetic exits: the fixture holds LNG, a real ticker (see step-floor.test.js)
+process.env.TRADER_MOMENTUM_EXIT = '0';
+process.env.TRADER_ZONE_EXIT = '0';
+process.env.TRADER_TAKE_PROFIT_R = '0';
+process.env.TRADER_EXIT_MIN_PWIN = '0';
+process.env.TRADER_EOD_DECARRY = '0';
+const at = require('../lib/auto-trader');
+
+const rows = () => (fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []);
+const resizes = () => rows().filter((r) => r.event === 'stop_resize');
+
+/** A held long at entry 100 marked at `mark`, with a resting stop at `stopPx`. */
+function world({ mark, stopPx = 97 }) {
+  at._resetCooldowns();
+  if (fs.existsSync(LOG)) fs.unlinkSync(LOG);
+  fs.writeFileSync(STATE, JSON.stringify({ lastPos: { LNG: { qty: 100, entry: 100, mark, ts: Date.now() } } }));
+  at._loadState();
+  const placed = [], cancelled = [];
+  return {
+    placed, cancelled,
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => [{ symbol: 'LNG', qty: 100, avg_entry_price: 100, current_price: mark, market_value: 100 * mark, unrealized_pl: (mark - 100) * 100 }],
+    getIBKROpenOrders: async () => [{ orderId: 'S1', symbol: 'LNG', side: 'sell', orderType: 'Stop', status: 'Submitted', price: stopPx, qty: 100 }],
+    getIBKRDayPnl: async () => 0,
+    getIBKROrderStatus: async () => null,
+    cancelIBKROrder: async (uid, id) => { cancelled.push(id); return { status: 'cancelled' }; },
+    placeIBKROrder: async (uid, o) => { placed.push(o); return { status: 'submitted', order_id: 'X' + placed.length }; },
+  };
+}
+const scan = { signals: [] };
+const withEnv = async (env, fn) => {
+  const keys = ['TRADER_BE_RATCHET', 'TRADER_BE_LOCK', 'TRADER_STEP_FLOOR', 'TRADER_STEP_FLOOR_BY_SYMBOL'];
+  const old = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
+  Object.assign(process.env, { TRADER_BE_RATCHET: '0.01', TRADER_BE_LOCK: '0.01' }, env);
+  try { await fn(); } finally { for (const k of keys) { if (old[k] == null) delete process.env[k]; else process.env[k] = old[k]; } }
+};
+const run = (w) => at.runAutoTrade(scan, { bridge: world(w), userId: 't' });
+
+test('pure: a listed name takes its own step, every other name the base', () => {
+  const spec = 'smh:1.5, GDX:2 ,SOXL:1.5';
+  assert.strictEqual(at._stepFloorFor('SMH', 1, spec), 1.5, 'case and spaces do not matter');
+  assert.strictEqual(at._stepFloorFor('gdx', 1, spec), 2);
+  assert.strictEqual(at._stepFloorFor('SPY', 1, spec), 1, 'unlisted keeps the base');
+  assert.strictEqual(at._stepFloorFor('SMH', 1, ''), 1, 'unset keeps the base');
+  assert.strictEqual(at._stepFloorFor('SMH', 1, undefined), 1);
+});
+
+test('pure: it sizes the step and never switches the floor on by itself', () => {
+  assert.strictEqual(at._stepFloorFor('SMH', 0, 'SMH:1.5'), 0, 'stepped floor off: nothing to size');
+  assert.strictEqual(at._stepFloorFor('SMH', NaN, 'SMH:1.5'), NaN);
+});
+
+test('pure: bad values fall back to the base, real ones are clamped to [0.25, 5]', () => {
+  assert.strictEqual(at._stepFloorFor('SMH', 1, 'SMH:abc'), 1);
+  assert.strictEqual(at._stepFloorFor('SMH', 1, 'SMH:0'), 1);
+  assert.strictEqual(at._stepFloorFor('SMH', 1, 'SMH:-2'), 1);
+  assert.strictEqual(at._stepFloorFor('SMH', 1, 'SMH'), 1);
+  assert.strictEqual(at._stepFloorFor('SMH', 1, 'SMH:0.1'), 0.25);
+  assert.strictEqual(at._stepFloorFor('SMH', 1, 'SMH:40'), 5);
+});
+
+test('unset: the book step applies, exactly as before', async () => {
+  await withEnv({ TRADER_STEP_FLOOR: '1' }, async () => {
+    await run({ mark: 101.2 });
+    const r = resizes();
+    assert.strictEqual(r.length, 1);
+    assert.strictEqual(r[0].stop_want, 101);
+    assert.strictEqual(r[0].step, 1);
+  });
+});
+
+test('a listed name steps at its own size: +1.2% is below the first 1.5% step', async () => {
+  await withEnv({ TRADER_STEP_FLOOR: '1', TRADER_STEP_FLOOR_BY_SYMBOL: 'LNG:1.5' }, async () => {
+    await run({ mark: 101.2 });
+    assert.strictEqual(resizes().length, 0, 'the 1% book step would have locked here');
+    await run({ mark: 101.6 });
+    let r = resizes();
+    assert.strictEqual(r.length, 1);
+    assert.strictEqual(r[0].stop_want, 101.5, 'first step at +1.5%');
+    assert.strictEqual(r[0].step, 1.5, 'the ledger names the step that was used');
+    assert.ok(/1\.5% steps/.test(r[0].reason), r[0].reason);
+    await run({ mark: 103.1, stopPx: 101.5 });
+    r = resizes();
+    assert.strictEqual(r[0].stop_want, 103, 'second step at +3.0%');
+    // and it still never lowers
+    await run({ mark: 101.7, stopPx: 103 });
+    assert.strictEqual(resizes().length, 0);
+  });
+});
+
+test('a name that is not listed keeps the book step', async () => {
+  await withEnv({ TRADER_STEP_FLOOR: '1', TRADER_STEP_FLOOR_BY_SYMBOL: 'SMH:1.5,GDX:1.5' }, async () => {
+    await run({ mark: 101.2 });
+    const r = resizes();
+    assert.strictEqual(r.length, 1);
+    assert.strictEqual(r[0].stop_want, 101);
+  });
+});
+
+test('with the stepped floor off the knob does nothing: the flat lock behaves as it did', async () => {
+  await withEnv({ TRADER_STEP_FLOOR_BY_SYMBOL: 'LNG:1.5' }, async () => {
+    await run({ mark: 101.4 });
+    const r = resizes();
+    assert.strictEqual(r.length, 1);
+    assert.strictEqual(r[0].stop_want, 101, 'the flat +1% lock');
+    assert.ok(/be_ratchet/.test(r[0].reason), r[0].reason);
+  });
+});
