@@ -5,8 +5,9 @@
  * the server only honours an allowlisted id for the pinned provider. The
  * effective default (env override included) is always accepted.
  *
- * Run with: npx jest test/model-pin.test.js
+ * Run with: node --test test/model-pin.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 const { CHAT_MODEL_OPTIONS, isAllowedModel, modelFor } = require("../lib/provider-models");
 
 describe("isAllowedModel", () => {

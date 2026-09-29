@@ -12,8 +12,9 @@
  *   - a repair is never silent (it is always reported in `repairs`),
  *   - semantics are never changed (no clobbering real values, no resolving ambiguity).
  *
- * Run with: npx jest test/tool-arg-repair.test.js
+ * Run with: node --test test/tool-arg-repair.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 const { _repairArgs, _validateArgs } = require("../lib/tool-runner");
 
 const schema = {

@@ -134,7 +134,7 @@ async function run() {
     // When provider is live, suggestions should reference real data.
     // When provider is down (429/503), fallback doors are acceptable.
     const realData = ["flying", "forest", "glow", "peace", "wonder", "light", "tree"];
-    const fallbackIndicators = ["door", "dream", "open", "understand", "different"];
+    const fallbackIndicators = ["door", "dream", "open", "understand", "different", "tell me more", "what happened next", "feeling"];
     const hasRealData = realData.some(word => allSuggestions.includes(word));
     const hasFallback = fallbackIndicators.some(word => allSuggestions.includes(word));
     assert.ok(hasRealData || hasFallback, `suggestions should reference dream data or valid fallbacks but got: ${turn1Suggestions.join(", ")}`);

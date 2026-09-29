@@ -75,7 +75,7 @@ const collector = { getLatestMarkets: () => [market] };
   const rec = emitted[0];
   assert.strictEqual(rec.reasoner, "kalshi-suggest", "reasoner should be kalshi-suggest");
   assert.ok(rec.hypothesis.includes("KXBTCTEST"), "hypothesis should name the contract");
-  assert.deepStrictEqual(rec.evidence_ids, ["KXBTCTEST"], "evidence_ids should carry the ticker");
+  assert.deepStrictEqual(rec.evidence_ids, ["KXBTCTEST", "paper-ledger:data/kalshi/paper-positions.jsonl"], "evidence_ids should carry the ticker and the ledger source (#1648)");
   assert.ok(typeof rec.result === "string" && rec.result.length > 0, "result should summarize the entry");
   assert.ok(rec.confidence > 0 && rec.confidence <= 1, `confidence should be normalized 0..1, got ${rec.confidence}`);
 

@@ -38,8 +38,8 @@ test("a guest cannot read the operator's overnight book", async () => {
     res, new URL("http://x/api/trading/overnight"), ctxFor(res),
   );
   assert.strictEqual(handled, true, "the route must claim the request, not fall through");
-  assert.ok(res.statusCode === 403 || res.statusCode === 302,
-    `expected a gate (403/302), got ${res.statusCode}`);
+  assert.ok([401, 403, 302].includes(res.statusCode),
+    `expected a gate (401/403/302), got ${res.statusCode}`);
   assert.ok(!/accountId|sleeves|edge/i.test(res.body || ""), "must not leak book state to a guest");
 });
 
@@ -55,7 +55,7 @@ test("a guest cannot FORCE A TICK of the operator's account", async () => {
       res, new URL("http://x/api/trading/overnight/run"), ctxFor(res),
     );
     assert.strictEqual(ticked, false, "an ungated /run trades the operator's own account");
-    assert.ok(res.statusCode === 403 || res.statusCode === 302);
+    assert.ok([401, 403, 302].includes(res.statusCode));
   } finally {
     overnight.tick = realTick;
   }

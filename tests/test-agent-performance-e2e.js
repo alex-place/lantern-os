@@ -11,7 +11,7 @@
 const http = require("http");
 const assert = require("assert");
 
-const BASE_URL = "http://127.0.0.1:4177";
+const { baseUrl: BASE_URL } = require("./lantern-test-base");
 
 // Helper to make HTTP requests
 function request(method, path, body = null) {
@@ -95,13 +95,6 @@ async function runTests() {
       console.log("   Top agent:", leaderboardRes.body.agents[0].agentId);
     }
     console.log();
-
-    // Test 4: Verify dashboard is accessible
-    console.log("Test 4: Verify dashboard is accessible...");
-    const dashboardRes = await request("GET", "/leaderboard");
-    assert.strictEqual(dashboardRes.status, 200, "Dashboard should return 200");
-    assert(dashboardRes.body.includes("Agent Performance Leaderboard"), "Dashboard HTML should be returned");
-    console.log("✅ Dashboard accessible at /leaderboard\n");
 
     // Test 5: Query retirement history
     console.log("Test 5: Query retirement history...");

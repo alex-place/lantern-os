@@ -69,7 +69,7 @@ ack/retry.
 | Sandbox | **git worktrees** | local, no Docker required |
 | Memory + graph | **JSONL + CSF + in-house graph over CSF** | one memory |
 | Tools | **your MCP server** | in-house |
-| Multi-machine | **`mesh_bridge` / `mesh-hub`** (your P2P) | donated local machines, not cloud |
+| Multi-machine | **`mesh_bridge`** (your P2P) | donated local machines, not cloud |
 | Observability | **PCSF receipts + Convergence Records + in-house fleet dashboard** | `super-jarvis-fleet.json`, `status.js`, live `active_slots` |
 
 ## Local-first guarantees
@@ -84,7 +84,7 @@ ack/retry.
 
 - **Phase 0 — DONE:** queue + MCP tools, `task_run` (single Kernel worker), live
   `active_slots`, task producers (the auto-merge zipper files tasks), `swarm-orchestrator`
-  (multi-model dispatch + consensus), `mesh_bridge`/`mesh-hub`, model-leaderboard, worktree
+  (multi-model dispatch + consensus), `mesh_bridge`, model-leaderboard, worktree
   sandboxing, the 36/64 capacity contract.
 - **Phase 1 — DONE:** in-house **durable task ledger** (`queue_ledger.py`) behind the
   existing queue tools; event-sourced, replay-on-restart. Closes the "queue resets on

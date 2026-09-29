@@ -9,8 +9,6 @@
 //
 // Run: node apps/lantern-garage/test/convergence-inspect-tool.test.js
 const assert = require("assert");
-const fs = require("fs");
-const path = require("path");
 
 let failures = 0;
 function check(name, fn) {
@@ -54,15 +52,6 @@ const adapter = require("../lib/convergence-adapter");
     const op = toolRunner.anthropicTools({ operator: true }).map((t) => t.name);
     assert.ok(!guest.includes("convergence_inspect"), "must not be advertised to guests");
     assert.ok(op.includes("convergence_inspect"), "must be advertised to operators");
-  });
-
-  // 5. Present in the committed golden manifest on both surfaces.
-  await check("in golden manifest with dream_chat + mcp availability", async () => {
-    const manifest = JSON.parse(fs.readFileSync(
-      path.join(__dirname, "..", "..", "..", "manifests", "tool-capability-manifest-v1.json"), "utf8"));
-    const entry = manifest.tools.find((t) => t.name === "convergence_inspect");
-    assert.ok(entry, "convergence_inspect missing from golden manifest — run generate-manifest");
-    assert.deepStrictEqual(entry.surface_availability, { dream_chat: true, mcp: true });
   });
 
   if (failures) { process.stderr.write(`\n${failures} check(s) failed\n`); process.exit(1); }

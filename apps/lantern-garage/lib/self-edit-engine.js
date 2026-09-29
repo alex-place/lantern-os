@@ -17,9 +17,9 @@ const { tokenizeCommand, safeExec } = require("./safe-exec");
 const https = require("https");
 
 // TLS-verification gate is centralized in lib/insecure-tls.js so all three LLM-call
-// sites share one source of truth — insecure ONLY on Windows or with an explicit
-// LANTERN_INSECURE_TLS=1, never unconditionally (the response here is applied as a
-// code diff, so an MITM would be RCE). #869
+// sites share one source of truth. Verification is always on (the Windows /
+// LANTERN_INSECURE_TLS=1 opt-in was removed, #1455): the response here is applied as a
+// code diff, so an MITM would be RCE. #869
 const { llmAgent } = require("./insecure-tls");
 
 const MAX_OUTPUT = 8000;

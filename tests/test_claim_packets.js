@@ -7,14 +7,14 @@
 
 const http = require("http");
 
-const BASE = "http://127.0.0.1:4177";
+const { baseUrl: BASE, hostname: HOST, port: PORT } = require("./lantern-test-base");
 const TEST_ID = `claim:${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`;
 
 function req(method, path, body = null) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: "127.0.0.1",
-      port: 4177,
+      hostname: HOST,
+      port: PORT,
       path,
       method,
       headers: { "Content-Type": "application/json" },

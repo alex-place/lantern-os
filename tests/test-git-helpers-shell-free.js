@@ -4,7 +4,6 @@
  *
  * Proves the shell-free conversion of the automation git() helpers:
  *   - src/worktree-manager.js  (createWorktree / listWorktrees / removeWorktree)
- *   - src/agent-worker-loop.js (commitAgentWork)
  *
  * Both formerly built `git ...` shell strings with interpolated input; they now
  * pass argv arrays to execFileSync (shell:false). This test exercises each
@@ -24,7 +23,6 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const wm = require(path.join(ROOT, 'src', 'worktree-manager.js'));
-const { commitAgentWork } = require(path.join(ROOT, 'src', 'agent-worker-loop.js'));
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; console.log('  PASS', msg); } else { fail++; console.log('  FAIL', msg); } };
@@ -46,21 +44,7 @@ function noInjectionFiles(dir, names) {
   return names.every((n) => !fs.existsSync(path.join(dir, n)));
 }
 
-// ── 1. agent-worker-loop: commitAgentWork with a malicious title ────────────
-console.log('commitAgentWork (agent-worker-loop):');
-{
-  const { dir, g } = tmpRepo();
-  fs.writeFileSync(path.join(dir, 'change.txt'), 'edited\n');
-  const evilTitle = 'x $(touch INJ1) `touch INJ2` ; touch INJ3';
-  const res = commitAgentWork(dir, 42, evilTitle);
-  ok(res.committed === true, 'commit succeeds');
-  ok(noInjectionFiles(dir, ['INJ1', 'INJ2', 'INJ3']), 'no shell injection from title');
-  const msg = g(['log', '-1', '--pretty=%B']);
-  ok(msg.includes('$(touch INJ1)'), 'title metacharacters preserved literally in message');
-  fs.rmSync(dir, { recursive: true, force: true });
-}
-
-// ── 2. worktree-manager: create / list / remove end-to-end ──────────────────
+// ── worktree-manager: create / list / remove end-to-end ──────────────────
 console.log('worktree-manager (create/list/remove):');
 {
   const { dir } = tmpRepo();

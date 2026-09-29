@@ -150,7 +150,7 @@ The route architecture is modular. **The authoritative list of what's registered
 
 **Rule: If you need a route, grep the `routes[]` array in `server.js` for the module, then read that module. If you need streaming, read `lib/stream-chat.js`. Read `server.js` itself only for startup / child-process / supervisor behavior.**
 
-**Orchestrator is tool-reachable:** the assistant can read live orchestrator state via the `convergence_inspect` native tool (operator-only; defined in `lib/tool-runner.js`, auto-exposed over MCP by `shared_tool_bridge`). Regenerate the golden tool manifest after any registry change: `echo '' | node scripts/tool-runner-bridge.js generate-manifest`.
+**Orchestrator is tool-reachable:** the assistant can read live orchestrator state via the `convergence_inspect` native tool (operator-only; defined in `lib/tool-runner.js`, auto-exposed over MCP by `shared_tool_bridge`).
 
 ### 5. Don't discover what tests exist — run them
 

@@ -125,24 +125,6 @@ its own canonical reference: **[trading-api-reference.md](./trading-api-referenc
 
 ---
 
-### Auto-Merge API
-
-**PR merge-conflict analysis and learned merge patterns**
-(`routes/auto-merge.js` → `lib/auto-merge-resolver.js`)
-
-- `GET /api/merge/status` — resolver status
-- `GET /api/merge/convergance-query` — query convergence records for merges
-- `POST /api/merge/analyze` — analyze a merge/conflict
-- `POST /api/merge/record` — record a merge decision
-- `POST /api/merge/apply-improvements` — apply learned improvements
-- `POST /api/merge/keystone-response` — feed an assistant response into the trainer
-- `GET /api/merge/analysis` — aggregated analysis
-- `GET /api/merge/export` — export decisions
-
-Data files: `data/auto-merge-decisions.jsonl` (append-only decision log),
-`data/merge-patterns.json` (learned-pattern cache; pattern key format
-`{agent}:{fileCount}`).
-
 ---
 
 ### Creator Dashboard API

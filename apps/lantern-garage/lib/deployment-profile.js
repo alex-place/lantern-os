@@ -31,7 +31,7 @@ const HOSTED_SURFACES = new Set([
   "auth.html", // login
   "terms.html", // terms of service + EULA (linked from signup; must be public everywhere)
   "entry.html", // post-login entry
-  "profile.html", // account
+  "settings.html", // account (profile.html merged into settings, #2899)
   "pricing.html", // plans
   "whats-new.html", // meta
   "changelog.html", // meta

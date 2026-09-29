@@ -7,8 +7,9 @@
  * watchlists get different orderings, and (c) every ranked item carries its
  * evidence (`relevanceWhy`). Network-free.
  *
- * Run with: npx jest test/news-personalize.test.js
+ * Run with: node --test test/news-personalize.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 
 const { rankNewsForUser, scoreOne, DEFAULT_WEIGHTS, _internals } = require("../lib/news-personalize");
 const { tickerScore, interestScore, recencyScore } = _internals;

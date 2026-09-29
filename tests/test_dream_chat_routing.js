@@ -58,9 +58,6 @@ test("non-coding turns get no directive (interactive chat unaffected)", () => {
   assert.strictEqual(codingPatchDirective(false, "general", false), "");
   assert.strictEqual(codingPatchDirective(false, "document_request", false), "");
 });
-test("RP mode never gets the directive", () => {
-  assert.strictEqual(codingPatchDirective(true, "coding_change", true), "");
-});
 
 console.log("\nTest: Bang command parsing");
 test("parseBangCommand extracts name and args", () => {

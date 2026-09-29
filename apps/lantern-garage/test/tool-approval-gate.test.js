@@ -9,8 +9,9 @@
  * The property that actually matters is arg-binding: an approval for one call must never
  * authorise a different one.
  *
- * Run with: npx jest test/tool-approval-gate.test.js
+ * Run with: node --test test/tool-approval-gate.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 const { REGISTRY, approvalToken, runTool } = require("../lib/tool-runner");
 
 describe("which tools are gated", () => {

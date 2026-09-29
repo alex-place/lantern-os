@@ -600,3 +600,9 @@ data/oracle/active-loop-runs.jsonl
 data/pr-watcher/
 data/queue/supervisor-events.jsonl
 data/csf_archives/
+data/coding-pending.jsonl
+data/coding-receipts.jsonl
+
+# App-relative runtime state (account modes, creator entries, convergence scratch). Tests used to
+# write fixtures here and they were committed; nothing tracked belongs in this folder (2026-09-29).
+apps/lantern-garage/data/

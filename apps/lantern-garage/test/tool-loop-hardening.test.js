@@ -12,8 +12,9 @@
  *
  * Deterministic: mock adapter, no live provider.
  *
- * Run with: npx jest test/tool-loop-hardening.test.js
+ * Run with: node --test test/tool-loop-hardening.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 const { runToolLoop } = require("../lib/stream-chat/tool-turns");
 
 const noSse = { writeData: () => {} };

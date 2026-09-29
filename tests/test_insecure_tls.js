@@ -34,12 +34,11 @@ ok("linux, no override → TLS verification ON (agent undefined)");
 assert.strictEqual(load("0", "linux").llmAgent, undefined);
 ok("linux + LANTERN_INSECURE_TLS=0 → secure");
 
-const li = load("1", "linux");
-assert.ok(li.llmAgent && li.llmAgent.options.rejectUnauthorized === false);
-ok("linux + LANTERN_INSECURE_TLS=1 → insecure agent (explicit opt-in)");
+assert.strictEqual(load("1", "linux").llmAgent, undefined);
+ok("linux + LANTERN_INSECURE_TLS=1 → still secure (the opt-in was removed, #1455)");
 
-assert.ok(load(null, "win32").llmAgent, "win32 default insecure agent");
-ok("win32 default → insecure agent (the documented #740 Windows workaround)");
+assert.strictEqual(load(null, "win32").llmAgent, undefined);
+ok("win32 default → secure (the #740 Windows workaround was removed, #1455)");
 
 assert.strictEqual(load("0", "win32").llmAgent, undefined);
 ok("win32 + LANTERN_INSECURE_TLS=0 → secure (force-off honored)");

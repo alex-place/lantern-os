@@ -5,9 +5,18 @@
  * provider being rate-limited / down doesn't dead-end the turn. Auto mode and the
  * no-key case are unchanged.
  *
- * Run with: npx jest test/provider-pin-backstop.test.js
+ * Run with: node --test test/provider-pin-backstop.test.js
  */
+const { describe, test, beforeEach, afterEach, afterAll, expect } = require("./_jest-compat");
 const { buildBrainOrder } = require("../lib/stream-chat/provider-order");
+
+// Hermetic: every variable buildBrainOrder reads starts unset, so a key, a Vertex project or
+// a preferred provider in the machine's own environment cannot reorder the expected chain.
+const ORDER_ENV = ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_USE_VERTEX", "VERTEX_PROJECT",
+  "OPENAI_API_KEY", "XAI_API_KEY", "COHERE_API_KEY", "KEYSTONE_PREFERRED_PROVIDER"];
+const SAVED_ENV = Object.fromEntries(ORDER_ENV.map((k) => [k, process.env[k]]));
+beforeEach(() => { for (const k of ORDER_ENV) delete process.env[k]; });
+afterAll(() => { for (const k of ORDER_ENV) { if (SAVED_ENV[k] === undefined) delete process.env[k]; else process.env[k] = SAVED_ENV[k]; } });
 
 const ALL = () => { process.env.ANTHROPIC_API_KEY = "x"; process.env.GEMINI_API_KEY = "x"; process.env.OPENAI_API_KEY = "x"; process.env.XAI_API_KEY = "x"; };
 beforeEach(ALL);

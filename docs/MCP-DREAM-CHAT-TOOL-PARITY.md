@@ -8,14 +8,10 @@ directly through that runner. MCP invokes `scripts/tool-runner-bridge.js`
 through `src/mcp_server/shared_tool_bridge.py`; Python does not contain a
 second schema or policy table.
 
-`manifests/tool-capability-manifest-v1.json` is a generated fallback for MCP
-discovery when Node is unavailable. Regenerate it with:
-
-```text
-node scripts/tool-runner-bridge.js generate-manifest
-```
-
-Contract tests compare it to the live JS registry so drift fails CI.
+There is no committed copy of the manifest: the generated fallback file
+(`manifests/tool-capability-manifest-v1.json`) was removed in #2922, so MCP
+discovery needs Node. `tests/test_tool_capability_manifest.js` checks that the
+bridge's manifest matches the in-process one.
 
 Shared tools:
 

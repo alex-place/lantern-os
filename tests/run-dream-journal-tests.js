@@ -97,6 +97,11 @@ function startServer() {
       ...process.env,
       LANTERN_GARAGE_PORT: String(port),
       LANTERN_GARAGE_HOST: "127.0.0.1",
+      // A test server must not join the production Cloudflare tunnel or take the MCP ports.
+      LANTERN_CLOUDFLARE_TUNNEL: "false",
+      LANTERN_MCP_SERVER: "false",
+      LANTERN_MCP_OAUTH: "false",
+      LANTERN_ROLE: "web",               // no trading loops (autoscan, exits) in a test server
     },
   });
   child.stdout.on("data", (chunk) => {
@@ -121,7 +126,9 @@ function stopServer(child) {
   const names = selectedCommands();
   let server = null;
   const canReuseExisting = Boolean(explicitBaseUrl || explicitPort);
-  let alreadyRunning = await getHealth();
+  // Reuse a running server ONLY when one was named explicitly. Otherwise 4177 is the
+  // operator's stable server; spawn a private one on a free port instead.
+  let alreadyRunning = canReuseExisting && (await getHealth());
 
   if (!alreadyRunning && !canReuseExisting) {
     port = await findFreePort();

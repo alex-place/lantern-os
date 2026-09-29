@@ -28,7 +28,8 @@ const ok = (n) => { passed++; console.log("  ✓ " + n); };
 // afterwards. Enumerate instead of enumerating-by-hand, so the next one can't hide.
 function walkJs(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === "node_modules" || e.name === ".git" || e.name === "public") continue;
+    // test/ and tests/ hold fixtures that set a secret inside their own process only.
+    if (e.name === "node_modules" || e.name === ".git" || e.name === "public" || e.name === "test" || e.name === "tests") continue;
     const full = path.join(dir, e.name);
     if (e.isDirectory()) walkJs(full, out);
     else if (e.name.endsWith(".js")) out.push(full);

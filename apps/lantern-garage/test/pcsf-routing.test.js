@@ -5,8 +5,9 @@
  * (data/pcsf/provider.pcsf.json -> routing.by_task_type). PCSF is the source of
  * truth for order; the static chain is the candidate set + cold fallback.
  *
- * Run with: npx jest test/pcsf-routing.test.js
+ * Run with: node --test test/pcsf-routing.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 
 const { orderChainByPcsf } = require("../lib/provider-router");
 
