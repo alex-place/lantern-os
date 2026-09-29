@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "busboy": "^1.6.0",
-    "docx": "^9.7.1",
+    "docx": "^9.7.2",
     "exceljs": "^4.4.0",
     "exif-parser": "^0.1.12",
     "express-session": "^1.19.0",
