@@ -179,6 +179,9 @@
     .vp .chip, .vp .tag { font-size: 10px; padding: 2px 6px; }
     .vp-chart { border-radius: 9px; overflow: hidden; background: var(--surface2); }
     .vp-chart svg { display: block; width: 100%; height: auto; }
+    .vp-cap { display: flex; align-items: center; gap: 6px; margin-top: 6px;
+              font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+    .vp-cap .tf { padding: 1px 6px; border-radius: 4px; background: var(--surface2); color: var(--text); letter-spacing: .04em; }
     .vp-stats { display: flex; gap: 14px; margin-top: 10px; }
     .vp-stats .s { min-width: 0; }
     .vp-stats .sk { font-size: 9.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -517,13 +520,35 @@
   var GATE = null;
   var BARS = {};   // ticker -> promise, so a symbol is fetched once per page load
 
-  function bars(ticker, limit) {
-    var key = ticker + ':' + limit;
+  function bars(ticker, tf, limit) {
+    var key = ticker + ':' + tf + ':' + limit;
     if (!BARS[key]) {
-      BARS[key] = get('/api/trading/bars?ticker=' + encodeURIComponent(ticker) + '&timeframe=5m&limit=' + limit)
-        .then(function (d) { return (d.bars || []).map(function (b) { return Number(b.close); }).filter(isFinite); });
+      BARS[key] = get('/api/trading/bars?ticker=' + encodeURIComponent(ticker) +
+                      '&timeframe=' + tf + '&limit=' + limit)
+        .then(function (d) { return d.bars || []; });
     }
     return BARS[key];
+  }
+  function closesOf(bs) {
+    return bs.map(function (b) { return Number(b.close); }).filter(isFinite);
+  }
+  /* Say what window the chart covers. Five-minute bars spanned ~5 hours and a 0.2%
+     price range, which drew a flat line and told the reader nothing; daily bars over
+     roughly six months show the shape that actually matters. Derived from the bars'
+     own timestamps, never assumed from the requested limit — a short history or a
+     halted name must report the window it really got. */
+  function spanLabel(bs) {
+    if (!bs.length) return null;
+    var t0 = Date.parse(bs[0].timestamp), t1 = Date.parse(bs[bs.length - 1].timestamp);
+    if (!isFinite(t0) || !isFinite(t1) || t1 <= t0) return null;
+    var days = (t1 - t0) / 86400000;
+    var short = days >= 330 ? Math.round(days / 365) + 'Y'
+              : days >= 55  ? Math.round(days / 30.44) + 'M'
+              : days >= 12  ? Math.round(days / 7) + 'W'
+              : days >= 1.5 ? Math.round(days) + 'D'
+              : Math.max(1, Math.round((t1 - t0) / 3600000)) + 'H';
+    var f = function (t) { return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+    return { short: short, range: f(t0) + ' – ' + f(t1) };
   }
 
   /* One compact verdict panel: the same content the hero card carried, at card scale.
@@ -576,16 +601,28 @@
       a.appendChild(tgt);
     }
 
+    var cap = el('div', 'vp-cap');
+    chart.after(cap);
+
     /* Chart last, and lazily: the panel is useful before the bars land. */
-    bars(symbol, 60).then(function (closes) {
-      if (closes.length < 2) { chart.remove(); return; }
+    bars(symbol, '1d', 120).then(function (bs) {
+      var closes = closesOf(bs);
+      if (closes.length < 2) { chart.remove(); cap.remove(); return; }
       var levels = [];
       ['stop', 'target1', 'target2'].forEach(function (k) {
         if (isFinite(Number(plan[k]))) levels.push({ k: k, v: Number(plan[k]) });
       });
       chart.style.minHeight = '';
       chart.appendChild(miniChart(closes, levels, up));
-    }).catch(function () { chart.remove(); });
+
+      var sp = spanLabel(bs);
+      if (sp) {
+        var tf = el('span', 'tf', sp.short);
+        cap.appendChild(tf);
+        cap.appendChild(el('span', null, 'daily · ' + sp.range));
+        cap.title = closes.length + ' daily closes, ' + sp.range;
+      } else { cap.remove(); }
+    }).catch(function () { chart.remove(); cap.remove(); });
 
     return a;
   }
@@ -689,8 +726,9 @@
         /* Sparklines are progressive enhancement: one light request each, and if it
            fails the row simply stays a row. */
         if (withSpark) {
-          bars(r.ticker, 60)
-            .then(function (closes) {
+          bars(r.ticker, '1d', 90)
+            .then(function (bs) {
+              var closes = closesOf(bs);
               if (closes.length > 1) slot.replaceWith(sparkline(closes, Number(r.chg_pct) >= 0));
             })
             .catch(function () {});
