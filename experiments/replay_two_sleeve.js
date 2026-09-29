@@ -20,8 +20,8 @@
 // Universe: REPLAY_EXCLUDE=SYM,SYM (global). Sessions: REPLAY_DAYS=N (first N). Dumps: REPLAY_DUMP=<prefix>
 // (per-variant trades + .daily.json with the per-sleeve MTM series, collisions, refusals).
 const fs = require("fs"), path = require("path");
-const LONGS = ["SPY", "QQQ", "IWM", "DIA", "GLD", "TLT", "SMH", "XLK", "SOXL", "TNA", "SPXL", "TQQQ", "UPRO"];
-const INV = ["SQQQ", "SOXS", "SPXS", "TZA"];
+const LONGS = String(process.env.REPLAY_LONGS || "SPY,QQQ,IWM,DIA,GLD,TLT,SMH,XLK,SOXL,TNA,SPXL,TQQQ,UPRO").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);   // REPLAY_LONGS / REPLAY_INV widen the universe (2026-09-25); the cache must hold every name
+const INV = String(process.env.REPLAY_INV || "SQQQ,SOXS,SPXS,TZA").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
 const SYMS = [...LONGS, ...INV];
 // REPLAY_CACHE overrides the bar cache dir (default rev60cache = Jun 5 – Aug 31 2026; rev73cache adds September).
 const CACHE = process.env.REPLAY_CACHE || path.join(process.env.TEMP || "/tmp", "rev60cache");
@@ -65,8 +65,14 @@ global.Date = class extends _RealDate {
 };
 // Sleeve M (strength/momentum, under measurement) = a SECOND INSTANCE of the race brain: the race lib is
 // copied to a temp app dir so its module-level state (entry clocks, peaks, stop registry) is its own.
-const APP_M = (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-M-")), "apps", "lantern-garage"); fs.cpSync(path.join(APP_R, "lib"), path.join(d, "lib"), { recursive: true }); return d; })();
-for (const APP of [APP_S, APP_R, APP_M]) {
+// REPLAY_APP_M (2026-09-25): the tree the M sleeve's brain is copied from — the race lib by default (the #3656 design),
+// or the master lib to give a strength entry MOMENTUM exits (ratchet floor + stop, no bounce/weakness exit).
+const M_SRC = process.env.REPLAY_APP_M ? path.resolve(process.env.REPLAY_APP_M) : APP_R;
+const APP_M = (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-M-")), "apps", "lantern-garage"); fs.cpSync(path.join(M_SRC, "lib"), path.join(d, "lib"), { recursive: true }); return d; })();
+// When R points at the SAME tree as S, require() would hand both sleeves ONE auto-trader module (shared cooldowns,
+// entry clocks, per-scan counters). Copy lib, as for M, so R is its own instance (2026-09-25, additive-sleeve runs).
+const APP_R_EFF = (path.resolve(APP_R) === path.resolve(APP_S)) ? (() => { const d = path.join(fs.mkdtempSync(path.join(require("os").tmpdir(), "sleeve-R-")), "apps", "lantern-garage"); fs.cpSync(path.join(APP_R, "lib"), path.join(d, "lib"), { recursive: true }); console.log("  [sleeve R] own copy of " + APP_R + " lib at " + d); return d; })() : APP_R;
+for (const APP of [APP_S, APP_R_EFF, APP_M]) {
   const mdPath = require.resolve(path.join(APP, "lib", "market-data-yahoo.js"));
   require.cache[mdPath] = { id: mdPath, filename: mdPath, loaded: true, exports: stub };
 }
@@ -75,7 +81,7 @@ process.env.TRADER_AUTO_EXECUTE = "1"; process.env.TRADER_MANAGE_EXITS = "1"; pr
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_S.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_S.json");
 const atS = require(path.join(APP_S, "lib", "auto-trader"));
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_R.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_R.json");
-const atR = require(path.join(APP_R, "lib", "auto-trader"));
+const atR = require(path.join(APP_R_EFF, "lib", "auto-trader"));
 process.env.TRADER_TRADES_LOG = path.join(TMP, "trades_M.jsonl"); process.env.TRADER_STATE_FILE = path.join(TMP, "state_M.json");
 const atM = require(path.join(APP_M, "lib", "auto-trader"));
 const AT = { S: atS, R: atR, M: atM };
@@ -109,6 +115,7 @@ function applyEodRules(state, eod, day, tag, ownership) {
     // within one gap of the stop at the close (SQQQ 2026-09-18 closed 0.4% above its stop and opened 2.4% below it)
     else if (eod.flatNearStop && stopPx > 0 && px <= stopPx * (1 + Number(eod.flatNearStop) / 100)) { closeQty = p.qty; why = "eod_flat_near_stop"; }
     else if (eod.flatWeekend && isFri && (eod.flatWeekend === "all" || (eod.flatWeekend === "inverse" && INV.includes(sym)) || (eod.flatWeekend === "lev" && LEV3X.has(sym)))) { closeQty = p.qty; why = "eod_flat_weekend"; }
+    else if (eod.flatLev && LEV3X.has(sym)) { closeQty = p.qty; why = "eod_decarry_lev"; }   // eod.flatLev (2026-09-27): the stable decarry, every close
     else if (eod.trimLev && LEV3X.has(sym)) { closeQty = Math.floor(p.qty * eod.trimLev); why = "eod_trim_lev"; }
     if (!(closeQty > 0)) continue;
     const pnl = closeQty * (px - p.entry);
@@ -138,7 +145,8 @@ function makeAccount(state, tag) {
       const b = barsUpTo(o.symbol, 1)[0]; if (!b) continue;
       const stop = Number(o.stopPrice);
       if (!(stop > 0) || !(Number(b.low) <= stop)) continue;
-      const fillPx = Number(b.high) < stop ? Number(b.high) : stop;
+      const _gf = String(process.env.REPLAY_GAP_FILL || "high").toLowerCase();   // REPLAY_GAP_FILL (2026-09-27): gap-through stop fill = high (default) | mid | close
+      const fillPx = Number(b.high) < stop ? (_gf === "close" ? Number(b.close ?? b.c) : _gf === "mid" ? (Number(b.high) + Number(b.low)) / 2 : Number(b.high)) : stop;
       book(o.symbol, held, fillPx, "stop");
       delete state.pos[o.symbol];
       o.status = "Filled"; o.filledQty = o.qty; o.avgPrice = fillPx; o.time = NOW_MS;
@@ -200,8 +208,73 @@ const FRI_PM_SYMS = new Set(String(process.env.REPLAY_FRI_PM_SYMS || "SQQQ,SOXS,
 // Sleeve M signal (REPLAY_M_IBS, default 0.7; REPLAY_M_FROM ET minute, default 630 = 10:30; REPLAY_M_SYMS, default all):
 // STRENGTH — a symbol at or above that fraction of its session range after the minute is BULLISH; WEAKNESS
 // (IBS <= 1 - threshold) is BEARISH, which the brain uses only to close a long it holds (a signal exit).
+const POLARITY = String(process.env.REPLAY_POLARITY || "raw").toLowerCase();
+const LEV_CONFIRM = process.env.REPLAY_LEV_CONFIRM === "1";
+const PLACEBO = String(process.env.REPLAY_PLACEBO || "").toLowerCase();   // REPLAY_PLACEBO=shuffle|shift (2026-09-27), sleeve S entries only
+let _placeboSeed = (Number(process.env.REPLAY_PLACEBO_SEED) || 1) >>> 0;
+const placeboRand = () => { _placeboSeed = (1664525 * _placeboSeed + 1013904223) >>> 0; return _placeboSeed / 4294967296; };
+let _allDaysCache = null;
+const allDays = () => _allDaysCache || (_allDaysCache = [...new Set(Object.values(DATA).flat().map((b) => b.d))].sort());
+let _inShift = false;
+const PLACEBO_SLEEVES = new Set(String(process.env.REPLAY_PLACEBO_SLEEVES || "S").split(",").map((x) => x.trim().toUpperCase()).filter(Boolean));   // which sleeves the placebo applies to (default S; S,R for the engine)
+let _posRef = null;   // the replay account's open positions (set per variant) so shuffle only moves fires that could have entered
+function applyPlacebo(out, day, m, sleeve) {
+  if (!PLACEBO || !PLACEBO_SLEEVES.has(sleeve) || _inShift) return out;
+  const setBull = (o, on) => { o.direction = on ? "BULLISH" : (o.direction === "BEARISH" ? "BEARISH" : "NEUTRAL"); o.convergence.decision = (o.direction === "BULLISH" || o.direction === "BEARISH") ? "ENTER" : "SKIP"; };
+  if (PLACEBO === "shuffle") {
+    const held = new Set(Object.keys(_posRef || {}));
+    const bulls = out.filter((o) => o.direction === "BULLISH" && !held.has(o.symbol)); if (!bulls.length) return out;
+    const pool = out.filter((o) => o.direction === "NEUTRAL" && !held.has(o.symbol)); const spare = out.filter((o) => o.direction === "BEARISH" && !held.has(o.symbol));
+    for (const o of bulls) { o.direction = "NEUTRAL"; o.convergence.decision = "SKIP"; }
+    let k = bulls.length;
+    const pick = (arr) => { while (k > 0 && arr.length) { const i = Math.floor(placeboRand() * arr.length); const o = arr.splice(i, 1)[0]; o.direction = "BULLISH"; o.convergence.decision = "ENTER"; k--; } };
+    pick(pool); pick(spare);
+    return out;
+  }
+  if (PLACEBO === "shift") {
+    const days = allDays(); const i = days.indexOf(day); if (i <= 0) return out;
+    _inShift = true; let prev; try { prev = signalsAt(days[i - 1], m, sleeve); } finally { _inShift = false; }
+    const prevBull = new Set(prev.filter((o) => o.direction === "BULLISH").map((o) => o.symbol));
+    for (const o of out) { if (o.direction === "BEARISH") continue; setBull(o, prevBull.has(o.symbol)); }
+    return out;
+  }
+  throw new Error("REPLAY_PLACEBO must be shuffle or shift");
+}
+const LEV_UNDERLYING = { SOXL: "SMH", TNA: "IWM", SPXL: "SPY", UPRO: "SPY", TQQQ: "QQQ", NUGT: "GDX", JNUG: "GDX", UCO: "USO" };
+function underlyingIbsAt(u, day, m) {
+  const ua = DATA[u]; if (!ua) return null;
+  const us = ua.filter((b) => b.d === day && b.m >= 570 && b.m <= m); if (us.length < 3) return null;
+  const uhi = Math.max(...us.map((b) => b.h)), ulo = Math.min(...us.map((b) => b.l)), uc = us[us.length - 1].c;
+  return uhi > ulo ? (uc - ulo) / (uhi - ulo) : null;
+}
+const _parseAdaptiveEnv = (raw) => { const v = String(raw || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; };
+const ADAPTIVE_ENV_R = _parseAdaptiveEnv(process.env.REPLAY_ADAPTIVE_ENV_R);
+const ADAPTIVE_ENV = (() => { const v = String(process.env.REPLAY_ADAPTIVE_ENV || "").trim(); if (!v) return null; const i1 = v.indexOf(":"), i2 = v.indexOf(":", i1 + 1); if (i1 < 0 || i2 < 0) return null; const n = Number(v.slice(0, i1)) || 10, x = Number(v.slice(i1 + 1, i2)) || 0; const deep = {}; for (const kv of v.slice(i2 + 1).split(";")) { const j = kv.indexOf("="); if (j > 0) deep[kv.slice(0, j).trim()] = kv.slice(j + 1).trim(); } return Object.keys(deep).length ? { n, x, deep } : null; })();
+const ADAPTIVE_SYM = (() => { const v = String(process.env.REPLAY_ADAPTIVE_SYM || "").trim(); if (!v) return null; const [n, x] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0 }; })();
+let _tradesRef = null, _daysRef = null, _dayIdx = -1;   // the current variant's realized trades, the session list, and today's index (set by the run loop)
+function symTrailingPnl(sym, n) {
+  if (!_tradesRef || !_daysRef || _dayIdx < 1) return null;
+  const from = _daysRef[Math.max(0, _dayIdx - n)], to = _daysRef[_dayIdx - 1];
+  let sum = 0, cnt = 0;
+  for (const t of _tradesRef) { if (t.sym === sym && t.day >= from && t.day <= to) { sum += t.pnl; cnt++; } }
+  return cnt ? { sum, cnt } : null;
+}
+const ADAPTIVE_PNL = (() => { const v = String(process.env.REPLAY_ADAPTIVE_PNL || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
+let _curveRef = null;   // the current variant's MTM equity curve (one point per completed session), set by the run loop
+function trailingPnlPct(n) { const c = _curveRef; if (!c || c.length <= n) return null; const a = c[c.length - 1], b = c[c.length - 1 - n]; return b ? (a / b - 1) * 100 : null; }
+const ADAPTIVE_IBS = (() => { const v = String(process.env.REPLAY_ADAPTIVE_IBS || "").trim(); if (!v) return null; const [n, x, up, dn] = v.split(":").map(Number); return { n: n || 10, x: Number.isFinite(x) ? x : 0, up: up || 0.30, dn: dn || 0.20 }; })();
+// SPY session closes in order, and a lookup from an ET day to the close-to-close return over the last N sessions ending the PRIOR session
+const _spyDays = (() => { const a = DATA.SPY || []; const byDay = new Map(); for (const b of a) byDay.set(b.d, b.c); const days = [...byDay.keys()].sort(); return { days, close: byDay }; })();
+function spyTrendPct(day, n) {
+  const i = _spyDays.days.indexOf(day); const j = (i >= 0 ? i : _spyDays.days.findIndex((d) => d > day)) - 1;   // prior session
+  if (j < n) return null;
+  const c1 = _spyDays.close.get(_spyDays.days[j]), c0 = _spyDays.close.get(_spyDays.days[j - n]);
+  return c1 && c0 ? (c1 / c0 - 1) * 100 : null;
+}   // raw | none | selective | top (see signalsAt)
+const INV_UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
 const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
 const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
+const M_NO_WEAKNESS = process.env.REPLAY_M_NO_WEAKNESS === "1";   // 2026-09-25: no weakness signal-exit; M exits by ratchet floor / stop / time only
 const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean));
 function signalsAt(day, m, sleeve) {
   const out = [];
@@ -216,17 +289,18 @@ function signalsAt(day, m, sleeve) {
       if (!(hi > lo)) continue;
       const cur = sess[sess.length - 1];
       const ibs = (cur.c - lo) / (hi - lo);
-      const bullish = ibs >= M_IBS, bearish = ibs <= 1 - M_IBS;
+      const bullish = ibs >= M_IBS, bearish = !M_NO_WEAKNESS && ibs <= 1 - M_IBS;
       out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
         decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
     }
     return out;
   }
-  const thr = sleeve === "S"
-    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (Number(process.env.TRADER_IBS_MAX) || 0.30))
-    : (Number(process.env.TRADER_IBS_MAX) || 0.15);
+  const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
+    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
+    : ((sleeve === "R" && m < 660 && process.env.TRADER_LAB_R_MORNING) ? Number(process.env.TRADER_LAB_R_MORNING) : (Number(process.env.TRADER_IBS_MAX) || 0.15));   // TRADER_LAB_R_MORNING (2026-09-27): stable-style morning depth for R
   const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
+    if (ADAPTIVE_SYM && sleeve === "S") { const tp = symTrailingPnl(s, ADAPTIVE_SYM.n); if (tp && tp.sum < ADAPTIVE_SYM.x) continue; }
     const a = DATA[s]; if (!a) continue;
     const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
     if (sess.length < 3) continue;
@@ -235,11 +309,46 @@ function signalsAt(day, m, sleeve) {
     const cur = sess[sess.length - 1];
     const ibs = (cur.c - lo) / (hi - lo);
     const strength = friPm && FRI_PM_SYMS.has(s) && ibs >= FRI_PM_INV;
-    const bullish = ibs <= thr || strength, bearish = !strength && ibs >= 0.6;
+    let bullish = ibs <= thr || strength, bearish = !strength && ibs >= 0.6;
+    // POLARITY (2026-09-25). A BULLISH fire on an inverse wrapper is an economic short and live
+    // it passes lib/signal-engine/scan.js applyPolarity under TRADER_SHORT_EDGE; this harness never
+    // modelled that, so its inverse entries ran under a fifth rule (the wrapper's own IBS only).
+    // REPLAY_POLARITY names the rule: raw (the harness as it was, default), none (SHORT_EDGE=0),
+    // selective (the armed rule: wrapper fell no more than 1.5% from its session open, underlying
+    // not up 0.5%+ from its open; the p_win time penalty is inert here because p_win is fixed), top
+    // (SHORT_EDGE=1: underlying at its session top, IBS >= 1 - thr). Exits (bearish) are untouched.
+    if (bullish && INV_UNDERLYING[s] && POLARITY !== "raw") {
+      if (POLARITY === "none") bullish = false;
+      else {
+        const ua = DATA[INV_UNDERLYING[s]] || [];
+        const us = ua.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
+        if (us.length < 3) bullish = false;
+        else {
+          const uhi = Math.max(...us.map((b) => b.h)), ulo = Math.min(...us.map((b) => b.l)), ucur = us[us.length - 1];
+          const uIbs = uhi > ulo ? (ucur.c - ulo) / (uhi - ulo) : 0.5;
+          const uTape = (ucur.c / us[0].c - 1) * 100;
+          const wrapperDD = (cur.c / sess[0].c - 1) * 100;
+          if (POLARITY === "top") bullish = uIbs >= 1 - thr;
+          else if (POLARITY === "selective") bullish = wrapperDD > -1.5 && uTape < 0.5;
+        }
+      }
+    }
+    if (bullish && sleeve === "S" && process.env.TRADER_LAB_FRI_FROM_M !== undefined && process.env.TRADER_LAB_FRI_FROM_M !== "" && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5 && m >= Number(process.env.TRADER_LAB_FRI_FROM_M)) bullish = false;   // TRADER_LAB_FRI_FROM_M (2026-09-27)
+    if (bullish && sleeve === "S" && process.env.TRADER_LAB_LEV_FROM_M && ["SOXL", "TNA", "SPXL", "UPRO", "TQQQ"].includes(s) && m < Number(process.env.TRADER_LAB_LEV_FROM_M)) bullish = false;   // TRADER_LAB_LEV_FROM_M (2026-09-27)
+    if (bullish && sleeve === "R" && process.env.TRADER_LAB_R_CADENCE) { const _N = Number(process.env.TRADER_LAB_R_CADENCE), _r = m % _N; if (_r !== 0 && _r < _N - 15) bullish = false; }   // the boundary bar and the three bars before it: the race brain's scan persistence/confirmation completes AT the boundary   // boundary bar + the bar before it, so the race brain's 2-scan confirmation can complete at the boundary   // TRADER_LAB_R_CADENCE (2026-09-27): R decides only on the boundary bar
+    if (bullish && sleeve === "R" && process.env.TRADER_LAB_R_LATE_BLOCK && m >= Number(process.env.TRADER_LAB_R_LATE_BLOCK)) bullish = false;   // TRADER_LAB_R_LATE_BLOCK (2026-09-27): no late R entries
+    if (bullish && LEV_CONFIRM && sleeve === "S" && LEV_UNDERLYING[s]) { const uIbs = underlyingIbsAt(LEV_UNDERLYING[s], day, m); if (uIbs == null || uIbs > thr) bullish = false; }   // REPLAY_LEV_CONFIRM (2026-09-27)
     out.push({ symbol: s, direction: bullish ? "BULLISH" : (bearish ? "BEARISH" : "NEUTRAL"), entry_price: cur.c,
       decision_context: { ibs, spy_tape: 0 }, convergence: { decision: (bullish || bearish) ? "ENTER" : "SKIP", p_win: 0.6 } });
   }
-  return out;
+  if (sleeve === "S" && process.env.TRADER_LAB_BREADTH_MAX) {
+    const max = Number(process.env.TRADER_LAB_BREADTH_MAX);
+    const levOnly = process.env.TRADER_LAB_BREADTH_LEV_ONLY === "1";
+    const LEVS = new Set(["SOXL", "TNA", "SPXL", "UPRO", "TQQQ", "NUGT", "JNUG", "UCO"]);
+    const breadth = out.filter((o) => o.direction === "BULLISH" && !INV_UNDERLYING[o.symbol]).length;   // long names in washout right now
+    if (breadth > max) for (const o of out) { if (o.direction === "BULLISH" && (!levOnly || LEVS.has(o.symbol))) { o.direction = "NEUTRAL"; o.convergence.decision = "SKIP"; o.decision_context.breadth_veto = breadth; } }
+  }
+  return applyPlacebo(out, day, m, sleeve);
 }
 
 function loadArmed(base, src) {
@@ -294,7 +403,7 @@ function loadArmed(base, src) {
     const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
     const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
     for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
-    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] };
+    const state = { equity: 100000, pos: {}, orders: [], trades: [], seq: 0, curve: [], realBy: { S: 0, R: 0, M: 0 }, collisions: [], daily: [] }; _curveRef = state.curve; _posRef = state.pos; _tradesRef = state.trades;
     const account = makeAccount(state, tag);
     const rows = [];
     const ownership = createOwnership({ defaultOwner: "S" });
@@ -307,6 +416,18 @@ function loadArmed(base, src) {
     engine.restoreEnv();
     const census = { S: {}, R: {}, M: {} };
     for (const day of days) {
+      _daysRef = days; _dayIdx = days.indexOf(day);
+      if (ADAPTIVE_ENV && envFor.S) {
+        if (!envFor.S.__adaptiveBase) Object.defineProperty(envFor.S, "__adaptiveBase", { value: Object.fromEntries(Object.keys(ADAPTIVE_ENV.deep).map((k) => [k, envFor.S[k]])), enumerable: false });
+        const t = trailingPnlPct(ADAPTIVE_ENV.n); const isDeep = t != null && t < ADAPTIVE_ENV.x;
+        for (const k of Object.keys(ADAPTIVE_ENV.deep)) { const base = envFor.S.__adaptiveBase[k]; if (isDeep) envFor.S[k] = ADAPTIVE_ENV.deep[k]; else if (base === undefined) delete envFor.S[k]; else envFor.S[k] = base; }
+        if (isDeep) state.adaptiveDeepDays = (state.adaptiveDeepDays || 0) + 1;
+      }
+      if (ADAPTIVE_ENV_R && envFor.R) {
+        if (!envFor.R.__adaptiveBase) Object.defineProperty(envFor.R, "__adaptiveBase", { value: Object.fromEntries(Object.keys(ADAPTIVE_ENV_R.deep).map((k) => [k, envFor.R[k]])), enumerable: false });
+        const tR = trailingPnlPct(ADAPTIVE_ENV_R.n); const deepR = tR != null && tR < ADAPTIVE_ENV_R.x;
+        for (const k of Object.keys(ADAPTIVE_ENV_R.deep)) { const base = envFor.R.__adaptiveBase[k]; if (deepR) envFor.R[k] = ADAPTIVE_ENV_R.deep[k]; else if (base === undefined) delete envFor.R[k]; else envFor.R[k] = base; }
+      }
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
