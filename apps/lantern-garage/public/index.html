@@ -117,6 +117,8 @@
     .track { margin-top: 5px; height: 6px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
     .fill { height: 100%; border-radius: 999px; background: var(--accent-strong); }
     .fill.up { background: var(--up); } .fill.down { background: var(--down); }
+    .hint { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+    .hint b { font-weight: 700; color: var(--text); }
     .vwhy { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.5; color: var(--muted); }
     .vwhy code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--text); }
 
@@ -518,7 +520,7 @@
     card.appendChild(chart);
 
     var meters = el('div', 'meters');
-    function meter(label, value, widthPct, cls) {
+    function meter(label, value, widthPct, cls, hintNode) {
       var m = el('div', 'meter');
       var row = el('div', 'mrow');
       row.appendChild(el('span', 'mk', label));
@@ -527,6 +529,7 @@
       var t = el('div', 'track'), f = el('div', 'fill' + (cls ? ' ' + cls : ''));
       f.style.width = Math.max(0, Math.min(100, widthPct)) + '%';
       t.appendChild(f); m.appendChild(t);
+      if (hintNode) m.appendChild(hintNode);
       return m;
     }
     if (isFinite(Number(conv.p_win))) {
@@ -534,7 +537,16 @@
     }
     if (isFinite(Number(conv.ev_r))) {
       var ev = Number(conv.ev_r);
-      meters.appendChild(meter('Expected value', fmt(ev, 2) + ' R', (ev / 2) * 100, ev > 0 ? 'up' : 'down'));
+      // "0.78 R" is trader shorthand and means nothing cold. R is the trade's OWN risk:
+      // the engine risks 1 R (entry to stop) to make target_R, so EV in R is literally
+      // "per unit risked". Stating it as money per $100 makes it land without teaching
+      // anyone a vocabulary. The figure is derived from the live ev_r, never hardcoded.
+      var evHint = el('p', 'hint');
+      evHint.appendChild(el('b', null, '1 R = what you would lose if the stop hit.'));
+      evHint.appendChild(document.createTextNode(
+        ' So for every $100 you put at risk, this setup is worth about $' +
+        Math.abs(Math.round(ev * 100)).toLocaleString('en-US') + (ev < 0 ? ' against you' : '') + ' on average.'));
+      meters.appendChild(meter('Expected value', fmt(ev, 2) + ' R', (ev / 2) * 100, ev > 0 ? 'up' : 'down', evHint));
     }
     card.appendChild(meters);
 
@@ -577,16 +589,22 @@
 
     var book = byId('book');
     book.innerHTML = '';
-    function column(title, sub, list, rowFn) {
+    function column(title, sub, list, rowFn, hintNode) {
       var c = el('div', 'card');
       c.appendChild(el('h3', null, title));
       c.appendChild(el('p', 'csub', sub));
+      if (hintNode) c.appendChild(hintNode);
       if (!list.length) { c.appendChild(el('div', 'state', 'None on this pass.')); return c; }
       list.slice(0, 6).forEach(function (it) { c.appendChild(rowFn(it)); });
       var a = el('a', 'inlink', 'See these in the terminal'); a.href = '/stock-trader.html';
       c.appendChild(a);
       return c;
     }
+    var rHint = el('p', 'hint');
+    rHint.style.marginBottom = '10px';
+    rHint.appendChild(el('b', null, 'R = the trade’s own risk'));
+    rHint.appendChild(document.createTextNode(
+      ' — what you would lose if the stop hit. 1.20 R means about $120 for every $100 risked, on average.'));
     book.appendChild(column('Accepted', 'Scored, and cleared every gate.', entered, function (e) {
       var sig = e[1], conv = sig.convergence || {};
       var r = el('div', 'row');
@@ -602,7 +620,7 @@
       n.appendChild(el('div', 'ch flat', 'expected'));
       r.appendChild(n);
       return r;
-    }));
+    }, rHint));
     book.appendChild(column('Turned down', 'Scored, then refused — with the rule that fired.', skipped, function (e) {
       var sig = e[1], conv = sig.convergence || {};
       var r = el('div', 'row');
