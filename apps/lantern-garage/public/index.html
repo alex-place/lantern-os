@@ -68,8 +68,7 @@
       -webkit-mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
       mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
     }
-    .band-inner { display: grid; gap: 32px; align-items: center; position: relative; }
-    @media (min-width: 1024px) { .band-inner { grid-template-columns: 1fr 1.05fr; gap: 48px; } }
+    .band-inner { position: relative; max-width: 68ch; }
 
     .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700;
                letter-spacing: .14em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 16px; }
@@ -169,6 +168,30 @@
     .arrow { display: none; align-self: center; color: var(--border); }
     @media (min-width: 900px) { .arrow { display: block; width: 24px; } }
 
+    /* Compact verdict panel — the hero card's content at card scale, 4-6 per grid. */
+    .vp { border: 1px solid var(--border); border-radius: 14px; padding: 13px; background: transparent;
+          text-decoration: none; color: var(--text); display: block; }
+    .vp:hover { border-color: var(--muted); background: var(--surface); }
+    .vp-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 9px; }
+    .vp-head .spacer { flex: 1 1 auto; }
+    .vp .badge { width: 24px; height: 24px; font-size: 10px; }
+    .vp .sym { font-size: 14px; font-weight: 700; }
+    .vp .chip, .vp .tag { font-size: 10px; padding: 2px 6px; }
+    .vp-chart { border-radius: 9px; overflow: hidden; background: var(--surface2); }
+    .vp-chart svg { display: block; width: 100%; height: auto; }
+    .vp-stats { display: flex; gap: 14px; margin-top: 10px; }
+    .vp-stats .s { min-width: 0; }
+    .vp-stats .sk { font-size: 9.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .vp-stats .sv { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums lining-nums; margin-top: 1px; }
+    .vp-why { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border);
+              font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+    .vp-why b { color: var(--text); font-weight: 700; }
+    .viewall { display: flex; justify-content: center; margin-top: 24px; }
+    .cta-line { display: inline-flex; align-items: center; gap: 7px; height: 46px; padding: 0 24px;
+                border: 1px solid var(--border); border-radius: 999px; text-decoration: none;
+                font-size: 15px; font-weight: 600; color: var(--text); }
+    .cta-line:hover { border-color: var(--accent-strong); color: var(--accent-strong); background: var(--surface); }
+
     .pulse { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border);
             border-radius: 999px; font-size: 12px; white-space: nowrap; }
@@ -229,22 +252,26 @@
           its own.
         </p>
       </div>
-      <div id="hero-card"><div class="state">Reading the engine…</div></div>
     </div>
   </div>
 
   <div class="canvas">
 
-    <!-- ── The engine's book ── -->
+    <!-- ── What the engine sees right now ── -->
     <section class="sec wrap" aria-labelledby="book-h">
       <div class="sec-head">
         <a href="/stock-trader.html">
-          <h2 id="book-h">The engine's book</h2>
+          <h2 id="book-h">What the engine sees now</h2>
           <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
         </a>
         <span class="sub" id="book-sub">scoring…</span>
       </div>
       <div class="grid g3" id="book"></div>
+      <div class="viewall">
+        <a class="cta-line" href="/stock-trader.html">View all tickers in the terminal
+          <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
+        </a>
+      </div>
     </section>
 
     <!-- ── The decision path ── -->
@@ -487,228 +514,135 @@
     return s;
   }
 
-  /* The hero chart: the price track with the engine's own levels drawn on it. */
-  function planChart(closes, plan, entry, up) {
-    var W = 560, H = 210, PAD = 14;
-    var levels = [];
-    ['stop', 'target1', 'target2'].forEach(function (k) {
-      if (isFinite(Number(plan[k]))) levels.push({ k: k, v: Number(plan[k]) });
-    });
-    var s = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', role: 'img',
-                         'aria-label': 'Price with the engine stop and targets marked' });
-    var y = scale(closes, levels.map(function (l) { return l.v; }).concat(isFinite(entry) ? [entry] : []), H, PAD);
-    var d = linePath(closes, y, W);
-    var c = up ? 'var(--up)' : 'var(--down)';
+  var GATE = null;
+  var BARS = {};   // ticker -> promise, so a symbol is fetched once per page load
 
-    var defs = svg('defs', {});
-    var grad = svg('linearGradient', { id: 'heroGrad', x1: '0', y1: '0', x2: '0', y2: '1' });
-    grad.appendChild(svg('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '.30' }));
-    grad.appendChild(svg('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0' }));
-    defs.appendChild(grad); s.appendChild(defs);
-
-    s.appendChild(svg('path', { d: d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z', fill: 'url(#heroGrad)' }));
-    s.appendChild(svg('path', { d: d, fill: 'none', stroke: c, 'stroke-width': '2', 'stroke-linejoin': 'round' }));
-
-    levels.forEach(function (l) {
-      var yy = y(l.v);
-      var stroke = l.k === 'stop' ? 'var(--down)' : 'var(--up)';
-      s.appendChild(svg('line', { x1: 0, x2: W, y1: yy, y2: yy, stroke: stroke, 'stroke-width': '1',
-                                  'stroke-dasharray': '4 4', 'stroke-opacity': '.85' }));
-      var label = svg('text', { x: 6, y: yy - 4, fill: stroke, class: 'lvl-label' });
-      label.textContent = (l.k === 'stop' ? 'STOP ' : l.k === 'target1' ? 'T1 ' : 'T2 ') + fmt(l.v, 2);
-      s.appendChild(label);
-    });
-    return s;
+  function bars(ticker, limit) {
+    var key = ticker + ':' + limit;
+    if (!BARS[key]) {
+      BARS[key] = get('/api/trading/bars?ticker=' + encodeURIComponent(ticker) + '&timeframe=5m&limit=' + limit)
+        .then(function (d) { return (d.bars || []).map(function (b) { return Number(b.close); }).filter(isFinite); });
+    }
+    return BARS[key];
   }
 
-  /* ── Hero verdict ───────────────────────────────────────────────────────────── */
-  var GATE = null;
-
-  function renderHero(symbol, sig) {
+  /* One compact verdict panel: the same content the hero card carried, at card scale.
+     4-6 of these replace the single big card, so a visitor sees the engine's actual
+     spread of opinion rather than one cherry-picked symbol. */
+  function verdictPanel(symbol, sig) {
     var conv = sig.convergence || {}, plan = sig.plan || {};
     var up = String(sig.direction || '').toUpperCase() === 'BULLISH';
-    var box = byId('hero-card');
-    box.innerHTML = '';
-    var card = el('div', 'vcard');
+    var skipped = !!conv.skip_reason || (conv.decision && conv.decision !== 'ENTER');
 
-    var head = el('div', 'vhead');
+    var a = el('a', 'vp');
+    a.href = '/stock-trader.html';
+
+    var head = el('div', 'vp-head');
     head.appendChild(badge(symbol));
     head.appendChild(el('span', 'sym', symbol));
     if (sig.direction) head.appendChild(el('span', 'chip', sig.direction));
     head.appendChild(el('span', 'spacer'));
     if (conv.decision) head.appendChild(el('span', 'tag ' + (conv.decision === 'ENTER' ? 'enter' : 'skip'), conv.decision));
-    card.appendChild(head);
+    a.appendChild(head);
 
-    var chart = el('div', 'chartbox');
-    chart.appendChild(el('div', 'state', 'Loading price…'));
-    card.appendChild(chart);
+    var chart = el('div', 'vp-chart');
+    chart.style.minHeight = '78px';
+    a.appendChild(chart);
 
-    var meters = el('div', 'meters');
-    function meter(label, value, widthPct, cls, hintNode) {
-      var m = el('div', 'meter');
-      var row = el('div', 'mrow');
-      row.appendChild(el('span', 'mk', label));
-      row.appendChild(el('span', 'mv' + (cls ? ' ' + cls : ''), value));
-      m.appendChild(row);
-      var t = el('div', 'track'), f = el('div', 'fill' + (cls ? ' ' + cls : ''));
-      f.style.width = Math.max(0, Math.min(100, widthPct)) + '%';
-      t.appendChild(f); m.appendChild(t);
-      if (hintNode) m.appendChild(hintNode);
-      return m;
+    var stats = el('div', 'vp-stats');
+    function stat(k, v, cls) {
+      var s = el('div', 's');
+      s.appendChild(el('div', 'sk', k));
+      s.appendChild(el('div', 'sv' + (cls ? ' ' + cls : ''), v));
+      stats.appendChild(s);
     }
-    if (isFinite(Number(conv.p_win))) {
-      // Stating this as "win probability" alone invites reading it as a measured hit
-      // rate. It is the model's score for THIS setup from current structure; we hold no
-      // published track record to calibrate it against, so the copy says so.
-      var pHint = el('p', 'hint');
-      pHint.appendChild(el('b', null, 'The engine’s estimate for this setup'));
-      pHint.appendChild(document.createTextNode(
-        ' — scored from current market structure, not a measured win rate and not a forecast.'));
-      meters.appendChild(meter('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%',
-                               Number(conv.p_win) * 100, null, pHint));
-    }
-    if (isFinite(Number(conv.ev_r))) {
-      var ev = Number(conv.ev_r);
-      // "0.78 R" is trader shorthand and means nothing cold. R is the trade's OWN risk:
-      // the engine risks 1 R (entry to stop) to make target_R, so EV in R is literally
-      // "per unit risked". Stating it as money per $100 makes it land without teaching
-      // anyone a vocabulary. The figure is derived from the live ev_r, never hardcoded.
-      var evHint = el('p', 'hint');
-      evHint.appendChild(el('b', null, '1 R = what you would lose if the stop hit.'));
-      evHint.appendChild(document.createTextNode(
-        ' So for every $100 you put at risk, this setup is worth about $' +
-        Math.abs(Math.round(ev * 100)).toLocaleString('en-US') + (ev < 0 ? ' against you' : '') +
-        ' on average — the same estimate as above, against a fixed ' +
-        (isFinite(Number(conv.target_r)) ? Number(conv.target_r) : 2) + ' R target.'));
-      // "Is 0.78 good?" is the first question anyone asks, and R-multiples give no
-      // intuition for it: 0.78 looks small because it is under 1, when it actually
-      // means +78% of the sum risked. Anchor it to the bar the engine itself acts on,
-      // read live from /zones so retuning EV_MIN can never leave this sentence lying.
-      if (GATE && isFinite(Number(GATE.ev_min))) {
-        var bar = Number(GATE.ev_min);
-        var mult = bar > 0 ? ev / bar : null;
-        var scale = el('p', 'hint');
-        scale.appendChild(el('b', null, 'Is that good?'));
-        scale.appendChild(document.createTextNode(
-          ' Anything above zero is an edge in the model’s view, and the engine only acts above +' +
-          fmt(bar, 2) + ' R' +
-          (mult && mult >= 1.2 ? ' — this is about ' + (mult >= 10 ? Math.round(mult) : mult.toFixed(1)) +
-             '× that bar.' : mult && mult >= 1 ? ' — this clears it.' : ' — this is below it.')));
-        evHint.appendChild(document.createElement('br'));
-        evHint.appendChild(scale.firstChild);          // the bold "Is that good?"
-        evHint.appendChild(scale.firstChild);          // and its sentence
-      }
-      meters.appendChild(meter('Expected value', fmt(ev, 2) + ' R', (ev / 2) * 100, ev > 0 ? 'up' : 'down', evHint));
-    }
-    card.appendChild(meters);
+    if (isFinite(Number(conv.p_win))) stat('Win prob.', (Number(conv.p_win) * 100).toFixed(1) + '%');
+    if (isFinite(Number(conv.ev_r))) stat('Exp. value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
+    if (isFinite(Number(plan.stop))) stat('Stop', fmt(plan.stop, 2));
+    a.appendChild(stats);
 
-    if (conv.skip_reason) {
+    if (skipped && conv.skip_reason) {
       var ex = explainSkip(conv.skip_reason);
-      var why = el('div', 'vwhy');
-      why.title = ex.rule;                       // the exact rule stays one hover away
-      why.appendChild(el('b', null, 'Turned down — ' + ex.short + '.'));
-      why.appendChild(document.createTextNode(' ' + ex.long));
-      card.appendChild(why);
-    } else if (sig.reasons) {
-      var w2 = el('div', 'vwhy');
-      w2.appendChild(el('b', null, 'Why: '));
-      w2.appendChild(document.createTextNode(String(sig.reasons)));
-      card.appendChild(w2);
+      var why = el('div', 'vp-why');
+      why.title = ex.rule;
+      why.appendChild(el('b', null, 'Turned down \u2014 '));
+      why.appendChild(document.createTextNode(ex.short + '.'));
+      a.appendChild(why);
+    } else if (isFinite(Number(plan.target1))) {
+      var tgt = el('div', 'vp-why');
+      tgt.appendChild(el('b', null, 'Targets '));
+      tgt.appendChild(document.createTextNode(
+        fmt(plan.target1, 2) + (isFinite(Number(plan.target2)) ? ' then ' + fmt(plan.target2, 2) : '')));
+      a.appendChild(tgt);
     }
-    box.appendChild(card);
 
-    /* Draw the price track behind the plan once the bars land. */
-    get('/api/trading/bars?ticker=' + encodeURIComponent(symbol) + '&timeframe=5m&limit=120')
-      .then(function (d) {
-        var closes = (d.bars || []).map(function (b) { return Number(b.close); }).filter(isFinite);
-        chart.innerHTML = '';
-        if (closes.length < 2) { chart.appendChild(el('div', 'state', 'No recent bars for ' + symbol + '.')); return; }
-        chart.appendChild(planChart(closes, plan, Number(sig.entry_price), up));
-      })
-      .catch(function (e) { chart.innerHTML = ''; chart.appendChild(el('div', 'state err', 'Chart unavailable (' + e.message + ').')); });
+    /* Chart last, and lazily: the panel is useful before the bars land. */
+    bars(symbol, 60).then(function (closes) {
+      if (closes.length < 2) { chart.remove(); return; }
+      var levels = [];
+      ['stop', 'target1', 'target2'].forEach(function (k) {
+        if (isFinite(Number(plan[k]))) levels.push({ k: k, v: Number(plan[k]) });
+      });
+      chart.style.minHeight = '';
+      chart.appendChild(miniChart(closes, levels, up));
+    }).catch(function () { chart.remove(); });
+
+    return a;
   }
 
-  /* ── The book ───────────────────────────────────────────────────────────────── */
+  /* Price track with the engine's levels, sized for a card. */
+  function miniChart(closes, levels, up) {
+    var W = 320, H = 78, PAD = 8;
+    var s = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    var y = scale(closes, levels.map(function (l) { return l.v; }), H, PAD);
+    var d = linePath(closes, y, W);
+    var c = up ? 'var(--green)' : 'var(--red)';
+    var id = 'mg' + Math.round(closes[0] * 100) + '_' + closes.length;
+    var defs = svg('defs', {});
+    var grad = svg('linearGradient', { id: id, x1: '0', y1: '0', x2: '0', y2: '1' });
+    grad.appendChild(svg('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '.26' }));
+    grad.appendChild(svg('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0' }));
+    defs.appendChild(grad); s.appendChild(defs);
+    s.appendChild(svg('path', { d: d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z', fill: 'url(#' + id + ')' }));
+    s.appendChild(svg('path', { d: d, fill: 'none', stroke: c, 'stroke-width': '1.7', 'stroke-linejoin': 'round' }));
+    levels.forEach(function (l) {
+      var yy = y(l.v);
+      if (yy < 1 || yy > H - 1) return;                 // off-panel: drawing it would lie about scale
+      s.appendChild(svg('line', { x1: 0, x2: W, y1: yy, y2: yy,
+        stroke: l.k === 'stop' ? 'var(--red)' : 'var(--green)',
+        'stroke-width': '1', 'stroke-dasharray': '3 3', 'stroke-opacity': '.8' }));
+    });
+    return s;
+  }
+
   function renderBook(zones) {
-    var entered = [], skipped = [], unscored = [];
+    var entered = [], skipped = [], unscored = 0;
     Object.keys(zones).forEach(function (s) {
       var sig = (zones[s] || {}).last_signal || {};
       var dec = (sig.convergence || {}).decision;
       if (dec === 'ENTER') entered.push([s, sig]);
       else if (dec) skipped.push([s, sig]);
-      else unscored.push(s);
+      else unscored++;
     });
 
-    /* Lead with a refusal when there is one: a published decline, with the rule that
-       produced it, is the most checkable thing on the page. */
-    var pick = skipped[0] || entered[0];
-    if (pick) renderHero(pick[0], pick[1]);
-    else { byId('hero-card').innerHTML = ''; byId('hero-card').appendChild(el('div', 'state', 'The engine has not scored anything on this pass.')); }
-
-    var book = byId('book');
-    book.innerHTML = '';
-    function column(title, sub, list, rowFn, hintNode) {
-      var c = el('div', 'card');
-      c.appendChild(el('h3', null, title));
-      c.appendChild(el('p', 'csub', sub));
-      if (hintNode) c.appendChild(hintNode);
-      if (!list.length) { c.appendChild(el('div', 'state', 'None on this pass.')); return c; }
-      list.slice(0, 6).forEach(function (it) { c.appendChild(rowFn(it)); });
-      var a = el('a', 'inlink', 'See these in the terminal'); a.href = '/stock-trader.html';
-      c.appendChild(a);
-      return c;
+    /* Show BOTH classes on purpose. Ranking the panels purely by expected value would
+       fill every slot with accepted setups and quietly bury the refusals, which are the
+       one thing here no competitor publishes. Four accepted, two turned down. */
+    var picks = entered.slice(0, 4).concat(skipped.slice(0, 2));
+    var box = byId('book');
+    box.innerHTML = '';
+    if (!picks.length) {
+      box.appendChild(el('div', 'state', 'The engine has not scored anything on this pass.'));
+      byId('book-sub').textContent = '';
+      return;
     }
-    var rHint = el('p', 'hint');
-    rHint.style.marginBottom = '10px';
-    rHint.appendChild(el('b', null, 'R = the trade’s own risk'));
-    rHint.appendChild(document.createTextNode(
-      ' — what you would lose if the stop hit. 1.20 R means about $120 for every $100 risked, on average.'));
-    book.appendChild(column('Accepted', 'Scored, and cleared every gate.', entered, function (e) {
-      var sig = e[1], conv = sig.convergence || {};
-      var r = el('div', 'row');
-      r.appendChild(badge(e[0]));
-      var g = el('div', 'grow'), l1 = el('div', 'l1');
-      l1.appendChild(el('span', 'sym', e[0]));
-      if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
-      g.appendChild(l1);
-      g.appendChild(el('div', 'l2', isFinite(Number(conv.p_win)) ? (Number(conv.p_win) * 100).toFixed(1) + '% win probability' : ''));
-      r.appendChild(g);
-      var n = el('div', 'num');
-      n.appendChild(el('div', 'px ' + (Number(conv.ev_r) > 0 ? 'up' : 'down'), fmt(conv.ev_r, 2) + ' R'));
-      n.appendChild(el('div', 'ch flat', 'expected'));
-      r.appendChild(n);
-      return r;
-    }, rHint));
-    book.appendChild(column('Turned down', 'Scored, then refused — with the rule that fired.', skipped, function (e) {
-      var sig = e[1], conv = sig.convergence || {};
-      var r = el('div', 'row');
-      r.appendChild(badge(e[0]));
-      var g = el('div', 'grow'), l1 = el('div', 'l1');
-      l1.appendChild(el('span', 'sym', e[0]));
-      if (sig.direction) l1.appendChild(el('span', 'chip', sig.direction));
-      g.appendChild(l1);
-      var ex2 = explainSkip(conv.skip_reason || 'no reason recorded');
-      var l2 = el('div', 'l2', ex2.short);
-      l2.title = ex2.rule;
-      g.appendChild(l2);
-      r.appendChild(g);
-      return r;
-    }));
-    book.appendChild(column('Not scored', 'Watched, but no setup on this pass.', unscored, function (s) {
-      var r = el('div', 'row');
-      r.appendChild(badge(s));
-      var g = el('div', 'grow'), l1 = el('div', 'l1');
-      l1.appendChild(el('span', 'sym', s));
-      g.appendChild(l1);
-      g.appendChild(el('div', 'l2', 'no qualifying setup'));
-      r.appendChild(g);
-      return r;
-    }));
+    picks.forEach(function (p) { box.appendChild(verdictPanel(p[0], p[1])); });
+
     byId('book-sub').textContent =
-      entered.length + ' accepted · ' + skipped.length + ' turned down · ' + unscored.length + ' not scored';
+      'showing ' + picks.length + ' of ' + (entered.length + skipped.length) + ' scored \u00b7 ' +
+      entered.length + ' accepted \u00b7 ' + skipped.length + ' turned down \u00b7 ' + unscored + ' not scored';
   }
 
-  /* ── Markets ────────────────────────────────────────────────────────────────── */
   function renderPulse(m) {
     var box = byId('pulse');
     box.innerHTML = '';
@@ -755,9 +689,8 @@
         /* Sparklines are progressive enhancement: one light request each, and if it
            fails the row simply stays a row. */
         if (withSpark) {
-          get('/api/trading/bars?ticker=' + encodeURIComponent(r.ticker) + '&timeframe=5m&limit=40')
-            .then(function (d) {
-              var closes = (d.bars || []).map(function (b) { return Number(b.close); }).filter(isFinite);
+          bars(r.ticker, 60)
+            .then(function (closes) {
               if (closes.length > 1) slot.replaceWith(sparkline(closes, Number(r.chg_pct) >= 0));
             })
             .catch(function () {});
@@ -798,7 +731,6 @@
   get('/api/trading/zones')
     .then(function (d) { GATE = (d && d.gate) || null; renderBook((d && d.zones) || {}); })
     .catch(function (e) {
-      fail(byId('hero-card'), 'the engine', e);
       fail(byId('book'), 'the engine', e);
       byId('book-sub').textContent = '';
     });
