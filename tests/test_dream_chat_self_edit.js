@@ -140,6 +140,11 @@ async function run() {
   });
 
   await test("rejects operation on master branch", async () => {
+    // The route checks the branch the SERVER runs on, not body.branch. Against a server on
+    // any other branch this call would add, commit, push and open a draft PR, so only
+    // run it where the server itself reports master.
+    const st = await request("GET", "/api/self-edit/status");
+    if (!st.body || st.body.isMaster !== true) return;
     const r = await request("POST", "/api/self-edit/pr", { title: "Test PR", branch: "master" });
     assert.strictEqual(r.status, 403);
     assert.strictEqual(r.body.error, "cannot_commit_on_master");

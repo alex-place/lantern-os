@@ -10,34 +10,16 @@
 # scripts/run-garage-tests.mjs fails the build if a file listed here starts
 # passing, so the list can only shrink. Delete a line when you fix its test.
 #
-# Known causes seen while triaging: some use a describe()/jest-style harness
-# node:test does not provide (model-pin), some assert seed data that has since
-# drifted (watchlist-store-seed), some depend on env this runner does not set.
+# Known causes seen while triaging: some assert seed data that has since drifted
+# (watchlist-store-seed), some depend on env this runner does not set. The 15
+# jest-style suites (describe/expect with no jest installed) were brought onto
+# node:test via test/_jest-compat.js on 2026-09-29 and removed from this list.
 #
-convergence-inspect-tool.test.js
-deployment-profile.test.js
-discover-feeds-parse.test.js
-entry-blocked-narration.test.js
-eval-keystone-tool.test.js
+# exit-warnings: NOT a stale test. It pins P0-8 (never auto-confirm IBKR warnings on
+# a BUY), and entries have passed acceptWarnings:true since 3aff30e2 (2026-08-10), so
+# ibkr-cpapi confirms every warning type on entries. Leave it here until the trading
+# lane narrows that change (e.g. benign-list the leveraged-ETF disclosure) or retires P0-8.
 exit-warnings.test.js
-explore-feed-diversity.test.js
-explore-feed-pagination.test.js
-model-escalation.test.js
-model-pin.test.js
-news-personalize.test.js
-overnight-staff-only.test.js
-pcsf-routing.test.js
-provider-pin-backstop.test.js
-pr-review-intent.test.js
-python-stdout-utf8.test.js
-refinement-2-3.test.js
-tool-approval-gate.test.js
-tool-arg-repair.test.js
-tool-loop-hardening.test.js
-tool-loop-memory-refresh.test.js
-tool-provider-matrix.test.js
-watchlist-store-seed.test.js
-web-search-snippet-quality.test.js
 
 # `env:` entries are ENVIRONMENT-DEPENDENT, not broken, and are never ratcheted —
 # their result is a property of the machine. These two pass on the 8GB dev box and

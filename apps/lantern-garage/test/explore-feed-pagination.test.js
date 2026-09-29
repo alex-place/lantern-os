@@ -6,8 +6,9 @@
  * deeper in the pool, so an infinite scroll keeps surfacing fresh content while
  * still leading with the highest-ranked cards.
  *
- * Run with: npx jest test/explore-feed-pagination.test.js
+ * Run with: node --test test/explore-feed-pagination.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 
 const { pickPage } = require("../lib/explore-feed");
 

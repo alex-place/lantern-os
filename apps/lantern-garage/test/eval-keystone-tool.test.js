@@ -22,7 +22,14 @@ const http = require("http");
 // ── load the tool directly ────────────────────────────────────────────────────
 const toolRunnerPath = path.join(__dirname, "..", "lib", "tool-runner.js");
 // We need to call runTool() to go through the full envelope flow
-const { runTool } = require(toolRunnerPath);
+const { runTool: rawRunTool } = require(toolRunnerPath);
+// local_eval_keystone_run needs human approval (#3070): the first call returns an
+// approval token bound to these exact args; resubmitting with it runs the tool.
+async function runTool(name, input, ctx) {
+  const first = await rawRunTool(name, input, ctx);
+  if (first.reason_code !== "approval_required") return first;
+  return rawRunTool(name, input, { ...ctx, approvals: [first.approval.token] });
+}
 
 let passed = 0;
 let failed = 0;
@@ -138,7 +145,7 @@ async function main() {
     );
     // No error about limit/timeout — those are silently clamped
     if (!env.ok) {
-      assert.notMatch(env.reason_code || "", /invalid_limit|invalid_timeout/);
+      assert.doesNotMatch(env.reason_code || "", /invalid_limit|invalid_timeout/);
     }
   });
 
@@ -179,7 +186,7 @@ async function main() {
     );
     // Should reach the endpoint probe, not fail on label validation
     if (!env.ok) {
-      assert.notMatch(env.reason_code || "", /invalid_label/, "64-char label should pass validation");
+      assert.doesNotMatch(env.reason_code || "", /invalid_label/, "64-char label should pass validation");
     }
   });
 

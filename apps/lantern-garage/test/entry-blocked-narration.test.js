@@ -22,6 +22,8 @@ process.env.TRADER_STATE_FILE = path.join(dir, "state.json");
 process.env.TRADER_AUTO_EXECUTE = "1";
 process.env.TRADER_REQUIRE_PERSIST = "0";     // don't require consecutive scans
 process.env.TRADER_ENTRY_KNIFE_FILTER = "0";  // no yahoo bars needed
+process.env.TRADER_SUP_ENTRY = "0";          // QQQ is a support-entry symbol (#3165); this fixture has no zones
+process.env.TRADER_STRESS_MULT = "1";        // fixed stress multiplier: no live VIX fetch
 delete process.env.TRADER_MANAGE_EXITS;
 
 const at = require("../lib/auto-trader");

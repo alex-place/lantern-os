@@ -9,8 +9,9 @@
  * The contract worth pinning: escalation is conservative (it costs real money), it never
  * overrides an explicit human choice, and it can only ever return an allowlisted model.
  *
- * Run with: npx jest test/model-escalation.test.js
+ * Run with: node --test test/model-escalation.test.js
  */
+const { describe, test, beforeEach, afterEach, expect } = require("./_jest-compat");
 const {
   isDeepTurn, escalatedModelFor, modelFor, isAllowedModel, DEEP_MODELS,
 } = require("../lib/provider-models");

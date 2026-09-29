@@ -5,7 +5,6 @@ const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
 const toolRunner = require(path.join(repoRoot, "apps", "lantern-garage", "lib", "tool-runner"));
-const generatedManifestPath = path.join(repoRoot, "manifests", "tool-capability-manifest-v1.json");
 
 function readInput() {
   const raw = fs.readFileSync(0, "utf8").trim();
@@ -21,13 +20,6 @@ async function main() {
 
   if (command === "manifest") {
     process.stdout.write(JSON.stringify(toolRunner.capabilityManifest({ executionEnabled })));
-    return;
-  }
-
-  if (command === "generate-manifest") {
-    const manifest = toolRunner.capabilityManifest({ executionEnabled: false });
-    fs.writeFileSync(generatedManifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
-    process.stdout.write(JSON.stringify({ written: path.relative(repoRoot, generatedManifestPath) }));
     return;
   }
 

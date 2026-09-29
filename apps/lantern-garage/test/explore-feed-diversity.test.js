@@ -9,8 +9,9 @@
  * scored list with a rank-based, scale-invariant diversity penalty so a strong
  * source still leads but then yields the next slot to something different.
  *
- * Run with: npx jest test/explore-feed-diversity.test.js
+ * Run with: node --test test/explore-feed-diversity.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 
 const { diversityRerank } = require("../lib/explore-feed");
 

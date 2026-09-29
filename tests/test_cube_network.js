@@ -6,9 +6,11 @@
 
 const http = require("http");
 
+const { hostname: HOST, port: PORT } = require("./lantern-test-base");
+
 function req(method, path, body = null) {
   return new Promise((resolve, reject) => {
-    const r = http.request({ hostname: "127.0.0.1", port: 4177, path, method, headers: { "Content-Type": "application/json" } }, (res) => {
+    const r = http.request({ hostname: HOST, port: PORT, path, method, headers: { "Content-Type": "application/json" } }, (res) => {
       let d = "";
       res.on("data", (c) => (d += c));
       res.on("end", () => {

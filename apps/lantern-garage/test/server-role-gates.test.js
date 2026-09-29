@@ -38,7 +38,6 @@ const WEB_GATES = [
   /if \(processRole\.runsWeb\(\)\) \{\n {6}const NewsCollector = require\("\.\/lib\/news-collector"\)/,
   /if \(processRole\.runsWeb\(\)\) require\("\.\/lib\/active-user-metric"\)\.startWeeklyRollupScheduler\(\)/,
   /KALSHI_CRYPTO_OBSERVER === "1" && processRole\.runsWeb\(\)/,
-  /if \(processRole\.runsWeb\(\)\) \(async \(\) => \{/,
   /if \(processRole\.runsWeb\(\)\) Promise\.resolve\(refreshAllPcsf/,
   /if \(processRole\.runsWeb\(\)\) \(\(\) => \{/,
 ];

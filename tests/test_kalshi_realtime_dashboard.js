@@ -1,5 +1,6 @@
 "use strict";
 const assert = require("assert");
+const { describe, it } = require("node:test");
 const path = require("path");
 const dashboardModule = require(path.join(__dirname, "../apps/lantern-garage/lib/kalshi-realtime-dashboard"));
 

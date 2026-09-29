@@ -14,11 +14,11 @@ const SEED_FILE = path.join(ROOT, "watchlist.seed.json");
 const LEGACY = path.join(ROOT, "watchlist.json");
 const DIR = path.join(ROOT, "watchlists");
 
-test("the tracked ideal-trader seed file exists and is broad (index + equities + crypto)", () => {
+test("the tracked ideal-trader seed file exists and is broad (index + sector + leveraged/inverse ETFs)", () => {
   const seed = JSON.parse(fs.readFileSync(SEED_FILE, "utf8")).tickers;
   assert.ok(Array.isArray(seed) && seed.length >= 10,
     `seed should be the broad ideal-trader list, got ${seed && seed.length} symbols`);
-  for (const sym of ["SPY", "AAPL", "NVDA", "GLD", "BTCUSD"]) {
+  for (const sym of ["SPY", "QQQ", "GLD", "TQQQ", "SQQQ"]) {
     assert.ok(seed.includes(sym), `seed should include ${sym}`);
   }
 });

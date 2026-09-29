@@ -11,8 +11,9 @@
  *
  * These tests pin the contract: what reaches the model is clean, non-redundant text.
  *
- * Run with: npx jest test/web-search-snippet-quality.test.js
+ * Run with: node --test test/web-search-snippet-quality.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 const { _parseNewsRss, _isNewsQuery, _isPrivateHostname, _enrichWithOgImages } = require("../lib/web-search-client");
 
 // Shaped exactly like a real Google News RSS item: entity-encoded HTML in <description>,

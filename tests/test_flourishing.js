@@ -43,14 +43,6 @@ async function test(name, fn) {
 async function run() {
   console.log("\nFlourishing Frameworks API Tests\n");
 
-  // ── Dashboard page ────────────────────────────────────────────────────────
-  console.log("GET /flourishing");
-  await test("returns HTML dashboard", async () => {
-    const r = await request("GET", "/flourishing");
-    assert.strictEqual(r.status, 200);
-    assert.ok(r.body.includes("<html") || r.body.includes("<!DOCTYPE"), "should return HTML");
-  });
-
   // ── World status ─────────────────────────────────────────────────────────
   console.log("GET /api/flourishing/world/status");
   await test("returns world status with ok=true", async () => {

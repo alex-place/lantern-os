@@ -20,7 +20,6 @@ async function test(name, fn) {
     ["what work needs to be done", "keystone", "work"],
     ["show me kalshi market positions", "xenon", "trade"],
     ["help me make a video short", "waterfall", "create"],
-    ["play the doors game", "lantern", "game"],
     ["tell me a story", "lantern", "story"],
     ["explain the convergence router", "xenon", "convergence"],
     ["is the system ready", "keystone", "status"],

@@ -43,7 +43,7 @@ assert.strictEqual(history.length, 10);
 assert.strictEqual(history[0].issueNumber, 99);
 
 const html = fs.readFileSync(
-  path.join(__dirname, "../apps/lantern-garage/public/orchestration.html"),
+  path.join(__dirname, "../apps/lantern-garage/public/work.html"),
   "utf8"
 );
 for (const contract of [
@@ -53,7 +53,7 @@ for (const contract of [
   'id="researchSort"',
   'id="researchRefresh"',
   "/api/queue/list?status=pending",
-  "/dream-chat.html?seed=",
+  "/chat.html?seed=",
   "Copy Codex handoff",
   "Copy Claude Code handoff",
   "Nothing is auto-dispatched",

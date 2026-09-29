@@ -5,8 +5,8 @@ const path = require("path");
 // TLS-verification gate centralized in lib/insecure-tls.js (shared by self-edit-engine
 // + routes/providers so the gate can't drift). Without it on Windows, cloud requests
 // throw, the auto cascade swallows the error, and chat silently degrades to the weak
-// local model — the "calm while wrong" failure in #740. Insecure only on Windows or
-// LANTERN_INSECURE_TLS=1; LANTERN_INSECURE_TLS=0 forces it off. #869
+// local model — the "calm while wrong" failure in #740. Verification is always on now:
+// the Windows / LANTERN_INSECURE_TLS=1 opt-in was removed (#1455). #869
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");

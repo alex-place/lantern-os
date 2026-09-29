@@ -166,14 +166,6 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
   "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
-  // Options ANALYSIS is market data, exactly like the Watch page's charts/news:
-  // the chain, the IV smile and the volume view are read-only views of public
-  // quotes. Gating them behind Pro left a logged-out visitor staring at "Chain
-  // unavailable — no data source" on a page we link them to (reported on
-  // unisona.ai). PLACING an options order stays Pro — that route is a POST
-  // (/api/trading/options/order) and this allowlist is GET-only.
-  "/api/trading/options/chain",     // read-only chain snapshot (free quote feed)
-  "/api/trading/options/strategies", // deterministic advisory proposals — no orders
   // NOTE deliberately absent: /api/trading/track-record. Product decision
   // (2026-08-11): we do not publish the ledger — the record stays behind
   // sign-in as the journal's data layer; the public proof surface is the live
@@ -393,7 +385,6 @@ const routes = [
   require("./routes/accounts"),        // Staff account-support console (admin/tech_support): multi-auth + password fixes
   require("./routes/personal-cube"),
   require("./routes/grounding"),       // Mesh grounding resolver: /api/grounding/resolve + /api/mesh/ground (gated by MESH_GROUNDING=1)
-  require("./routes/auto-merge"),
   require("./routes/creators"),        // creator profiles + intake form
   require("./routes/surfaces"),        // static file catch-all — MUST stay last (returns true for any path)
 ];
@@ -1003,62 +994,6 @@ server.listen(port, host, () => {
   } else {
     console.log("[CryptoObserver] Disabled (opt-in: set KALSHI_CRYPTO_OBSERVER=1 with Kalshi creds to collect paper data)");
   }
-
-  // Auto-register this node to the mesh (the web process's job when split, #3523)
-  if (processRole.runsWeb()) (async () => {
-    try {
-      const nodeId = process.env.LANTERN_NODE_ID || require("os").hostname();
-      const nodeName = process.env.LANTERN_NODE_NAME || `Lantern (${require("os").hostname()})`;
-      const agentList = AGENT_PERSONAS.map(a => a.id) || ["lantern"];
-      const workerCount = parseInt(process.env.LANTERN_WORKERS || "1", 10);
-
-      const registrationData = {
-        nodeId,
-        nodeName,
-        agents: agentList,
-        workers: workerCount,
-        port
-      };
-
-      const registrationReq = require("http").request({
-        hostname: "127.0.0.1",
-        port,
-        path: "/api/nodes/register",
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      }, (res) => {
-        let data = "";
-        res.on("data", chunk => data += chunk);
-        res.on("end", () => {
-          try {
-            const result = JSON.parse(data);
-            if (result.ok) {
-              console.log(`[Mesh] Node registered: ${nodeName} (${agentList.length} agents, ${workerCount} workers)`);
-            }
-          } catch { /* silent */ }
-        });
-      });
-      registrationReq.on("error", () => { /* silent */ });
-      registrationReq.write(JSON.stringify(registrationData));
-      registrationReq.end();
-
-      // Heartbeat every 30 seconds
-      setInterval(() => {
-        const heartbeat = require("http").request({
-          hostname: "127.0.0.1",
-          port,
-          path: "/api/nodes/register",
-          method: "POST",
-          headers: { "Content-Type": "application/json" }
-        }, () => {});
-        heartbeat.on("error", () => {});
-        heartbeat.write(JSON.stringify(registrationData));
-        heartbeat.end();
-      }, 30000);
-    } catch (err) {
-      console.warn(`[Mesh] Auto-registration failed: ${err.message}`);
-    }
-  })();
 
   if (processRole.runsWeb()) Promise.resolve(refreshAllPcsf(repoRoot)).catch((e) => console.error("[PCSF] refresh failed:", e.message));
 

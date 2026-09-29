@@ -12,6 +12,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
+// trading-account-mode writes one file per user; keep them out of the app's real data dir
+// (this test used to leave u-demo-*/u-paper-* files behind, which got committed).
+process.env.ACCOUNT_MODE_DIR = require('fs').mkdtempSync(path.join(require('os').tmpdir(), 'account-mode-'));
 
 const ADAPTER = require.resolve('../lib/alpaca-adapter');
 const FACADE = require.resolve('../lib/broker-facade');

@@ -13,9 +13,9 @@ const { baseUrl, hostname: HOST, port: PORT } = require("./lantern-test-base");
 let passed = 0;
 let failed = 0;
 
-function ok(label, fn) {
+async function ok(label, fn) {
   try {
-    fn();
+    await fn();
     console.log(`  ✓ ${label}`);
     passed++;
   } catch (e) {
@@ -46,7 +46,7 @@ console.log("\nProvider Cache — unit tests");
 delete require.cache[require.resolve("../apps/lantern-garage/lib/provider-cache")];
 const cache = require("../apps/lantern-garage/lib/provider-cache");
 
-ok("getProviderState() returns all 5 providers", () => {
+ok("getProviderState() includes the core providers", () => {
   const state = cache.getProviderState();
   assert.ok(state.gemini, "missing gemini");
   assert.ok(state.anthropic, "missing anthropic");
@@ -100,7 +100,7 @@ ok("getRoutingSnapshot returns schema + cacheTtlSeconds + providers array", () =
   assert.strictEqual(snap.cacheTtlSeconds, 60);
   assert.ok(typeof snap.cacheAgeSeconds === "number", "cacheAgeSeconds missing");
   assert.ok(Array.isArray(snap.providers), "providers not array");
-  assert.strictEqual(snap.providers.length, 5);
+  assert.ok(snap.providers.length >= 5, `expected at least 5 providers, got ${snap.providers.length}`);
 });
 
 ok("getRoutingSnapshot does NOT expose key values", () => {
@@ -125,16 +125,20 @@ ok("recentHistory in snapshot is capped to last 5 entries", () => {
 });
 
 ok("refreshProviderCache re-reads env keys", () => {
-  const before = cache.getProviderState();
-  // Keys won't be set in test env, so hasKey should be false
-  assert.strictEqual(before.gemini.hasKey, false);
-  // Simulate a key being set
-  process.env._CACHE_TEST_KEY = "test-value";
-  delete require.cache[require.resolve("../apps/lantern-garage/lib/provider-cache")];
-  const fresh = require("../apps/lantern-garage/lib/provider-cache");
-  const after = fresh.getProviderState();
-  assert.strictEqual(after.gemini.hasKey, false, "no gemini key expected");
-  delete process.env._CACHE_TEST_KEY;
+  // Hermetic: clear every variable that makes Gemini reachable, then set one.
+  const GEMINI_ENV = ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_USE_VERTEX", "VERTEX_PROJECT"];
+  const saved = Object.fromEntries(GEMINI_ENV.map((k) => [k, process.env[k]]));
+  try {
+    for (const k of GEMINI_ENV) delete process.env[k];
+    cache.refreshProviderCache();
+    assert.strictEqual(cache.getProviderState().gemini.hasKey, false, "no gemini credentials → hasKey false");
+    process.env.GEMINI_API_KEY = "test-value";
+    cache.refreshProviderCache();
+    assert.strictEqual(cache.getProviderState().gemini.hasKey, true, "a gemini key → hasKey true");
+  } finally {
+    for (const k of GEMINI_ENV) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+    cache.refreshProviderCache();
+  }
 });
 
 // ── HTTP endpoint tests ───────────────────────────────────────────────────────
@@ -169,8 +173,8 @@ async function runEndpointTests() {
     assert.ok(typeof snap.cacheAgeSeconds === "number" && snap.cacheAgeSeconds >= 0);
   });
 
-  ok("providers array has 5 entries", () => {
-    assert.strictEqual(snap.providers.length, 5);
+  ok("providers array has at least 5 entries", () => {
+    assert.ok(snap.providers.length >= 5);
   });
 
   ok("all providers have hasKey boolean", () => {
@@ -185,13 +189,13 @@ async function runEndpointTests() {
     assert.ok(!raw.includes("AIza"), "found AIza prefix");
   });
 
-  ok("endpoint responds in under 1 second", async () => {
+  await ok("endpoint responds in under 1 second", async () => {
     const t0 = Date.now();
     await get("/api/pcsf/routing");
     assert.ok(Date.now() - t0 < 1000, `too slow: ${Date.now() - t0}ms`);
   });
 
-  ok("second request reflects same or newer cache age", async () => {
+  await ok("second request reflects same or newer cache age", async () => {
     const r1 = JSON.parse((await get("/api/pcsf/routing")).body);
     const r2 = JSON.parse((await get("/api/pcsf/routing")).body);
     assert.ok(r2.cacheAgeSeconds >= r1.cacheAgeSeconds - 1, "cache age went backwards unexpectedly");

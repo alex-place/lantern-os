@@ -49,7 +49,6 @@ def _resolve_repo_root() -> Path:
 
 REPO_ROOT = _resolve_repo_root()
 BRIDGE_PATH = REPO_ROOT / "scripts" / "tool-runner-bridge.js"
-GENERATED_MANIFEST_PATH = REPO_ROOT / "manifests" / "tool-capability-manifest-v1.json"
 BRIDGE_TIMEOUT_SECONDS = 35
 
 # ── Bridge spawn throttle ────────────────────────────────────────────────────
@@ -124,20 +123,10 @@ def operator_authorized() -> bool:
 
 
 def load_manifest() -> Dict[str, Any]:
-    try:
-        return _invoke("manifest", {"execution_enabled": execution_enabled()})
-    except SharedToolBridgeError as exc:
-        try:
-            manifest = json.loads(GENERATED_MANIFEST_PATH.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as fallback_exc:
-            raise SharedToolBridgeError(
-                f"{exc}; generated_manifest_unavailable: {fallback_exc}"
-            ) from fallback_exc
-        manifest["execution"] = {"enabled": False, "reason": "node_bridge_unavailable"}
-        for descriptor in manifest.get("tools", []):
-            descriptor["execution_enabled"] = False
-            descriptor["execution_disabled_reason"] = "node_bridge_unavailable"
-        return manifest
+    # The Node registry is the only source of the tool surface. The committed golden
+    # manifest this used to fall back to was deleted (#2922), so a bridge failure is
+    # reported as-is (SharedToolBridgeError) instead of as a second, missing-file error.
+    return _invoke("manifest", {"execution_enabled": execution_enabled()})
 
 
 def execute_tool(

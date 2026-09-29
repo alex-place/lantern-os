@@ -25,12 +25,6 @@ check("convergence-adapter spawn sets PYTHONIOENCODING utf-8", () =>
   assert.ok(/PYTHONIOENCODING:\s*['"]utf-8['"]/.test(adapterSrc),
     "convergence-adapter.js spawn env is missing PYTHONIOENCODING: 'utf-8'"));
 
-const streamSrc = fs.readFileSync(
-  path.join(__dirname, "..", "lib", "stream-chat.js"), "utf8");
-check("doors spawn sets PYTHONIOENCODING utf-8", () =>
-  assert.ok(/PYTHONIOENCODING:\s*['"]utf-8['"]/.test(streamSrc),
-    "stream-chat.js door-image spawn env is missing PYTHONIOENCODING: 'utf-8'"));
-
 // 2. Functional: a Python subprocess with PYTHONIOENCODING=utf-8 round-trips the
 // em-dash intact (no "�"). Skips cleanly if no `python` is on PATH.
 for (const py of ["python", "python3"]) {

@@ -4,8 +4,9 @@
  * Test matrix: every provider (Anthropic, OpenAI, Gemini, Grok, local Ouro) × every tool
  * Verifies that tool schemas are consistent and tool execution doesn't crash per-provider.
  *
- * Run with: npx jest test/tool-provider-matrix.test.js
+ * Run with: node --test test/tool-provider-matrix.test.js
  */
+const { describe, it, beforeAll, expect } = require("./_jest-compat");
 
 const path = require("path");
 

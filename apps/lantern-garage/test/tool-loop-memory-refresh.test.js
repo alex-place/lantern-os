@@ -7,8 +7,9 @@
  * see it. Verifies the mechanism deterministically with a mock adapter — no live provider,
  * no seeded data.
  *
- * Run with: npx jest test/tool-loop-memory-refresh.test.js
+ * Run with: node --test test/tool-loop-memory-refresh.test.js
  */
+const { test, expect } = require("./_jest-compat");
 const { runToolLoop } = require("../lib/stream-chat/tool-turns");
 
 // Mock adapter whose turn() reads a MUTABLE system value each call (mirrors the Gemini

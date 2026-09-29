@@ -7,8 +7,9 @@
  * preview length, and the image is a best-effort lead thumbnail. These are pure
  * and network-free.
  *
- * Run with: npx jest test/discover-feeds-parse.test.js
+ * Run with: node --test test/discover-feeds-parse.test.js
  */
+const { describe, test, expect } = require("./_jest-compat");
 
 const { parseFeed, htmlToText, clip, firstImage } = require("../routes/discover-feeds");
 

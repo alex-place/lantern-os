@@ -9,7 +9,16 @@ async function runTests() {
   let passed = 0;
   let failed = 0;
 
-  const asm = new AgentSlotManager(require("path").join(process.env.HOME || process.env.USERPROFILE, ".claude", "agent-slots.json"));
+  // Hermetic: a throwaway slots config and state file, so the test never reads the
+  // operator's ~/.claude/agent-slots.json or writes data/agent-slots-state.json.
+  const fs = require("fs"); const os = require("os"); const path = require("path");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "agent-slots-"));
+  const configPath = path.join(tmp, "agent-slots.json");
+  fs.writeFileSync(configPath, JSON.stringify({ slots: [
+    { id: "claude-1", agent: "claude", enabled: true },
+    { id: "gemini-1", agent: "gemini", enabled: true },
+  ] }));
+  const asm = new AgentSlotManager(configPath, path.join(tmp, "state.json"));
 
   // Test 1: Load configuration
   try {
