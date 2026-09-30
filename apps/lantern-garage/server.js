@@ -77,7 +77,7 @@ function sendServerError(res, err, context) {
   }
 }
 const { readJson, readJsonl, appendJsonlQueued } = require("./lib/file-queue");
-const { getStatus, getReadiness, getMiningLabStatus, getActionCapabilities, getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus, setTunnelState } = require("./lib/status");
+const { getStatus, getReadiness, getActionCapabilities, getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus, setTunnelState } = require("./lib/status");
 const { readConversationLog, normalizeConversationEntry, appendConversationEntry, appendExternalRagItem, readOperatorQueue } = require("./lib/conversation-store");
 const { buildFlatRagHouse, writeFlatRagHouse } = require("./lib/rag-house");
 const { runPowerShell } = require("./lib/powershell");
@@ -122,7 +122,7 @@ const deps = {
   fs, path,
   sendJson, sendFile, sendHtml, collectRequestBody,
   readJson, readJsonl, appendJsonlQueued,
-  getStatus, getReadiness, getMiningLabStatus, getActionCapabilities,
+  getStatus, getReadiness, getActionCapabilities,
   getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus,
   readConversationLog, normalizeConversationEntry, appendConversationEntry,
   appendExternalRagItem, readOperatorQueue,

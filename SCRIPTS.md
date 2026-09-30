@@ -40,7 +40,6 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 | `src/discord_lounge_bot/bot.py` | Backward-compatible alias for `bot_v2.py`. | `python src/discord_lounge_bot/bot.py` |
 | `scripts/Start-DiscordBotV2.ps1` | PowerShell launcher — loads `.env.local`, checks deps/env. | `.\scripts\Start-DiscordBotV2.ps1` |
 | `scripts/Start-DiscordBotWatchdog.ps1` | 24/7 watchdog — restarts the bot on crash. | `.\scripts\Start-DiscordBotWatchdog.ps1` |
-| `scripts/Test-DiscordBotHealth.ps1` | Deep health check — token, guild access, voice visibility. | `.\scripts\Test-DiscordBotHealth.ps1` |
 | `src/discord_lounge_bot/health_check.py` | Standalone health checker (env, process, API latency). | `python src/discord_lounge_bot/health_check.py --json` |
 
 ---
@@ -63,7 +62,6 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 | Script | Purpose | How to run |
 |--------|---------|-----------|
 | `scripts/reports/sigma_trader_report_2026_07.py` | Builds the July 2026 Sigma Trader Report PDF into the git-ignored `reports/` folder (local-only; the trading record is not published) — the champion's monthly balance, current events, suggestions, receipts. All numbers pinned in-file; reproducible offline. Next month: copy to a new dated file, update the DATA + prose. | `python scripts/reports/sigma_trader_report_2026_07.py` |
-| `scripts/reports/leap-video-2026-07/` (`make_narration.py`, `make_music.py`, `index.html`) | The July Leap video edition (~66s, 16:9): HyperFrames composition + Gemini-TTS narration (Vertex ADC) + synthesized bed → an mp4 kept local (not committed or served; the trading record is not published). | `python make_narration.py && python make_music.py && npm run render` (in that dir) |
 
 ---
 
@@ -147,7 +145,6 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/generate-with-trained-lora.py` | `lib/image-generation.js` | server-driven |
 | `scripts/generate-door-images.py` | `lib/stream-chat.js` | server-driven |
 | `scripts/train-three-doors-lora.py` | `routes/training.js` | server-driven |
-| `scripts/merge-lora-weights.py` | `src/sd_image_server.py` | via SD server |
 | `models/three-doors-imagegen/generate.py` | registered here — generates the tracked Three-Doors scene art | `python models/three-doors-imagegen/generate.py` |
 | `scripts/facecam_face_detect.py` | `lib/facecam-v3.js` | server-driven |
 | `scripts/fetch_radio_audio.py` | `scripts/normalize_radio_levels.py` | via normalizer |
@@ -162,7 +159,6 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 |--------|-------------|-----------|
 | `scripts/kalshi_odds.py` | `src/mcp_server/server.py` | via MCP |
 | `scripts/mcp_stdio_bridge.py` | `.mcp.json`, `.mcp/claude-desktop.json` | via MCP client config |
-| `scripts/agent_inspector.py` | `scripts/Start-TesseractListener.ps1` | via launcher |
 | `scripts/Test-ConvergenceAgentFleet.py` | `scripts/Invoke-LanternConvergenceLoop.ps1`, `…SmartConvergenceLoop.ps1` | via launcher |
 
 ⚠ `scripts/orchestration/lantern-{billing,chat-ui,kids-ui,telemetry}.py` are anchored only by
@@ -175,8 +171,6 @@ removal-wave candidates (#2538, founder sign-off pending), not registry members.
 
 | Script | Purpose | How to run |
 |--------|---------|-----------|
-| `scripts/start-ngrok-tunnels.sh` | Launches ngrok tunnels for all services. | `bash scripts/start-ngrok-tunnels.sh` |
-| `scripts/restart-headless.sh` | Docker Compose restart for headless services (CSF, proxy). | `bash scripts/restart-headless.sh` |
 | `scripts/install-rust.sh` | Installs Rust + builds `src/csf_rust`. | `bash scripts/install-rust.sh` |
 
 ---

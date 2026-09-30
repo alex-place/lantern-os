@@ -61,7 +61,7 @@ so that broadening scope does **not** become sprawl (which ADR-0002 forbids).
    **Tool** (a `name + input + output + success` capability — the core Tool object,
    [`objects.py:95`](../../src/convergence/objects.py)) registered in the canonical registry
    ([`tool-runner.js`](../../apps/lantern-garage/lib/tool-runner.js) /
-   [`tool_registry.py`](../../src/convergence/tool_registry.py)), optionally orchestrated by a **Skill**
+   `tool_registry.py`), optionally orchestrated by a **Skill**
    (a workflow over tools). They run in the loop's **Act** stage and are grounded in **Verify**.
    This keeps ADR-0002 intact: a resume builder is *Act-stage extension*, never a top-level system.
 

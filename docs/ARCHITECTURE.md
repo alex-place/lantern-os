@@ -177,7 +177,7 @@ The 2026-06 v2 consolidation **deleted** the duplicate/legacy writers (segmented
 lossy symbolic text compressors); existing on-disk archives still open **read-only** via
 [`legacy.py`](../src/csf/legacy.py) (`__init__.py:27`, `:38`). Kept: the v07 lattice primitives
 (Tesseract "storage face") and the Status-Cube container ([`status_cube.py`](../src/csf/status_cube.py)).
-Memory-specific helpers: `memory_engine.py`, `trading_memory.py`, `delta_stream.py`.
+Memory-specific helper: `memory_engine.py`.
 The CADD layer (`caad/`) was archived 2026-07-24 (see docs/ARCHIVE-LEDGER.md).
 
 ---

@@ -80,7 +80,6 @@ GROUNDING_DOCS = [
     "docs/SURFACE-BOUNDARY.md",
     "docs/AGENT.md",
     "THIRD-PARTY-NOTICES.md",
-    "docs/KEYSTONE-COCKPIT.md",
     "docs/SIGMA0-MODEL-ADAPTER.md",
     "docs/convergence-io/AAPF.md",
     "docs/adr/0001-record-architecture-decisions.md",
