@@ -98,6 +98,7 @@ async function brokerFacadeFor(userId, ibkrBridge) {
         getIBKRDayPnl: async () => ({ dailyPnl: snap.account.pnl_today, unrealizedPnl: snap.account.unrealized, realizedPnl: 0 }),
         placeIBKROrder: reject,
         cancelIBKROrder: reject,
+        sellPreflight: async () => ({ allowed: false, reason: 'demo account is read-only' }),
       },
     };
   };
@@ -116,7 +117,10 @@ async function brokerFacadeFor(userId, ibkrBridge) {
     if (!acct) return null;
     const facade = {
       getIBKRAccount: (uid) => alpaca.getAccount(uid),
-      getIBKRPositions: async (uid) => ((await alpaca.getPositions(uid)) || { positions: [] }).positions,
+      // A failed read is UNKNOWN (null), not a flat book (review H3). The adapter marks
+      // it `unreadable`; collapsing that into [] let an outage read as "you hold
+      // nothing" and the engine could buy on top of positions it could not see.
+      getIBKRPositions: async (uid) => { const r = await alpaca.getPositions(uid); return r && !r.unreadable ? r.positions : null; },
       // ENGINE feed, not the UI feed (#3381): rows carry `orderId` (the field
       // cancelRestingStops reads — with `order_id`-only rows the engine could
       // never cancel a resting stop on Alpaca) and include the last ~30h of
@@ -132,6 +136,7 @@ async function brokerFacadeFor(userId, ibkrBridge) {
       // Alpaca — leaving orphaned GTC sell-stops that can fire on a flat position
       // and open an unintended short. Map it.
       cancelIBKROrder: (uid, orderId) => alpaca.cancelOrder(uid, orderId),
+      sellPreflight: (uid, o) => alpaca.sellPreflight(uid, o),
     };
     return { broker: 'alpaca', accountId: acct.account_id, facade };
   };
@@ -154,11 +159,12 @@ async function brokerFacadeFor(userId, ibkrBridge) {
     if (!acct) return null;
     const facade = {
       getIBKRAccount: (uid) => house.getAccount(uid),
-      getIBKRPositions: async (uid) => ((await house.getPositions(uid)) || { positions: [] }).positions,
+      getIBKRPositions: async (uid) => { const r = await house.getPositions(uid); return r ? r.positions : null; },
       getIBKROpenOrders: (uid) => house.getOpenOrders(uid),
       getIBKRDayPnl: (uid) => house.getDayPnl(uid),
       placeIBKROrder: (uid, o) => house.placeOrder(uid, o),
       cancelIBKROrder: (uid, id) => house.cancelOrder(uid, id),
+      sellPreflight: async () => ({ allowed: true, reason: 'house practice ledger (no broker guard)' }),
     };
     return { broker: 'house', accountId: acct.account_id, facade, practice: true };
   };

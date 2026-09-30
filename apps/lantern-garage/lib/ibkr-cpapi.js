@@ -517,14 +517,21 @@ class IbkrCpapi {
     };
   }
 
-  /** GET /portfolio/{acct}/positions/{page} (paginated) → normalized positions[]. */
+  /**
+   * GET /portfolio/{acct}/positions/{page} (paginated) → normalized positions[], or
+   * null when the book could not be read. A failed page used to end the loop and
+   * return whatever came before it, [] when the first page failed, so a gateway error
+   * looked like a flat (or smaller) book and the engine could buy on top of positions
+   * it could not see (review H3, 2026-09-29). An EMPTY page is still the end.
+   */
   async getPositions(accountId, { maxPages = 5 } = {}) {
     const id = accountId || (await this.resolveAccountId());
-    if (!id) return [];
+    if (!id) return null;
     const out = [];
     for (let page = 0; page < maxPages; page += 1) {
       const r = await this._request('GET', `/portfolio/${encodeURIComponent(id)}/positions/${page}`);
-      if (!r.ok || !Array.isArray(r.json) || r.json.length === 0) break;
+      if (!r.ok || !Array.isArray(r.json)) return null;
+      if (r.json.length === 0) break;
       for (const row of r.json) {
         const n = normalizePosition(row);
         if (n) out.push(n);

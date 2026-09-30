@@ -37,6 +37,9 @@ process.env.TRADER_STATE_FILE = STATE;
 process.env.TRADER_AUTO_EXECUTE = '1';
 process.env.TRADER_MANAGE_EXITS = '1';
 process.env.TRADER_PERSIST_SCANS = '1';        // one bullish scan is enough to enter
+// Hermetic clock: SOXS is leveraged, so from 15:50 ET the EOD de-carry sells it mid-scan
+// and the veto tests read a flat book they did not set up (failed 2026-09-30 15:57 ET).
+process.env.TRADER_EOD_DECARRY = '0';
 delete process.env.TRADER_FLAT_CONFIRM_SEC;
 
 const { runAutoTrade, _resetCooldowns, _saveState } = require('../lib/auto-trader');

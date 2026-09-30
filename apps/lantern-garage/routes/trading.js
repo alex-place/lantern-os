@@ -259,7 +259,7 @@ async function _autoscanTick() {
         // each engine manages only its own positions. Fail-soft empty set.
         let _ovnHeld = [];
         try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
-        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld, protectiveOnly: extManageNow });
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, accountId: resolved.accountId, extended: !marketHours, excludeSymbols: _ovnHeld, protectiveOnly: extManageNow });
       }
       // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
       // the only point that means a scan CYCLE COMPLETED. A wedged broker session leaves
@@ -324,7 +324,7 @@ if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
             let ovn = [];
             try { ovn = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
             await require('../lib/auto-trader').fastExitTick({
-              bridge: resolved.facade, userId: 'local-owner', extended: !mh, excludeSymbols: ovn,
+              bridge: resolved.facade, userId: 'local-owner', accountId: resolved.accountId, extended: !mh, excludeSymbols: ovn,
             });
           }
         }

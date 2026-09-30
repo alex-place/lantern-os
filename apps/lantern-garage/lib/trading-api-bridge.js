@@ -7,6 +7,7 @@
 const http = require('http');
 const https = require('https');
 const IbkrCpapi = require('./ibkr-cpapi');
+const { orderGate } = require('./trading-guard');
 const ibkrCreds = require('./ibkr-credentials');
 
 // Module-level so the short-lived cache is SHARED across bridge instances — the
@@ -132,6 +133,27 @@ class TradingAPIBridge {
       mode: status.mode,
       source: 'ibkr-cpapi',
     };
+  }
+
+  /**
+   * Could a SELL go out on this user's IBKR account right now? The same checks
+   * placeIBKROrder and IbkrCpapi.placeOrder apply (a connected client, the account
+   * pin, the hard guard), with nothing sent. The engine asks before it cancels a
+   * protective stop: a stop cancelled ahead of a sell the guard then refuses leaves
+   * the position with no stop at all (review H1, 2026-09-29).
+   * Returns { allowed, reason }.
+   */
+  async sellPreflight(userId, { qty = 1 } = {}) {
+    const client = this.ibkrForUser(userId);
+    if (!client) return { allowed: false, reason: 'no IBKR connection for this user' };
+    const status = await client.getStatus();
+    if (!status.connected) return { allowed: false, reason: 'IBKR not connected' };
+    const pin = this._pinnedAccount();
+    if (pin && status.accountId && String(status.accountId) !== pin) {
+      return { allowed: false, reason: `ibkr account mismatch: gateway is serving ${status.accountId}, this engine is pinned to ${pin}` };
+    }
+    const gate = orderGate({ mode: status.mode, qty: Math.max(1, Math.floor(Number(qty) || 1)), side: 'sell' });
+    return { allowed: !!gate.allowed, reason: gate.reason };
   }
 
   /**
@@ -319,6 +341,10 @@ class TradingAPIBridge {
     if (!status.connected) return [];
     this._assertPinnedAccount(status, 'a positions read');
     const positions = await client.getPositions(status.accountId);
+    // A failed read is UNKNOWN, not a flat book (review H3). Throwing lets every caller
+    // keep its own fallback: the engine's .catch(() => null) stands the scan down, and
+    // the UI routes answer 503 or show an empty panel as before.
+    if (!Array.isArray(positions)) throw new Error('IBKR positions read failed — the book is unknown, not flat');
     return positions.map((p) => {
       const qty = Number(p.qty) || 0;
       const avg = p.avgPrice != null ? p.avgPrice : 0;

@@ -67,6 +67,8 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
     const other = (sym) => { const w = ownership.ownerOf(sym); return w && w !== owner ? w : null; };
     return {
       getIBKRAccount: (uid) => facade.getIBKRAccount(uid),
+      // Forwarded so the brain asks the real leg before it cancels a stop (review H1).
+      ...(typeof facade.sellPreflight === 'function' ? { sellPreflight: (uid, o) => facade.sellPreflight(uid, o) } : {}),
       getIBKRPositions: async (uid) => {
         const raw = await facade.getIBKRPositions(uid);
         // An unreadable read — or any read inside a tick whose account snapshot was unreadable —

@@ -89,6 +89,8 @@ test('an EXPLICIT demo choice short-circuits, even with brokers connected', asyn
   assert.strictEqual(r.readOnly, true);
   const placed = await r.facade.placeIBKROrder('u1', { symbol: 'SPY', side: 'buy', qty: 1 });
   assert.strictEqual(placed.status, 'rejected');
+  // Read-only all the way down: the engine asks before it cancels a stop (review H1).
+  assert.strictEqual((await r.facade.sellPreflight('u1')).allowed, false);
 });
 
 test('paper mode, neither broker connected → the user\'s own house practice account', async () => {
@@ -99,7 +101,31 @@ test('paper mode, neither broker connected → the user\'s own house practice ac
   const r = await brokerFacadeFor(uid, deadIbkr);
   assert.strictEqual(r.broker, 'house');
   assert.strictEqual(r.practice, true);
+  // The practice ledger has no broker guard, so its sells always go out (review H1).
+  assert.strictEqual((await r.facade.sellPreflight(uid)).allowed, true);
   require('fs').rmSync(require('../lib/house-paper-broker')._file(uid), { force: true });
+});
+
+// Review H3 (2026-09-29): the adapter marks a failed read `unreadable`, and the facade
+// used to collapse that into [], so an outage read as "you hold nothing" and the engine
+// could buy on top of positions it could not see. Unknown must stay unknown.
+test('Alpaca leg: a failed positions read is unknown (null), never an empty book', async () => {
+  process.env.BROKER_PREFER = 'alpaca';
+  const rows = [{ symbol: 'SPY', qty: 10 }];
+  let down = false;
+  const stub = {
+    ...aliveAlpaca,
+    getPositions: async () => (down ? { positions: [], source: 'alpaca', unreadable: true } : { positions: rows, source: 'alpaca' }),
+    sellPreflight: (uid, o) => ({ allowed: false, reason: `stub ${uid} ${o && o.qty}` }),
+  };
+  const { brokerFacadeFor } = loadFacadeWith(stub);
+  const r = await brokerFacadeFor('u1', deadIbkr);
+  assert.strictEqual(r.broker, 'alpaca');
+  assert.deepStrictEqual(await r.facade.getIBKRPositions('u1'), rows);
+  down = true;
+  assert.strictEqual(await r.facade.getIBKRPositions('u1'), null, 'an outage is not "you hold nothing"');
+  assert.deepStrictEqual(await r.facade.sellPreflight('u1', { qty: 3 }), { allowed: false, reason: 'stub u1 3' },
+    'the leg answers the preflight from the adapter');
 });
 
 test('REGRESSION: never having chosen a mode does NOT hijack a connected account', async () => {
