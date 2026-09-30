@@ -1,0 +1,3 @@
+### Added
+
+- Proposed ADR-0035: the autotrader becomes a multi-user system where each user is a bring-your-own-key consumer of their own Alpaca account. The broker account is the tenancy unit (all engine state keyed per account, stored under the state root), the autopilot trades only the account the user connected with no broker fallback, configuration splits into operator-owned platform limits and user-owned settings validated against them (one schema that also generates the config docs), arming is per user, the guard covers every order including paper, and a halt never cancels a protective stop. Paper first; live money stays under ADR-0032.
