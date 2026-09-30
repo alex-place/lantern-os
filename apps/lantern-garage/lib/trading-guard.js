@@ -37,9 +37,19 @@ function envInt(name, dflt) {
 
 // Which global halt file (if any) is engaged. Fail-safe: a stat error is treated
 // as "not halted" only for the specific file — never swallows into "armed".
+// The kill switch is also honoured under the data root (ADR-0035 step 1): on the hosted
+// deployment that is the persistent volume, so a halt placed there survives deploys. A halt
+// file in EITHER location halts. Locally both paths are the same folder.
+function _haltDirs() {
+  let vol = null;
+  try { vol = require('./app-paths').dataPath('kalshi'); } catch (_e) { /* app-paths absent → repo dir only */ }
+  return vol && path.resolve(vol) !== path.resolve(KALSHI_DIR) ? [KALSHI_DIR, vol] : [KALSHI_DIR];
+}
 function haltFile() {
-  try { if (fs.existsSync(KILL_SWITCH)) return "LIVE-KILL-SWITCH"; } catch (_e) {}
-  try { if (fs.existsSync(TRADING_PAUSED)) return "TRADING-PAUSED"; } catch (_e) {}
+  for (const dir of _haltDirs()) {
+    try { if (fs.existsSync(path.join(dir, "LIVE-KILL-SWITCH"))) return "LIVE-KILL-SWITCH"; } catch (_e) {}
+    try { if (fs.existsSync(path.join(dir, "TRADING-PAUSED"))) return "TRADING-PAUSED"; } catch (_e) {}
+  }
   return null;
 }
 

@@ -17,7 +17,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.join(__dirname, "..", "..", "..", "data", "lantern-garage", "trading");
+const ROOT = require('./app-paths').dataPath('lantern-garage', 'trading');
 const DIR = path.join(ROOT, "tradelists");
 const SEED_FILE = path.join(ROOT, "tradelist.seed.json");
 const DEFAULT = ["SPY", "QQQ", "IWM", "TQQQ", "SQQQ", "SOXL", "SOXS"];

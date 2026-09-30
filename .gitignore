@@ -603,3 +603,22 @@ data/coding-receipts.jsonl
 # App-relative runtime state (account modes, creator entries, convergence scratch). Tests used to
 # write fixtures here and they were committed; nothing tracked belongs in this folder (2026-09-29).
 apps/lantern-garage/data/
+
+# ─── Trading stores under the data root (ADR-0035 step 1, 2026-09-30) ───
+# Every trading store now resolves under the data root (the persistent volume when hosted),
+# so broker credentials, per-user choices and runtime state land here. Never track them.
+data/alpaca-credentials/
+data/ibkr-credentials/
+data/trader-mode/
+data/account-mode/
+data/broker-preference/
+data/journal-layout/
+data/trade-notes/
+data/lantern-garage/trading/paper/
+data/lantern-garage/trading/alerts/
+data/lantern-garage/trading/tradelists/
+data/lantern-garage/trading/watchlists/
+data/lantern-garage/trading/champion-contest.json
+data/trading/heartbeat.json
+data/trading/trades.jsonl
+data/trading/signals.jsonl

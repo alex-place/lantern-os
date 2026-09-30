@@ -22,7 +22,7 @@ const path = require('path');
 // see the same store. Explicit BROKER_PREF_DIR wins (tests use it).
 const DIR = process.env.BROKER_PREF_DIR
   ? path.resolve(process.env.BROKER_PREF_DIR)
-  : path.join(__dirname, '..', 'data', 'broker-preference');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'broker-preference'), 'broker-preference');
 
 const VALID = new Set(['alpaca', 'ibkr', 'auto']);
 

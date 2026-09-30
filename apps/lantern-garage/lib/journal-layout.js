@@ -33,7 +33,7 @@ const path = require('path');
 // var at a temp dir.
 const DIR = process.env.JOURNAL_LAYOUT_DIR
   ? path.resolve(process.env.JOURNAL_LAYOUT_DIR)
-  : path.join(__dirname, '..', 'data', 'journal-layout');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'journal-layout'), 'journal-layout');
 
 const ID = /^[a-z][a-z0-9-]{0,31}$/;
 const MAX_CARDS = 40;

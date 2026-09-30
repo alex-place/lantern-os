@@ -11,7 +11,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.join(__dirname, "..", "..", "..", "data", "lantern-garage", "trading");
+const ROOT = require('./app-paths').dataPath('lantern-garage', 'trading');
 const DIR = path.join(ROOT, "watchlists");
 const LEGACY = path.join(ROOT, "watchlist.json");
 // The tracked "ideal trader" starter list — liquid broad ETFs + high-vol leveraged/

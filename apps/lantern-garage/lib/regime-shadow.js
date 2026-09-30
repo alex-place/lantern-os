@@ -49,7 +49,7 @@ function enabled() { return process.env.TRADER_REGIME_SHADOW === '1'; }
 function timeoutMs() { return Number(process.env.TRADER_REGIME_TIMEOUT_MS) || 45000; }
 function logFile() {
   return process.env.TRADER_REGIME_LOG
-    || path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'regime-shadow.jsonl');
+    || require('./app-paths').dataPath('lantern-garage', 'trading', 'regime-shadow.jsonl');
 }
 const etDay = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 

@@ -42,7 +42,9 @@ test('NO ORDER AUTHORITY: the module cannot reach a bridge, broker, or the auto-
     assert.ok(!code.includes(forbidden), `regime-shadow must not touch ${forbidden}`);
   }
   const requires = [...code.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]).sort();
-  assert.deepStrictEqual(requires, ['fs', 'http', 'https', 'path'],
+  // ./app-paths is the data-root path helper (node's os/path/fs only, asserted in
+  // test/trading-state-root.test.js), so it adds no order authority (ADR-0035 step 1).
+  assert.deepStrictEqual(requires, ['./app-paths', 'fs', 'http', 'https', 'path'],
     `only node built-ins allowed, got: ${requires}`);
 });
 

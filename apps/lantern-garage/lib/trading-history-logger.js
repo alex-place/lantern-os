@@ -19,8 +19,8 @@ const fs = require("fs");
 const path = require("path");
 const { appendJsonlQueued } = require("./file-queue");
 
-const TRADES_LOG_PATH = path.resolve(__dirname, "../../data/trading/trades.jsonl");
-const SIGNALS_LOG_PATH = path.resolve(__dirname, "../../data/trading/signals.jsonl");
+const TRADES_LOG_PATH = require('./app-paths').migratedDataPath(path.resolve(__dirname, "../../data/trading/trades.jsonl"), 'trading', 'trades.jsonl');
+const SIGNALS_LOG_PATH = require('./app-paths').migratedDataPath(path.resolve(__dirname, "../../data/trading/signals.jsonl"), 'trading', 'signals.jsonl');
 
 /**
  * Ensure trading data directory exists

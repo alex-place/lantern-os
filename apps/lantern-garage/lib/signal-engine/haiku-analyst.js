@@ -61,7 +61,7 @@ function enabled() { return process.env.TRADER_HAIKU_ANALYST === '1'; }
 function timeoutMs() { return Number(process.env.TRADER_HAIKU_TIMEOUT_MS) || 4000; }
 function logFile() {
   return process.env.TRADER_HAIKU_LOG
-    || path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'haiku-analyst.jsonl');
+    || require('../app-paths').dataPath('lantern-garage', 'trading', 'haiku-analyst.jsonl');
 }
 
 /**

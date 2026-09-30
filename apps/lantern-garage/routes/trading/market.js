@@ -18,7 +18,7 @@ async function alpacaDayPnl(account, positions) {
   try {
     const fs = require('fs'), path = require('path');
     const dayPnlLib = require('../../lib/day-pnl');
-    const dataDir = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading');
+    const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
     const d = await dayPnlLib.computeDayPnl({
       positions,
       // every ledger that trades this account (TRADER_TRADES_LOG_EXTRA): the two-sleeve
@@ -361,7 +361,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             // the tree the engine actually writes, or its "today" figures are
             // computed against a stale ledger and silently fall back to broker
             // numbers with the wrong meaning.
-            const _dataDir = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading');
+            const _dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
             const { computeDayPnl } = dayPnlLib;
             const _d = await computeDayPnl({
               positions: ibkrPositions,
@@ -425,7 +425,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           // now call the one module so they cannot drift apart again.
           try {
             const fs = require('fs'), path = require('path');
-            const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+            const logPath = require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
             const { computeDayPnl } = require('../../lib/day-pnl');
             const _d = await computeDayPnl({
               positions: opPositions,
@@ -435,7 +435,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
               // hour, and pre-market it can still serve the SESSION-BEFORE-LAST as
               // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
-              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars')),
+              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'bars')),
             });
             opAccount.realized_today = _d.realized_today;
             opAccount.realized_booked = _d.realized_booked;

@@ -25,9 +25,9 @@ const fs = require('fs');
 const path = require('path');
 
 const LEDGER = process.env.TRADER_PREDICTION_LEDGER
-  || path.join(__dirname, '..', '..', '..', '..', 'data', 'trading', 'prediction-ledger.jsonl');
+  || require('../../lib/app-paths').dataPath('trading', 'prediction-ledger.jsonl');
 const JOURNAL = process.env.TRADER_TRADES_LOG
-  || path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+  || require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
 
 const BAD = new Set(['REVERSED', 'MISLEADING', 'INVALIDATED_BY_FIDELITY']);
 

@@ -25,7 +25,7 @@ const path = require('path');
 // the same creds. An explicit ALPACA_CRED_DIR wins.
 const DIR = process.env.ALPACA_CRED_DIR
   ? path.resolve(process.env.ALPACA_CRED_DIR)
-  : path.join(__dirname, '..', 'data', 'alpaca-credentials');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'alpaca-credentials'), 'alpaca-credentials');
 
 function _key() {
   // Reuse the IBKR/session secret chain so operators configure one key, not three.

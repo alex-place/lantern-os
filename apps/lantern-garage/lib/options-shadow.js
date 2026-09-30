@@ -33,7 +33,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const ROOT = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading');
+const ROOT = require('./app-paths').dataPath('lantern-garage', 'trading');
 const LEDGER = path.join(ROOT, 'options-shadow.jsonl');
 const STATE = path.join(ROOT, 'options-shadow-state.json');
 const MIN_N = 30;                  // measured nights before any verdict is trusted

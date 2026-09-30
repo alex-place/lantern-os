@@ -144,7 +144,7 @@ const path = require("path");
 
 function loadWatchlistTickers() {
   try {
-    const p = path.resolve(__dirname, "..", "..", "..", "data", "lantern-garage", "trading", "watchlist.json");
+    const p = require('./app-paths').dataPath('lantern-garage', 'trading', 'watchlist.json');
     const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
     return Array.isArray(parsed.tickers) ? parsed.tickers : [];
   } catch {

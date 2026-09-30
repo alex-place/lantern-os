@@ -27,7 +27,7 @@ const path = require('path');
 // stores so a server started from any dir sees the same choice. TRADER_MODE_DIR wins.
 const DIR = process.env.TRADER_MODE_DIR
   ? path.resolve(process.env.TRADER_MODE_DIR)
-  : path.join(__dirname, '..', 'data', 'trader-mode');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'trader-mode'), 'trader-mode');
 
 // 'off' (#3212): the user's autopilot kill-switch. An 'off' account is never
 // entered OR exited by the loop — fully hands-off, the user manages their own

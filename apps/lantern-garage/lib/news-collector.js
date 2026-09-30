@@ -31,7 +31,7 @@ try {
   };
 }
 
-const WATCHLIST_PATH = path.resolve(__dirname, "..", "..", "..", "data", "lantern-garage", "trading", "watchlist.json");
+const WATCHLIST_PATH = require('./app-paths').dataPath('lantern-garage', 'trading', 'watchlist.json');
 const BROAD_MARKET_SYMBOLS = ["^GSPC", "^DJI", "^IXIC", "^VIX"];
 
 // Primary source: the locally-running AI Trader dashboard (dashboard.py), whose

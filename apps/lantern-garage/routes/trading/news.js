@@ -42,7 +42,7 @@ module.exports = async function newsRoutes(req, res, url, ctx) {
       }
       // No ticker → aggregate across the watchlist.
       const fs = require('fs'); const path = require('path');
-      const wlPath = path.resolve(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
+      const wlPath = require('../../lib/app-paths').migratedDataPath(path.resolve(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json'), 'lantern-garage', 'trading', 'watchlist.json');
       let tickers = [];
       try { tickers = (JSON.parse(fs.readFileSync(wlPath, 'utf8')).tickers || []); } catch { /* empty */ }
       tickers = tickers.filter((t) => /^[A-Z]{1,5}$/.test(t));

@@ -74,7 +74,7 @@ function recentLedger(limit) {
   try {
     const fs = require('fs');
     const path = require('path');
-    const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+    const logPath = require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
     const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n');
     const out = [];
     for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {

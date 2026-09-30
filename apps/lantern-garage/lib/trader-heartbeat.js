@@ -62,7 +62,7 @@ const path = require('path');
 // server started from any directory reads the same ledger. The override is for tests.
 const LEDGER = process.env.TRADER_HEARTBEAT_FILE
   ? path.resolve(process.env.TRADER_HEARTBEAT_FILE)
-  : path.join(__dirname, '..', 'data', 'trading', 'heartbeat.json');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'trading', 'heartbeat.json'), 'trading', 'heartbeat.json');
 
 const HOUR_MS = 3600000;
 

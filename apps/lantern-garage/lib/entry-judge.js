@@ -37,6 +37,7 @@
 const fs = require('fs');
 const path = require('path');
 const { FAMILY, instrumentSign, leverageOf } = require('./direction-lock');
+const { dataPath } = require('./app-paths');
 
 const CLAUDE_MODEL = () => process.env.TRADER_JUDGE_MODEL || 'claude-opus-5';
 const LOCAL_URL = () => process.env.TRADER_JUDGE_LOCAL_URL || process.env.TRADER_REGIME_LOCAL_URL || 'http://127.0.0.1:11434';
@@ -53,7 +54,7 @@ function enabled() { return process.env.TRADER_ENTRY_JUDGE === '1'; }
 // entry_judge_score.js can test "bearish news at entry -> outcome" forward
 // instead of asserting it. Read-only, capped, fail-soft: no feed = no block.
 const NEWS_FILE = () => process.env.TRADER_NEWS_LOG
-  || path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'news.jsonl');
+  || dataPath('lantern-garage', 'trading', 'news.jsonl');
 const MARKET_TAGS = new Set(['SPY', 'QQQ', 'IWM', 'DIA', 'VIX', '^VIX', 'SPX', 'NDX', 'DJI']);
 function newsContext(symbol, now = Date.now(), { maxItems = 6, hours = 24, file = NEWS_FILE() } = {}) {
   try {
@@ -85,7 +86,7 @@ function newsContext(symbol, now = Date.now(), { maxItems = 6, hours = 24, file 
 function timeoutMs() { return Number(process.env.TRADER_JUDGE_TIMEOUT_MS) || 30000; }
 function logFile() {
   return process.env.TRADER_JUDGE_LOG
-    || path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'entry-judge.jsonl');
+    || dataPath('lantern-garage', 'trading', 'entry-judge.jsonl');
 }
 
 function journal(row) {

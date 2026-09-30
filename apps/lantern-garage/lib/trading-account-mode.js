@@ -39,7 +39,7 @@ const path = require('path');
 
 const DIR = process.env.ACCOUNT_MODE_DIR
   ? path.resolve(process.env.ACCOUNT_MODE_DIR)
-  : path.join(__dirname, '..', 'data', 'account-mode');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'account-mode'), 'account-mode');
 
 const DEMO = 'demo';
 const PAPER = 'paper';

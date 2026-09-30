@@ -44,7 +44,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DIR = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'paper');
+const DIR = require('./app-paths').dataPath('lantern-garage', 'trading', 'paper');
 const START_EQUITY = Number(process.env.HOUSE_PAPER_START_EQUITY) || 100000;
 
 function _file(userId) {

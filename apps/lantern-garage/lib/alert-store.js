@@ -19,7 +19,7 @@ const path = require('path');
 
 const ROOT = process.env.ALERTS_DIR
   ? path.resolve(process.env.ALERTS_DIR)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'alerts', 'users');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'alerts', 'users');
 
 const MAX_RULES_PER_USER = 20;   // bounds per-scan evaluation cost
 const MAX_FEED_READ = 200;
