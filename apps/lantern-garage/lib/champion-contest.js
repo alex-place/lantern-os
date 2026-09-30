@@ -22,7 +22,7 @@ const champion = require('./champion-book');
 
 const STORE = process.env.CHAMPION_CONTEST_STORE
   ? path.resolve(process.env.CHAMPION_CONTEST_STORE)
-  : path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'champion-contest.json');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'champion-contest.json'), 'lantern-garage', 'trading', 'champion-contest.json');
 const START_EQUITY = 100000;   // every contestant starts with the same virtual $100k
 const UNIVERSE = champion.UNIVERSE;
 

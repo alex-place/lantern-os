@@ -29,8 +29,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const LEDGER = path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'overnight-trades.jsonl');
-const STATE = path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'overnight-state.json');
+const LEDGER = require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'overnight-trades.jsonl'), 'lantern-garage', 'trading', 'overnight-trades.jsonl');
+const STATE = require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'overnight-state.json'), 'lantern-garage', 'trading', 'overnight-state.json');
 
 function cfg() {
   const n = (name, d) => { const v = parseFloat(process.env[name]); return Number.isFinite(v) ? v : d; };

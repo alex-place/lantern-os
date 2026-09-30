@@ -22,7 +22,7 @@ const path = require('path');
 
 const DIR = process.env.BAR_ARCHIVE_DIR
   ? path.resolve(process.env.BAR_ARCHIVE_DIR)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'bars');
 
 const _cache = new Map();   // file -> { key, bars }
 const CACHE_MAX = 8;

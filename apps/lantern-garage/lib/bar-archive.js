@@ -21,7 +21,7 @@ const path = require('path');
 
 const DIR = process.env.BAR_ARCHIVE_DIR
   ? path.resolve(process.env.BAR_ARCHIVE_DIR)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'bars');
 // Research timeframes only — 1m is noise-heavy bulk, daily is freely re-fetchable.
 const TFS = new Set(['5m', '15m', '1h']);
 const _lastTs = new Map();   // "SYM|tf" -> newest archived bar time (ms)

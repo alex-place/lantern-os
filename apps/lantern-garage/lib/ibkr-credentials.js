@@ -23,7 +23,7 @@ const IbkrOAuth1 = require('./ibkr-oauth1');
 // A legacy cwd-relative dir is honored read-only so pre-existing creds still load.
 const DIR = process.env.IBKR_CRED_DIR
   ? path.resolve(process.env.IBKR_CRED_DIR)
-  : path.join(__dirname, '..', 'data', 'ibkr-credentials');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'ibkr-credentials'), 'ibkr-credentials');
 const LEGACY_DIR = path.join(process.cwd(), 'data', 'ibkr-credentials');
 const REQUIRED = ['consumerKey', 'accessToken', 'accessTokenSecret', 'signaturePem', 'encryptionPem', 'dhPrime'];
 

@@ -27,7 +27,7 @@ const { roundTrips, toLedgerRow } = require('./round-trips');
 
 const TRADES_LOG = process.env.TRADER_TRADES_LOG
   ? path.resolve(process.env.TRADER_TRADES_LOG)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
 
 /** Every exit already on record for this user, by the id that identifies its close. */
 function existingExitIds(userId, logPath = TRADES_LOG) {

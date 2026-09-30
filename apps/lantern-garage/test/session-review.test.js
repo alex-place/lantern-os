@@ -155,9 +155,11 @@ test('NO ORDER AUTHORITY: no code path can reach an order', () => {
   for (const forbidden of ['placeIBKROrder', 'cancelIBKROrder', 'closeLong', 'getIBKRPositions', 'trading-api-bridge', 'auto-trader']) {
     assert.ok(!code.includes(forbidden), `a reviewer must not call ${forbidden}`);
   }
-  // the ONLY module it may pull in is node's own fs/path
+  // the ONLY modules it may pull in are node's own fs/path and the data-root path helper
+  // ./app-paths is the data-root path helper (node's os/path/fs only, asserted in
+  // test/trading-state-root.test.js), so it adds no order authority (ADR-0035 step 1).
   const requires = [...code.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]);
-  assert.deepStrictEqual(requires.sort(), ['fs', 'path'], `unexpected dependency: ${requires}`);
+  assert.deepStrictEqual(requires.sort(), ['./app-paths', 'fs', 'path'], `unexpected dependency: ${requires}`);
 });
 
 test('the prompt forbids ungrounded findings and trading advice', () => {

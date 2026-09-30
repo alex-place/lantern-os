@@ -23,7 +23,7 @@ const path = require('path');
 // test or preview can point BOTH the writer and every reader at a fixture ledger.
 const DEFAULT_LOG = process.env.TRADER_TRADES_LOG
   ? path.resolve(process.env.TRADER_TRADES_LOG)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
 
 // A confirmed fill is one the broker actually accepted/executed. Everything else
 // (needs_confirmation, dry_run, error, null) is a DECISION the strategy made but

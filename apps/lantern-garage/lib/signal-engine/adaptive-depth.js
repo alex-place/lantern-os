@@ -32,7 +32,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const DEFAULT_LEDGER = path.join(__dirname, "..", "..", "..", "..", "data", "lantern-garage", "trading", "autopilot-trades.jsonl");
+const DEFAULT_LEDGER = require('../app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
 
 function parseSpec(v) {
   const s = String(v == null ? "" : v).trim();

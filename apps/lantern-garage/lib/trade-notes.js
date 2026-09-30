@@ -32,7 +32,7 @@ const path = require('path');
 // Resolved against THIS module, not the cwd — same rationale as journal-layout.js.
 const DIR = process.env.TRADE_NOTES_DIR
   ? path.resolve(process.env.TRADE_NOTES_DIR)
-  : path.join(__dirname, '..', 'data', 'trade-notes');
+  : require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'trade-notes'), 'trade-notes');
 
 /* A trade id is either the broker's order id or the trade log's fallback key
    (ts|symbol|qty), so the shape is broad but bounded. */

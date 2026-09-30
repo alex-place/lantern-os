@@ -37,7 +37,7 @@ function enabled() { return process.env.TRADER_SESSION_REVIEW === '1'; }
 function timeoutMs() { return Number(process.env.TRADER_REVIEW_TIMEOUT_MS) || 120000; }
 function logFile() {
   return process.env.TRADER_REVIEW_LOG
-    || path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'session-reviews.jsonl');
+    || require('./app-paths').dataPath('lantern-garage', 'trading', 'session-reviews.jsonl');
 }
 const etDay = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 const etHM = (t) => new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' });

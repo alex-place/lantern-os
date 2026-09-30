@@ -92,6 +92,34 @@ function ensureStateDirs(env = process.env, platform = process.platform) {
   return dr;
 }
 
+/**
+ * dataPath(...parts) for a store that used to live somewhere else (ADR-0035 step 1).
+ *
+ * Several trading stores were written beside the code (apps/lantern-garage/data/...), which
+ * a hosted deploy replaces, so every deploy wiped them. They now resolve under the data
+ * root like everything else. The first time the canonical path doesn't exist and the legacy
+ * one does, the legacy file or folder is copied across once; the legacy copy stays in place
+ * as a backup. Fail-soft: a copy error logs and still returns the canonical path. An env
+ * override in the caller still wins (it never reaches this function).
+ */
+const _migratedOnce = new Set();
+function migratedDataPath(legacyPath, ...parts) {
+  const canonical = dataPath(...parts);
+  if (!legacyPath || _migratedOnce.has(canonical)) return canonical;
+  _migratedOnce.add(canonical);
+  try {
+    const legacy = path.resolve(legacyPath);
+    if (legacy !== path.resolve(canonical) && !fs.existsSync(canonical) && fs.existsSync(legacy)) {
+      fs.mkdirSync(path.dirname(canonical), { recursive: true });
+      fs.cpSync(legacy, canonical, { recursive: true, force: false, errorOnExist: false, preserveTimestamps: true });
+      console.info(`[app-paths] moved store to the data root: ${legacy} -> ${canonical} (legacy copy kept)`);
+    }
+  } catch (e) {
+    console.warn(`[app-paths] store migration skipped for ${canonical}: ${e.message}`);
+  }
+  return canonical;
+}
+
 module.exports = {
   repoRoot,
   APP_DIR_NAME,
@@ -100,5 +128,6 @@ module.exports = {
   stateRoot,
   dataRoot,
   dataPath,
+  migratedDataPath,
   ensureStateDirs,
 };

@@ -29,7 +29,7 @@ const path = require('path');
 
 // Fixed universe — the 8-asset momentum book (matches experiments/dca_champion_2k.py).
 const UNIVERSE = ['SPY', 'QQQ', 'IWM', 'EFA', 'TLT', 'GLD', 'XMMO', 'SPMO'];
-const LEDGER = path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'champion-book.jsonl');
+const LEDGER = require('./app-paths').migratedDataPath(path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'champion-book.jsonl'), 'lantern-garage', 'trading', 'champion-book.jsonl');
 const MAX_GROSS = 2.0;              // hard leverage ceiling (ADR-0028 §4)
 const DEFAULT_BAND_PCT = 0.6;       // don't trade a leg whose drift < this % of equity (no-churn)
 

@@ -13,7 +13,7 @@ const { macd, rsi, emaSeries } = require('./signal-engine/indicators');
 // real append + reconciliation without writing into the operator's live ledger.
 const TRADES_LOG = process.env.TRADER_TRADES_LOG
   ? path.resolve(process.env.TRADER_TRADES_LOG)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
 // PER-USER ATTRIBUTION. The autopilot drives every connected account, but the
 // ledger was one undifferentiated book: a row said WHAT was traded and never FOR
 // WHOM, so one user's journal could only ever be answered with everyone's. Each
@@ -1006,7 +1006,7 @@ function _isExitInFlight(status) {
 // the box had been restarted repeatedly). Snapshot to disk each scan; reload at boot.
 const STATE_FILE = process.env.TRADER_STATE_FILE
   ? path.resolve(process.env.TRADER_STATE_FILE)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'trader-state.json');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'trader-state.json');
 /**
  * RECONCILE THE LEDGER AGAINST BROKER FILLS.
  *

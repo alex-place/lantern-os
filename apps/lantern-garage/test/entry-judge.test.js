@@ -37,7 +37,9 @@ test('NO ORDER AUTHORITY: requires are fs/path/direction-lock only', () => {
     assert.ok(!code.includes(forbidden), `entry-judge must not touch ${forbidden}`);
   }
   const requires = [...code.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]).sort();
-  assert.deepStrictEqual(requires, ['./direction-lock', 'fs', 'path'], `unexpected requires: ${requires}`);
+  // ./app-paths is the data-root path helper (node's os/path/fs only, asserted in
+  // test/trading-state-root.test.js), so it adds no order authority (ADR-0035 step 1).
+  assert.deepStrictEqual(requires, ['./app-paths', './direction-lock', 'fs', 'path'], `unexpected requires: ${requires}`);
 });
 
 test('DEFAULT OFF: judge() is a no-op without the flag', async () => {

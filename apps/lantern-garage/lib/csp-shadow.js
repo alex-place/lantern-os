@@ -37,7 +37,7 @@ const path = require('path');
 
 const FILE = process.env.CSP_SHADOW_FILE
   ? path.resolve(process.env.CSP_SHADOW_FILE)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'csp-shadow.jsonl');
+  : require('./app-paths').dataPath('lantern-garage', 'trading', 'csp-shadow.jsonl');
 
 // In-memory index of the journal (small file; loaded once, appended after).
 let _loaded = false;

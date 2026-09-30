@@ -36,7 +36,7 @@ class TraderAgent {
     // a transient failure recovers quickly, but long enough that a persistently
     // broken backend isn't re-scanning on every GET.
     this._scanFailTtl = config.scanFailTtl || 30000; // 30s
-    this.watchlistPath = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
+    this.watchlistPath = require('./app-paths').dataPath('lantern-garage', 'trading', 'watchlist.json');
     // Broker (IBKR Client Portal gateway) — fail-soft; reads return an honest
     // "not connected" when the gateway is down. Order placement is hard-gated.
     this.ibkr = new IbkrCpapi();
