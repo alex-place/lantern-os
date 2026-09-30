@@ -1,6 +1,6 @@
 # CEG — Convergence Execution Graph
 
-**Module:** [`src/convergence_io/ceg.py`](../../src/convergence_io/ceg.py) · **Role:** the typed substrate the rest of the stack plugs into · **Tests:** [`test_ceg.py`](../../tests/test_ceg.py), [`test_ceg_engine.py`](../../tests/test_ceg_engine.py), [`test_ceg_v04.py`](../../tests/test_ceg_v04.py)
+**Module:** [`src/convergence_io/ceg.py`](../../src/convergence_io/ceg.py) · **Role:** the typed substrate the rest of the stack plugs into · **Tests:** [`test_ceg.py`](../../tests/test_ceg.py), [`test_ceg_v04.py`](../../tests/test_ceg_v04.py)
 **Status:** Implemented + unit-tested (largest module, ~725 LOC). Python reference contract; not on the live JS path (see [README](README.md#status-honest)).
 
 ## What it is
