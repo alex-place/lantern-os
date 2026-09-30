@@ -1943,6 +1943,33 @@ function _orderEntries(enters, mode = process.env.TRADER_SLOT_ORDER) {
     return di || a.i - b.i;   // stable
   }).map((x) => x.s);
 }
+// TREND-DAY SHADOW (2026-09-30). The book buys washouts, so a session that rallies with no dip
+// gives it nothing (SOXL 2026-09-22: +10.4% from the opening print). A second rule was measured
+// for those days and holds on SOXL through the replay engine (+0.20% / +0.18% per entry on the 13
+// scored windows / 30 unseen quarters); lib/trend-shadow.js journals what it would do at live
+// prices before anyone arms it. Enabled by TRADER_TREND_SHADOW=SOXL. One instance per process,
+// kicked by every pass and never awaited, so no trade waits on it; its rows carry the user
+// 'trend-shadow', which keeps them out of every account's journal, P&L and demo feed.
+let _trendShadow = null;
+function _trendShadowKick(now) {
+  const spec = String(process.env.TRADER_TREND_SHADOW || '').trim();
+  if (!spec) return;
+  try {
+    if (!_trendShadow || _trendShadow.spec !== spec) {
+      _trendShadow = require('./trend-shadow').createTrendShadow({
+        symbols: spec.split(','),
+        log: (rec) => logTrade({ user: 'trend-shadow', ...rec }),
+        stateFile: path.join(path.dirname(TRADES_LOG), 'trend-shadow-state.json'),
+        getBars: (s, tf) => yahoo.getBars(s, tf),
+        getQuote: async (s) => { const r = await yahoo.getQuotes([s]); return r && r[0] ? r[0].price : null; },
+      });
+      _trendShadow.spec = spec;
+    }
+    const p = _trendShadow.tick(now);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a shadow never breaks a pass */ }
+}
+
 async function runAutoTrade(scan, opts = {}) {
   return _onePassPerAccount(opts,
     () => _pass.run({ user: (opts && opts.userId) || null }, () => _runAutoTradeInner(scan, opts)));
@@ -1956,6 +1983,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   const c = cfg();
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
   _warnExitAuthority(c);
+  _trendShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js)
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
   if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
