@@ -1,5 +1,7 @@
 # Beating zstd-19 in CSF — a grounded theorization
 
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 **Date:** 2026-06-29 · **Status:** design + external/internal grounding; no production claim yet.
 **Loop stage:** Remember (memory encoding). **Tracking:** issues #1593 (CSF-Col), #1594 (RKD), #1595 (GRC), #1596 (hybrid).
 
@@ -14,7 +16,7 @@ match-finding (bounded window) + an FSE/Huffman entropy stage. The entropy stage
 near-optimal — beating zstd means modeling structure or statistics that LZ cannot express. The lapse
 field already measured the target: on the 1 MB JSONL memory log the per-symbol code length
 `L(x) = −log₂ p(x|ctx)` averages **0.82 bits/byte with 70.4 % "horizon" cells (L < 1 bit)**
-([`experiments/lapse_field_demo.py`](../../experiments/lapse_field_demo.py)). That 70 % is structural
+([`experiments/lapse_field_demo.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/lapse_field_demo.py)). That 70 % is structural
 redundancy waiting to be exposed.
 
 The project has four assets a generic compressor lacks, and each technique weaponizes one:
@@ -30,7 +32,7 @@ omni only swaps whole-blob entropy coders — neither reshapes records. **Novelt
 they infer schema at runtime; our records have a *known* schema, so the transform is cheaper and tighter.
 External grounding: Meta **OpenZL** (2025, structure-aware reversible transforms beat zstd on ratio+speed),
 **DataCortex** (2–3× over zstd on NDJSON). Internal: "sparsity+redundancy wins, low-rank fails"
-([`sigma0_compressibility.py`](../../experiments/sigma0_compressibility.py)). **Prediction:** 1.5–2.5× over
+([`sigma0_compressibility.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/sigma0_compressibility.py)). **Prediction:** 1.5–2.5× over
 zstd-19 on `data/csf_memory/*.jsonl`. **Build first.**
 
 > **BUILT + MEASURED (v1 2026-07; v2 2026-07-21 — [`col_transform.py`](../../src/csf/col_transform.py), wired into omni).**
@@ -41,7 +43,7 @@ zstd-19 on `data/csf_memory/*.jsonl`. **Build first.**
 > build** fixed the two measured weaknesses — per-line passthrough (one weird line no longer disables a
 > corpus) and shape-keyed columns (mixed-schema ledgers stop interleaving fields) — with best-of-both
 > layout selection since neither dominates. Measured 2026-07-21
-> ([`csf_col_v2_bench.py`](../../experiments/csf_col_v2_bench.py), round-trip verified):
+> ([`csf_col_v2_bench.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/csf_col_v2_bench.py), round-trip verified):
 > `raw.jsonl` NotApplicable → **+5.4% vs zstd-19 / +5.8% vs brotli-11**; `records.jsonl` +3.2% → **+5.2%**;
 > `conversations.jsonl` auto-selects v1, keeping **+3.6%**. Honest status: a real, wired, lossless win that
 > omni picks automatically — and a **falsified headline prediction**, recorded per the kill-criteria rule.
@@ -94,7 +96,7 @@ variant. Best ceiling.
 **Go/no-go probe — DEFER (no premise at current data scale).** Before building the ~20 min/MB cold coder,
 the load-bearing premise — "the col residual is a slice of surprising language an LM can drive below brotli"
 — was tested directly on the real `data/csf_memory` logs. Reproducible:
-[`experiments/csf_hybrid_residual_probe.py`](../../experiments/csf_hybrid_residual_probe.py).
+[`experiments/csf_hybrid_residual_probe.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/csf_hybrid_residual_probe.py).
 
 The probe decomposes the CSF-Col output into per-column brotli-11 streams and accounts where the bytes go on
 the realistic log (`raw.jsonl`, 23.1 KB col+brotli budget):
@@ -119,9 +121,9 @@ by the current engine (`verify()` = 0/373), so the 53 % column also can't be dro
 ## 5. Doors that stay closed (theorized and refuted/impractical)
 
 - **Low-rank / SVD / PCA** — refuted: the log stays high-rank even in its optimal basis
-  ([`sigma0_compressibility.py`](../../experiments/sigma0_compressibility.py)).
+  ([`sigma0_compressibility.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/sigma0_compressibility.py)).
 - **Kolmogorov / generator coding** — 6,666× on π, but real logs have no compact generator; the no-free-lunch
-  offset result confirms it does not generalize ([`sigma0_pi_kolmogorov.py`](../../experiments/sigma0_pi_kolmogorov.py)).
+  offset result confirms it does not generalize ([`sigma0_pi_kolmogorov.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/sigma0_pi_kolmogorov.py)).
 - **Pure tesseract geometry** — the lapse-field metric is a measurement/routing tool (Fisher–Rao/Chentsov),
   not a codec; it adds zero bits on its own.
 - **cmix / PAQ context mixing** — best-known text ratio, but ~1000× slower than zstd; not viable even cold.

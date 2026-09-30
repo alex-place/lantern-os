@@ -278,7 +278,7 @@ Two learning timescales, deliberately separated:
   **eval-gated ratchet, not a telemetry treadmill**:
   1. **Trigger by evidence** (eval gap / enough new verified episodes), not a bare clock.
   2. **Train only on execution-VERIFIED episodes** (the sandboxed compile+exec+assert gate from
-     [`scripts/build_ouro_coding_dataset.py`](../scripts/build_ouro_coding_dataset.py)). Never raw
+     [`scripts/build_ouro_coding_dataset.py`](https://github.com/alex-place/lantern-os-research/blob/master/scripts/build_ouro_coding_dataset.py)). Never raw
      telemetry or the model's own unverified output — that is model-autophagy / collapse.
   3. **Accumulate, don't replace** (cumulative corpus > "latest"), to avoid catastrophic forgetting.
   4. **Promote only on a measured win, with rollback** — A/B vs the incumbent on the harness +

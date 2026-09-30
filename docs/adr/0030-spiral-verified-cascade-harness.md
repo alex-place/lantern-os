@@ -32,7 +32,7 @@ model." Two facts settle it:
 
 This touches the whole loop but is centered on **Reason → Act → Verify → Converge**. We already shipped
 the pieces in isolation: the live single-shot verified cascade (cheap → run tests → escalate on fail;
-[experiments/verified_cascade_live.py](../../experiments/verified_cascade_live.py), #2800, measured
+[experiments/verified_cascade_live.py](https://github.com/alex-place/lantern-os-research/blob/master/experiments/verified_cascade_live.py), #2800, measured
 8.3× cheaper at ≈0% escalation on a strong cheap tier), the constraint-aware cheap-tier picker
 ([`selectCheapStandin`](../../apps/lantern-garage/lib/local-model-registry.js), #2814), the outcome
 router ([`lib/coding-backend/router.js`](../../apps/lantern-garage/lib/coding-backend/router.js)), and
@@ -118,7 +118,7 @@ It is `extension over addition` per ADR-0002/0013.
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| Single-shot verified cascade works live, ≈8.3× cheaper at ≈0% escalation | [experiments/verified_cascade_live.py](../../experiments/verified_cascade_live.py); #2798/#2800 | High | measured on-box |
+| Single-shot verified cascade works live, ≈8.3× cheaper at ≈0% escalation | [experiments/verified_cascade_live.py](https://github.com/alex-place/lantern-os-research/blob/master/experiments/verified_cascade_live.py); #2798/#2800 | High | measured on-box |
 | Fix-Rate ratchet metric implemented + tested (anti-memorization gate) | [lib/spiral-fix-rate.js](../../apps/lantern-garage/lib/spiral-fix-rate.js); [test/spiral-fix-rate.test.js](../../apps/lantern-garage/test/spiral-fix-rate.test.js) | High | this PR (19 tests green) |
 | Spiral loop (grow-memory + per-turn cascade + honest halt + corpus) implemented + tested | [lib/spiral-harness.js](../../apps/lantern-garage/lib/spiral-harness.js); [test/spiral-harness.test.js](../../apps/lantern-garage/test/spiral-harness.test.js) | High | this PR |
 | Per-step cascade routing + escalate-inheriting-progress is a real 2026 frontier | arXiv 2605.06116, 2606.27457, 2605.06350 | High | external, web-grounded |
@@ -135,7 +135,7 @@ It is `extension over addition` per ADR-0002/0013.
 shipped `lib/spiral-harness.js` and `lib/spiral-fix-rate.js` implement **no holdout** — candidates
 are scored against the same tests they are optimised against. Documented at
 [SIGMA0-OURO-CODER.md §3](../SIGMA0-OURO-CODER.md). Measured consequence
-([`experiments/spiral_anytime_counterexample.py`](../../experiments/spiral_anytime_counterexample.py)):
+([`experiments/spiral_anytime_counterexample.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/spiral_anytime_counterexample.py)):
 harmless for a competent proposer — the anytime property holds — but with a proposer that has no
 real skill on the task, true correctness peaks early then declines (−3.1pp/60 turns at 5 visible
 tests). We have measured ourselves in that regime (SWE-bench single-shot 0/5), so the holdout is

@@ -6,6 +6,8 @@ status: design — the cosmology seed ships; the full answerability contract is 
 
 # The Convergence Oracle — the machine above the 42 machine
 
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 > **One line.** Deep Thought computed *the* answer to the ultimate question and returned
 > **42** — a confident scalar, disconnected from a question it never understood. The Oracle is
 > the machine one level up: it answers **any** question with Σ₀ discipline (best effort, every

@@ -6,6 +6,8 @@ updated: 2026-06-20
 
 # CSF Format Specification (canonical, consolidated)
 
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 **CSF** = Convergence-Fitted Searchable Format — unisona.ai's binary container
 family for memory, symbolic data, and (as of v0.8) **arbitrary files**.
 
@@ -102,7 +104,7 @@ are unchanged. Solid archives stamp **version 0.9** so pre-solid readers refuse 
 with a clean version error instead of misparsing offsets; readers accept 0.8 and 0.9.
 
 **Measured (2026-07-21, whole-archive bytes via the real API, unpack-verified —**
-[`experiments/csf_solid_bench.py`](../experiments/csf_solid_bench.py)**):** solid beats
+[`experiments/csf_solid_bench.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/csf_solid_bench.py)**):** solid beats
 per-file zstd-19 by **+18.4% (src/csf py) / +28.7% (docs/research md) / +30.8%
 (changelog fragments)**, and `solid=True, codec="omni"` adds a further **+6.4–9.3%**
 (the max-ratio cold tier). The trained-dict path (`use_dict`) measured **net-negative
@@ -228,7 +230,7 @@ is a new opt-in codec (`codec="omni"`) that goes one better: it runs the whole p
 the smallest behind a 7-byte self-describing, CRC-checked header — deterministically (same input → same bytes).
 
 Measured against the shipped zstd-19, every codec round-trip-verified lossless
-([`experiments/csf_compression_benchmark.py`](../experiments/csf_compression_benchmark.py); full write-up:
+([`experiments/csf_compression_benchmark.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/csf_compression_benchmark.py); full write-up:
 [**CSF Compression Benchmark — Review v3 (PDF)**](/reports/csf-compression-benchmark.pdf)):
 
 | Corpus (raw) | zstd-19 (ships) | brotli-11 | **CSF-Omni** | Omni vs zstd |
@@ -402,7 +404,7 @@ in [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md). Bridge facts:
 | `NUM_DIMENSIONS = 12`, `TOTAL_POSITIONS = 3 ** 12` | 12 ternary axes (one per Convergence-12 component) | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py) |
 | `QutritState` (amp 0-7, phase 0-7) + `QutritDelta` (2 B) | a lattice cell + its signed change | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py) |
 | `QuantumDustField` baseline + active deltas + dust | a stored point; most cells implicit ("dust") | [`quantum_dust.py`](../src/csf/v07/quantum_dust.py) |
-| observer-collapsed wavefront | the **motion face** (Tesseract) reads the same field | [`converged_tesseract.py`](../src/converged_tesseract.py) |
+| observer-collapsed wavefront | the **motion face** (Tesseract) reads the same field | [`converged_tesseract.py`](https://github.com/alex-place/lantern-os-research/blob/master/src/converged_tesseract.py) |
 
 **Why base-3, not base-2:** ternary is the most economical integer radix (optimum is `e`,
 nearest integer 3), and balanced ternary `{-1,0,+1}` gives symmetric arithmetic — the same

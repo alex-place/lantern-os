@@ -1,5 +1,7 @@
 # The 3¹² Convergence Lattice — CSF and the Tesseract Are One Object
 
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+
 **Date:** 2026-06-19
 **Type:** Design consolidation (the "one pair → one lattice" singularity)
 **Branch:** `research/convergence-tesseract-spiral`
@@ -38,7 +40,7 @@ it), or **[hypothesis — to be measured]**. Metaphor is labelled as metaphor.
 > object**: a `3**12 = 531,441`-cell **balanced-ternary lattice**. CSF is how a point on the
 > lattice is **stored**; the Tesseract spiral is how a point **moves** across it toward a
 > fixed point. The substrate is already built ([`src/csf/v07/`](../src/csf/v07/) +
-> [`src/converged_tesseract.py`](../src/converged_tesseract.py)); this doc unifies the
+> [`src/converged_tesseract.py`](https://github.com/alex-place/lantern-os-research/blob/master/src/converged_tesseract.py)); this doc unifies the
 > vocabulary and the docs. Per the anti-sprawl law, **two design threads collapse to one
 > Convergence-Core object.**
 
@@ -50,7 +52,7 @@ it), or **[hypothesis — to be measured]**. Metaphor is labelled as metaphor.
 |---|---|---|
 | `3**12` ternary state space, `NUM_DIMENSIONS=12`, `TOTAL_POSITIONS=531441` | **[implemented]** | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py) |
 | Sparse "dust" field: baseline + active deltas, most cells implicit | **[implemented]** | [`quantum_dust.py`](../src/csf/v07/quantum_dust.py) |
-| Observer-collapsed wavefront over the `3**12` field | **[implemented]** | [`converged_tesseract.py`](../src/converged_tesseract.py) |
+| Observer-collapsed wavefront over the `3**12` field | **[implemented]** | [`converged_tesseract.py`](https://github.com/alex-place/lantern-os-research/blob/master/src/converged_tesseract.py) |
 | Convergence-exit (contraction `‖Δh‖/‖h‖ < ε` to a fixed point) | **[implemented]** | [`loop_lm.py`](../src/sigma0/loop_lm.py) `converge_step` |
 | Base-3 is the most economical integer radix | **[grounded]** | radix-economy literature (§5) |
 | Ternary `{-1,0,+1}` is a viable, efficient compute substrate | **[grounded]** | BitNet b1.58 (§5) |
@@ -140,7 +142,7 @@ pass).
 |---|---|---|
 | **Question** | *Where is the system?* | *Where is it going?* |
 | **Object** | a point / delta-stream on the lattice | a trajectory across the lattice |
-| **Code** | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py), [`quantum_dust.py`](../src/csf/v07/quantum_dust.py), [`csf_pack.py`](../src/csf/csf_pack.py) | [`converged_tesseract.py`](../src/converged_tesseract.py), [`loop_lm.py`](../src/sigma0/loop_lm.py) |
+| **Code** | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py), [`quantum_dust.py`](../src/csf/v07/quantum_dust.py), [`csf_pack.py`](../src/csf/csf_pack.py) | [`converged_tesseract.py`](https://github.com/alex-place/lantern-os-research/blob/master/src/converged_tesseract.py), [`loop_lm.py`](../src/sigma0/loop_lm.py) |
 | **Operation** | `observe(pos, deltas)` / `get_state(pos)` | `update_present(t)` → wavefront slice; `converge_step` → fixed point |
 | **Loop stage** | **Remember** | **Observe → Reason → Act → Verify → Converge** |
 | **External anchor** | BitNet ternary storage; CSF radix economy | recurrent-depth latent reasoning; STARS stability |
@@ -159,7 +161,7 @@ storage face.
 
 ### 3.2 Motion face — the Tesseract moves the point **[implemented]**
 
-`ConvergedTesseract` ([`converged_tesseract.py`](../src/converged_tesseract.py)) never
+`ConvergedTesseract` ([`converged_tesseract.py`](https://github.com/alex-place/lantern-os-research/blob/master/src/converged_tesseract.py)) never
 materialises all `531,441` cells. It loads a **minimal observer-collapsed wavefront** — the
 cells within a ternary-Hamming radius of the present `center`, ranked by information density
 (active deltas > baseline > dust). The wavefront *is* the spiral's current position; advancing
@@ -266,8 +268,8 @@ are the same phenomenon; X4 tests whether the spiral actually spirals. **Both we
 
 Run via a Workflow (implement → run → 3-lens adversarial verify; all six verifier lenses
 returned **sound, reproduced = true**). Reproducible scripts:
-[`experiments/x3_dust_vs_bitnet_sparsity.py`](../experiments/x3_dust_vs_bitnet_sparsity.py) and
-[`experiments/x4_converge_step_instrument.py`](../experiments/x4_converge_step_instrument.py)
+[`experiments/x3_dust_vs_bitnet_sparsity.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/x3_dust_vs_bitnet_sparsity.py) and
+[`experiments/x4_converge_step_instrument.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/x4_converge_step_instrument.py)
 (run as `PYTHONPATH=src python …`); raw numbers in
 [`experiments/results/`](../experiments/results/).
 

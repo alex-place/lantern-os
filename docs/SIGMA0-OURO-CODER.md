@@ -131,7 +131,7 @@ answer**:
 > does.
 >
 > **How much this matters, measured rather than asserted.**
-> [`experiments/spiral_anytime_counterexample.py`](../experiments/spiral_anytime_counterexample.py)
+> [`experiments/spiral_anytime_counterexample.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/spiral_anytime_counterexample.py)
 > attacked the anytime claim in this step and **the attack failed** — with a proposer of any real
 > skill (≥30% of edits genuinely correct) more budget keeps helping, exactly as claimed, even with
 > only 5 visible tests. The claim stands for a competent model, and the counterexample was

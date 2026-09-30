@@ -94,22 +94,15 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/eval_keystone.py` | `.github/workflows/eval-leaderboard-gate.yml` | `python scripts/eval_keystone.py` |
 | `scripts/rollover_gate.py` | `scripts/eval_keystone.py` | via `eval_keystone.py` |
 | `scripts/eval_ledger.py` | `tests/test_eval_ledger.py` | `python scripts/eval_ledger.py` |
-| `scripts/honesty_ledger.py` | `tests/test_honesty_ledger.py` | `python scripts/honesty_ledger.py` |
-| `scripts/eval_sigma0_adapter.py` | `tests/test_sigma0_eval.py` | `python scripts/eval_sigma0_adapter.py` |
-| `src/sigma0/switched_gate.py` | `tests/test_sigma0_switched_gate.py` | ADR-0034 MoE admission-gate kit (per-mode ρ receipts, ADT dwell-time certificate, serve-time DwellMonitor + router canaries); `python -m pytest tests/test_sigma0_switched_gate.py -q` |
 | `scripts/eval_coding.py` | `scripts/eval_coding_backend_ab.py` | via the A/B harness |
 | `scripts/eval_coding_backend_ab.py` | `apps/lantern-garage/lib/coding-backend/index.js` | `python scripts/eval_coding_backend_ab.py` |
-| `scripts/eval_humaneval_ouro.py` | `scripts/continual_ouro_pipeline.py` | `python scripts/eval_humaneval_ouro.py` |
+| `scripts/eval_humaneval_ouro.py` | `scripts/eval_humaneval_chat.py`, `scripts/eval_cadence.py` | `python scripts/eval_humaneval_ouro.py` |
 | `scripts/humaneval_rerank.py` | `scripts/eval_humaneval_ouro.py` | via `eval_humaneval_ouro.py` |
 | `scripts/eval_humaneval_chat.py` | registered here (docs: BENCHMARKS.md) | `python scripts/eval_humaneval_chat.py` |
 | `scripts/eval_swebench_chat.py` | registered here (docs: BENCHMARKS.md) | `python scripts/eval_swebench_chat.py` |
-| `scripts/swe_agent_loop.py` | registered here (docs: BENCHMARKS.md) | `python scripts/swe_agent_loop.py` |
-| `scripts/swe_agentic_run.py` | registered here (docs: BENCHMARKS.md) | `python scripts/swe_agentic_run.py` |
-| `scripts/swebench_verifier_harness.py` | registered here (docs: BENCHMARKS.md) | `python scripts/swebench_verifier_harness.py` |
 | `scripts/eval_paired_diff.py` | registered here (docs: BENCHMARKS.md) | `python scripts/eval_paired_diff.py` |
 | `scripts/eval_dashboard.py` | registered here — generates the tracked eval-dashboard artifact | `python scripts/eval_dashboard.py` |
 | `scripts/eval_cadence.py` | registered here (#2766) — ranks the next eval run (unsaturated + most-stale first) and stamps `docs/BENCHMARKS.md` | `python scripts/eval_cadence.py --stamp` |
-| `scripts/measure_drift_equivalence.py` | `tests/test_drift_equivalence.py` | `python scripts/measure_drift_equivalence.py` |
 | `scripts/serve_minicheck.py` | registered here — MiniCheck groundedness provider (PROVIDERS.md; wire a launcher or retire, audit §3) | `python scripts/serve_minicheck.py` |
 
 ---
@@ -121,40 +114,11 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/ouro_serve.py` | `.claude/agent-slots.json`, eval-leaderboard CI | `python scripts/ouro_serve.py` (serves :11434) |
 | `scripts/ouro_serve_smoketest.py` | `scripts/rebuild-train-venv.ps1` | `python scripts/ouro_serve_smoketest.py` |
 | `scripts/ouro_compat.py` | `tests/test_ouro_compat.py` | imported |
-| `scripts/ouro_anthropic_bridge.py` | `lib/tool-runner.js`, `scripts/Start-OuroClaudeCode.ps1` | via launcher |
-| `scripts/continual_ouro_pipeline.py` | `lib/keystone-escalation.js`, `lib/stream-chat.js` | `python scripts/continual_ouro_pipeline.py` |
-| `scripts/build_ouro_coding_dataset.py` | `scripts/continual_ouro_pipeline.py` | via pipeline |
-| `scripts/prepare_coding_train_data.py` | `apps/lantern-garage/lib/model-registry.js` | `python scripts/prepare_coding_train_data.py` |
-| `scripts/validate_ouro_coding.py` | `scripts/prepare_coding_train_data.py` | via prep script |
 | `scripts/train-qlora-ouro.py` | `apps/lantern-garage/lib/model-registry.js` | `python scripts/train-qlora-ouro.py` |
-| `scripts/train-qlora-peft.py` | `scripts/continual-train.ps1` | via launcher |
-| `scripts/merge-lora.py` | `scripts/continual-train.ps1` | via launcher |
-| `scripts/fetch_mbpp.py` | registered here — VTD Phase-1 data prep (ADR-0030); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_mbpp.py` |
-| `scripts/fetch_taco.py` | registered here — VTD Phase-1 scale corpus (TACO-verified, Apache lineage; stdio problems); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_taco.py --difficulty EASY` |
-| `scripts/train_qlora_qwen_coder.py` | registered here — VTD Phase-1 tiny-coder QLoRA trainer (ADR-0030) | `.venv-train python scripts/train_qlora_qwen_coder.py` |
-| `scripts/eval_qwen_coder.py` | registered here — VTD Phase-1 held-out lift eval (ADR-0030) | `.venv-train python scripts/eval_qwen_coder.py` |
-| `scripts/spiral_build_self_train.py` | registered here — builds the replay-balanced, reward-weighted SFT set from the spiral escalation corpus (`data/eval/spiral/*.jsonl` → `self-train/`); consumes the `spiral-harness.js` sink | `python scripts/spiral_build_self_train.py` (`--dry-run` for report only) |
-| `scripts/spiral_oracle_ceiling.py` | registered here (#2998 slice 3) — replays `data/eval/cascade/*.jsonl` to measure the oracle-router ceiling (rented-frontier calls a perfect router would save) before building a learned router | `python scripts/spiral_oracle_ceiling.py` |
-| `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` | via launcher |
-| `scripts/convert_fc_dataset.py` | `scripts/retrain-combined.ps1` | via launcher |
-| `scripts/extract-session-pairs.py` | `scripts/continual-train.ps1` | via launcher |
-| `scripts/upload-anthropic-finetune.py` | `scripts/extract-session-pairs.py` | via pairs script |
-| `scripts/fine-tune-ollama-model.py` | `scripts/convert-pairs-to-alpaca.py` | via converter |
-| `scripts/rlvr_grpo_ouro.py` | `tests/test_sigma_theta_gate.py` | `python scripts/rlvr_grpo_ouro.py` |
-| `scripts/gen_sigma0_traces.py` | `apps/lantern-garage/lib/local-model-registry.js` | `python scripts/gen_sigma0_traces.py` |
 | `scripts/lightning_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` | via dispatcher UI |
 | `scripts/modal_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` | via dispatcher UI (Modal twin of lightning_dispatch) |
-| `scripts/reconcile_dual_provider.py` | `docs/SIGMA0-EB-L4-RUNBOOK.md` §10 | `python scripts/reconcile_dual_provider.py --decision A B` |
 | `scripts/eb_prep_corpus.py` | `docs/SIGMA0-EB-L4-RUNBOOK.md` §3; `scripts/{lightning,modal}_dispatch.py` prep-if-missing | `python scripts/eb_prep_corpus.py --allow-download` (egress host); `--dry-run` validates offline |
-| `scripts/weekly-training-orchestrator.py` | `scripts/Schedule-WeeklyTraining.ps1` | via scheduler |
 | `scripts/build_claude_session_dataset.py` | `tests/test_agent_session_dataset.py` | `python scripts/build_claude_session_dataset.py` |
-| `scripts/harvest_coding_corpus.py` | `apps/lantern-garage/lib/harvest-emitter.js` | server-driven |
-| `scripts/distill_from_teacher.py` | registered here — Qwen→Ouro teacher distillation | `python scripts/distill_from_teacher.py` |
-| `scripts/pr_crystallize.py` | registered here — PR-diff crystallization data prep | `python scripts/pr_crystallize.py` |
-| `scripts/qwen_teacher_crystallize.py` | registered here — teacher-pair crystallization | `python scripts/qwen_teacher_crystallize.py` |
-| `scripts/prep_code_instruct.py` | registered here — code-instruct data prep | `python scripts/prep_code_instruct.py` |
-| `scripts/decontaminate_training.py` | registered here — training-set decontamination | `python scripts/decontaminate_training.py` |
-| `scripts/build_honesty_calibration_aug.py` | registered here — honesty-calibration augmentation | `python scripts/build_honesty_calibration_aug.py` |
 
 ---
 
@@ -168,7 +132,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/csf_split_archive.py` | `routes/pdfs.js` | server-driven |
 | `scripts/build_knowledge_index.py` | `apps/lantern-garage/lib/knowledge-router.js` | `python scripts/build_knowledge_index.py` |
 | `scripts/arxiv_build_index.py` | `lib/arxiv-index.js`, `lib/csf-memory.js` | server-driven |
-| `scripts/arxiv_harvest.py` | `lib/arxiv-fulltext.js`, `lib/csf-memory.js` | server-driven |
+| `scripts/arxiv_harvest.py` | `lib/csf-memory.js` | server-driven |
 | `scripts/arxiv_add_papers.py` | `scripts/arxiv_harvest.py` (ShardWriter/dedup) | `python scripts/arxiv_add_papers.py --ids … --pdfs --reindex` (curated tranches; docs/ARXIV-CORPUS.md) |
 | `scripts/resume_docx.py` | `routes/docmode.js`, `routes/documents.js` | server-driven |
 | `scripts/orchestration/rag_local_knowledge_base.py` | `scripts/Ingest-CaadZip.ps1` | via launcher |

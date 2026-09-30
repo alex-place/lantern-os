@@ -6,7 +6,7 @@
 
 **Grounding contract — External Reality Rule.** Every load-bearing claim is tagged **[implemented]**, **[measured — this note]**, **[grounded]** (external peer literature, verified URL), or **[killed]** (a falsifiable claim run and refuted). Metaphor is labelled metaphor.
 
-**Artifacts (reproducible):** [`experiments/lapse_e1_ouro_coder.py`](../../experiments/lapse_e1_ouro_coder.py) · [`experiments/lapse_e1_contraction_diag.py`](../../experiments/lapse_e1_contraction_diag.py) · [`experiments/ouro_adaptive_compute_probe.py`](../../experiments/ouro_adaptive_compute_probe.py) → `data/lapse_e1_ouro_coder_report.json`, `data/lapse_e1_contraction_diag.json`, `data/ouro_adaptive_compute_probe.json`. Run on Ouro-1.4B (n_ut=4), RTX 3070, `.venv-train`.
+**Artifacts (reproducible):** [`experiments/lapse_e1_ouro_coder.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/lapse_e1_ouro_coder.py) · [`experiments/lapse_e1_contraction_diag.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/lapse_e1_contraction_diag.py) · [`experiments/ouro_adaptive_compute_probe.py`](https://github.com/alex-place/lantern-os-research/blob/master/experiments/ouro_adaptive_compute_probe.py) → `data/lapse_e1_ouro_coder_report.json`, `data/lapse_e1_contraction_diag.json`, `data/ouro_adaptive_compute_probe.json`. Run on Ouro-1.4B (n_ut=4), RTX 3070, `.venv-train`.
 
 ---
 
@@ -38,7 +38,7 @@ The contribution of this note is the **external validation** (§2) + the **run e
 ## 1. The three layers wearing one name
 
 1. **Shipping codec (real, conventional).** CSF-Pack v0.8: lossless, zstd-19 backend (zlib fallback), per-file SHA-256. CSF-Omni: best-fit panel that ties brotli. Measured: 2.73× on repo files (≈ zip), 362× on a 4 MB JSONL memory log. **No novelty, none claimed.**
-2. **The 3¹² ternary lattice ("tesseract", real engineering, decorative branding).** Sparse baseline+delta store, base-3 delta codec, cluster-to-baseline promotion. "Qutrit" = a classical 6-bit (amp, phase) slot; "quantum dust" = implicit zero-cost positions. Its `base3_cyclic` codec **loses to generic `delta+varint+zstd` by 1–8%** on real streams ([`data/sigma0_delta_codec_benchmark_report.json`](../../data/sigma0_delta_codec_benchmark_report.json)); the "8.55× vs naive JSON" game-save figure is schema-aware, not vs a codec.
+2. **The 3¹² ternary lattice ("tesseract", real engineering, decorative branding).** Sparse baseline+delta store, base-3 delta codec, cluster-to-baseline promotion. "Qutrit" = a classical 6-bit (amp, phase) slot; "quantum dust" = implicit zero-cost positions. Its `base3_cyclic` codec **loses to generic `delta+varint+zstd` by 1–8%** on real streams ([`data/sigma0_delta_codec_benchmark_report.json`](https://github.com/alex-place/lantern-os-research/blob/master/data/sigma0_delta_codec_benchmark_report.json)); the "8.55× vs naive JSON" game-save figure is schema-aware, not vs a codec.
 3. **The research thread (where the only novelty lived).** CSF≡Tesseract unification; convergence-exit spiral; and the **Lapse Tesseract** — attach a per-cell code-length field `L(x)=−log₂p(x)` to the lattice, with Ouro's recurrent depth as the predictor. This is what §3–4 test.
 
 ---
