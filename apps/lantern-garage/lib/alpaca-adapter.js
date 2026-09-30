@@ -237,6 +237,20 @@ async function getPositions(userId) {
   return { positions, source: 'alpaca' };
 }
 
+/** Could a SELL go out on this user's Alpaca account right now? Mirrors placeOrder's
+ *  gating with nothing sent: paper sends without the guard; live needs its opt-in and
+ *  the hard guard. The engine asks before it cancels a protective stop (review H1). */
+function sellPreflight(userId, { qty = 1 } = {}) {
+  const auth = _authFor(userId);
+  if (!auth) return { allowed: false, reason: 'no Alpaca account for this user' };
+  if (auth.env !== 'live') return { allowed: true, reason: 'alpaca paper (orders are sent without the guard)' };
+  if (process.env.TRADER_ALLOW_LIVE_ACCOUNT !== '1') {
+    return { allowed: false, reason: 'live Alpaca account — TRADER_ALLOW_LIVE_ACCOUNT=1 not set' };
+  }
+  const gate = orderGate({ mode: 'live', qty: Math.max(1, Math.floor(Number(qty) || 1)), side: 'sell' });
+  return { allowed: !!gate.allowed, reason: gate.reason };
+}
+
 /** Place an order on the resolved Alpaca account. PAPER fills for real (no guard);
  *  LIVE passes trading-guard + needs TRADER_ALLOW_LIVE_ACCOUNT=1. Normalized shape. */
 async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, equity, outsideRth }) {
@@ -537,4 +551,4 @@ async function getPortfolioHistory(userId, range = '1D') {
   };
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getEngineOrders, getOrder, getAllOrders, getFillActivities, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };
+module.exports = { available, getAccount, getPositions, getOpenOrders, getEngineOrders, getOrder, getAllOrders, getFillActivities, getDayPnl, getPortfolioHistory, placeOrder, sellPreflight, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };

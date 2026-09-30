@@ -139,9 +139,11 @@ async function main() {
     assert.strictEqual(a, null);
   });
 
-  await checkAsync('getPositions() returns [] when disconnected (no throw)', async () => {
+  // A failed read is UNKNOWN, not a flat book (review H3, 2026-09-29). This used to
+  // assert [] here, which is how a gateway error read as "you hold nothing".
+  await checkAsync('getPositions() returns null (unknown, not flat) when disconnected (no throw)', async () => {
     const p = await client.getPositions('DU000000');
-    assert.ok(Array.isArray(p) && p.length === 0);
+    assert.strictEqual(p, null);
   });
 
   await checkAsync('probe() resolves (never rejects) on a closed port', async () => {

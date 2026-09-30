@@ -78,18 +78,25 @@ test('TRADER_EXT_DEFER_EXITS=0 reverts to filling in the dark', () => {
 // ---------------------------------------------------------------------------
 // the end-to-end path, driven through the real exit machinery
 // ---------------------------------------------------------------------------
-function world({ qty = 1517, entry = 115.2640538, mark = 113.698 } = {}) {
+function world({ qty = 1517, entry = 115.2640538, mark = 113.698, withStop = false } = {}) {
   at._resetCooldowns();
-  const placed = [];
+  const placed = [], cancels = [];
+  // withStop: the position carries a working protective stop, so a cancel is observable.
+  const stops = withStop ? [{ orderId: 'STP1', symbol: 'SOXL', side: 'sell', orderType: 'STP', status: 'Submitted', qty }] : [];
   return {
-    placed,
+    placed, cancels,
     getIBKRAccount: async () => ({ equity: 966744, mode: 'paper' }),
     getIBKRPositions: async () => [{ symbol: 'SOXL', qty, avg_entry_price: entry, current_price: mark,
       market_value: qty * mark, unrealized_pl: (mark - entry) * qty }],
-    getIBKROpenOrders: async () => [],
+    getIBKROpenOrders: async () => stops.map((o) => ({ ...o })),
     getIBKRDayPnl: async () => 0,
     getIBKROrderStatus: async () => null,
-    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    cancelIBKROrder: async (uid, id) => {
+      cancels.push(id);
+      const o = stops.find((x) => x.orderId === id);
+      if (o) o.status = 'Cancelled';
+      return { status: 'cancelled', ok: true };
+    },
     placeIBKROrder: async (uid, o) => { placed.push(o); return { status: 'submitted', order_id: 'X' + placed.length }; },
   };
 }
@@ -148,6 +155,52 @@ test('AT THE OPEN: the deferred exit fills, and the decision is consumed', async
   assert.strictEqual(sells(b).length, 1, 'the open is where it fills');
   assert.strictEqual(at._deferredExit.size, 0, 'and the decision is consumed exactly once');
   assert.match(String(sells(b)[0].type), /market/i, 'RTH fills go out as a market order');
+});
+
+// Review H2 (2026-09-29): the deferral only held on the FIRST extended-hours check. The
+// guard read `!_deferredExit.has(sym)`, so the second check fell through, cancelled the
+// stop and sold into the dark print the feature exists to avoid.
+test('EXTENDED, every later check: an exit already deferred still places nothing and keeps its stop', async () => {
+  reset();
+  const b = world({ withStop: true });
+  const hp = { avg_entry_price: 115.264, current_price: 113.698 };
+  const t0 = Date.now();
+  for (let i = 0; i < 3; i++) {
+    await at._closeLongForTest(b, 'u', 'SOXL', 1517, hp, 'trailing_stop (−3.3% from peak +2.0%, trig 2.5%)',
+      { skipped: [], executed: [] }, t0 + i * 60e3, { extended: true, refPrice: 113.698 });
+  }
+  assert.strictEqual(sells(b).length, 0, 'the decision waits for the open on every check, not only the first');
+  assert.deepStrictEqual(b.cancels, [], 'and the protective stop stays in place meanwhile');
+  assert.ok(at._deferredExit.has('SOXL'));
+  assert.strictEqual(rows().filter((r) => r.event === 'exit_deferred').length, 1, 'one decision, journaled once');
+});
+
+test('a real exit supersedes a pending deferral, so the open cannot sell the same shares again', async () => {
+  reset();
+  const b = world({ withStop: true });
+  const hp = { avg_entry_price: 115.264, current_price: 113.698 };
+  await at._closeLongForTest(b, 'u', 'SOXL', 1517, hp, 'trailing_stop (−3.3% from peak +2.0%)',
+    { skipped: [], executed: [] }, Date.now(), { extended: true, refPrice: 113.698 });
+  assert.ok(at._deferredExit.has('SOXL'));
+  // later in the dark the position reaches its loss cap: the brake fills now
+  await at._closeLongForTest(b, 'u', 'SOXL', 1517, { ...hp, current_price: 100 }, 'max_loss (−13.2% ≤ -10%)',
+    { skipped: [], executed: [] }, Date.now(), { extended: true, refPrice: 100 });
+  assert.strictEqual(sells(b).length, 1, 'the brake fills in the dark');
+  assert.strictEqual(at._deferredExit.has('SOXL'), false, 'and the deferred decision it replaces is gone');
+});
+
+test('AT THE OPEN: a deferred exit does not stack on a sell already resting for the symbol', async () => {
+  reset();
+  const b = world();
+  at._deferredExit.set('SOXL', { reason: 'trailing_stop', decidedAt: Date.now() - 3600e3, decidedPx: 113.698 });
+  await at._manageHeldExitsForTest({
+    bridge: b, userId: 'u',
+    heldPos: { SOXL: { symbol: 'SOXL', qty: 1517, avg_entry_price: 115.264, current_price: 115.54 } },
+    heldQty: { SOXL: 1517 }, c: at.cfg(), now: Date.now(), out: { skipped: [], executed: [] }, extended: false,
+    workingSells: new Set(['SOXL']),
+  });
+  assert.strictEqual(sells(b).length, 0, 'the resting sell closes it; a second one would oversell');
+  assert.strictEqual(at._deferredExit.size, 0, 'the decision is consumed');
 });
 
 test('a position that left the book overnight does not resurrect as a sell', async () => {

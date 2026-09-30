@@ -106,6 +106,8 @@ the positions it opened.
 | Connect Alpaca fails | Regenerate the key pair in Alpaca (paper section!) and paste both values fresh. |
 | Autopilot "isn't trading" | Is the Trader switch on? Is the market open? The journal's *skip log* shows every declined opportunity and why — most "not trading" is the trader correctly declining. |
 | A position closed "by itself" | Check the journal: stops and ladder exits are recorded with their reason. |
+| Journal says **exits held** | Orders can't go out for your account right now (a trading halt, or the account isn't armed for orders). The autopilot changes nothing while that lasts, and your broker-side stops stay exactly where they are. Exits resume on the first scan after orders can go out; the journal says **exits resumed**. |
+| Journal says **entries wait** | The position feed came back missing holdings, with no exit or fill on record to explain it. New entries wait (up to 10 minutes) rather than buy into what may be a data dropout. Exits keep running. |
 
 The algorithm itself — what the signals are, why the stops are wide, what was
 measured and rejected — is documented separately in the trader algorithm paper

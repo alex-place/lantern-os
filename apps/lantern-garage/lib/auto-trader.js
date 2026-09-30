@@ -19,12 +19,15 @@ const TRADES_LOG = process.env.TRADER_TRADES_LOG
 // WHOM, so one user's journal could only ever be answered with everyone's. Each
 // row now carries the account it was traded for.
 //
-// A module scalar (rather than threading userId through ~15 logTrade call sites)
-// is safe because the account loop is SEQUENTIAL — routes/trading.js awaits each
-// account's pass before starting the next — and every entry point sets it inside
-// a try/finally that restores the previous value.
-let _actingUser = null;
+// The acting user rides the pass's async context, not a module scalar (review M1,
+// 2026-09-29). The scalar assumed passes never overlap, but the fast-exit loop runs
+// on its own timer beside the scan loop: an interleaved pass restored the wrong
+// "previous" user and tagged rows with it, and the public demo feed decides what
+// to show by exactly this tag.
+const { AsyncLocalStorage } = require('async_hooks');
+const _pass = new AsyncLocalStorage();   // { user, gate } of the pass in progress
 function logTrade(rec) {
+  const _actingUser = (_pass.getStore() || {}).user || null;
   try {
     fs.mkdirSync(path.dirname(TRADES_LOG), { recursive: true });
     fs.appendFileSync(TRADES_LOG, JSON.stringify({
@@ -391,7 +394,54 @@ const isFailedStop = (status) => {
   return !STOP_WORKING.test(v) && !STOP_TERMINAL.test(v);
 };
 
+// A STOP IS NEVER CANCELLED AHEAD OF AN ORDER THAT CANNOT GO OUT (review H1,
+// 2026-09-29). The hard guard refuses every order while a halt file is present, while
+// the account is dry (TRADER_LIVE unset on IBKR, a live account without its opt-in) or
+// its mode is unknown. A cancel is not an order, so it went through. Exits cancel the
+// resting stop and then sell; the stop resize and the breakeven ratchet cancel and then
+// re-place. With orders refused, the sell or the new stop never went out and the
+// position was left with no stop at all: engaging the kill switch stripped protection
+// from the very book it was meant to freeze.
+//
+// So a pass first asks the broker leg whether a sell can go out now. The leg answers,
+// not the engine, because only the leg knows which guard applies to it (Alpaca paper
+// orders skip the guard; the house ledger has none; demo is read-only). While the
+// answer is no, the pass changes no stop and fires no exit, and the stops the broker
+// already holds keep guarding the book.
+async function _sellGate(bridge, userId) {
+  if (bridge && typeof bridge.sellPreflight === 'function') {
+    try {
+      const g = await bridge.sellPreflight(userId, { qty: 1 });
+      if (g && typeof g.allowed === 'boolean') return { allowed: g.allowed, reason: String(g.reason || '') };
+      return { allowed: false, reason: 'sell preflight gave no answer' };
+    } catch (e) { return { allowed: false, reason: `sell preflight failed: ${e.message}` }; }
+  }
+  // A bridge without a preflight (a test double, a wrapper that doesn't forward it):
+  // the process-wide halt still holds.
+  let halt = null;
+  try { halt = require('./trading-guard').haltFile(); } catch (_e) { /* guard absent */ }
+  return halt ? { allowed: false, reason: `global halt engaged (${halt})` } : { allowed: true, reason: 'no preflight on this bridge' };
+}
+function _passSellGate() { const st = _pass.getStore(); return (st && st.gate) || null; }
+function _setPassSellGate(gate) { const st = _pass.getStore(); if (st) st.gate = gate; }
+const _exitsHeldNoted = new Map();   // user -> reason last journaled (one row per change, not per pass)
+function _noteExitsHeld(userId, gate, out) {
+  if (out) (out.skipped = out.skipped || []).push({ symbol: '*', why: `exits held — ${gate.reason}; no stop is cancelled while orders cannot go out` });
+  const k = String(userId || '');
+  if (_exitsHeldNoted.get(k) === gate.reason) return;
+  _exitsHeldNoted.set(k, gate.reason);
+  logTrade({ event: 'exits_held', symbol: '*', reason: gate.reason,
+    why: 'orders cannot go out for this account, so exits and stop changes wait; the broker-side stops stay in place' });
+}
+function _noteExitsResumed(userId) {
+  if (_exitsHeldNoted.delete(String(userId || ''))) logTrade({ event: 'exits_resumed', symbol: '*' });
+}
+
 async function cancelRestingStops(bridge, userId, sym) {
+  // Never strip a stop while orders cannot go out for this account (review H1): the
+  // sell or replacement stop that follows would be refused. See _sellGate.
+  const gate = _passSellGate() || await _sellGate(bridge, userId);
+  if (!gate.allowed) return { cancelled: [], held: gate.reason };
   try {
     const orders = await bridge.getIBKROpenOrders(userId);
     const canceled = [];
@@ -423,7 +473,9 @@ async function cancelRestingStops(bridge, userId, sym) {
       if (!stillWorking) break;
       await new Promise((r) => setTimeout(r, 700));
     }
+    return { cancelled: canceled };
   } catch (_e) { /* fail-soft — a missed cancel is caught by the never-short guard */ }
+  return { cancelled: [] };
 }
 
 /** Stop distance %% for an entry: the signal's ATR/S-R plan stop when enabled and
@@ -579,6 +631,39 @@ function _flatConfirmMs() {
   if (raw == null || String(raw).trim() === '') return 600000;   // 10 min
   const v = Number(raw);
   return Number.isFinite(v) && v >= 0 ? v * 1000 : 600000;
+}
+// ENTRIES WAIT OUT A BOOK THAT LOST POSITIONS (review H3, 2026-09-29). A read that
+// FAILED is now "unknown" and stands the pass down. A read that succeeded but came back
+// short (empty while this account held names on its last trusted read, or three or
+// more gone at once) with no exit or fill on record is kept for exits, because an
+// honest empty book must still clear exit freezes. Entries wait, though: sizing and the
+// position caps count what the snapshot shows, so a dropout reads as free room. The
+// per-symbol guard above (#3282) stops re-buying the same name; this stops the caps
+// being filled with other names on top of the invisible ones.
+//
+// Per ACCOUNT, not per symbol: the symbol-keyed maps are shared by every account the
+// loop drives (ADR-0035 step 2 re-keys them), and a per-symbol reading here would let
+// one user's holdings stall another user's entries. Bounded by the same window as
+// #3282; after that the reading is accepted.
+const _trustedBook = new Map();   // user -> { held: Set<symbol>, suspectSince: ms or 0 }
+function _entriesWaitOnBook(userId, heldQty, explained, now) {
+  const k = String(userId || '');
+  const tb = _trustedBook.get(k) || { held: new Set(), suspectSince: 0 };
+  const cur = new Set(Object.keys(heldQty || {}).filter((s) => Number(heldQty[s]) >= 1));
+  const lost = [...tb.held].filter((s) => !cur.has(s) && !explained(s));
+  const suspect = (cur.size === 0 && lost.length > 0) || (lost.length >= 3 && lost.length > cur.size);
+  const ttl = _flatConfirmMs();
+  if (suspect && ttl > 0) {
+    const started = !tb.suspectSince;
+    if (started) tb.suspectSince = now;
+    if (now - tb.suspectSince <= ttl) {
+      _trustedBook.set(k, tb);
+      return { wait: true, started, lost,
+        why: `entries wait — ${lost.join(', ')} left the book with no exit or fill on record (${Math.round((now - tb.suspectSince) / 1000)}s ago); a feed dropout, not free room` };
+    }
+  }
+  _trustedBook.set(k, { held: cur, suspectSince: 0 });
+  return { wait: false, started: false, lost, why: '' };
 }
 function _stopAttribFrac() {
   const raw = process.env.TRADER_STOP_ATTRIB_FRAC;
@@ -1344,7 +1429,14 @@ function trailTriggerPct(peakGainPct, base) {
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
 async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
   // Outside RTH a gain-protecting exit records its decision and fills at the open.
-  if (extended && _extDeferEnabled() && _isDeferrableExit(reason) && !_deferredExit.has(sym)) {
+  if (extended && _extDeferEnabled() && _isDeferrableExit(reason)) {
+    // Decided on an earlier pass: the fill still waits for the open. This used to fall
+    // through and sell on the SECOND extended-hours check (review H2, 2026-09-29), the
+    // very dark fill the deferral exists to avoid.
+    if (_deferredExit.has(sym)) {
+      if (out) out.skipped.push({ symbol: sym, why: `exit_deferred: ${reason} — already decided, filling at the open` });
+      return;
+    }
     _deferredExit.set(sym, { reason, decidedAt: now, decidedPx: Number(refPrice) || null });
     _saveState();
     logTrade({ event: 'exit_deferred', symbol: sym, qty,
@@ -1376,6 +1468,17 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   // filled; XLK/IWM merely won the same race). Cancel-first closes that window;
   // if the sell then errors, the fast-exit tick re-attaches the missing stop
   // within seconds, so the position is never left unprotected for long.
+  //
+  // Unless orders cannot go out (review H1): then nothing can re-attach it either.
+  // Leave the position, its stop and its exit state exactly as they are.
+  const _gate = _passSellGate() || await _sellGate(bridge, userId);
+  if (!_gate.allowed) {
+    if (out) out.skipped.push({ symbol: sym, why: `exit held (${reason}) — ${_gate.reason}` });
+    return { status: 'held', reason: _gate.reason };
+  }
+  // A real exit supersedes a decision deferred to the open; left in place, the open's
+  // flush would sell the same shares a second time.
+  if (_deferredExit.delete(sym)) _saveState();
   await cancelRestingStops(bridge, userId, sym);
   const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   // Freeze the excursion run BEFORE clearing per-symbol state — the fill row that
@@ -1428,7 +1531,7 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
       const p = heldPos[sym];
       const dq = Math.floor(Number(p && p.qty) || 0);
       _deferredExit.delete(sym);
-      if (!(dq >= 1) || exclude.has(sym)) continue;    // gone by other means, or not ours
+      if (!(dq >= 1) || exclude.has(sym) || workingSells.has(sym)) continue;    // gone by other means, not ours, or a sell already resting
       await closeLong(bridge, userId, sym, dq, p, `${d.reason} [deferred from extended hours]`, out, now, { extended: false });
       delete heldQty[sym];
     }
@@ -1667,6 +1770,30 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
   }
 }
 
+// ONE PASS PER ACCOUNT AT A TIME (review M1, 2026-09-29). The scan loop and the
+// fast-exit loop each guarded only against themselves, so both could be inside one
+// account at once: each read the same book, decided the same exit and sent its own
+// full-size sell, and the second sell opens a short. A scan waits for a fast tick in
+// flight on its account (price-only, a few broker calls). A fast tick that finds its
+// account busy skips its turn, because the pass it would race runs the same exits.
+// The wait is bounded, so one hung broker call cannot stall the account for good.
+const _passInFlight = new Map();   // account key -> promise of the pass running on it
+const PASS_WAIT_MS = 30000;
+async function _onePassPerAccount(opts, fn, { skipIfBusy = false } = {}) {
+  const key = String((opts && (opts.accountId || opts.userId)) || '');
+  if (skipIfBusy && _passInFlight.has(key)) {
+    return { executed: [], skipped: [], reason: 'another pass is running on this account — skipped this turn' };
+  }
+  const deadline = Date.now() + PASS_WAIT_MS;
+  for (let p = _passInFlight.get(key); p && Date.now() < deadline; p = _passInFlight.get(key)) {
+    let timer;
+    await Promise.race([p.catch(() => {}), new Promise((r) => { timer = setTimeout(r, Math.max(1, deadline - Date.now())); })]);
+    clearTimeout(timer);
+  }
+  const run = Promise.resolve().then(fn);
+  _passInFlight.set(key, run);
+  try { return await run; } finally { if (_passInFlight.get(key) === run) _passInFlight.delete(key); }
+}
 /**
  * PRICE-ONLY exit tick (#3165 "fast exit loop") — runs BETWEEN full scans so the
  * ladder / trailing / max-loss exits react in seconds, not the 60s scan cadence
@@ -1677,9 +1804,8 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
  * anti-churn gates (min-hold, exit debounce, oversell guard) apply unchanged.
  */
 async function fastExitTick(opts = {}) {
-  const prev = _actingUser;
-  _actingUser = (opts && opts.userId) || null;
-  try { return await _fastExitTickInner(opts); } finally { _actingUser = prev; }
+  return _onePassPerAccount(opts,
+    () => _pass.run({ user: (opts && opts.userId) || null }, () => _fastExitTickInner(opts)), { skipIfBusy: true });
 }
 async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended = false, excludeSymbols = [] } = {}) {
   const c = cfg();
@@ -1691,6 +1817,10 @@ async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended =
   const heldQty = {}, heldPos = {};
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
   if (!Object.values(heldQty).some((q) => q > 0)) return out;   // flat → nothing to do
+  const gate = await _sellGate(bridge, userId);   // review H1: no exit, no cancel while orders cannot go out
+  _setPassSellGate(gate);
+  if (!gate.allowed) { _noteExitsHeld(userId, gate, out); return out; }
+  _noteExitsResumed(userId);
   const openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
   const workingSells = new Set((openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
@@ -1814,9 +1944,8 @@ function _orderEntries(enters, mode = process.env.TRADER_SLOT_ORDER) {
   }).map((x) => x.s);
 }
 async function runAutoTrade(scan, opts = {}) {
-  const prev = _actingUser;
-  _actingUser = (opts && opts.userId) || null;
-  try { return await _runAutoTradeInner(scan, opts); } finally { _actingUser = prev; }
+  return _onePassPerAccount(opts,
+    () => _pass.run({ user: (opts && opts.userId) || null }, () => _runAutoTradeInner(scan, opts)));
 }
 async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [], protectiveOnly = false } = {}) {
   // Position partitioning: symbols owned by ANOTHER engine (the overnight sleeve book)
@@ -2017,6 +2146,11 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     out.reason = 'position snapshot looks like another account\'s book — standing down this scan (never trade blind)';
     return out;
   }
+  // Entries wait while this account's book reads short of its last trusted read with
+  // nothing on record to explain it (review H3). Exits still run on the reading.
+  const _bookWait = _entriesWaitOnBook(userId, heldQty,
+    (s) => _exitStatus.has(s) || (_filledSyms && _filledSyms.has(s)) || exclude.has(s), now);
+  if (_bookWait.started) logTrade({ event: 'entries_held', symbol: '*', reason: _bookWait.why });
   if (_snapshotSuspect && _vanished.length) {
     out.skipped.push({ symbol: '*', why: `external-close sweep deferred: ${_vanished.length} position(s) absent from a ${_positionsOk ? positions.length + '-row' : 'FAILED'} snapshot (${_foreignRows} foreign row(s)) — treating as unreadable, not closed` });
   }
@@ -2249,10 +2383,18 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     }
   }
 
+  // ── Can this account's orders go out right now? (review H1) ─────────────────────
+  // If not (a halt file, a dry account, an unknown mode), this pass changes no stop
+  // and fires no exit: each of those cancels first, and the order that follows would
+  // be refused. The broker's stops keep guarding the book meanwhile.
+  const _gate = await _sellGate(bridge, userId);
+  _setPassSellGate(_gate);
+  if (!_gate.allowed) _noteExitsHeld(userId, _gate, out); else _noteExitsResumed(userId);
+
   // ── Re-protect naked longs: any held long that's lost its protective stop (the
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
   //    SELL STP. Runs every scan so a long is never left unprotected. ──
-  try {
+  if (_gate.allowed) try {
     // EMPTY ORDERS != NO STOPS (2026-08-12). Every re-protect decision below reads
     // ONE orders fetch. IBKR's CPAPI intermittently answers /iserver/account/orders
     // with an empty array (cold endpoint, session re-auth, maintenance window) —
@@ -2481,7 +2623,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude, protectiveOnly }); } catch (_e) { /* fail-soft */ }
+  if (_gate.allowed) try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude, protectiveOnly }); } catch (_e) { /* fail-soft */ }
   // manageHeldExits updates every held position's peak; persist NOW so the common
   // early-return paths below (exits-only mode, no ENTER signals) don't drop it.
   _saveState();
@@ -2603,6 +2745,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       // thresholds (trail/floor/max-loss) in manageHeldExits still run, and the
       // broker stop is untouched.
       if (protectiveOnly) { out.skipped.push({ ...record, why: 'extended hours: protective exits only — signal exit suppressed' }); continue; }
+      if (held >= 1 && !_gate.allowed) { out.skipped.push({ ...record, why: `signal exit held — ${_gate.reason}` }); continue; }
       if (held >= 1) {
         // (held >= 1, not > 0: a sub-share split remnant can never fill a sell on
         // this API — same rule as manageHeldExits' dust guard, 2026-08-10.)
@@ -2708,6 +2851,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const _heldMv = Math.abs(Number(heldPos[sym] && heldPos[sym].market_value)
       || held * (Number(heldPos[sym] && heldPos[sym].current_price) || price || 0));
     const _isDustHolding = held > 0 && c.dustPct > 0 && _heldMv < account.equity * (c.dustPct / 100);
+    if (_bookWait.wait) { out.skipped.push({ ...record, why: _bookWait.why }); continue; }
     if (held > 0 && !_isDustHolding) { out.skipped.push({ ...record, why: 'already long' }); continue; }
     // UNEXPLAINED FLAT = FEED DROPOUT, NOT AN OPPORTUNITY (#3282).
     //
@@ -3439,6 +3583,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
 module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
