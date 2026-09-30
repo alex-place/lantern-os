@@ -20,14 +20,5 @@ permissive licenses (Apache-2.0 / MIT / BSD).
 
 ## Components
 
-### Aider — repository map approach
-
-- **Source:** https://github.com/Aider-AI/aider (https://aider.chat/docs/repomap.html)
-- **License:** Apache-2.0
-- **Form:** Clean-room re-implementation (no upstream source copied).
-- **What was adapted:** The repo-map *concept* — extract symbols defined and
-  referenced per file, build a graph where edges follow symbol references, and
-  rank files with PageRank to select the most relevant context slice.
-- **Where:** `src/keystone/repo_map.py` (stdlib-only; regex symbol extraction
-  in place of tree-sitter, hand-rolled PageRank in place of networkx).
-- **Issues:** #1409, #1413; convention: #1412.
+None at present. The Aider-derived repository map (`src/keystone/repo_map.py`, clean-room,
+Apache-2.0 concept) was removed with `src/keystone/` on 2026-09-29.

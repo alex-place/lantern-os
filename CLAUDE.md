@@ -119,16 +119,15 @@ npm run dev --prefix apps/lantern-garage
 # Install dependencies
 python -m pip install -r requirements.txt
 
-# Run all tests. The anti-entropy + audit-chain suites pass and are no longer
-# excluded; the discord suites self-skip via importorskip when discord/dpytest are
-# absent, so the full run is clean without --ignore flags (#862).
+# Run all tests. The discord suites self-skip via importorskip when discord/dpytest
+# are absent, so the full run is clean without --ignore flags (#862).
 python -m pytest tests/ -q --tb=short
 
 # Run a single test file
-python -m pytest tests/test_dream_journal.py -q --tb=short
+python -m pytest tests/test_csf_pack.py -q --tb=short
 
 # Run a specific test function
-python -m pytest tests/test_dream_journal.py::test_function_name -q
+python -m pytest tests/test_csf_pack.py::test_function_name -q
 ```
 
 ### Node.js (lantern-garage)
@@ -200,7 +199,7 @@ Business logic is split into `apps/lantern-garage/lib/`:
 | `dreamer-store.js` | Per-user dream notebook JSONL persistence |
 | `conversation-store.js` | Conversation log append/read |
 | `rag-house.js` | Flat RAG document house builder |
-| `status.js` | System/readiness/mining-lab status aggregation |
+| `status.js` | System/readiness status aggregation |
 | `file-queue.js` | Async JSONL append queue (avoids concurrent write corruption) |
 
 ### Dream Journal agents

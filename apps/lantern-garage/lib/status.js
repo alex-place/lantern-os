@@ -101,45 +101,6 @@ function getTraderHeartbeat() {
   }
 }
 
-function getMiningLabStatus() {
-  const files = [
-    "docs/ARC-REACTOR-MINING-LAB.md",
-    "docs/WALLET-MATRIX-TEMPLATE.md",
-        "templates/hardware-intake.csv",
-    "templates/wallet-matrix.csv",
-    "templates/coin-feasibility.csv",
-    "templates/mining-receipt.json",
-    "scripts/Get-HardwareInventory.ps1",
-    "scripts/Test-MiningProfitability.ps1",
-    "reports/ARC-REACTOR-MINING-LAB-2026-05-29.md",
-  ];
-  const present = files.map((relativePath) => ({
-    path: relativePath,
-    exists: fs.existsSync(path.join(repoRoot, relativePath)),
-  }));
-  const ready = present.every((item) => item.exists);
-  return {
-    ready,
-    mode: "manual_first_read_only",
-    shortcutRule: "single_lantern_shortcut",
-    routeSummary: {
-      cpu: "XMR learning lane",
-      gpu: "RVN / ETC experiment lane",
-      eth: "wallet / claim checks only",
-      asic: "BTC / LTC / DOGE / KAS only with owned or justified hardware",
-    },
-    blocked: [
-      "wallet_bruteforce",
-      "unauthorized_transfers",
-      "hidden_transaction_signing",
-      "mining_on_unowned_devices",
-      "fake_roi_claims",
-      "eth_mainnet_mining_claims",
-    ],
-    files: present,
-  };
-}
-
 function parseMirrorEnv() {
   return String(process.env.LANTERN_CLOUD_MIRROR_URLS || "")
     .split(/[,\s]+/)
@@ -311,7 +272,6 @@ function getCloudMirrorStatus() {
 module.exports = {
   getStatus,
   getReadiness,
-  getMiningLabStatus,
   getActionCapabilities,
   getOperatorFeedbackMemory,
   getAccessModel,

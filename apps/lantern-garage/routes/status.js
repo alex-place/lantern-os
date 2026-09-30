@@ -127,7 +127,7 @@ function getGitVersion(repoRoot) {
 }
 
 module.exports = async function statusRoutes(req, res, url, deps) {
-  const { sendJson, readJson, readJsonl, getStatus, getReadiness, getMiningLabStatus,
+  const { sendJson, readJson, readJsonl, getStatus, getReadiness,
     getActionCapabilities, getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus } = deps;
 
   if (url.pathname === "/favicon.ico") {
@@ -310,10 +310,6 @@ module.exports = async function statusRoutes(req, res, url, deps) {
   }
   if (url.pathname === "/api/readiness") {
     sendJson(res, getReadiness());
-    return true;
-  }
-  if (url.pathname === "/api/mining-lab") {
-    sendJson(res, getMiningLabStatus());
     return true;
   }
   if (url.pathname === "/api/action-capabilities") {

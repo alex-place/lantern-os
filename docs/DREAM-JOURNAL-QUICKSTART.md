@@ -71,24 +71,6 @@ curl http://127.0.0.1:4177/health
 
 ---
 
-## Cleanup Unused Docker Resources
-
-Run the cleanup script to reclaim ~50GB from old containers and build cache:
-
-```powershell
-.\cleanup-docker.ps1
-```
-
-This removes:
-- All exited containers
-- Unused images (keeps only slim image)
-- Build cache
-- Dangling volumes
-
-**Result:** Frees up 50+ GB of disk space.
-
----
-
 ## Storage
 
 - Dreams stored in: `/app/data/dreams/dreams_YYYY-MM.jsonl` (append-only, one per month)

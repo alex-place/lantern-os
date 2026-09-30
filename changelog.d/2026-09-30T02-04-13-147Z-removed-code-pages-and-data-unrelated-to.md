@@ -1,0 +1,3 @@
+### Changed
+
+- Removed code, pages and data unrelated to the unisona product or the autotrader: a Discord music bot, a Stable Diffusion image server, a standalone MCP autoscaler, the crypto mining lab (its status route, scripts and validation check), the superfleet swarm memory, the Keystone cockpit prototype and ORION dream-journal package (both test-only), about 20 other test-only Python modules and their tests, orphaned public assets (a bundled pdf.js, unused scripts, stylesheets, locale files and images), stale config for services that no longer exist, unused data folders, an ngrok setup, and a US Bank automation template that held placeholder credentials and an empty cache. The chat grounding index no longer pins the retired Keystone cockpit doc.

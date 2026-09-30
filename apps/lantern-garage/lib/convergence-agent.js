@@ -118,7 +118,7 @@ const KNOWLEDGE = [
     persona: "keystone",
     keywords: ["status", "health", "ready", "system", "version", "online", "uptime"],
     answer:
-      "System status, readiness and the mining-lab/agent fleet are aggregated server-side. Run the convergence loop for a live readiness + version + fleet snapshot.",
+      "System status, readiness and the agent fleet are aggregated server-side. Run the convergence loop for a live readiness + version + fleet snapshot.",
     actions: [
       { label: "Run convergence loop", command: "!convergance" },
     ],
