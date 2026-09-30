@@ -271,13 +271,88 @@ function spyTrendPct(day, n) {
   const c1 = _spyDays.close.get(_spyDays.days[j]), c0 = _spyDays.close.get(_spyDays.days[j - n]);
   return c1 && c0 ? (c1 / c0 - 1) * 100 : null;
 }   // raw | none | selective | top (see signalsAt)
-const INV_UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
+// REGIME SWITCH (variant.regime, 2026-09-29; ledger row carry-3x-weeknights-regime200-13-windows):
+//   regime: { n: 200, with: { ENV }, against: { ENV } }
+// sets sleeve S's env for the session by SPY's trend as it stood BEFORE the session opened: the prior
+// session's close against the mean of the n closes ending with it ("with" = above). One window's cache
+// is too short for 200 sessions, so SPY's closes are read from EVERY oos_* cache beside REPLAY_CACHE.
+// Not enough history = the variant's base env for that session (counted as "unknown").
+const _longDailyMemo = new Map();
+function _longDaily(sym) {                                 // a name's session closes across every cached window
+  if (_longDailyMemo.has(sym)) return _longDailyMemo.get(sym);
+  const root = path.dirname(CACHE); const byDay = new Map();
+  let dirs = []; try { dirs = fs.readdirSync(root).filter((d) => /^oos_/.test(d)); } catch (_e) { dirs = []; }
+  for (const d of new Set([...dirs, path.basename(CACHE)])) {
+    const f = path.join(root, d, sym + ".json"); if (!fs.existsSync(f)) continue;
+    let a; try { a = JSON.parse(fs.readFileSync(f, "utf8")); } catch (_e) { continue; }
+    for (const b of a) { const m = MIN(b.t); if (m < 570 || m >= 960) continue; const day = DAY(b.t); const cur = byDay.get(day); if (!cur || b.t >= cur.t) byDay.set(day, { t: b.t, c: Number(b.c) }); }
+  }
+  const days = [...byDay.keys()].sort();
+  const out = { days, close: days.map((d) => byDay.get(d).c) };
+  _longDailyMemo.set(sym, out);
+  return out;
+}
+const _spyLong = () => _longDaily("SPY");
+// The name's own scale for a day: the median |close-to-close move| over the n sessions completed before it.
+// null = not enough history, or a move no split-adjusted series makes (dropped, not guessed).
+const _madMemo = new Map();
+function medianDailyMove(sym, day, n = 60) {
+  const key = sym + ":" + day + ":" + n; if (_madMemo.has(key)) return _madMemo.get(key);
+  const L = _longDaily(sym);
+  let j = L.days.indexOf(day); if (j < 0) { j = L.days.findIndex((d) => d > day); if (j < 0) j = L.days.length; }
+  let out = null;
+  if (j > n) {
+    const abs = []; let bad = false;
+    for (let k = j - n; k < j; k++) { const r1 = L.close[k] / L.close[k - 1] - 1; if (Math.abs(r1) > 0.6) { bad = true; break; } abs.push(Math.abs(r1)); }
+    if (!bad) { abs.sort((a, b) => a - b); out = (abs[n / 2 - 1] + abs[n / 2]) / 2; if (n % 2) out = abs[(n - 1) / 2]; }
+  }
+  _madMemo.set(key, out); return out;
+}
+function spyAboveMean(day, n) {
+  const L = _spyLong();
+  let j = L.days.indexOf(day); if (j < 0) { j = L.days.findIndex((d) => d > day); if (j < 0) j = L.days.length; }   // j = completed sessions before `day`
+  if (j < n) return null;
+  // a hole in the cached history would make "the last n closes" span more than n sessions: refuse rather than guess
+  const spanDays = (Date.parse(L.days[j - 1] + "T00:00:00Z") - Date.parse(L.days[j - n] + "T00:00:00Z")) / 86400000;
+  if (spanDays > n * 1.6) return null;
+  let s = 0; for (let k = j - n; k < j; k++) s += L.close[k];
+  return L.close[j - 1] > s / n;
+}
+const INV_UNDERLYING ={ SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
 const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
 const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
 const M_NO_WEAKNESS = process.env.REPLAY_M_NO_WEAKNESS === "1";   // 2026-09-25: no weakness signal-exit; M exits by ratchet floor / stop / time only
 const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean));
+// TREND-DAY ENTRY for sleeve M (2026-09-29, ledger row soxl-trend-replay-13-windows): REPLAY_M_CHECKS=<bar starts, ET
+// minutes> and REPLAY_M_RANGE_K=<k>. A name is BULLISH at the FIRST of those bars at which it sits at or above
+// REPLAY_M_IBS of its session range AND that range is at least k x its own median daily move; at that bar only, once
+// per name per session. The rule of experiments/intraday_hold_anatomy.js, expressed where a signal rule lives.
+const M_CHECKS = String(process.env.REPLAY_M_CHECKS || "").split(",").map((s) => Number(s.trim())).filter((x) => Number.isFinite(x) && x > 0);
+const M_RANGE_K = Number(process.env.REPLAY_M_RANGE_K) || 0;
+const _mFired = new Map();                                  // `${day}:${sym}` -> the bar that fired (a replay process runs its variants one after another: cleared per variant)
 function signalsAt(day, m, sleeve) {
   const out = [];
+  if (sleeve === "M" && M_CHECKS.length) {
+    for (const s of SYMS) {
+      if (!M_SYMS.has(s)) continue;
+      const a = DATA[s]; if (!a) continue;
+      const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
+      if (sess.length < 3) continue;
+      const hi = Math.max(...sess.map((b) => b.h)), lo = Math.min(...sess.map((b) => b.l));
+      if (!(hi > lo)) continue;
+      const cur = sess[sess.length - 1];
+      const ibs = (cur.c - lo) / (hi - lo);
+      const key = day + ":" + s;
+      let bullish = false;
+      if (M_CHECKS.includes(m) && cur.m === m && !_mFired.has(key)) {
+        const mad = M_RANGE_K > 0 ? medianDailyMove(s, day) : 0;
+        if (ibs >= M_IBS && (M_RANGE_K <= 0 || (mad != null && (hi - lo) / lo >= M_RANGE_K * mad))) { bullish = true; _mFired.set(key, m); }
+      }
+      out.push({ symbol: s, direction: bullish ? "BULLISH" : "NEUTRAL", entry_price: cur.c,
+        decision_context: { ibs, spy_tape: 0 }, convergence: { decision: bullish ? "ENTER" : "SKIP", p_win: 0.6 } });
+    }
+    return out;
+  }
   if (sleeve === "M") {
     if (m < M_FROM) return out;
     for (const s of SYMS) {
@@ -390,7 +465,7 @@ function loadArmed(base, src) {
   ];
   if (process.env.REPLAY_VARIANTS) {
     const list = JSON.parse(fs.readFileSync(process.env.REPLAY_VARIANTS, "utf8"));
-    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [], eod: v.eod || null }]);
+    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [], eod: v.eod || null, regime: v.regime || null, mBase: v.mBase || "R" }]);
     console.log(`  [variants] ${VARIANTS.length} from ${process.env.REPLAY_VARIANTS}: ${VARIANTS.map(([n]) => n).join(" ")}`);
   }
   console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
@@ -399,7 +474,9 @@ function loadArmed(base, src) {
   for (const [name, v] of VARIANTS) {
     const t0 = _RealDate.now();
     const tag = name.replace(/\W+/g, "") + "-";
-    const envFor = { S: { ...BASE_S, ...v.S }, R: { ...BASE_R, ...v.R }, M: { ...BASE_R, ...(v.M || {}) } };
+    // mBase "S" (2026-09-29): sleeve M starts from the STABLE settings (it runs the master brain); default = the race settings, as before
+    const envFor = { S: { ...BASE_S, ...v.S }, R: { ...BASE_R, ...v.R }, M: { ...(v.mBase === "S" ? BASE_S : BASE_R), ...(v.M || {}) } };
+    _mFired.clear();
     const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
     const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
     for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
@@ -427,6 +504,14 @@ function loadArmed(base, src) {
         if (!envFor.R.__adaptiveBase) Object.defineProperty(envFor.R, "__adaptiveBase", { value: Object.fromEntries(Object.keys(ADAPTIVE_ENV_R.deep).map((k) => [k, envFor.R[k]])), enumerable: false });
         const tR = trailingPnlPct(ADAPTIVE_ENV_R.n); const deepR = tR != null && tR < ADAPTIVE_ENV_R.x;
         for (const k of Object.keys(ADAPTIVE_ENV_R.deep)) { const base = envFor.R.__adaptiveBase[k]; if (deepR) envFor.R[k] = ADAPTIVE_ENV_R.deep[k]; else if (base === undefined) delete envFor.R[k]; else envFor.R[k] = base; }
+      }
+      if (v.regime && envFor.S) {
+        const keys = [...new Set([...Object.keys(v.regime.with || {}), ...Object.keys(v.regime.against || {})])];
+        if (!envFor.S.__regimeBase) Object.defineProperty(envFor.S, "__regimeBase", { value: Object.fromEntries(keys.map((k) => [k, envFor.S[k]])), enumerable: false });
+        const up = spyAboveMean(day, Number(v.regime.n) || 200);
+        const set = up == null ? {} : ((up ? v.regime.with : v.regime.against) || {});
+        for (const k of keys) { const base = envFor.S.__regimeBase[k]; if (k in set) envFor.S[k] = String(set[k]); else if (base === undefined) delete envFor.S[k]; else envFor.S[k] = base; }
+        state.regimeDays = state.regimeDays || { with: 0, against: 0, unknown: 0 }; state.regimeDays[up == null ? "unknown" : up ? "with" : "against"]++;
       }
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
@@ -460,6 +545,7 @@ function loadArmed(base, src) {
     const per = order.map((sl) => { const t = tr.filter((x) => x.owner === sl); return `${sl}:${t.length}tr ${(t.reduce((s, x) => s + x.ret, 0) * 100).toFixed(1)}%`; }).join("  ");
     const stops = tr.filter((t) => t.why === "stop").length;
     console.log(`  ${name.padEnd(18)}${((state.equity / 100000 - 1) * 100).toFixed(2).padStart(8)}%${String(tr.length).padStart(8)}${(tr.length ? (w.length / tr.length * 100).toFixed(0) + "%" : "-").padStart(6)}${(avg(w).toFixed(3) + "%").padStart(9)}${(avg(l).toFixed(3) + "%").padStart(10)}${(avg(l) !== 0 ? Math.abs(avg(w) / avg(l)).toFixed(2) : "-").padStart(8)}   ${dd.toFixed(2).padStart(5)}%   ${per}${Object.keys(refused).length ? "   refused " + JSON.stringify(refused) : ""}   stops ${stops}   ${((_RealDate.now() - t0) / 60000).toFixed(1)}min`);
+    if (state.regimeDays) console.log(`      regime days (SPY against the mean of its last ${Number(v.regime.n) || 200} closes): ${JSON.stringify(state.regimeDays)}`);
     if (!tr.length) console.log("      !! TRIPWIRE: zero trades");
     if (!stops) console.log("      !! TRIPWIRE: zero stop fills");
     for (const sl of order) { const c = Object.entries(census[sl]).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k}:${n}`).join("  "); if (c) console.log(`      gates ${sl}: ${c}`); }
