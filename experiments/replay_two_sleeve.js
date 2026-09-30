@@ -427,7 +427,7 @@ function signalsAt(day, m, sleeve) {
 }
 
 function loadArmed(base, src) {
-  const IGNORE = /^TRADER_(TRADES_LOG|STATE_FILE|LOCK_DIR|LIVE|AUTO_EXECUTE|AUTO_USER|SESSION_REVIEW|MANAGE_EXITS)$/;
+  const IGNORE = /^TRADER_(TRADES_LOG|STATE_FILE|LOCK_DIR|LIVE|AUTO_EXECUTE|AUTO_USER|SESSION_REVIEW|MANAGE_EXITS|TREND_SHADOW)$/;   // TREND_SHADOW: a live journal-only shadow, never replayed
   let n = 0;
   for (const line of fs.readFileSync(src, "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*(TRADER_[A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
