@@ -208,3 +208,32 @@ test('the brain: off without TRADER_NOISE_SHADOW; on, every row carries the user
   assert.ok(fs.existsSync(path.join(dir, 'noise-shadow-state.json')), 'state beside the journal');
   delete process.env.TRADER_NOISE_SHADOW;
 });
+
+// ── the feed's depth (2026-10-01) ────────────────────────────────────────────
+// The live 5m feed keeps 2,600 bars including the extended sessions: about 14 sessions, one short of the band's 15.
+// On 2026-10-01 QQQ and SMH had no band all day and SPY lost its band from 12:30 ("13 prior sessions (< 14)").
+// The older history comes from a settled window (getHistory) and is merged under the recent feed.
+test('a feed holding only 13 prior sessions makes no band; the older window restores it', async () => {
+  const m = market(rallyDay());
+  const short = (sym) => m.S[sym].filter((b) => b.t >= Date.parse(`${PRIOR[2]}T13:30:00Z`));   // the last 13 prior sessions + today
+  const feed = async (sym, tf) => (tf === '1d' ? m.getBars(sym, tf) : { bars: short(sym).filter((b) => b.t <= m.now).map((b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c })) });
+  // without the history: the check rows say why, and nothing is bought
+  const a = { rows: [] };
+  a.s = ts.createNoiseShadow({ pairs: 'SPY:UPRO:SPXS', log: (r) => a.rows.push(r), stateFile: tmpState(), getBars: feed, getQuote: m.getQuote });
+  await run(a.s, m, at(9, 30), at(10, 1));
+  const c = a.rows.find((r) => r.event === 'noise_shadow_check');
+  assert.strictEqual(c.state, 'no band');
+  assert.match(String(c.why), /13 prior sessions/);
+  assert.ok(!a.rows.some((r) => r.event === 'noise_shadow_entry'));
+  // with the history window: the band is back and the 10:00 breakout is bought as before
+  const asked = [];
+  const getHistory = async (sym, from, to) => { asked.push([sym, from, to]); return { bars: m.S[sym].filter((b) => b.t >= from && b.t <= to).map((b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c })) }; };
+  const b = { rows: [] };
+  b.s = ts.createNoiseShadow({ pairs: 'SPY:UPRO:SPXS', log: (r) => b.rows.push(r), stateFile: tmpState(), getBars: feed, getQuote: m.getQuote, getHistory });
+  await run(b.s, m, at(9, 30), at(10, 1));
+  const e = b.rows.find((r) => r.event === 'noise_shadow_entry');
+  assert.ok(e && e.symbol === 'UPRO' && e.check === '10:00', `rows: ${b.rows.map((r) => r.event + ':' + (r.state || r.symbol)).join(',')}`);
+  assert.ok(asked.length >= 1 && asked.length <= 2, 'the window is fetched once a day (twice at most: one per pass that needed it before it answered)');
+  const [, from, to] = asked[0];
+  assert.ok(to < at(9, 30) && from < to, 'a settled window entirely before today');
+});
