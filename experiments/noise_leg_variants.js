@@ -8,6 +8,8 @@
 //   F3  a wider band: sigma x 1.5
 //   F4  the paper's trailing stop, a time-weighted session average standing in for VWAP (no volume in the caches):
 //       the long wrapper is sold when the proxy closes below max(upper, TWAP), the inverse above min(lower, TWAP)
+//   DN / UP  only the inverse / only the long entries (the drop-day hedge question); DNb = DN when at least 2 of the
+//       3 proxies are below their lower bands (a broad selloff); the g suffix = under the G1 gate
 //   G1  V0 traded only when SPY's 20-session annualized realized volatility (log close-to-close, known at the open)
 //       is >= 16%, the scenario map's definition (intraday momentum is stronger on volatile days: Gao, Han, Li and Zhou
 //       2018, JFE 'Market intraday momentum'); G1F2 = F2 under the same gate
@@ -87,6 +89,7 @@ function legTrades(wins, opt) {
         if (!DECISIONS.has(b.min)) continue;
         if (opt.firstOnly && entries >= 1) break;
         const side = stateOf(lim); if (side !== 'up' && side !== 'dn') continue;
+        if (opt.side && side !== opt.side) continue;
         if ((opt.confirm || 1) > 1) {
           const agree = PAIRS.filter((q) => stateOf(bands[q.proxy] && bands[q.proxy].get(b.min)) === side).length;
           if (agree < opt.confirm) continue;
@@ -114,7 +117,8 @@ function sweep() {
     console.log('  ' + wins.map((w) => { const days = lib.windowDays(w); const a = tr.filter((t) => t.win === w); const g = a.filter((t) => (t.vol || 0) >= 0.16), o = a.filter((t) => !((t.vol || 0) >= 0.16)); return `${w} ${days.filter((d) => (volOf(d) || 0) >= 0.16).length}/${days.length} ${g.length} ${(g.reduce((x, t) => x + t.net, 0) * NOTIONAL / 1000).toFixed(1)} ${(o.reduce((x, t) => x + t.net, 0) * NOTIONAL / 1000).toFixed(1)}`; }).join(' | '));
   }
 }
-const VARIANTS = { V0: {}, F1: { firstOnly: true }, F2: { confirm: 2 }, F3: { k: 1.5 }, F4: { twap: true }, G1: { volGate: 'hi' }, G1F2: { volGate: 'hi', confirm: 2 } };
+const VARIANTS = { V0: {}, F1: { firstOnly: true }, F2: { confirm: 2 }, F3: { k: 1.5 }, F4: { twap: true }, G1: { volGate: 'hi' }, G1F2: { volGate: 'hi', confirm: 2 },
+  DN: { side: 'dn' }, UP: { side: 'up' }, DNg: { side: 'dn', volGate: 'hi' }, UPg: { side: 'up', volGate: 'hi' }, DNb: { side: 'dn', confirm: 2 }, DNbg: { side: 'dn', confirm: 2, volGate: 'hi' } };
 const ONLY = flag('--only') ? flag('--only').split(',') : Object.keys(VARIANTS);
 const usd = (x) => (x >= 0 ? '+' : '') + Math.round(x).toLocaleString('en-US');
 const pct = (x, d = 3) => (x == null || !Number.isFinite(x) ? '-' : (100 * x).toFixed(d) + '%');
@@ -153,6 +157,7 @@ for (const [surface, wins, prefix] of [['13w', S13, flag('--prefix13') || 'trend
     console.log(`| ${name} | ${o.n} | ${pct(o.gross)} | ${pct(o.net)} | ${o.netPp.toFixed(1)} | ${wpos} of ${wins.length} | ${pct(o.bigNet)} (${big.length}) | ${pct(o.restNet)} (${rest.length}) | ${pct(o.posWeeks, 0)} | ${usd(o.worstWeek)} | ${q} of ${wins.length} |`);
   }
   { const tr = legTrades(wins, {}); for (const [lab, pick] of [['gate days (SPY vol >= 16%)', (t) => spyHiVol(t.day) === true], ['other days', (t) => spyHiVol(t.day) !== true]]) { const a = tr.filter(pick); const n = a.reduce((x, t) => x + netRet(t), 0); console.log(`  V0 on ${lab}: ${a.length} trades, net ${pct(n / a.length)} a trade, ${(n * NOTIONAL / 1000).toFixed(1)}pp`); } }
+  { const dd = days.filter((d) => lib.dayType(d) === 'DROP'); const bk = dd.reduce((a, d) => a + bookDay.get(d), 0); console.log(`  book on its ${dd.length} DROP days: ${usd(bk)}`); for (const name of ONLY) { const tr = legTrades(wins, VARIANTS[name]); const ld = tr.filter((t) => lib.dayType(t.day) === 'DROP').reduce((a, t) => a + netRet(t) * NOTIONAL, 0); console.log(`  ${name} on those days, net: ${usd(ld)} (${(100 * ld / Math.max(1, -bk)).toFixed(0)}% of the book's loss)`); } }
   for (const name of ONLY) console.log(`  ${name} net by symbol: ` + Object.entries(out[surface][name].bySym).map(([s, e]) => `${s} ${e.n} ${pct(e.net / e.n)}`).join(' | '));
 }
 const o = flag('--json'); if (o) fs.writeFileSync(o, JSON.stringify(out, null, 1));
