@@ -1969,6 +1969,30 @@ function _trendShadowKick(now) {
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (_e) { /* journal only: a shadow never breaks a pass */ }
 }
+// NOISE-AREA SHADOW (2026-10-01). The trend-following leg for rally AND drop days: the intraday
+// momentum rule of Zarattini, Aziz and Barbon (2024) on SPY / QQQ / SMH, traded through the 3x
+// wrappers (lib/trend-shadow.js createNoiseShadow). Same contract as the trend shadow: journal only,
+// never awaited, rows under the user 'noise-shadow'. Enabled by
+// TRADER_NOISE_SHADOW=SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS (proxy:long wrapper:inverse wrapper).
+let _noiseShadow = null;
+function _noiseShadowKick(now) {
+  const spec = String(process.env.TRADER_NOISE_SHADOW || '').trim();
+  if (!spec) return;
+  try {
+    if (!_noiseShadow || _noiseShadow.spec !== spec) {
+      _noiseShadow = require('./trend-shadow').createNoiseShadow({
+        pairs: spec,
+        log: (rec) => logTrade({ user: 'noise-shadow', ...rec }),
+        stateFile: path.join(path.dirname(TRADES_LOG), 'noise-shadow-state.json'),
+        getBars: (s, tf) => yahoo.getBars(s, tf),
+        getQuote: async (s) => { const r = await yahoo.getQuotes([s]); return r && r[0] ? r[0].price : null; },
+      });
+      _noiseShadow.spec = spec;
+    }
+    const p = _noiseShadow.tick(now);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a shadow never breaks a pass */ }
+}
 
 async function runAutoTrade(scan, opts = {}) {
   return _onePassPerAccount(opts,
@@ -1984,6 +2008,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
   _warnExitAuthority(c);
   _trendShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js)
+  _noiseShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js createNoiseShadow)
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
   if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
