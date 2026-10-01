@@ -595,7 +595,10 @@ function loadArmed(base, src) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
         NOW_MS = cur.t + CLOCK_SHIFT_MS;
-        const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0] });
+        // At 16:00 and later the live loop is protective-only: no entries, no signal exits (auto-trader.js,
+        // EXTENDED-HOURS PROTECTIVE MODE). Only the bar-end clock reaches 16:00 here (the 15:55 bar), and before
+        // this guard the brain bought there: 21 entries on Jul-Sep 2026, every one an overnight carry live never takes.
+        const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0], protectiveOnly: clockMin(m) >= 960 });
         for (const sl of order) for (const s of (((res[sl] || {}).skipped) || [])) { const k = String(s.why || "?").split(/[—(:]/)[0].trim().slice(0, 26); census[sl][k] = (census[sl][k] || 0) + 1; }
       }
       if (v.eod) applyEodRules(state, v.eod, day, tag, ownership);   // end-of-day rules under measurement, at the day's last bar
