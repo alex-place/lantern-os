@@ -45,11 +45,21 @@ for (const s of SYMS) {
 }
 if (!Object.keys(DATA).length) { console.error("no cached bars"); process.exit(1); }
 
+// REPLAY_CLOCK_AT_BAR_END=1 (2026-10-01, ledger replay-clock-at-bar-end). By default the brains act at tick m on the
+// close of the bar STARTING at m with their clock at m: decision and fill share one price (no look-ahead), but every
+// CLOCK rule fires five minutes late against live, where the clock reads the END of the bar whose close it acts on.
+// The 30-minute exit gate opens on the 10:05 price (live: 10:00), the hourly entry cadence decides on the hh:05 close
+// (live: hh:00-hh:03), the 15:50 de-carry fills at 15:55 (live: 15:50). With the flag the clock reads the bar's END:
+// the bars seen and the fill prices are unchanged, and each clock rule fires on the bar that ends at its clock time,
+// as it does live. The harness's own clock rules (the morning threshold, the Friday-afternoon and M-sleeve start
+// times) move with it; the noise and trend decision bars are bar STARTS by definition and do not.
+const CLOCK_SHIFT_MS = process.env.REPLAY_CLOCK_AT_BAR_END === "1" ? 5 * 60000 : 0;
+const clockMin = (m) => m + CLOCK_SHIFT_MS / 60000;
 let NOW_MS = Math.min(...Object.values(DATA).map((a) => (a[0] && a[0].t) || Infinity));
 const barsUpTo = (sym, n) => {
   const a = DATA[String(sym).toUpperCase()] || [];
   const out = [];
-  for (let i = a.length - 1; i >= 0 && out.length < n; i--) if (a[i].t <= NOW_MS) out.push(a[i]);
+  for (let i = a.length - 1; i >= 0 && out.length < n; i--) if (a[i].t + CLOCK_SHIFT_MS <= NOW_MS) out.push(a[i]);
   return out.reverse().map((b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c, volume: 0 }));
 };
 const stub = {
@@ -422,7 +432,7 @@ function signalsAt(day, m, sleeve) {
     return out;
   }
   if (sleeve === "M") {
-    if (m < M_FROM) return out;
+    if (clockMin(m) < M_FROM) return out;
     for (const s of SYMS) {
       if (!M_SYMS.has(s)) continue;
       const a = DATA[s]; if (!a) continue;
@@ -439,9 +449,9 @@ function signalsAt(day, m, sleeve) {
     return out;
   }
   const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
-    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
-    : ((sleeve === "R" && m < 660 && process.env.TRADER_LAB_R_MORNING) ? Number(process.env.TRADER_LAB_R_MORNING) : (Number(process.env.TRADER_IBS_MAX) || 0.15));   // TRADER_LAB_R_MORNING (2026-09-27): stable-style morning depth for R
-  const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
+    ? (clockMin(m) < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
+    : ((sleeve === "R" && clockMin(m) < 660 && process.env.TRADER_LAB_R_MORNING) ? Number(process.env.TRADER_LAB_R_MORNING) : (Number(process.env.TRADER_IBS_MAX) || 0.15));   // TRADER_LAB_R_MORNING (2026-09-27): stable-style morning depth for R
+  const friPm = FRI_PM_INV > 0 && sleeve === "R" && clockMin(m) >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
     if (ADAPTIVE_SYM && sleeve === "S") { const tp = symTrailingPnl(s, ADAPTIVE_SYM.n); if (tp && tp.sum < ADAPTIVE_SYM.x) continue; }
     const a = DATA[s]; if (!a) continue;
@@ -536,7 +546,7 @@ function loadArmed(base, src) {
     VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [], eod: v.eod || null, regime: v.regime || null, mBase: v.mBase || "R" }]);
     console.log(`  [variants] ${VARIANTS.length} from ${process.env.REPLAY_VARIANTS}: ${VARIANTS.map(([n]) => n).join(" ")}`);
   }
-  console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
+  console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core${CLOCK_SHIFT_MS ? ", clock at bar end" : ""}) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
   console.log(`  ${"variant".padEnd(18)}${"return".padStart(9)}${"trades".padStart(8)}${"WR".padStart(6)}${"avg win".padStart(9)}${"avg loss".padStart(10)}${"payoff".padStart(8)}   maxDD   per-sleeve`);
 
   for (const [name, v] of VARIANTS) {
@@ -584,7 +594,7 @@ function loadArmed(base, src) {
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
-        NOW_MS = cur.t;
+        NOW_MS = cur.t + CLOCK_SHIFT_MS;
         const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0] });
         for (const sl of order) for (const s of (((res[sl] || {}).skipped) || [])) { const k = String(s.why || "?").split(/[—(:]/)[0].trim().slice(0, 26); census[sl][k] = (census[sl][k] || 0) + 1; }
       }
