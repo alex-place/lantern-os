@@ -327,11 +327,79 @@ const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split
 // minutes> and REPLAY_M_RANGE_K=<k>. A name is BULLISH at the FIRST of those bars at which it sits at or above
 // REPLAY_M_IBS of its session range AND that range is at least k x its own median daily move; at that bar only, once
 // per name per session. The rule of experiments/intraday_hold_anatomy.js, expressed where a signal rule lives.
+// NOISE-AREA MOMENTUM for sleeve M (2026-09-30, ledger row noise-leg-beside-book-13-windows): REPLAY_M_NOISE=
+// "SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS" (proxy:long wrapper:inverse wrapper). The noise area of Zarattini,
+// Aziz and Barbon (2024, SSRN 4824172): sigma(t) = the 14-session average of |price(t) / open - 1| at the same time
+// of day; upper = max(open, prevClose) x (1 + sigma), lower = min(open, prevClose) x (1 - sigma). Our deviations:
+// 5m bars, the first bar's midpoint as the open, no VWAP. At the bars closing 10:00 ... 15:30 a flat pair buys its
+// long wrapper with the proxy above the band, its inverse below; a held wrapper stays BULLISH while the proxy stays
+// outside on its side and turns BEARISH (a signal exit) when it comes back. The 15:50 de-carry closes the rest.
+const M_NOISE = String(process.env.REPLAY_M_NOISE || "").split(",").map((p) => { const [proxy, up, dn] = p.split(":").map((x) => String(x || "").trim().toUpperCase()); return proxy && up && dn ? { proxy, up, dn } : null; }).filter(Boolean);
+const NOISE_DECISIONS = new Set(Array.from({ length: 12 }, (_, k) => 595 + 30 * k));
+const _intraMemo = new Map();
+function _longIntraday(sym) {                             // a proxy's regular-session 5m bars from every cached window
+  if (_intraMemo.has(sym)) return _intraMemo.get(sym);
+  const root = path.dirname(CACHE); const byT = new Map();
+  let dirs = []; try { dirs = fs.readdirSync(root).filter((d) => /^oos_/.test(d)); } catch (_e) { dirs = []; }
+  for (const d of new Set([...dirs, path.basename(CACHE)])) {
+    const f = path.join(root, d, sym + ".json"); if (!fs.existsSync(f)) continue;
+    let a; try { a = JSON.parse(fs.readFileSync(f, "utf8")); } catch (_e) { continue; }
+    for (const b of a) { const m = MIN(b.t); if (m < 570 || m >= 960 || byT.has(b.t)) continue; byT.set(b.t, { t: b.t, c: Number(b.c), h: Number(b.h), l: Number(b.l), d: DAY(b.t), m }); }
+  }
+  const sessions = new Map();
+  for (const b of [...byT.values()].sort((x, y) => x.t - y.t)) { if (!sessions.has(b.d)) sessions.set(b.d, []); sessions.get(b.d).push(b); }
+  const days = [...sessions.keys()].sort();
+  for (const d of days) { const s = sessions.get(d); s.byMin = new Map(s.map((b) => [b.m, b])); s.open = (s[0].h + s[0].l) / 2; s.close = s[s.length - 1].c; }
+  const out = { sessions, days, idx: new Map(days.map((d, i) => [d, i])) };
+  _intraMemo.set(sym, out); return out;
+}
+const _bandMemo = new Map();
+function noiseState(sym, day, m) {                        // 'UP' | 'DOWN' | 'IN' | null (no clean 14-session history)
+  const key = sym + ":" + day;
+  let bd = _bandMemo.get(key);
+  if (bd === undefined) {
+    bd = null;
+    const L = _longIntraday(sym); const i = L.idx.get(day);
+    const calDays = (a, b) => (Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000;
+    if (i != null && i > 14 && calDays(L.days[i - 1], day) <= 5 && calDays(L.days[i - 14], day) <= 28 && L.sessions.get(day).length >= 60) {   // no half sessions (as the anatomy)
+      const cur = L.sessions.get(day), prevClose = L.sessions.get(L.days[i - 1]).close;
+      const hiRef = Math.max(cur.open, prevClose), loRef = Math.min(cur.open, prevClose);
+      bd = new Map();
+      for (const b of cur) {
+        const mv = [];
+        for (let k = 1; k <= 14; k++) { const ss = L.sessions.get(L.days[i - k]); const bb = ss.byMin.get(b.m); if (bb) mv.push(Math.abs(bb.c / ss.open - 1)); }
+        if (mv.length < 10) continue;
+        const sg = mv.reduce((x, y) => x + y, 0) / mv.length;
+        bd.set(b.m, { upper: hiRef * (1 + sg), lower: loRef * (1 - sg), c: b.c });
+      }
+    }
+    _bandMemo.set(key, bd);
+  }
+  const lim = bd && bd.get(m); if (!lim) return null;
+  return lim.c > lim.upper ? "UP" : lim.c < lim.lower ? "DOWN" : "IN";
+}
 const M_CHECKS = String(process.env.REPLAY_M_CHECKS || "").split(",").map((s) => Number(s.trim())).filter((x) => Number.isFinite(x) && x > 0);
 const M_RANGE_K = Number(process.env.REPLAY_M_RANGE_K) || 0;
 const _mFired = new Map();                                  // `${day}:${sym}` -> the bar that fired (a replay process runs its variants one after another: cleared per variant)
 function signalsAt(day, m, sleeve) {
   const out = [];
+  if (sleeve === "M" && M_NOISE.length) {
+    const wrapIbs = (s) => { const a = DATA[s] || []; const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m); if (sess.length < 1) return null; const hi = Math.max(...sess.map((b) => b.h)), lo = Math.min(...sess.map((b) => b.l)), cur = sess[sess.length - 1]; return { cur, ibs: hi > lo ? (cur.c - lo) / (hi - lo) : 0.5 }; };
+    for (const pr of M_NOISE) {
+      const st = noiseState(pr.proxy, day, m);
+      const heldUp = _posRef && _posRef[pr.up] && _posRef[pr.up].owner === "M", heldDn = _posRef && _posRef[pr.dn] && _posRef[pr.dn].owner === "M";
+      for (const [sym, side] of [[pr.up, "UP"], [pr.dn, "DOWN"]]) {
+        const w = wrapIbs(sym); if (!w || w.cur.m !== m) continue;
+        const held = side === "UP" ? heldUp : heldDn;
+        let dir = "NEUTRAL";
+        if (held) dir = st === side ? "BULLISH" : (st ? "BEARISH" : "BULLISH");            // no reading: hold
+        else if (!heldUp && !heldDn && NOISE_DECISIONS.has(m) && st === side) dir = "BULLISH";
+        out.push({ symbol: sym, direction: dir, entry_price: w.cur.c, decision_context: { ibs: w.ibs, spy_tape: 0, noise: st },
+          convergence: { decision: dir === "NEUTRAL" ? "SKIP" : "ENTER", p_win: 0.6 } });
+      }
+    }
+    return out;
+  }
   if (sleeve === "M" && M_CHECKS.length) {
     for (const s of SYMS) {
       if (!M_SYMS.has(s)) continue;
