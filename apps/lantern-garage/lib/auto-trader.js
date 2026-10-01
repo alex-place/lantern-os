@@ -1986,6 +1986,8 @@ function _noiseShadowKick(now) {
         stateFile: path.join(path.dirname(TRADES_LOG), 'noise-shadow-state.json'),
         getBars: (s, tf) => yahoo.getBars(s, tf),
         getQuote: async (s) => { const r = await yahoo.getQuotes([s]); return r && r[0] ? r[0].price : null; },
+        // the live 5m feed holds about 14 sessions; the band needs 15: older bars from a settled window (2026-10-01)
+        getHistory: typeof yahoo.getBarsWindow === 'function' ? (s, from, to) => yahoo.getBarsWindow(s, '5m', from, to) : null,
       });
       _noiseShadow.spec = spec;
     }

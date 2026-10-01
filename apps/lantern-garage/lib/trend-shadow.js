@@ -331,11 +331,45 @@ function realizedVol(rawDaily, day, n = 20) {
   return Math.sqrt(r.reduce((x, y) => x + (y - m) ** 2, 0) / (r.length - 1) * 252);
 }
 
-function createNoiseShadow({ pairs, log, stateFile, getBars, getQuote, stopPct = STOP_PCT, closeMin = CLOSE_MIN, volGate = VOL_GATE } = {}) {
+// The live bar feed keeps at most 2,600 5m bars INCLUDING the extended sessions (lib/market-data-yahoo.js
+// MAX_BARS), about 14 sessions: one short of the band's 15 (14 prior + today), and the oldest session drops out as
+// today's bars arrive (2026-10-01: QQQ and SMH had no band all day, SPY lost it from 12:30). A settled window of
+// older bars (7 to 28 calendar days back, fixed per day, so the market-data module serves it from its 6-hour cache)
+// is merged under the recent feed when `getHistory(sym, fromMs, toMs)` is given.
+const HISTORY_FROM_DAYS = 28;
+const HISTORY_TO_DAYS = 7;
+
+function createNoiseShadow({ pairs, log, stateFile, getBars, getQuote, getHistory = null, stopPct = STOP_PCT, closeMin = CLOSE_MIN, volGate = VOL_GATE } = {}) {
   const P = Array.isArray(pairs) ? pairs : parseNoisePairs(pairs);
   let state = null;
   let inFlight = false;
   const volCache = new Map();   // day -> { value, tries }
+  const histCache = new Map();  // `${sym}:${day}` -> { bars, tries }
+  async function historyOf(sym, day) {
+    if (typeof getHistory !== 'function') return [];
+    const key = `${sym}:${day}`;
+    let h = histCache.get(key) || { bars: null, tries: 0 };
+    if (h.bars == null && h.tries < 3) {
+      const dayStart = Date.parse(`${day}T12:00:00Z`);
+      let bars = null;
+      try { const r = await getHistory(sym, dayStart - HISTORY_FROM_DAYS * 86400000, dayStart - HISTORY_TO_DAYS * 86400000); bars = (r && r.bars) || null; } catch (_e) { bars = null; }
+      h = { bars: bars && bars.length ? bars : null, tries: h.tries + 1 };
+      histCache.set(key, h);
+    }
+    return h.bars || [];
+  }
+  /** Older history under the recent feed, one row per bar start. */
+  function withHistory(older, recent) {
+    if (!older.length) return recent;
+    const seen = new Set();
+    const out = [];
+    for (const b of [...older, ...recent]) {
+      const t = Date.parse(b.timestamp != null ? b.timestamp : b.t);
+      if (!Number.isFinite(t) || seen.has(t)) continue;
+      seen.add(t); out.push(b);
+    }
+    return out.sort((a, b) => Date.parse(a.timestamp != null ? a.timestamp : a.t) - Date.parse(b.timestamp != null ? b.timestamp : b.t));
+  }
 
   function load() {
     if (state) return state;
@@ -394,6 +428,7 @@ function createNoiseShadow({ pairs, log, stateFile, getBars, getQuote, stopPct =
       let raw = null;
       try { raw = (await getBars(pr.proxy, '5m')).bars; } catch (_e) { raw = null; }
       if (!raw) continue;
+      raw = withHistory(await historyOf(pr.proxy, e.day), raw);
       R[pr.proxy] = { bars: sessionBars(raw, e.day), band: noiseBand(raw, e.day) };
     }
     const stateAt = (proxy, min) => {
