@@ -127,3 +127,50 @@ test('a dead local provider degrades to a journalled reason — it can never blo
   assert.ok(claude && !claude.degraded && claude.posture === 'flat', 'claude row is clean');
   assert.ok(local && local.degraded && /ECONNREFUSED/.test(local.reason), 'local row records why');
 });
+
+// ── the opening gap (2026-10-01) ─────────────────────────────────────────────
+// Fetched at 09:35, Yahoo's DAILY bar for today still carried the previous
+// session's open, so every open read of 08-21..09-30 was told a "gap" equal to
+// open(D-1) / close(D-1) - 1. The open now comes from the intraday 09:30 bar.
+function yahooChart(bars) {
+  return { chart: { result: [{ timestamp: bars.map((b) => b.t),
+    indicators: { quote: [{ open: bars.map((b) => b.o), high: bars.map((b) => b.h), low: bars.map((b) => b.l), close: bars.map((b) => b.c) }] } }] } };
+}
+function fakeYahoo({ intradayFirstMin = 570 } = {}) {
+  // 12 sessions ending Mon 2026-08-31 (weekdays), then TODAY (Tue 09-01) as Yahoo's daily series shows it at 09:35:
+  // a bar dated today that still carries yesterday's open.
+  const days = [];
+  for (let t = Date.parse('2026-08-13T13:30:00Z'); days.length < 12; t += 86400000) { const d = new Date(t); if (d.getUTCDay() % 6) days.push(t); }
+  const daily = days.map((t, i) => ({ t: t / 1000, o: 760 + i, h: 763 + i, l: 758 + i, c: 761 + i }));
+  const yesterday = daily[daily.length - 1];
+  daily.push({ t: Date.parse('2026-09-01T13:30:00Z') / 1000, o: yesterday.o, h: yesterday.h, l: yesterday.l, c: 770 });   // stale open
+  const first = Date.parse('2026-09-01T13:30:00Z') / 1000 + (intradayFirstMin - 570) * 60;
+  const intraday = [{ t: first, o: 766.5, h: 767, l: 766, c: 766.8 }, { t: first + 300, o: 766.8, h: 767.5, l: 766.4, c: 767.2 }];
+  return { yesterday, getJson: async (url) => (url.includes('interval=5m') ? yahooChart(intraday) : yahooChart(daily)) };
+}
+const NOW_0935 = Date.parse('2026-09-01T13:35:00Z');   // 09:35 ET
+
+test('the open read: the gap is today\'s 09:30 print against yesterday\'s close, never the daily bar\'s stale open', async () => {
+  const y = fakeYahoo();
+  const ctx = await rs.buildContext('open', { getJson: y.getJson, now: NOW_0935 });
+  assert.strictEqual(ctx.gapSource, 'intraday-0930');
+  assert.strictEqual(ctx.gapPct, +(((766.5 / y.yesterday.c) - 1) * 100).toFixed(2));
+  assert.notStrictEqual(ctx.gapPct, +(((y.yesterday.o / y.yesterday.c) - 1) * 100).toFixed(2), 'the bug: minus yesterday\'s intraday move');
+  assert.ok(ctx.spy.every((b) => b.d < '2026-09-01'), 'today\'s bar stays out of the history');
+});
+
+test('the open read: no 09:30 bar yet means the gap is unavailable, not guessed', async () => {
+  const y = fakeYahoo({ intradayFirstMin: 575 });
+  const ctx = await rs.buildContext('open', { getJson: y.getJson, now: NOW_0935 });
+  assert.strictEqual(ctx.gapPct, null);
+  assert.strictEqual(ctx.gapSource, 'unavailable');
+  assert.match(rs.buildPrompt(ctx), /flat \(gap unavailable\)/);
+});
+
+test('the close read: today\'s completed bar carries the intraday open', async () => {
+  const y = fakeYahoo();
+  const ctx = await rs.buildContext('close', { getJson: y.getJson, now: Date.parse('2026-09-01T20:05:00Z') });
+  assert.strictEqual(ctx.todayBar.o, 766.5);
+  assert.strictEqual(ctx.todayBar.c, 770);
+  assert.strictEqual(ctx.openSource, 'intraday-0930');
+});

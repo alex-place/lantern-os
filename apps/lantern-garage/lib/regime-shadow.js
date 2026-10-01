@@ -88,10 +88,10 @@ function fetchJson(url) {
   });
 }
 
-async function daily(sym, days) {
+async function daily(sym, days, getJson = fetchJson) {
   const p2 = Math.floor(Date.now() / 1000);
   const p1 = p2 - (days + 15) * 86400;
-  const j = await fetchJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&period1=${p1}&period2=${p2}`);
+  const j = await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&period1=${p1}&period2=${p2}`);
   const r = j.chart && j.chart.result && j.chart.result[0];
   if (!r) return [];
   const ts = r.timestamp || [];
@@ -106,27 +106,57 @@ async function daily(sym, days) {
 }
 
 const dayIbs = (b) => (b.h - b.l > 0 ? (b.c - b.l) / (b.h - b.l) : 0.5);
+const etMin = (t) => { const p = new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false }).split(':'); return (Number(p[0]) % 24) * 60 + Number(p[1]); };
+
+/**
+ * Today's opening print: the open of the 09:30 bar of the INTRADAY chart, or null.
+ * Never the daily series: fetched at 09:35, Yahoo's daily bar for today still carries the
+ * PREVIOUS session's open, so every open read of 2026-08-21..09-30 was told "SPY opened
+ * X% vs yesterday's close" with X = open(D-1) / close(D-1) - 1 — minus yesterday's
+ * intraday move, not today's gap (found scoring the journal, 2026-10-01).
+ */
+async function todayOpen(sym, now, getJson = fetchJson) {
+  const j = await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=5m&range=1d`);
+  const r = j && j.chart && j.chart.result && j.chart.result[0];
+  if (!r) return null;
+  const ts = r.timestamp || [];
+  const q = (r.indicators && r.indicators.quote && r.indicators.quote[0]) || {};
+  const day = etDay(now);
+  for (let i = 0; i < ts.length; i++) {
+    const t = ts[i] * 1000;
+    if (etDay(t) !== day) continue;
+    const m = etMin(t);
+    if (m < 570) continue;                       // regular session only
+    return m === 570 && q.open && q.open[i] > 0 ? q.open[i] : null;   // the first regular bar must BE the 09:30 bar
+  }
+  return null;
+}
 
 /** Everything the prompt gets. Exposed for tests and for the scorer. */
-async function buildContext(read) {
-  const [spy, qqq, iwm, vix] = await Promise.all([
-    daily('SPY', 11), daily('QQQ', 11), daily('IWM', 11), daily('^VIX', 2),
+async function buildContext(read, { getJson = fetchJson, now = Date.now() } = {}) {
+  const [spy, qqq, iwm, vix, open] = await Promise.all([
+    daily('SPY', 11, getJson), daily('QQQ', 11, getJson), daily('IWM', 11, getJson), daily('^VIX', 2, getJson),
+    todayOpen('SPY', now, getJson).catch(() => null),
   ]);
   if (spy.length < 5) throw new Error('insufficient SPY history');
   // For the OPEN read, today's partial bar (if Yahoo already lists it) must be
   // dropped from the history and used only as the gap reference — the model
   // may not see today's high/low/close before predicting them.
-  const today = etDay(Date.now());
+  const today = etDay(now);
   const hist = spy.filter((b) => b.d < today);
-  const todayBar = spy.find((b) => b.d === today) || null;
+  const dailyToday = spy.find((b) => b.d === today) || null;
+  // the close read shows today's completed bar: its open from the intraday 09:30 bar too (same staleness)
+  const todayBar = dailyToday && open > 0 ? { ...dailyToday, o: open } : dailyToday;
   return {
     read, date: today,
     spy: hist.slice(-10).map((b) => ({ ...b, ibs: +dayIbs(b).toFixed(2) })),
     qqq5: qqq.filter((b) => b.d < today).slice(-5).map((b) => ({ d: b.d, chg: null, c: b.c })),
     iwm5: iwm.filter((b) => b.d < today).slice(-5).map((b) => ({ d: b.d, c: b.c })),
     vix: vix.length ? vix[vix.length - 1].c : null,
-    gapPct: read === 'open' && todayBar && hist.length
-      ? +(((todayBar.o / hist[hist.length - 1].c) - 1) * 100).toFixed(2) : null,
+    gapPct: read === 'open' && open > 0 && hist.length
+      ? +(((open / hist[hist.length - 1].c) - 1) * 100).toFixed(2) : null,
+    gapSource: read === 'open' ? (open > 0 ? 'intraday-0930' : 'unavailable') : null,
+    openSource: open > 0 ? 'intraday-0930' : (read === 'close' && dailyToday ? 'daily' : null),
     todayBar: read === 'close' ? (todayBar ? { ...todayBar, ibs: +dayIbs(todayBar).toFixed(2) } : null) : null,
   };
 }
@@ -245,7 +275,7 @@ async function run(read, { fetchImpl, now = Date.now(), ctx: injectedCtx } = {})
       model: name === 'claude' ? CLAUDE_MODEL() : LOCAL_MODEL(),
       latency_ms: Date.now() - t0,
       // the exact tape shown, so the scorer can verify no look-ahead
-      gap_pct: ctx.gapPct, vix: ctx.vix, last_close: ctx.spy[ctx.spy.length - 1].c,
+      gap_pct: ctx.gapPct, gap_source: ctx.gapSource || null, open_source: ctx.openSource || null, vix: ctx.vix, last_close: ctx.spy[ctx.spy.length - 1].c,
       ...r };
     journal(row);
     out.push(row);
@@ -253,4 +283,4 @@ async function run(read, { fetchImpl, now = Date.now(), ctx: injectedCtx } = {})
   return { logged: out.length };
 }
 
-module.exports = { run, enabled, buildContext, buildPrompt, parseReply, alreadyLogged, logFile };
+module.exports = { run, enabled, buildContext, buildPrompt, parseReply, alreadyLogged, logFile, todayOpen };

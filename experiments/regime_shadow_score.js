@@ -92,8 +92,12 @@ function fetchJson(url) {
 
   console.log("\nprovider  read     n   regime-hit   posture-return   always-long   rho(conv, realized)");
   for (const provider of ["claude", "local"]) {
-    for (const read of ["open", "close"]) {
-      const g = grade(usable.filter((r) => r.provider === provider && r.read === read));
+    // "open*" = open reads journaled before 2026-10-01 (no gap_source): they were told a wrong gap,
+    // minus the previous session's open-to-close move (lib/regime-shadow.js todayOpen). Reported apart, never pooled.
+    for (const read of ["open", "open*", "close"]) {
+      const pick = read === "open*" ? (r) => r.read === "open" && !r.gap_source
+        : read === "open" ? (r) => r.read === "open" && !!r.gap_source : (r) => r.read === read;
+      const g = grade(usable.filter((r) => r.provider === provider && pick(r)));
       if (!g) { console.log(`${provider.padEnd(8)} ${read.padEnd(6)}   —`); continue; }
       console.log(`${provider.padEnd(8)} ${read.padEnd(6)} ${String(g.n).padStart(3)}   ${(g.hitRate * 100).toFixed(0).padStart(7)}%   ${(g.postureRet * 100).toFixed(2).padStart(12)}%   ${(g.baselineRet * 100).toFixed(2).padStart(9)}%   ${g.rho == null ? "        n<5" : g.rho.toFixed(3).padStart(10)}`);
     }
