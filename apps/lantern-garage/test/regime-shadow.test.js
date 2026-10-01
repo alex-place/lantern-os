@@ -16,6 +16,8 @@ const path = require('path');
 
 const LOG = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'regime-')), 'regime.jsonl');
 process.env.TRADER_REGIME_LOG = LOG;
+const NEWS = path.join(path.dirname(LOG), 'news.jsonl');   // the v2 headlines come from here in tests, never the real feed
+process.env.TRADER_REGIME_NEWS = NEWS;
 
 const rs = require('../lib/regime-shadow');
 
@@ -44,8 +46,13 @@ test('NO ORDER AUTHORITY: the module cannot reach a bridge, broker, or the auto-
   const requires = [...code.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]).sort();
   // ./app-paths is the data-root path helper (node's os/path/fs only, asserted in
   // test/trading-state-root.test.js), so it adds no order authority (ADR-0035 step 1).
-  assert.deepStrictEqual(requires, ['./app-paths', 'fs', 'http', 'https', 'path'],
+  // ./trend-shadow (v2, 2026-10-01) supplies the noise-band math over bars; it is pinned
+  // below to fs + path, so the guarantee holds through it.
+  assert.deepStrictEqual(requires, ['./app-paths', './trend-shadow', 'fs', 'http', 'https', 'path'],
     `only node built-ins allowed, got: ${requires}`);
+  const ts = fs.readFileSync(path.join(__dirname, '..', 'lib', 'trend-shadow.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.deepStrictEqual([...ts.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]).sort(), ['fs', 'path'],
+    'lib/trend-shadow.js must stay pure bar math (fs + path only)');
 });
 
 test('DEFAULT OFF: without the flag, run() does nothing and calls nothing', async () => {
@@ -140,7 +147,7 @@ function fakeYahoo({ intradayFirstMin = 570 } = {}) {
   // 12 sessions ending Mon 2026-08-31 (weekdays), then TODAY (Tue 09-01) as Yahoo's daily series shows it at 09:35:
   // a bar dated today that still carries yesterday's open.
   const days = [];
-  for (let t = Date.parse('2026-08-13T13:30:00Z'); days.length < 12; t += 86400000) { const d = new Date(t); if (d.getUTCDay() % 6) days.push(t); }
+  for (let t = Date.parse('2026-08-14T13:30:00Z'); days.length < 12; t += 86400000) { const d = new Date(t); if (d.getUTCDay() % 6) days.push(t); }
   const daily = days.map((t, i) => ({ t: t / 1000, o: 760 + i, h: 763 + i, l: 758 + i, c: 761 + i }));
   const yesterday = daily[daily.length - 1];
   daily.push({ t: Date.parse('2026-09-01T13:30:00Z') / 1000, o: yesterday.o, h: yesterday.h, l: yesterday.l, c: 770 });   // stale open
@@ -173,4 +180,109 @@ test('the close read: today\'s completed bar carries the intraday open', async (
   assert.strictEqual(ctx.todayBar.o, 766.5);
   assert.strictEqual(ctx.todayBar.c, 770);
   assert.strictEqual(ctx.openSource, 'intraday-0930');
+});
+
+// ── v2 (2026-10-01): the account's whole view, and positions ─────────────────
+// The operator: "give a human trader or an AI all of the info that the trader has and
+// just ask it to find positions". The open read and a new 10:35 mid read now carry the
+// scan's universe, the indices against their noise bands, the headlines and the model's
+// own track record, and answer with picks, which the journal prices for the scorer.
+const SCAN = { signals: [
+  { symbol: 'SPY', direction: 'NEUTRAL', entry_price: 767.2, decision_context: { ibs: 0.62 }, rsi: 55, news: { label: 'neutral' }, sector: null },
+  { symbol: 'SOXL', direction: 'BULLISH', entry_price: 151.4, decision_context: { ibs: 0.12 }, rsi: 38, news: { label: 'bullish' }, sector: { etf: 'SMH', trend_pct: -0.8 } },
+  { symbol: 'SQQQ', direction: 'BEARISH', entry_price: 33.1, decision_context: { ibs: 0.71 }, rsi: 61 },
+  { symbol: 'soxl', direction: 'BULLISH', entry_price: 999 },                  // a duplicate: the first one stands
+  { symbol: 'not a ticker!', entry_price: 1 },
+] };
+
+test('v2 universe: the scan as the system sees it, one row a name, nothing fetched', () => {
+  const u = rs.universeOf(SCAN);
+  assert.deepStrictEqual(u.map((x) => x.sym), ['SPY', 'SOXL', 'SQQQ']);
+  assert.deepStrictEqual(u[1], { sym: 'SOXL', px: 151.4, ibs: 0.12, read: 'BULLISH', rsi: 38, news: 'bullish', sector: -0.8 });
+  assert.deepStrictEqual(rs.universeOf(null), []);
+});
+
+test('v2 headlines: in time order, deduplicated, only the last 18 hours, never anything after now', () => {
+  const now = Date.parse('2026-09-01T14:35:00Z');   // 10:35 ET
+  const row = (minsAgo, headline, source = 'Reuters', symbols = ['SPY']) => JSON.stringify({ headline, source, published: new Date(now - minsAgo * 60000).toISOString(), symbols });
+  fs.writeFileSync(NEWS, [row(20 * 60, 'too old'), row(300, 'Stocks steady ahead of the jobs report'), row(120, 'Chip stocks slide'),
+    row(60, 'Chip stocks slide'), row(-30, 'FROM THE FUTURE'), 'not json'].join('\n') + '\n');
+  const h = rs.headlinesOf(now);
+  assert.deepStrictEqual(h.map((x) => x.headline), ['Stocks steady ahead of the jobs report', 'Chip stocks slide']);
+  assert.ok(!h.some((x) => x.headline === 'FROM THE FUTURE'), 'no look-ahead');
+});
+
+test('v2 headlines: when there are more than fit, market-wide rows outrank single-stock list articles', () => {
+  const now = Date.parse('2026-09-01T14:35:00Z');
+  const row = (minsAgo, headline, source, symbols) => JSON.stringify({ headline, source, published: new Date(now - minsAgo * 60000).toISOString(), symbols });
+  fs.writeFileSync(NEWS, [row(200, 'Futures slip ahead of the jobs report', 'Reuters', ['CME']), row(150, 'Yields jump', 'Bloomberg', []),
+    row(30, '3 Reasons to Sell XYZ', 'StockStory', ['XYZ']), row(20, 'Why ABC Is a Buy', 'Motley Fool', ['ABC'])].join('\n') + '\n');
+  assert.deepStrictEqual(rs.headlinesOf(now, { limit: 2 }).map((x) => x.headline), ['Futures slip ahead of the jobs report', 'Yields jump']);
+});
+
+test('v2 prompt: everything the account sees, the three decisions, and no bar of today beyond the reads', async () => {
+  const y = fakeYahoo();
+  fs.writeFileSync(NEWS, JSON.stringify({ headline: 'Chip stocks slide', source: 'Reuters', published: '2026-09-01T13:00:00Z' }) + '\n');
+  fs.writeFileSync(LOG, '');
+  const ctx = await rs.buildContext('mid', { getJson: y.getJson, now: Date.parse('2026-09-01T14:35:00Z'), scan: SCAN });
+  assert.strictEqual(ctx.v, rs.PROMPT_V);
+  assert.strictEqual(ctx.asOf, '10:35');
+  assert.strictEqual(ctx.gapSource, 'intraday-0930', 'the mid read gets the fixed gap too');
+  const p = rs.buildPrompt(ctx);
+  for (const want of [/10:35 ET on 2026-09-01/, /SOXL\s+151\.40\s+IBS 0\.12\s+rule read BULLISH/, /Chip stocks slide/, /none yet: this is your first/,
+    /"picks":\["SYM"\]/, /up to 3 names from the universe to hold/, /SPY\s+\+[\d.]+% from the open/]) assert.match(p, want);
+  assert.ok(!p.includes('2026-09-01  O'), 'today is never a completed bar on an intraday read');
+});
+
+test('v2 replies: picks must be names in the universe, counted when dropped; v1 replies parse as before', () => {
+  const u = rs.universeOf(SCAN);
+  const r = rs.parseReply('{"regime":"trend_down","posture":"inverse","conviction":64,"day_type":"DROP","picks":["sqqq","NVDA","SQQQ","SOXL"],"avoid":["SOXL"],"reason":"x"}', { universe: u });
+  assert.deepStrictEqual([r.day_type, r.picks, r.avoid, r.picks_dropped], ['DROP', ['SQQQ', 'SOXL'], ['SOXL'], 2]);
+  const bad = rs.parseReply('{"regime":"chop","posture":"flat","conviction":50,"day_type":"SIDEWAYS","picks":"SOXL"}', { universe: u });
+  assert.deepStrictEqual([bad.degraded, bad.day_type, bad.picks], [false, null, []]);
+  const v1 = rs.parseReply('{"regime":"chop","posture":"flat","conviction":50,"reason":"r"}');
+  assert.ok(!('picks' in v1) && !('day_type' in v1), 'a v1 reply carries no v2 fields');
+});
+
+test('v2 run: the journal prices the picks and the universe at the read, and a refused model falls back once', async () => {
+  fs.writeFileSync(LOG, '');
+  fs.writeFileSync(NEWS, '');
+  const y = fakeYahoo();
+  const models = [];
+  const fetchImpl = async (url, opts) => {
+    if (!String(url).includes('anthropic')) throw new Error('ECONNREFUSED');
+    const model = JSON.parse(opts.body).model; models.push(model);
+    if (model !== 'claude-opus-5') return { ok: false, status: 404, json: async () => ({}) };
+    return { ok: true, json: async () => ({ content: [{ type: 'text', text: '{"regime":"trend_up","posture":"long","conviction":61,"day_type":"RALLY","picks":["SOXL"],"avoid":["SQQQ"],"reason":"semis lead"}' }] }) };
+  };
+  const now = Date.parse('2026-09-01T14:35:00Z');
+  await withEnv({ TRADER_REGIME_SHADOW: '1', ANTHROPIC_API_KEY: 'test-key', TRADER_REGIME_MODEL: null }, () =>
+    rs.run('mid', { scan: SCAN, getJson: y.getJson, now, fetchImpl }));
+  const row = readLog().find((r) => r.provider === 'claude');
+  assert.deepStrictEqual(models, ['claude-opus-5-5', 'claude-opus-5']);
+  assert.strictEqual(row.model, 'claude-opus-5');
+  assert.strictEqual(row.prompt_v, rs.PROMPT_V);
+  assert.strictEqual(row.read, 'mid');
+  assert.deepStrictEqual(row.picks, [{ symbol: 'SOXL', px: 151.4 }]);
+  assert.deepStrictEqual(row.universe_px, { SPY: 767.2, SOXL: 151.4, SQQQ: 33.1 });
+  assert.strictEqual(row.read_min, 635);
+  assert.ok(row.spy_at_read > 0);
+  assert.strictEqual(row.day_type, 'RALLY');
+  const local = readLog().find((r) => r.provider === 'local');
+  assert.ok(local.degraded && local.prompt_v === rs.PROMPT_V, 'the local model degrades, the row still says which prompt it was');
+});
+
+test('v2 track record: its own earlier calls with what followed, read from the journal (learning in context)', async () => {
+  fs.writeFileSync(LOG, [
+    { date: '2026-08-31', read: 'mid', provider: 'claude', prompt_v: 2, degraded: false, regime: 'trend_up', posture: 'long', conviction: 60, day_type: 'RALLY', spy_at_read: 770, picks: [{ symbol: 'SPY', px: 770 }] },
+    { date: '2026-08-31', read: 'open', provider: 'claude', prompt_v: 2, degraded: false, regime: 'chop', posture: 'flat', conviction: 50, picks: [] },
+    { date: '2026-08-31', read: 'mid', provider: 'local', prompt_v: 2, degraded: true },
+    { date: '2026-09-01', read: 'mid', provider: 'claude', prompt_v: 2, degraded: false, regime: 'chop', posture: 'flat', conviction: 50, picks: [] },
+  ].map((r) => JSON.stringify(r)).join('\n') + '\n');
+  const y = fakeYahoo();
+  const t = await rs.trackOf('mid', Date.parse('2026-09-01T14:35:00Z'), y.getJson);
+  assert.strictEqual(t.length, 1, 'same read, claude, v2, before today only');
+  assert.strictEqual(t[0].date, '2026-08-31');
+  assert.strictEqual(t[0].spyRetPct, +((y.yesterday.c / 770 - 1) * 100).toFixed(2));
+  assert.deepStrictEqual(t[0].picks.map((p) => p.symbol), ['SPY']);
 });
