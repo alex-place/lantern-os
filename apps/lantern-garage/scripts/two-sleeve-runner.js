@@ -53,6 +53,9 @@
  *        TWO_SLEEVE_SCAN=per-sleeve|shared, TWO_SLEEVE_SCAN_TIMEOUT_MS (45000),
  *        TWO_SLEEVE_FAKE_NOW=<ISO> (dry runs only: pin the runner's clock for an after-hours smoke),
  *        TRADER_AUTOSCAN_MS (60000), TRADER_AUTOSCAN_CLOSED_MS (300000),
+ * A sleeve may carry "scan": "noise" (2026-10-02): its worker runs the noise-area leg (lib/two-sleeve/noise-scan.js) over
+ * the sleeve env s TRADER_NOISE_LEG_PAIRS instead of the tree s trader-agent scan; see
+ * scripts/two-sleeve.config.noise-leg.example.json for the measured leg s settings. Without such a sleeve nothing changes.
  *        TRADER_EXTENDED_EXITS=1 (protective-only ticks pre/post market, as the server does).
  */
 const fs = require('fs');
@@ -124,7 +127,7 @@ const sleeves = (cfg.sleeves || []).map((s) => {
   process.env.TRADER_STATE_FILE = path.join(DIR, `${s.id}.state.json`);
   const brain = require(path.join(app, 'lib', 'auto-trader'));
   const env = { ...envFromFile(s.envFile), ...(s.env || {}) };
-  return { id: s.id, brain, env, envFile: s.envFile, userId: USER, universe: Array.isArray(s.universe) && s.universe.length ? s.universe : null, app };
+  return { id: s.id, brain, env, envFile: s.envFile, userId: USER, universe: Array.isArray(s.universe) && s.universe.length ? s.universe : null, app, scan: s.scan || null };
 });
 if (sleeves.length < 1) { console.error('[two-sleeve] no sleeves configured'); process.exit(2); }
 // After the requires, the process-level journal/state env must not point at either sleeve.
@@ -133,7 +136,7 @@ delete process.env.TRADER_TRADES_LOG; delete process.env.TRADER_STATE_FILE;
 // ---- scanners: one worker per sleeve, in that sleeve's tree under that sleeve's env -------------
 const workers = {};
 if (SCAN_MODE === 'per-sleeve') {
-  for (const s of sleeves) workers[s.id] = new ScanWorker({ id: s.id, app: s.app, envFile: s.envFile, env: s.env, universe: s.universe || [], dir: DIR, timeoutMs: SCAN_TIMEOUT_MS, log: journal });
+  for (const s of sleeves) workers[s.id] = new ScanWorker({ id: s.id, app: s.app, envFile: s.envFile, env: s.env, universe: s.universe || [], dir: DIR, timeoutMs: SCAN_TIMEOUT_MS, log: journal, scan: s.scan });
 }
 const stopWorkers = () => { for (const w of Object.values(workers)) { try { w.stop(); } catch (_e) { /* best effort */ } } };
 
@@ -169,7 +172,7 @@ async function ensureEngine() {
   facade = DRY ? dryFacade(resolved.facade, journal) : resolved.facade;
   engine = createEngine({ sleeves, order: cfg.order || sleeves.map((s) => s.id), facade, ownership, defaultOwner: DEFAULT_OWNER, journal });
   journal({ event: 'engine_start', broker: resolved.broker, accountId: resolved.accountId, order: engine.order, dry: DRY, scan: SCAN_MODE, mode: MODE, fakeNow: stats.fakeNow,
-    sleeves: sleeves.map((s) => ({ id: s.id, app: s.app, envFile: s.envFile, universe: s.universe ? s.universe.length : 'all', env: s.env })) });
+    sleeves: sleeves.map((s) => ({ id: s.id, app: s.app, envFile: s.envFile, universe: s.universe ? s.universe.length : 'all', scan: s.scan || undefined, env: s.env })) });
   console.info(`[two-sleeve] ${resolved.broker} ${resolved.accountId} — sleeves ${engine.order.join(' then ')}${DRY ? ' (DRY: no orders)' : ''} — scans ${SCAN_MODE}`);
   return true;
 }
@@ -191,7 +194,7 @@ async function scanAll() {
   if (SCAN_MODE === 'shared') {
     if (sharedAgent.cache) sharedAgent.cache.market_scan = null;
     const sc = await sharedAgent.scanMarket();
-    for (const s of sleeves) scans[s.id] = sc;
+    for (const s of sleeves) scans[s.id] = s.scan ? { signals: [], error: 'a scan:' + s.scan + ' sleeve needs per-sleeve scans' } : sc;
     return scans;
   }
   await Promise.all(sleeves.map(async (s) => {

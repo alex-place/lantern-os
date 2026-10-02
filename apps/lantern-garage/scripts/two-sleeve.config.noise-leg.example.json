@@ -1,0 +1,119 @@
+{
+  "_comment": "Three-sleeve engine config: the two-sleeve design plus the noise-area momentum leg as sleeve M (2026-10-02; ledger rows noise-leg-engine-13-windows, noise-leg-engine-30-unseen-quarters, live-engine-plus-noise-leg). M trades SPY>UPRO/SPXS, QQQ>TQQQ/SQQQ, SMH>SOXL/SOXS on the noise-area rule (lib/two-sleeve/noise-scan.js, scan:noise): buy the wrapper on the proxy s side of its band at the bars closing 10:00..15:30, sell when the proxy is back inside, an 8% stop, the 15:50 de-carry; ~12% a position (risk 0.96% at an 8% stop), one per pair, last in order so it never takes a wrapper S or R holds. Every other entry gate and exit of the stable brain is OFF for M, as in the replay. Copy the M block into the live config only on the operator s word.",
+  "userId": "local-owner",
+  "order": [
+    "S",
+    "R",
+    "M"
+  ],
+  "sleeves": [
+    {
+      "id": "S",
+      "app": ".",
+      "envFile": "C:/dev/lantern-os-stable/.env.local",
+      "env": {
+        "TRADER_MAX_CONCURRENT": "2",
+        "TRADER_POSITION_PCT": "4",
+        "TRADER_MAX_POSITION_PCT": "4"
+      },
+      "universe": [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "DIA",
+        "GLD",
+        "TLT",
+        "SMH",
+        "XLK",
+        "SOXL",
+        "SQQQ",
+        "SOXS",
+        "SPXS",
+        "TQQQ",
+        "TNA",
+        "SPXL",
+        "UPRO"
+      ]
+    },
+    {
+      "id": "R",
+      "app": "C:/dev/lantern-race/apps/lantern-garage",
+      "envFile": "C:/dev/lantern-race/.env.local",
+      "env": {
+        "TRADER_MAX_CONCURRENT": "4",
+        "TRADER_POSITION_PCT": "8",
+        "TRADER_MAX_POSITION_PCT": "8",
+        "TRADER_FRESHLOW_SIZE_MULT": "1.5",
+        "TRADER_NO_FRIDAY_ENTRIES": "1"
+      },
+      "universe": [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "DIA",
+        "GLD",
+        "TLT",
+        "SMH",
+        "XLK",
+        "SOXL",
+        "SQQQ",
+        "SOXS",
+        "SPXS",
+        "TNA",
+        "TZA"
+      ]
+    },
+    {
+      "id": "M",
+      "app": ".",
+      "envFile": "C:/dev/lantern-os-stable/.env.local",
+      "scan": "noise",
+      "env": {
+        "TRADER_NOISE_LEG_PAIRS": "SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS",
+        "TRADER_MAX_CONCURRENT": "3",
+        "TRADER_POSITION_PCT": "18",
+        "TRADER_MAX_POSITION_PCT": "18",
+        "TRADER_STOP_MIN_PCT": "8",
+        "TRADER_RISK_PCT": "0.96",
+        "TRADER_SYMBOL_SIZE_MULT": "",
+        "TRADER_REGIME_SIZE_MULT": "0",
+        "TRADER_STRESS_MULT": "1",
+        "TRADER_MAX_NEW_PER_SCAN": "3",
+        "TRADER_ENTRY_CONFIRM": "0",
+        "TRADER_ENTRY_CADENCE_MIN": "0",
+        "TRADER_ENTRY_BLOCK_ET": "",
+        "TRADER_SYMBOL_ENTRY_BLOCK_ET": "",
+        "TRADER_ENTRY_KNIFE_FILTER": "0",
+        "TRADER_INVERSE_SPY_GATE": "0",
+        "TRADER_SUP_ENTRY": "0",
+        "TRADER_MIN_ENTRY_RR": "0",
+        "TRADER_COOLDOWN_MS": "0",
+        "TRADER_IBS_EXIT": "0",
+        "TRADER_MIN_HOLD_MIN": "0",
+        "TRADER_PERSIST_SCANS": "1",
+        "TRADER_EXIT_MIN_PWIN": "0",
+        "TRADER_STEP_FLOOR": "0",
+        "TRADER_BE_RATCHET": "0",
+        "TRADER_BE_LOCK": "0",
+        "TRADER_R2_TRAIL": "0",
+        "TRADER_TRAIL_ARM_PCT": "99",
+        "TRADER_TAKE_PROFIT_R": "0",
+        "TRADER_MOMENTUM_EXIT": "0",
+        "TRADER_ZONE_EXIT": "0",
+        "TRADER_EOD_DECARRY": "1",
+        "TRADER_DECARRY_SYMBOLS": "TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA,UPRO",
+        "TRADER_TREND_SHADOW": "",
+        "TRADER_NOISE_SHADOW": ""
+      },
+      "universe": [
+        "UPRO",
+        "SPXS",
+        "TQQQ",
+        "SQQQ",
+        "SOXL",
+        "SOXS"
+      ]
+    }
+  ],
+  "defaultOwner": "R"
+}
