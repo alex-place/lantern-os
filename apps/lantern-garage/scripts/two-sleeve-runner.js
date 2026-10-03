@@ -146,6 +146,7 @@ const { brokerFacadeFor } = require(path.join(APP, 'lib', 'broker-facade'));
 const accountLock = require(path.join(APP, 'lib', 'account-lock'));
 const { createEngine } = require(path.join(APP, 'lib', 'two-sleeve', 'engine'));
 const { createOwnership } = require(path.join(APP, 'lib', 'two-sleeve', 'ownership'));
+const { passWindow } = require(path.join(APP, 'lib', 'scan-window'));
 
 const ibkrBridge = new TradingAPIBridge();
 // The shared in-process scan survives only as a smoke mode (TWO_SLEEVE_SCAN=shared).
@@ -227,7 +228,11 @@ async function tick() {
           const scans = await scanAll();
           stats.scans++;
           for (const s of sleeves) stats.lastSignals[s.id] = Array.isArray(scans[s.id] && scans[s.id].signals) ? scans[s.id].signals.length : 0;
-          const res = await engine.tick((sl) => scans[sl.id] || { signals: [] }, { now, extended: !mh, protectiveOnly, userId: USER });
+          // AFTER THE BELL (2026-10-02, lib/scan-window.js): `mh` was read when this tick started; the scans take tens of
+          // seconds. A tick that crossed the bell runs protective-only: no entry decided at 15:59 lands after the close.
+          const win = passWindow({ startedInSession: mh, inSessionNow: marketHours(nowMs()), extManageNow: protectiveOnly });
+          if (win.afterBell) journal({ event: 'after_bell_pass', startedAt: new Date(now).toISOString() });
+          const res = await engine.tick((sl) => scans[sl.id] || { signals: [] }, { now, extended: win.extended, protectiveOnly: win.protectiveOnly, userId: USER });
           stats.ticks++; stats.lastTick = new Date().toISOString();
           journal({ event: 'tick', protectiveOnly, sleeves: tickSummary(res, scans), collisions: engine.stats.collisions,
             intents: DRY && facade ? Object.keys(facade.intents).length : undefined });

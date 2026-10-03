@@ -69,7 +69,8 @@ function _isUsExtendedHours() {
   const mins = et.getHours() * 60 + et.getMinutes();
   return (mins >= 240 && mins < 570) || (mins >= 960 && mins < 1200); // 04:00–09:30 | 16:00–20:00
 }
-const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const { passWindow } = require('../lib/scan-window');
 const accountLock = require('../lib/account-lock');       // one account, one managing process
 const processRole = require('../lib/process-role');     // which half of the app this process runs (#3523)
 const traderForward = require('../lib/trader-forward');
@@ -262,7 +263,13 @@ async function _autoscanTick() {
         // each engine manages only its own positions. Fail-soft empty set.
         let _ovnHeld = [];
         try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
-        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, accountId: resolved.accountId, extended: !marketHours, excludeSymbols: _ovnHeld, protectiveOnly: extManageNow });
+        // AFTER THE BELL (2026-10-02): `marketHours` was read when this tick STARTED and the scan above takes tens of
+        // seconds. A tick that began at 15:59:5x reached the brain at 16:00:23 still marked regular-session and bought
+        // 1,143 TLT after the weekend flat. The window is re-read per pass: a pass that crossed the bell runs
+        // protective-only (lib/scan-window.js).
+        const _win = passWindow({ startedInSession: marketHours, inSessionNow: _isUsMarketHours(), extNow, extManageNow });
+        if (_win.afterBell) console.info(`[Trading] autoscan — the pass for ${uid} reached the brain after the bell: protective only, no entries`);
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, accountId: resolved.accountId, extended: _win.extended, excludeSymbols: _ovnHeld, protectiveOnly: _win.protectiveOnly });
       }
       // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
       // the only point that means a scan CYCLE COMPLETED. A wedged broker session leaves
