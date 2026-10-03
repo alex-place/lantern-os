@@ -83,7 +83,7 @@ const REPO = process.env.TWO_SLEEVE_ENV_ROOT ? path.resolve(process.env.TWO_SLEE
 const args = new Set(process.argv.slice(2));
 const DRY = args.has('--dry');
 const ONCE = args.has('--once');
-const { envFromFile, envForMode, dryFacade, tickSummary, ScanWorker } = require(path.join(APP, 'lib', 'two-sleeve', 'runner-support'));
+const { envFromFile, envForMode, dryFacade, tickSummary, ScanWorker, loadSleeveBrain } = require(path.join(APP, 'lib', 'two-sleeve', 'runner-support'));
 const CFG_FILE = process.env.TWO_SLEEVE_CONFIG || path.join(REPO, 'data', 'lantern-garage', 'trading', 'two-sleeve', 'config.json');
 const cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'));
 const DIR = path.dirname(CFG_FILE);
@@ -123,11 +123,10 @@ for (const [ev, kind] of [['uncaughtException', 'uncaught_exception'], ['unhandl
 // ---- brains: ARMED in-process in every mode; each with its own journal + state (captured at require time)
 const MODE = envForMode({ dry: DRY, sessionReview: process.env.TRADER_SESSION_REVIEW });
 Object.assign(process.env, MODE);
+const brainsLoaded = new Set();   // one brain instance per sleeve, even on a shared tree (runner-support loadSleeveBrain)
 const sleeves = (cfg.sleeves || []).map((s) => {
   const app = s.app && s.app !== '.' ? path.resolve(s.app) : APP;
-  process.env.TRADER_TRADES_LOG = path.join(DIR, `${s.id}.autopilot-trades.jsonl`);
-  process.env.TRADER_STATE_FILE = path.join(DIR, `${s.id}.state.json`);
-  const brain = require(path.join(app, 'lib', 'auto-trader'));
+  const brain = loadSleeveBrain({ app, id: s.id, dir: DIR, loaded: brainsLoaded });
   const env = { ...envFromFile(s.envFile), ...(s.env || {}) };
   return { id: s.id, brain, env, envFile: s.envFile, userId: USER, universe: Array.isArray(s.universe) && s.universe.length ? s.universe : null, app, scan: s.scan || null };
 });

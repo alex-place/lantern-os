@@ -221,4 +221,23 @@ class ScanWorker {
   }
 }
 
-module.exports = { IGNORE, parseEnvFile, envFromFile, envForMode, dryFacade, tickSummary, ScanWorker, READS };
+/**
+ * ONE BRAIN INSTANCE PER SLEEVE (2026-10-03). A brain is a module, and require() caches modules by path: before this, every
+ * sleeve after the first on the SAME app tree (S, the noise leg M, the close-IBS sleeve C all run ".") got the FIRST sleeve s
+ * instance — its maps (cooldowns, entry and exit clocks, the hourly cadence decision, the breakeven/stop registry) and the
+ * journal and state files it captured at load. A dry rehearsal showed it: sleeve C s rows landed in S.autopilot-trades.jsonl
+ * and C was refused five names on S s cooldowns. The replay always gave each sleeve its own copy (the harness copies lib for
+ * M and R), so the live engine did not run what was measured. Here a tree already loaded by an earlier sleeve has its
+ * auto-trader module dropped from the cache first, so this sleeve loads a fresh instance that captures ITS journal and state.
+ * Its helper modules (market data, pure libraries) stay shared, as before.
+ */
+function loadSleeveBrain({ app, id, dir, loaded }) {
+  process.env.TRADER_TRADES_LOG = path.join(dir, `${id}.autopilot-trades.jsonl`);
+  process.env.TRADER_STATE_FILE = path.join(dir, `${id}.state.json`);
+  const modPath = require.resolve(path.join(app, 'lib', 'auto-trader'));
+  if (loaded && loaded.has(modPath)) delete require.cache[modPath];
+  if (loaded) loaded.add(modPath);
+  return require(modPath);
+}
+
+module.exports = { IGNORE, parseEnvFile, envFromFile, envForMode, dryFacade, tickSummary, ScanWorker, READS, loadSleeveBrain };
