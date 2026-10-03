@@ -14,12 +14,17 @@
  * trader-agent scan, the worker runs lib/two-sleeve/noise-scan.js over TRADER_NOISE_LEG_PAIRS
  * ("SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS") with the tree s market-data module, the 5m feed plus the
  * settled history window. The scan reply is the same { signals } shape; its `noise` field carries the band reads.
+ *
+ * TWO_SLEEVE_WORKER_SCAN=closeibs (2026-10-03): the sleeve buys index funds that close near their session low
+ * (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe (TWO_SLEEVE_WORKER_UNIVERSE, required), entry depth
+ * TRADER_CLOSE_IBS_MAX (default 0.15). The reply's `closeIbs` field carries the per-name reads.
  */
 const path = require('path');
 
 const queue = [];
 let agent = null;
 let noise = null;   // the noise-area leg s scan when TWO_SLEEVE_WORKER_SCAN=noise
+let closeIbs = null;   // the close-IBS sleeve s scan when TWO_SLEEVE_WORKER_SCAN=closeibs
 let draining = false;
 
 process.on('message', (m) => {
@@ -29,7 +34,7 @@ process.on('message', (m) => {
 });
 
 async function drain() {
-  if ((!agent && !noise) || draining) return;
+  if ((!agent && !noise && !closeIbs) || draining) return;
   draining = true;
   try {
     while (queue.length) {
@@ -37,6 +42,7 @@ async function drain() {
       try {
         let scan;
         if (noise) scan = await noise.scan(Date.now());
+        else if (closeIbs) scan = await closeIbs.scan(Date.now());
         else {
           if (agent.cache) agent.cache.market_scan = null;   // every tick scans fresh; the bar cache inside the engine persists
           scan = await agent.scanMarket();
@@ -65,6 +71,17 @@ async function drain() {
       if (!noise.pairs.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=noise needs TRADER_NOISE_LEG_PAIRS (proxy:long:inverse,...)');
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'noise', watchlist: noise.pairs.length * 2,
         pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null });
+      drain();
+      return;
+    }
+    if (String(process.env.TWO_SLEEVE_WORKER_SCAN || '').toLowerCase() === 'closeibs') {
+      const yahoo = require(path.join(app, 'lib', 'market-data-yahoo'));
+      const { createCloseIbsScan } = require(path.join(app, 'lib', 'two-sleeve', 'closeibs-scan'));
+      if (!Array.isArray(universe) || !universe.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=closeibs needs the sleeve s universe (its index funds)');
+      const ibsMax = process.env.TRADER_CLOSE_IBS_MAX ? Number(process.env.TRADER_CLOSE_IBS_MAX) : 0.15;
+      closeIbs = createCloseIbsScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), ibsMax });
+      process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'closeibs', watchlist: closeIbs.symbols.length,
+        symbols: closeIbs.symbols.join(','), ibsMax, pMin: null, shortEdge: null });
       drain();
       return;
     }

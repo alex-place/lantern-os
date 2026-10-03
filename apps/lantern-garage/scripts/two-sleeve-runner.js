@@ -56,6 +56,8 @@
  * A sleeve may carry "scan": "noise" (2026-10-02): its worker runs the noise-area leg (lib/two-sleeve/noise-scan.js) over
  * the sleeve env s TRADER_NOISE_LEG_PAIRS instead of the tree s trader-agent scan; see
  * scripts/two-sleeve.config.noise-leg.example.json for the measured leg s settings. Without such a sleeve nothing changes.
+ * "scan": "closeibs" (2026-10-03, draft): the close-IBS sleeve (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe;
+ * see scripts/two-sleeve.config.close-ibs.example.json.
  *        TRADER_EXTENDED_EXITS=1 (protective-only ticks pre/post market, as the server does).
  */
 const fs = require('fs');

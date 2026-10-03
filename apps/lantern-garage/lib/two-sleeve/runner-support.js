@@ -170,7 +170,7 @@ class ScanWorker {
     if (m.ready !== undefined) {
       this.ready = !!m.ready; this.info = m;
       this.log({ event: m.ready ? 'scan_worker_ready' : 'scan_worker_failed', sleeve: this.id, pid: cp.pid, app: this.app,
-        watchlist: m.watchlist, ibsMax: m.ibsMax, pMin: m.pMin, shortEdge: m.shortEdge, scan: m.scan, pairs: m.pairs, error: m.error });
+        watchlist: m.watchlist, ibsMax: m.ibsMax, pMin: m.pMin, shortEdge: m.shortEdge, scan: m.scan, pairs: m.pairs, symbols: m.symbols, error: m.error });
       return;
     }
     if (m.seq != null && this.pending.has(m.seq)) {
