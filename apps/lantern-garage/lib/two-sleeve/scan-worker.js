@@ -26,6 +26,8 @@ let agent = null;
 let noise = null;   // the noise-area leg s scan when TWO_SLEEVE_WORKER_SCAN=noise
 let closeIbs = null;   // the close-IBS sleeve s scan when TWO_SLEEVE_WORKER_SCAN=closeibs
 let draining = false;
+// The clock the custom scans read: the real one, or a dry run's pin (TWO_SLEEVE_WORKER_FAKE_NOW, set by the runner only with --dry).
+const clock = () => { const f = Date.parse(process.env.TWO_SLEEVE_WORKER_FAKE_NOW || ''); return Number.isFinite(f) ? f : Date.now(); };
 
 process.on('message', (m) => {
   if (!m) return;
@@ -41,8 +43,8 @@ async function drain() {
       const m = queue.shift();
       try {
         let scan;
-        if (noise) scan = await noise.scan(Date.now());
-        else if (closeIbs) scan = await closeIbs.scan(Date.now());
+        if (noise) scan = await noise.scan(clock());
+        else if (closeIbs) scan = await closeIbs.scan(clock());
         else {
           if (agent.cache) agent.cache.market_scan = null;   // every tick scans fresh; the bar cache inside the engine persists
           scan = await agent.scanMarket();

@@ -112,3 +112,28 @@ test('the scan worker runs the sleeve under TWO_SLEEVE_WORKER_SCAN=closeibs over
     assert.ok(log.some((x) => x.event === 'scan_worker_failed' && x.sleeve === 'X' && /universe/.test(String(x.error))));
   } finally { W.stop(); bad.stop(); }
 });
+
+test('a dry run s clock pin reaches the custom scan: an after-hours rehearsal replays Tuesday 15:50 and the washout is a buy', async () => {
+  // the fake feed holds one synthetic Tuesday (2026-09-22) on which SPY closes on its low all day
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), 'closeibs-pin-'));
+  fs.mkdirSync(path.join(app, 'lib', 'two-sleeve'), { recursive: true });
+  const real = path.resolve(__dirname, '..', 'lib', 'two-sleeve', 'closeibs-scan.js').replace(/\\/g, '/');
+  fs.writeFileSync(path.join(app, 'lib', 'two-sleeve', 'closeibs-scan.js'), `module.exports = require(${JSON.stringify(real)});\n`);
+  fs.writeFileSync(path.join(app, 'lib', 'market-data-yahoo.js'), [
+    "'use strict';",
+    "const t0 = Date.parse('2026-09-22T13:30:00Z');",
+    "const bars = Array.from({ length: 78 }, (_, i) => { const c = 100 - 3 * (i / 77); return { timestamp: new Date(t0 + i * 300000).toISOString(), open: c, high: c + 0.05, low: c - 0.05, close: c }; });",
+    "module.exports = { getBars: async () => ({ bars }) };",
+  ].join('\n'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'closeibs-pin-dir-'));
+  const pinned = new ScanWorker({ id: 'C', app, envFile: null, env: {}, universe: ['SPY'], dir, timeoutMs: 8000, scan: 'closeibs', fakeNow: '2026-09-22T19:50:30.000Z' });
+  const live = new ScanWorker({ id: 'C2', app, envFile: null, env: {}, universe: ['SPY'], dir, timeoutMs: 8000, scan: 'closeibs' });
+  try {
+    assert.equal(pinned._childEnv().TWO_SLEEVE_WORKER_FAKE_NOW, '2026-09-22T19:50:30.000Z');
+    assert.equal(live._childEnv().TWO_SLEEVE_WORKER_FAKE_NOW, undefined, 'no pin, no variable: an armed runner reads the real clock');
+    const r = await pinned.scan();
+    assert.equal(r.signals[0].direction, 'BULLISH'); assert.equal(r.closeIbs.window, true);
+    const r2 = await live.scan();
+    assert.equal(r2.signals[0].direction, 'NEUTRAL', 'on the real clock the synthetic Tuesday is long past');
+  } finally { pinned.stop(); live.stop(); }
+});
