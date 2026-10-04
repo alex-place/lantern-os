@@ -315,10 +315,12 @@ async function getEarningsSurprise(ticker) {
  * Latest price + % change for each ticker.
  * Returns: [{ ticker, price, chg_pct, is_crypto }]
  */
-async function getQuotes(tickers) {
+async function getQuotes(tickers, opts = {}) {
   const list = Array.isArray(tickers) ? tickers : [];
   const key = 'q:' + list.join(',');
-  const hit = cacheGet(key, QUOTE_TTL);
+  // opts.fresh (2026-10-04): skip the cache READ — the entry re-quote shadow wants the print at the moment the order
+  // goes out, not a card price up to QUOTE_TTL old. The result still refreshes the cache for everyone else.
+  const hit = opts && opts.fresh ? null : cacheGet(key, QUOTE_TTL);
   if (hit) return hit;
 
   const rows = await pmap(list, FETCH_CONCURRENCY, async (ticker) => {
