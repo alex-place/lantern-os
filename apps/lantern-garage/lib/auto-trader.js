@@ -1069,6 +1069,28 @@ function requoteRead({ decisionPx, freshPx, capBps = 5 }) {
     would_refuse: drift > cap,                                // the re-quote guard: the move since the decision ate the cap
   };
 }
+// ── FIRST LOCK (2026-10-04, default OFF) ─────────────────────────────────────
+// TRADER_FIRST_LOCK="arm:lock" in PERCENT (e.g. "0.5:0.1"), stepped-floor mode only
+// (TRADER_STEP_FLOOR > 0): a position that is up at least `arm` but has not reached
+// its first whole step gets its stop raised to entry + `lock`; the stepped floor takes
+// over at the first step, and a lock only ever rises. TRADER_FIRST_LOCK_SYMBOLS (comma
+// list) restricts it; unset = every symbol this brain trades.
+// WHY. The 1% step was tuned on a book that held 3x funds; on a 1x index ETF +1% is a
+// large intraday move, so many dip-buys go up 0.5%, come back and end as losers. On the
+// stable sleeve's six index ETFs (SPY QQQ IWM DIA SMH XLK) inside the armed engine design,
+// "0.5:0.1" measured, net of live costs: the sleeve's win rate 62.9 -> 66.4% and its
+// net per trade +0.022 -> +0.048% on the 13 recent windows, the account +2.7pp with the
+// worst week -4.23 -> -3.99% and a lower mean drawdown; a stop exit became a small win
+// 81% of the time (65% before). The lock must clear the name's round-trip cost: on a 3x
+// fund (~11 bp) a +0.1% lock is a net loser, so scope it with TRADER_FIRST_LOCK_SYMBOLS
+// wherever the brain also trades leveraged funds.
+function _firstLockCfg(sym) {
+  const v = String(process.env.TRADER_FIRST_LOCK || '').split(':').map(Number);
+  if (!(v.length === 2 && v[0] > 0 && v[1] >= 0 && v[1] < v[0])) return null;
+  const only = String(process.env.TRADER_FIRST_LOCK_SYMBOLS || '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
+  if (only.length && !only.includes(String(sym).toUpperCase())) return null;
+  return { arm: v[0], lock: v[1] };
+}
 function _checkFillBasis(sym, brokerEntry) {
   const p = _pendingFillBasis.get(sym);
   if (!p || !(Number(brokerEntry) > 0)) return;
@@ -2610,10 +2632,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         // following the peak continuously. It also subsumes the generic trail.
         const _prevLock = Number(_beStopAt.get(sym)) || 0;
         let _wantPct = null;
+        let _firstLock = null;   // set when this resize is the FIRST LOCK (see _firstLockCfg)
         if (_stepPct > 0) {
           const _gain = (mark / entry - 1) * 100;
           const _steps = Math.floor(_gain / _stepPct);
           if (_steps >= 1) _wantPct = (_steps * _stepPct) / 100;
+          else { const _fl = _firstLockCfg(sym); if (_fl && _gain >= _fl.arm) { _wantPct = _fl.lock / 100; _firstLock = _fl; } }
         } else if (mark >= entry * (1 + _bePct)) {
           _wantPct = _beLock;
         }
@@ -2634,10 +2658,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         if (_wk.length) { await cancelRestingStops(bridge, userId, sym); _beCancels++; }
         _beStopAt.set(sym, _lockLvl);
         logTrade({ event: 'stop_resize', symbol: sym,
-          reason: _stepPct > 0
+          reason: _firstLock
+            ? `first_lock: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${_firstLock.arm}% — stop rises to entry+${_firstLock.lock}% (TRADER_FIRST_LOCK; the ${_stepPct}% stepped floor takes over at its first step)`
+            : _stepPct > 0
             ? `step_floor: mark +${((mark / entry - 1) * 100).toFixed(2)}% — stop steps up to entry+${(_wantPct * 100).toFixed(2)}% (${_stepPct}% steps, 2026-08-24)`
             : `be_ratchet: mark +${((mark / entry - 1) * 100).toFixed(2)}% >= +${(_bePct * 100).toFixed(1)}% — stop rises to ${_beLock > 0 ? `entry+${(_beLock * 100).toFixed(2)}% (profit lock, #3415)` : 'entry (#3413)'}`,
-          entry, mark, stop_was: _top || null, stop_want: _lockLvl, lock: _wantPct || undefined, step: _stepPct || undefined });
+          entry, mark, stop_was: _top || null, stop_want: _lockLvl, lock: _wantPct || undefined, step: _stepPct || undefined, first_lock: _firstLock ? true : undefined });
         _saveState();   // the ratchet must survive a restart between cancel and re-protect
       }
       // Re-read orders after any cancel so the re-protect pass below sees the
@@ -3688,4 +3714,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
