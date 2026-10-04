@@ -1040,6 +1040,35 @@ function _limitShadowClose(sym, why) {
   logTrade({ event: 'limit_shadow_close', symbol: sym, touch_px: sh.touch, fills: sh.fills, why });
   _limitShadow.delete(sym);
 }
+// ── ENTRY RE-QUOTE SHADOW (2026-10-04, journal-only) ─────────────────────────
+// Real fills since 2026-09-01 cost 2-3 bp on index ETFs but 5-6 bp on the 3x
+// longs and 14-15 bp on the 3x commodity funds (max 36), on both brokers. Two
+// causes on our side: the buy goes out on the SCAN's quote, which is up to a
+// tick (~70 s) old by then and was itself a card price up to 20 s old; and a
+// market order takes whatever the book gives. Two fixes are proposed — refuse
+// an entry whose price has already run more than a cap since the decision
+// (re-quote at placement), and send a marketable limit at the fresh quote plus
+// the cap instead of a market order — and both get a SHADOW before any order
+// path changes. TRADER_ENTRY_REQUOTE=shadow: at placement a fresh print is
+// fetched CONCURRENTLY with the market order (no latency added), and the row
+// `entry_requote` records the decision quote, the fresh quote, the drift and
+// what the cap would have done; when the broker's basis arrives, the entry_fill
+// row (written for every shadowed entry, even a same-price fill) adds the fill
+// against the fresh quote and whether a marketable limit at quote + cap would
+// have filled. experiments/entry_requote_score.js reads both. Off by default;
+// nothing here changes an order. TRADER_ENTRY_REQUOTE_CAP_BPS (default 5).
+const _requoteShadow = new Map();   // sym -> the entry_requote row's numbers, joined into entry_fill
+function requoteRead({ decisionPx, freshPx, capBps = 5 }) {
+  const d = Number(decisionPx), f = Number(freshPx), cap = Number(capBps);
+  if (!(d > 0) || !(f > 0) || !(cap >= 0)) return null;
+  const drift = (f / d - 1) * 1e4;                           // + = the price ran up since the decision (worse for a buy)
+  return {
+    drift_bps: Math.round(drift * 10) / 10,
+    cap_bps: cap,
+    limit_px: Math.round(f * (1 + cap / 1e4) * 1e4) / 1e4,   // the marketable limit: the fresh quote plus the cap
+    would_refuse: drift > cap,                                // the re-quote guard: the move since the decision ate the cap
+  };
+}
 function _checkFillBasis(sym, brokerEntry) {
   const p = _pendingFillBasis.get(sym);
   if (!p || !(Number(brokerEntry) > 0)) return;
@@ -1047,9 +1076,13 @@ function _checkFillBasis(sym, brokerEntry) {
   const q = Number(p.quote);
   if (!(q > 0)) return;
   const bps = Math.abs(brokerEntry / q - 1) * 1e4;
-  if (bps <= 1) return;                                  // same price — nothing to correct
-  logTrade({ event: 'entry_fill', symbol: sym, quote_px: q, fill_px: Number(brokerEntry),
-    delta_bps: Math.round(bps * 10) / 10 });
+  const rq = _requoteShadow.get(sym); _requoteShadow.delete(sym);
+  if (bps <= 1 && !rq) return;                           // same price — nothing to correct (a shadowed entry always gets its row)
+  const fill = Number(brokerEntry);
+  logTrade({ event: 'entry_fill', symbol: sym, quote_px: q, fill_px: fill,
+    delta_bps: Math.round(bps * 10) / 10,
+    ...(rq ? { requote_px: rq.requote_px, fill_vs_requote_bps: Math.round((fill / rq.requote_px - 1) * 1e5) / 10,
+      limit_px: rq.limit_px, limit_would_fill: fill <= rq.limit_px, cap_bps: rq.cap_bps, would_refuse: rq.would_refuse } : {}) });
 }
 // PROTECTIVE-STOP REGISTRY (#3379). sym -> { id, px, qty, at } for the stop THIS
 // engine last placed. The point: /iserver/account/orders does not reliably show
@@ -3317,7 +3350,22 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const enOrder = (extended && price > 0)
       ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true, refPrice: price }
       : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true, refPrice: price };
-    const r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
+    // ENTRY RE-QUOTE SHADOW (2026-10-04) — see requoteRead. The fresh print is fetched beside the order, never before it.
+    const _rqMode = String(process.env.TRADER_ENTRY_REQUOTE || '').toLowerCase();
+    const _rqWanted = _rqMode === 'shadow' && !extended && price > 0;
+    const [r, _rqQuote] = await Promise.all([
+      bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message })),
+      _rqWanted ? yahoo.getQuotes([sym], { fresh: true }).then((qs) => (qs && qs[0] && Number(qs[0].price) > 0 ? Number(qs[0].price) : null)).catch(() => null) : Promise.resolve(null),
+    ]);
+    if (_rqWanted && r && r.status === 'placed') {
+      const _rq = requoteRead({ decisionPx: price, freshPx: _rqQuote, capBps: Number(process.env.TRADER_ENTRY_REQUOTE_CAP_BPS) || 5 });
+      const _scanTs = scan && scan.timestamp ? Date.parse(scan.timestamp) : NaN;
+      const _age = Number.isFinite(_scanTs) ? Math.max(0, Date.now() - _scanTs) : null;
+      if (_rq) _requoteShadow.set(sym, { requote_px: _rqQuote, limit_px: _rq.limit_px, cap_bps: _rq.cap_bps, would_refuse: _rq.would_refuse });
+      logTrade({ event: 'entry_requote', symbol: sym, mode: 'shadow', decision_px: price, requote_px: _rqQuote,
+        ...(_rq || { drift_bps: null, cap_bps: Number(process.env.TRADER_ENTRY_REQUOTE_CAP_BPS) || 5, limit_px: null, would_refuse: null }),
+        decision_age_ms: _age, why: _rqQuote ? undefined : 'no fresh quote' });
+    }
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.
@@ -3640,4 +3688,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
