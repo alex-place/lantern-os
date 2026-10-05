@@ -774,6 +774,17 @@ function _entryHourBlocked(etMin, spec) {
   if (!spec || !(etMin >= 0)) return null;
   return _parseEtWindows(spec).find((w) => etMin >= w.from && etMin < w.to) || null;
 }
+// NO FRIDAY ENTRIES (2026-10-05, the gate audit; ledger gate-audit-stable-no-friday-entries-13-windows / -30-quarters).
+// TRADER_EOD_FLAT=weekend sells every long at Friday 15:50, so a dip bought on a Friday has hours, not sessions, to
+// bounce. On the stable box Friday entries lost on both replay surfaces (-0.108% / -0.065% a trade net, win rate
+// 48% / 53% against 67% / 65% Monday to Thursday); without them the box netted +0.040% / +0.025% a week more with
+// 3.5 / 2.3 points more winning trades and a fifth fewer trades (its two crash weeks were slightly worse).
+// TRADER_NO_FRIDAY_ENTRIES=1 skips NEW entries on an ET Friday. Exits, stops and the weekend flat are untouched.
+// Off by default.
+function _noFridayEntry(nowMs) {
+  if (process.env.TRADER_NO_FRIDAY_ENTRIES !== '1') return false;
+  return new Date(new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay() === 5;
+}
 // PER-SYMBOL ENTRY WINDOW (lab 2026-09-27, shadow-first). The nine-window anatomy of the
 // armed stack: the leveraged INDEX wrappers (SOXL TNA SPXL UPRO TQQQ) lost on their
 // 11:00-13:00 entries and won on their afternoon ones; "leveraged index only from 13:00 ET"
@@ -3204,6 +3215,11 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       out.skipped.push({ ...record, why: `circuit breaker: ${_stopFillsCount} stop-outs today (max ${c.stopBreaker}) — no new entries this session` });
       continue;
     }
+    // NO FRIDAY ENTRIES — see _noFridayEntry. Entries only.
+    if (_noFridayEntry(now)) {
+      out.skipped.push({ ...record, why: 'no_friday_entries: the weekend flat sells at 15:50 — a Friday dip has no session to bounce (TRADER_NO_FRIDAY_ENTRIES=1)' });
+      continue;
+    }
     // ENTRY-HOUR BLOCK (#3427) — see _entryHourBlocked. Entries only.
     if (process.env.TRADER_ENTRY_BLOCK_ET) {
       const _ehMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
@@ -3714,4 +3730,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
