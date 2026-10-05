@@ -20,9 +20,16 @@
 <!-- Shared global header styling (#1579). Loaded BEFORE the trader <style> so the
      trader's own rules still win on any conflict. -->
 <link rel="stylesheet" href="/css/site.css">
+<!-- trader.css is a <link>, NOT an @import inside the <style> below. A style block that
+     imports another sheet is read by the Dark Reader extension on a slower path than
+     every other sheet. On a page that is already dark the extension switches itself off,
+     the import finishes afterwards, and it leaves ONE override sheet behind, for this
+     block alone: every gain and loss then paints in the extension's own text colour while
+     the palette still says Classic (operator, 2026-10-05: Zen + Dark Reader 4.9.133).
+     Same place in the cascade the import had: after site.css, ahead of the page's rules. -->
+<link rel="stylesheet" href="/css/trader.css">
 
 <style>
-  @import url('/css/trader.css');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
     --bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
