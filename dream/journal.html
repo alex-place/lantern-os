@@ -18,9 +18,12 @@
 </script>
 <script src="/js/signal-palette.js"></script>
 <link rel="stylesheet" href="/css/site.css">
+<!-- A <link>, not an @import inside the <style> below: an importing style block is what
+     the Dark Reader extension leaves an override sheet behind for, and the page's gains
+     and losses then lose their colour. The trader page carries the full note. -->
+<link rel="stylesheet" href="/css/trader.css">
 
 <style>
-  @import url('/css/trader.css');
 
   /* ── Journal page ───────────────────────────────────────────────────────────
      The journal used to be the fourth tab of the trader's bottom panel, in a
