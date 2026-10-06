@@ -58,8 +58,12 @@ const LATE_TO_MIN = 950;
 const LATE_LOOKBACKS = [40, 60];      // both reported: 60 is the rule the engine replay confirmed, 40 what the feed's reach allows at once
 const LATE_MIN_FRAC = 0.8;            // 48 of 60 sessions before the 60-session reading exists
 const LATE_KEEP = 400;                // observations kept per proxy in the state file
-const LATE_BOOT_FROM_DAYS = 70;       // the older settled window merged once a day under the scan's own (28 -> 7 days)
-const LATE_BOOT_TO_DAYS = 28;
+// The older settled history, merged once a day under the scan's own 28 -> 7 day window, fetched in SLICES: the 5m feed's
+// reach is under 60 calendar days (a window starting 60 days back comes back empty, 58 works) and one call returns at
+// most ~2,600 bars (~13-14 sessions with extended hours), so the single 70 -> 28 day window of the first build returned
+// NOTHING live (dry rehearsal 2026-10-06) and the state could only grow by one session a day. Two slices of 17-18
+// calendar days reach ~25 sessions; with the scan's own ~18 that is the 40-session reading from the first day.
+const LATE_BOOT_SLICES = [[57, 40], [40, 22]];   // [from, to] in calendar days before the day
 
 const tOf = (b) => Date.parse(b.timestamp != null ? b.timestamp : b.t);
 const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
@@ -164,9 +168,12 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
     if (S.boot[pr.proxy] !== e.day && typeof getHistory === 'function' && (lateBootTries.get(key) || 0) < 3) {
       lateBootTries.set(key, (lateBootTries.get(key) || 0) + 1);
       const dayStart = Date.parse(`${e.day}T12:00:00Z`);
-      let older = null;
-      try { const r = await getHistory(pr.proxy, dayStart - LATE_BOOT_FROM_DAYS * 86400000, dayStart - LATE_BOOT_TO_DAYS * 86400000); older = (r && r.bars) || null; } catch (_e) { older = null; }
-      if (older) { S.boot[pr.proxy] = e.day; changed = true; if (lateAbsorb(pr.proxy, lateObservations(merge(older, raw), e.day, now))) changed = true; }
+      let older = [];
+      for (const [from, to] of LATE_BOOT_SLICES) {
+        try { const r = await getHistory(pr.proxy, dayStart - from * 86400000, dayStart - to * 86400000); if (r && Array.isArray(r.bars)) older = older.concat(r.bars); } catch (_e) { /* a slice the feed refused: the others still count */ }
+      }
+      // marked done only when something came back: an empty day is retried (3 tries), then again tomorrow
+      if (older.length) { S.boot[pr.proxy] = e.day; changed = true; if (lateAbsorb(pr.proxy, lateObservations(merge(older, raw), e.day, now))) changed = true; }
     }
     if (lateAbsorb(pr.proxy, lateObservations(raw, e.day, now))) changed = true;
     const logged = S.logged[pr.proxy] || (S.logged[pr.proxy] = {});

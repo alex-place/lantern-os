@@ -169,3 +169,41 @@ test('the worker builds the shadow from TRADER_NOISE_LATE_GATE_SHADOW=1 and the 
     assert.ok(readyPlain); assert.equal(readyPlain.lateGate, null);
   } finally { W.stop(); plain.stop(); }
 });
+
+test('the bootstrap reaches the history in slices the 5m feed can serve: the 40-session reading from the first day', async () => {
+  // The feed as Yahoo serves 5m bars: nothing for a window that starts 59 or more calendar days back, and at most 14
+  // sessions a call. The single 70 -> 28 day window of the first build came back EMPTY live (dry rehearsal 2026-10-06),
+  // leaving the state with the scan's own ~18 sessions; two slices (57 -> 40 and 40 -> 22 days) reach ~25 more.
+  const m = market({ feedPrior: 13 }); const sh = shadow();
+  const dayStart = Date.parse(`${DAY}T12:00:00Z`);
+  const reach = dayStart - 59 * 86400000;
+  const full = m.getHistory;
+  m.getHistory = async (sym, from, to) => {
+    if (from < reach) return { bars: [] };
+    const r = await full(sym, from, to); const days = new Set(); const out = [];
+    for (const b of r.bars) { days.add(b.timestamp.slice(0, 10)); if (days.size > 14) break; out.push(b); }
+    return { bars: out };
+  };
+  const old = await m.getHistory('SPY', dayStart - 70 * 86400000, dayStart - 28 * 86400000);
+  assert.equal(old.bars.length, 0, 'the single 70-day window the first build used is beyond the feed');
+  const s = createNoiseScan({ pairs: 'SPY:UPRO:SPXS', getBars: m.getBars, getHistory: m.getHistory, lateGate: { stateFile: sh.stateFile, log: sh.log } });
+  await scanAt(m, s, at(15, 30, 25));
+  const g = sh.rows.find((r) => r.event === 'late_gate_shadow');
+  assert.ok(g, 'a gate row');
+  assert.ok(g.n >= 32 && g.n < 48, `two slices plus the scan's own sessions: 32..47 before today, got ${g.n}`);
+  assert.notEqual(g.m40, null); assert.equal(g.gate40, true, 'the 40-session reading exists from the first day');
+  assert.equal(g.m60, null, 'the 60-session reading still waits for live sessions');
+  const state = JSON.parse(fs.readFileSync(sh.stateFile, 'utf8'));
+  assert.equal(state.boot.SPY, DAY, 'the bootstrap is marked done for the day once a slice returned bars');
+});
+
+test('a bootstrap that returns nothing is not marked done', async () => {
+  const m = market({ feedPrior: 13 }); const sh = shadow();
+  m.getHistory = async () => ({ bars: [] });
+  const s = createNoiseScan({ pairs: 'SPY:UPRO:SPXS', getBars: m.getBars, getHistory: m.getHistory, lateGate: { stateFile: sh.stateFile, log: sh.log } });
+  await scanAt(m, s, at(15, 30, 25));
+  const g = sh.rows.find((r) => r.event === 'late_gate_shadow');
+  assert.equal(g.n, 12, 'only the scan s own sessions (13 fed, the first has no previous close)');
+  const state = JSON.parse(fs.readFileSync(sh.stateFile, 'utf8'));
+  assert.equal(state.boot.SPY, undefined, 'an empty day is retried, not recorded as bootstrapped');
+});
