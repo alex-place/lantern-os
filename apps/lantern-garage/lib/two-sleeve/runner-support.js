@@ -146,6 +146,7 @@ class ScanWorker {
     for (const [k, v] of Object.entries(this.env)) if (!IGNORE.test(k)) base[k] = String(v);
     base.TRADER_ENTRY_JUDGE = base.TRADER_ENTRY_JUDGE || '0';
     base.TRADER_TRADES_LOG = path.join(this.dir, `${this.id}.scan.jsonl`);
+    base.TWO_SLEEVE_WORKER_STATE_FILE = path.join(this.dir, `${this.id}.scan-state.json`);   // a custom scan's own state (the noise leg's late-reversal gate)
     base.TWO_SLEEVE_WORKER_APP = this.app;
     base.TWO_SLEEVE_WORKER_ID = String(this.id);
     base.TWO_SLEEVE_WORKER_UNIVERSE = JSON.stringify(this.universe);
@@ -174,7 +175,7 @@ class ScanWorker {
     if (m.ready !== undefined) {
       this.ready = !!m.ready; this.info = m;
       this.log({ event: m.ready ? 'scan_worker_ready' : 'scan_worker_failed', sleeve: this.id, pid: cp.pid, app: this.app,
-        watchlist: m.watchlist, ibsMax: m.ibsMax, pMin: m.pMin, shortEdge: m.shortEdge, scan: m.scan, pairs: m.pairs, symbols: m.symbols, error: m.error });
+        watchlist: m.watchlist, ibsMax: m.ibsMax, pMin: m.pMin, shortEdge: m.shortEdge, scan: m.scan, pairs: m.pairs, symbols: m.symbols, lateGate: m.lateGate, error: m.error });
       return;
     }
     if (m.seq != null && this.pending.has(m.seq)) {

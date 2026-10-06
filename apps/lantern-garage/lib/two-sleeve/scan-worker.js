@@ -15,6 +15,10 @@
  * ("SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS") with the tree s market-data module, the 5m feed plus the
  * settled history window. The scan reply is the same { signals } shape; its `noise` field carries the band reads.
  *
+ * TRADER_NOISE_LATE_GATE_SHADOW=1 (2026-10-05): the noise scan also runs its journal-only late-reversal gate (see
+ * noise-scan.js), writing late_gate_shadow / late_drift_shadow rows to the worker's own log (<dir>/<id>.scan.jsonl)
+ * and keeping its observations in TWO_SLEEVE_WORKER_STATE_FILE (<dir>/<id>.scan-state.json, set by the runner).
+ *
  * TWO_SLEEVE_WORKER_SCAN=closeibs (2026-10-03): the sleeve buys index funds that close near their session low
  * (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe (TWO_SLEEVE_WORKER_UNIVERSE, required), entry depth
  * TRADER_CLOSE_IBS_MAX (default 0.15). The reply's `closeIbs` field carries the per-name reads.
@@ -65,14 +69,26 @@ async function drain() {
     if (String(process.env.TWO_SLEEVE_WORKER_SCAN || '').toLowerCase() === 'noise') {
       const yahoo = require(path.join(app, 'lib', 'market-data-yahoo'));
       const { createNoiseScan } = require(path.join(app, 'lib', 'two-sleeve', 'noise-scan'));
+      // The journal-only late-reversal gate: rows to the worker's own log, observations in the runner's state file.
+      let lateGate = null;
+      if (process.env.TRADER_NOISE_LATE_GATE_SHADOW === '1') {
+        const ownLog = process.env.TRADER_TRADES_LOG || null;
+        const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;
+        lateGate = {
+          stateFile: process.env.TWO_SLEEVE_WORKER_STATE_FILE || (ownLog ? path.join(path.dirname(ownLog), `${process.env.TWO_SLEEVE_WORKER_ID || 'noise'}.scan-state.json`) : null),
+          log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); },
+        };
+      }
       noise = createNoiseScan({
         pairs: process.env.TRADER_NOISE_LEG_PAIRS || '',
         getBars: (s, tf) => yahoo.getBars(s, tf),
         getHistory: typeof yahoo.getBarsWindow === 'function' ? (s, from, to) => yahoo.getBarsWindow(s, '5m', from, to) : null,
+        lateGate,
       });
       if (!noise.pairs.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=noise needs TRADER_NOISE_LEG_PAIRS (proxy:long:inverse,...)');
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'noise', watchlist: noise.pairs.length * 2,
-        pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null });
+        pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null,
+        lateGate: lateGate ? 'shadow' : null, stateFile: lateGate ? lateGate.stateFile : null });
       drain();
       return;
     }
