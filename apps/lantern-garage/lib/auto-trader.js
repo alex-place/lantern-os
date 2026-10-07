@@ -3392,21 +3392,43 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const enOrder = (extended && price > 0)
       ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true, refPrice: price }
       : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true, refPrice: price };
-    // ENTRY RE-QUOTE SHADOW (2026-10-04) — see requoteRead. The fresh print is fetched beside the order, never before it.
+    // ENTRY RE-QUOTE GUARD (shadow 2026-10-04, refuse 2026-10-07) — see requoteRead.
+    //   TRADER_ENTRY_REQUOTE=shadow : the fresh print is fetched BESIDE the order, never before it; rows only, nothing changes an order.
+    //   TRADER_ENTRY_REQUOTE=refuse : the fresh print is fetched BEFORE the order; when it has run more than
+    //     TRADER_ENTRY_REQUOTE_CAP_BPS past the decision quote the entry is SKIPPED (a skip row naming the guard and an
+    //     entry_requote row with refused: true). The first live read of the shadow (2026-10-06, 21 fills on both boxes):
+    //     the five fills it would have refused paid +13.7 bp and the three closed lost $1,556 with no winner; the sixteen
+    //     it kept paid -1.4 bp and made $2,456 (ledger live-entry-requote-shadow). A quote that ran away between the
+    //     decision and the order is a market already moving against the entry. No fresh quote = no verdict: the order
+    //     places, as in shadow mode. Default OFF.
     const _rqMode = String(process.env.TRADER_ENTRY_REQUOTE || '').toLowerCase();
-    const _rqWanted = _rqMode === 'shadow' && !extended && price > 0;
-    const [r, _rqQuote] = await Promise.all([
-      bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message })),
-      _rqWanted ? yahoo.getQuotes([sym], { fresh: true }).then((qs) => (qs && qs[0] && Number(qs[0].price) > 0 ? Number(qs[0].price) : null)).catch(() => null) : Promise.resolve(null),
-    ]);
+    const _rqCap = Number(process.env.TRADER_ENTRY_REQUOTE_CAP_BPS) || 5;
+    const _rqWanted = (_rqMode === 'shadow' || _rqMode === 'refuse') && !extended && price > 0;
+    const _rqFetch = () => yahoo.getQuotes([sym], { fresh: true }).then((qs) => (qs && qs[0] && Number(qs[0].price) > 0 ? Number(qs[0].price) : null)).catch(() => null);
+    const _rqScanTs = scan && scan.timestamp ? Date.parse(scan.timestamp) : NaN;
+    const _rqAge = Number.isFinite(_rqScanTs) ? Math.max(0, Date.now() - _rqScanTs) : null;
+    let r = null, _rqQuote = null;
+    if (_rqWanted && _rqMode === 'refuse') {
+      _rqQuote = await _rqFetch();
+      const _rqPre = requoteRead({ decisionPx: price, freshPx: _rqQuote, capBps: _rqCap });
+      if (_rqPre && _rqPre.would_refuse) {
+        logTrade({ event: 'entry_requote', symbol: sym, mode: 'refuse', decision_px: price, requote_px: _rqQuote, ..._rqPre, decision_age_ms: _rqAge, refused: true });
+        out.skipped.push({ ...record, why: `requote_guard: the quote ran ${_rqPre.drift_bps >= 0 ? '+' : ''}${_rqPre.drift_bps} bp past the decision ${price} (cap ${_rqCap} bp) — entry refused` });
+        continue;
+      }
+      r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
+    } else {
+      [r, _rqQuote] = await Promise.all([
+        bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message })),
+        _rqWanted ? _rqFetch() : Promise.resolve(null),
+      ]);
+    }
     if (_rqWanted && r && r.status === 'placed') {
-      const _rq = requoteRead({ decisionPx: price, freshPx: _rqQuote, capBps: Number(process.env.TRADER_ENTRY_REQUOTE_CAP_BPS) || 5 });
-      const _scanTs = scan && scan.timestamp ? Date.parse(scan.timestamp) : NaN;
-      const _age = Number.isFinite(_scanTs) ? Math.max(0, Date.now() - _scanTs) : null;
+      const _rq = requoteRead({ decisionPx: price, freshPx: _rqQuote, capBps: _rqCap });
       if (_rq) _requoteShadow.set(sym, { requote_px: _rqQuote, limit_px: _rq.limit_px, cap_bps: _rq.cap_bps, would_refuse: _rq.would_refuse });
-      logTrade({ event: 'entry_requote', symbol: sym, mode: 'shadow', decision_px: price, requote_px: _rqQuote,
-        ...(_rq || { drift_bps: null, cap_bps: Number(process.env.TRADER_ENTRY_REQUOTE_CAP_BPS) || 5, limit_px: null, would_refuse: null }),
-        decision_age_ms: _age, why: _rqQuote ? undefined : 'no fresh quote' });
+      logTrade({ event: 'entry_requote', symbol: sym, mode: _rqMode, decision_px: price, requote_px: _rqQuote,
+        ...(_rq || { drift_bps: null, cap_bps: _rqCap, limit_px: null, would_refuse: null }),
+        decision_age_ms: _rqAge, why: _rqQuote ? undefined : 'no fresh quote' });
     }
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the
