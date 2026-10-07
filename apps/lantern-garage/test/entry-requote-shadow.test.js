@@ -114,3 +114,48 @@ test('shadow off: no re-quote rows, no extra fill row, the buy places as before'
   assert.strictEqual(rows().filter((r) => r.event === 'entry_requote').length, 0);
   assert.strictEqual(rows().filter((r) => r.event === 'entry_fill').length, 0, 'the legacy rule: a same-price fill writes nothing');
 });
+
+// ── REFUSE MODE (2026-10-07): the guard that acts ────────────────────────────────────────────────────────────────────
+const skipsOf = (out) => (out && Array.isArray(out.skipped) ? out.skipped.map((s) => String(s.why || '')) : []).concat(rows().filter((r) => r.event === 'skip').map((r) => String(r.reason || '')));
+
+test('refuse on: a quote that ran past the cap refuses the entry: no order, a skip naming the guard, an entry_requote row with refused true', async () => {
+  reset();
+  process.env.TRADER_ENTRY_REQUOTE = 'refuse'; process.env.TRADER_ENTRY_REQUOTE_CAP_BPS = '5';
+  FRESH.QQQ = 500.40;   // +8 bp past the 500 decision
+  const b = bridge();
+  const out = await at.runAutoTrade({ signals: [signal], timestamp: new Date(Date.now() - 65000).toISOString() }, { bridge: b, userId: 'u', now: NOW });
+  assert.ok(!b.placed.some((o) => o.side === 'buy'), 'no buy placed');
+  assert.ok(asked.some((a) => a.tickers[0] === 'QQQ' && a.opts && a.opts.fresh === true), 'the fresh print was asked for, cache bypassed');
+  const rq = rows().find((r) => r.event === 'entry_requote');
+  assert.ok(rq, 'entry_requote journaled');
+  assert.strictEqual(rq.mode, 'refuse'); assert.strictEqual(rq.refused, true); assert.strictEqual(rq.drift_bps, 8); assert.strictEqual(rq.would_refuse, true);
+  assert.ok(rq.decision_age_ms >= 60000, 'the decision quote s age is journaled');
+  assert.ok(skipsOf(out).some((w) => /requote_guard/.test(w)), 'the skip names the guard');
+  assert.ok(!rows().some((r) => r.event === 'entry'), 'no entry row');
+});
+
+test('refuse on: a quote inside the cap places the buy and journals as the shadow does, in refuse mode', async () => {
+  reset();
+  process.env.TRADER_ENTRY_REQUOTE = 'refuse';
+  FRESH.QQQ = 500.10;   // +2 bp
+  const b = bridge();
+  const out = await at.runAutoTrade({ signals: [signal] }, { bridge: b, userId: 'u', now: NOW });
+  assert.ok(b.placed.some((o) => o.side === 'buy' && o.ticker === 'QQQ' && o.type === 'market'), 'the market buy places');
+  const rq = rows().find((r) => r.event === 'entry_requote');
+  assert.ok(rq); assert.strictEqual(rq.mode, 'refuse'); assert.strictEqual(rq.would_refuse, false); assert.strictEqual(rq.refused, undefined); assert.strictEqual(rq.drift_bps, 2);
+  assert.ok(!skipsOf(out).some((w) => /requote_guard/.test(w)), 'no guard skip');
+  FRESH.QQQ = 500.40;
+});
+
+test('refuse on, no fresh quote: no verdict, the buy places and the row says so', async () => {
+  reset();
+  process.env.TRADER_ENTRY_REQUOTE = 'refuse';
+  FRESH.QQQ = 0;
+  const b = bridge();
+  await at.runAutoTrade({ signals: [signal] }, { bridge: b, userId: 'u', now: NOW });
+  assert.ok(b.placed.some((o) => o.side === 'buy'), 'fails open: the buy places');
+  const rq = rows().find((r) => r.event === 'entry_requote');
+  assert.ok(rq); assert.strictEqual(rq.why, 'no fresh quote'); assert.strictEqual(rq.would_refuse, null);
+  FRESH.QQQ = 500.40;
+  delete process.env.TRADER_ENTRY_REQUOTE;
+});
