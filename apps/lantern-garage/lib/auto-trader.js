@@ -260,6 +260,15 @@ function cfg() {
     decarrySyms: new Set(String(process.env.TRADER_DECARRY_SYMBOLS
       || 'TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
+    // CARRY ON A DOWN DAY (2026-10-08, ledger tier0-inverse-carry-gated-by-entry-day): the de-carry stands aside for
+    // the symbols in TRADER_CARRY_DOWNDAY_SYMBOLS (default: the inverse family) when SPY's regular session (first
+    // 5m close -> now) is at or below TRADER_CARRY_DOWNDAY_SPY_PCT (e.g. -1.5). The stop, the weekend flat and the
+    // signal exit are untouched: the breakdown rides the overnight gap and the next session's first bar sells it.
+    // Unset = off (every wrapper flat at 15:50, as before). Measured static on 43 windows: carries after a <= -1.5%
+    // SPY day earned +11.2k | +0.5k gross, carries after a milder down day -4.9k | -4.8k.
+    carryDownDayPct: (() => { const v = Number(process.env.TRADER_CARRY_DOWNDAY_SPY_PCT); return Number.isFinite(v) && v < 0 ? v : 0; })(),
+    carryDownDaySyms: new Set(String(process.env.TRADER_CARRY_DOWNDAY_SYMBOLS || 'SQQQ,SOXS,SPXS,TZA,FAZ')
+      .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     // Positions below this % of equity are DUST and never consume a
     // concurrency slot (nor do unclosable ones). 0 counts every row.
     dustPct: n('TRADER_DUST_PCT', 0.1),
@@ -1337,6 +1346,31 @@ const PIN_FILE = process.env.TRADER_PIN_FILE
   ? path.resolve(process.env.TRADER_PIN_FILE)
   : path.join(path.dirname(TRADES_LOG), 'pins.json');
 let _pinCache = { at: 0, set: new Set() };
+// SPY's regular-session move today: % from the first 5m close to the latest bar at or before `now` (the carry-on-a-
+// down-day gate). One fetch per scan; null when the feed has fewer than two regular bars, and the gate then stands
+// aside (the de-carry runs as before).
+let _spyMoveAt = 0, _spyMoveV = null;
+async function _spySessionMovePct(now) {
+  if (_spyMoveAt === now) return _spyMoveV;
+  let v = null;
+  try {
+    const bm = await yahoo.getBarsMulti(['SPY'], '5m');
+    const bars = (bm && bm.bars && bm.bars.SPY && bm.bars.SPY.bars) || [];
+    const et = (ms) => new Date(new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const today = et(now).toDateString();
+    const reg = [];
+    for (const b of bars) {
+      const t = Date.parse(b.timestamp || b.t || b.time); if (!Number.isFinite(t) || t > now) continue;
+      const d = et(t); if (d.toDateString() !== today) continue;
+      const m = d.getHours() * 60 + d.getMinutes(); if (m < 570 || m >= 960) continue;
+      reg.push(Number(b.close));
+    }
+    if (reg.length >= 2 && reg[0] > 0 && reg[reg.length - 1] > 0) v = (reg[reg.length - 1] / reg[0] - 1) * 100;
+  } catch (_e) { v = null; }
+  _spyMoveAt = now; _spyMoveV = v;
+  return v;
+}
+
 function _isPinned(sym) {
   const now = Date.now();
   if (now - _pinCache.at > 2000) {
@@ -1632,7 +1666,10 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     if (c.eodDecarry && c.decarrySyms.has(sym) && qty >= 1 && !extended) {
       const _dm = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
       if (_dm >= c.decarryMin && _dm < 960) {
-        if (_isPinned(sym)) {
+        const _cdd = c.carryDownDayPct < 0 && c.carryDownDaySyms.has(sym) ? await _spySessionMovePct(now) : null;
+        if (_cdd != null && _cdd <= c.carryDownDayPct) {
+          out.skipped.push({ symbol: sym, price: cur, qty, why: `carry_downday — eod_decarry suppressed: SPY ${_cdd.toFixed(2)}% on the session (at or below ${c.carryDownDayPct}%); the inverse breakdown rides the gap (ledger tier0-inverse-carry-gated-by-entry-day)` });
+        } else if (_isPinned(sym)) {
           out.skipped.push({ symbol: sym, why: 'pinned — eod_decarry suppressed by operator (#3318); carrying overnight deliberately' });
         } else {
           const _ea = _exitAt.get(sym) || 0;
