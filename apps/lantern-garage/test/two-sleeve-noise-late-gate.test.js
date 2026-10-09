@@ -207,3 +207,58 @@ test('a bootstrap that returns nothing is not marked done', async () => {
   const state = JSON.parse(fs.readFileSync(sh.stateFile, 'utf8'));
   assert.equal(state.boot.SPY, undefined, 'an empty day is retried, not recorded as bootstrapped');
 });
+const dirDec = (r) => r.signals.map((x) => [x.symbol, x.direction, x.convergence.decision]);
+
+test('ARMED (TRADER_NOISE_LATE_GATE=1): a reversal regime sells the leg from the first read after the 15:30 bar, and takes no 15:30 entry', async () => {
+  const m = market(); const sh = shadow(); const sh2 = shadow();
+  const armed = createNoiseScan({ pairs: 'SPY:UPRO:SPXS', getBars: m.getBars, getHistory: m.getHistory, lateGate: { stateFile: sh.stateFile, log: sh.log, armed: true } });
+  const shad = createNoiseScan({ pairs: 'SPY:UPRO:SPXS', getBars: m.getBars, getHistory: m.getHistory, lateGate: { stateFile: sh2.stateFile, log: sh2.log } });
+  assert.equal(armed.lateGate.armed, true); assert.equal(shad.lateGate.armed, false);
+  for (const ms of [at(10, 0, 30), at(14, 5, 30), at(15, 25, 30)]) {
+    assert.deepEqual(dirDec(await scanAt(m, armed, ms)), dirDec(await scanAt(m, shad, ms)), 'before the 15:30 bar the signals are the leg s own');
+  }
+  const r = await scanAt(m, armed, at(15, 30, 25));
+  const up = r.signals.find((x) => x.symbol === 'UPRO'), dn = r.signals.find((x) => x.symbol === 'SPXS');
+  assert.equal(up.direction, 'BEARISH'); assert.equal(up.convergence.decision, 'ENTER'); assert.equal(up.decision_context.noise_late_gate, true);
+  assert.equal(dn.direction, 'BEARISH'); assert.equal(dn.convergence.decision, 'ENTER');
+  const s = await scanAt(m, shad, at(15, 30, 25));
+  assert.equal(s.signals.find((x) => x.symbol === 'UPRO').direction, 'BULLISH', 'the shadow still offers the 15:30 entry');
+  const r2 = await scanAt(m, armed, at(15, 40, 25));
+  assert.equal(r2.signals.find((x) => x.symbol === 'UPRO').direction, 'BEARISH', 'and stays sold for the rest of the session');
+  const g = sh.rows.find((x) => x.event === 'late_gate_shadow');
+  assert.equal(g.armed, true); assert.equal(g.shadow, false); assert.equal(g.gate60, true);
+});
+
+test('ARMED: a continuation regime, or too little history, changes no signal', async () => {
+  for (const opts of [{ late: +0.001 }, { priorN: 20 }]) {
+    const m = market(opts); const sh = shadow(); const sh2 = shadow();
+    const armed = createNoiseScan({ pairs: 'SPY:UPRO:SPXS', getBars: m.getBars, getHistory: m.getHistory, lateGate: { stateFile: sh.stateFile, log: sh.log, armed: true } });
+    const shad = createNoiseScan({ pairs: 'SPY:UPRO:SPXS', getBars: m.getBars, getHistory: m.getHistory, lateGate: { stateFile: sh2.stateFile, log: sh2.log } });
+    for (const ms of [at(15, 30, 25), at(15, 40, 25), at(15, 55, 25)]) assert.deepEqual(dirDec(await scanAt(m, armed, ms)), dirDec(await scanAt(m, shad, ms)));
+    const g = sh.rows.find((x) => x.event === 'late_gate_shadow');
+    assert.equal(g.armed, true); assert.notEqual(g.gate40, true, 'the gate did not read on');
+    assert.equal((await scanAt(m, armed, at(15, 40, 25))).signals.find((x) => x.symbol === 'UPRO').decision_context.noise_late_gate, false);
+  }
+});
+
+test('the worker builds the armed gate from TRADER_NOISE_LATE_GATE=1 and reports it armed', async () => {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), 'late-gate-app-'));
+  fs.mkdirSync(path.join(app, 'lib', 'two-sleeve'), { recursive: true });
+  const real = (p) => path.resolve(__dirname, '..', 'lib', ...p).replace(/\\/g, '/');
+  fs.writeFileSync(path.join(app, 'lib', 'two-sleeve', 'noise-scan.js'), `module.exports = require(${JSON.stringify(real(['two-sleeve', 'noise-scan.js']))});\n`);
+  fs.writeFileSync(path.join(app, 'lib', 'file-queue.js'), `module.exports = require(${JSON.stringify(real(['file-queue.js']))});\n`);
+  fs.writeFileSync(path.join(app, 'lib', 'market-data-yahoo.js'), [
+    "'use strict';",
+    "const bar = (t, c) => ({ timestamp: new Date(t).toISOString(), open: c, high: c, low: c, close: c });",
+    "module.exports = { getBars: async () => ({ bars: [bar(Date.now() - 86400000, 100)] }), getBarsWindow: async () => ({ bars: [] }) };",
+  ].join('\n'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'late-gate-dir-'));
+  const log = [];
+  const W = new ScanWorker({ id: 'M', app, envFile: null, env: { TRADER_NOISE_LEG_PAIRS: 'SPY:UPRO:SPXS', TRADER_NOISE_LATE_GATE: '1' }, universe: [], dir, timeoutMs: 8000, log: (r) => log.push(r), scan: 'noise' });
+  try {
+    await W.scan();
+    const ready = log.find((x) => x.event === 'scan_worker_ready' && x.sleeve === 'M');
+    assert.ok(ready); assert.equal(ready.lateGate, 'armed'); assert.equal(W._childEnv().TWO_SLEEVE_WORKER_STATE_FILE, path.join(dir, 'M.scan-state.json'));
+  } finally { W.stop(); }
+});
+
