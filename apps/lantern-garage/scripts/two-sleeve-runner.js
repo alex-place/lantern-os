@@ -58,6 +58,9 @@
  * scripts/two-sleeve.config.noise-leg.example.json for the measured leg s settings. Without such a sleeve nothing changes.
  * "scan": "closeibs" (2026-10-03, draft): the close-IBS sleeve (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe;
  * see scripts/two-sleeve.config.close-ibs.example.json.
+ * "scan": "overnight" (2026-10-09, draft): the overnight book (lib/two-sleeve/overnight-scan.js) over the sleeve s universe —
+ * its index funds held from the 15:55 print to the 09:40 print when above their 200-session mean, weekends held;
+ * TRADER_OVERNIGHT_SHADOW=1 = journal-only. See scripts/two-sleeve.config.overnight.example.json.
  *        TRADER_EXTENDED_EXITS=1 (protective-only ticks pre/post market, as the server does).
  */
 const fs = require('fs');

@@ -22,6 +22,12 @@
  * TWO_SLEEVE_WORKER_SCAN=closeibs (2026-10-03): the sleeve buys index funds that close near their session low
  * (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe (TWO_SLEEVE_WORKER_UNIVERSE, required), entry depth
  * TRADER_CLOSE_IBS_MAX (default 0.15). The reply's `closeIbs` field carries the per-name reads.
+ *
+ * TWO_SLEEVE_WORKER_SCAN=overnight (2026-10-09, draft): the overnight book. The sleeve holds its index funds from the
+ * 15:55 print to the 09:40 print when the name's prior close is above its trailing 200-session mean
+ * (lib/two-sleeve/overnight-scan.js) over the sleeve s universe (required); TRADER_OVERNIGHT_TREND_N (default 200).
+ * TRADER_OVERNIGHT_SHADOW=1 offers nothing and journals the reads it would have traded (overnight_shadow /
+ * overnight_shadow_exit rows in the worker's own log). The reply's `overnight` field carries the per-name reads.
  */
 const path = require('path');
 
@@ -29,6 +35,7 @@ const queue = [];
 let agent = null;
 let noise = null;   // the noise-area leg s scan when TWO_SLEEVE_WORKER_SCAN=noise
 let closeIbs = null;   // the close-IBS sleeve s scan when TWO_SLEEVE_WORKER_SCAN=closeibs
+let overnight = null;   // the overnight book s scan when TWO_SLEEVE_WORKER_SCAN=overnight
 let draining = false;
 // The clock the custom scans read: the real one, or a dry run's pin (TWO_SLEEVE_WORKER_FAKE_NOW, set by the runner only with --dry).
 const clock = () => { const f = Date.parse(process.env.TWO_SLEEVE_WORKER_FAKE_NOW || ''); return Number.isFinite(f) ? f : Date.now(); };
@@ -40,7 +47,7 @@ process.on('message', (m) => {
 });
 
 async function drain() {
-  if ((!agent && !noise && !closeIbs) || draining) return;
+  if ((!agent && !noise && !closeIbs && !overnight) || draining) return;
   draining = true;
   try {
     while (queue.length) {
@@ -49,6 +56,7 @@ async function drain() {
         let scan;
         if (noise) scan = await noise.scan(clock());
         else if (closeIbs) scan = await closeIbs.scan(clock());
+        else if (overnight) scan = await overnight.scan(clock());
         else {
           if (agent.cache) agent.cache.market_scan = null;   // every tick scans fresh; the bar cache inside the engine persists
           scan = await agent.scanMarket();
@@ -91,6 +99,23 @@ async function drain() {
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'noise', watchlist: noise.pairs.length * 2,
         pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null,
         lateGate: lateGate ? (lateGate.armed ? 'armed' : 'shadow') : null, stateFile: lateGate ? lateGate.stateFile : null });
+      drain();
+      return;
+    }
+    if (String(process.env.TWO_SLEEVE_WORKER_SCAN || '').toLowerCase() === 'overnight') {
+      // THE OVERNIGHT BOOK (2026-10-09, draft): the sleeve holds its index funds from the 15:55 print to the 09:40 print when
+      // the name is above its trailing 200-session mean; TRADER_OVERNIGHT_SHADOW=1 journals what it would do instead.
+      const yahoo = require(path.join(app, 'lib', 'market-data-yahoo'));
+      const { createOvernightScan, TREND_N } = require(path.join(app, 'lib', 'two-sleeve', 'overnight-scan'));
+      if (!Array.isArray(universe) || !universe.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=overnight needs the sleeve s universe (its index funds)');
+      const shadow = process.env.TRADER_OVERNIGHT_SHADOW === '1';
+      const ownLog = process.env.TRADER_TRADES_LOG || null;
+      const fq = ownLog && shadow ? require(path.join(app, 'lib', 'file-queue')) : null;
+      const trendN = process.env.TRADER_OVERNIGHT_TREND_N ? Number(process.env.TRADER_OVERNIGHT_TREND_N) : TREND_N;
+      overnight = createOvernightScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), trendN, shadow,
+        log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
+      process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'overnight', watchlist: overnight.symbols.length,
+        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : 'armed', trendN, ibsMax: null, pMin: null, shortEdge: null });
       drain();
       return;
     }
