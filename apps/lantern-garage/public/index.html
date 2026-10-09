@@ -7,7 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0e17">
   <link rel="manifest" href="/manifest.json">
-  <title>Unisona — automated trading that shows its work</title>
+  <title>Unisona — a trading engine that publishes the trades it turns down</title>
+  <meta name="description" content="Sixteen funds scored in the open, refusals included, with the rule behind each one. Free to read, no account.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Unisona">
+  <meta property="og:title" content="Unisona — A trading engine that publishes the trades it turns down">
+  <meta property="og:description" content="Sixteen funds scored in the open, refusals included, with the rule behind each one. Free to read, no account.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Unisona — A trading engine that publishes the trades it turns down">
+  <meta name="twitter:description" content="Sixteen funds scored in the open, refusals included, with the rule behind each one. Free to read, no account.">
   <script>
     /* Theme bootstrap before first paint. Always writes an explicit value: the old
        "set the attribute only when dark" form left it ABSENT in light mode, which
@@ -68,12 +76,9 @@
       -webkit-mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
       mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
     }
-    .band-inner { position: relative; max-width: 68ch; }
+    .band-inner { position: relative; display: grid; gap: 32px; align-items: center; }
+    @media (min-width: 1024px) { .band-inner { grid-template-columns: 1.05fr .95fr; gap: 48px; } }
 
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700;
-               letter-spacing: .14em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 16px; }
-    .eyebrow .led { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-strong);
-                    box-shadow: 0 0 0 4px rgba(34,211,238,.16); }
     .band h1 { font-size: 34px; line-height: 1.12; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 16px; }
     @media (min-width: 561px)  { .band h1 { font-size: 44px; } }
     @media (min-width: 1024px) { .band h1 { font-size: 56px; line-height: 1.08; } }
@@ -88,38 +93,30 @@
            border-radius: 12px; background: var(--accent-strong); color: #04121a; font-size: 16px; font-weight: 700;
            text-decoration: none; box-shadow: 0 8px 24px -10px rgba(34,211,238,.7); }
     .cta:hover { background: #67e8f9; }
-    .cta-ghost { display: inline-flex; align-items: center; height: 50px; padding: 0 20px; border-radius: 12px;
-                 border: 1px solid #2b3648; color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; }
-    .cta-ghost:hover { border-color: var(--muted); background: rgba(255,255,255,.03); }
-    .honesty { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 20px 0 0; max-width: 62ch; }
+    .cta-link { display: inline-flex; align-items: center; height: 50px; padding: 0 6px; color: var(--muted);
+                text-decoration: none; font-size: 15px; font-weight: 600; }
+    .cta-link:hover { color: var(--text); }
+    .microcopy { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+    .proof-cap { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+                 color: var(--muted); margin: 0 0 10px; }
+    #hero-proof .vp { background: rgba(17,24,39,.72); border-color: #22304a;
+                      box-shadow: 0 30px 70px -32px rgba(0,0,0,.9); }
+    #hero-proof .vp:hover { background: rgba(17,24,39,.9); border-color: var(--muted); }
+    /* The honesty note moved into "How the decision is made", where it reads as substance
+       rather than as the hero retracting its own headline. */
+    .note { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 18px 0 0; max-width: 72ch; }
 
-    /* ── The live verdict card (the hero graphic) ─────────────────────────────── */
-    .vcard { border: 1px solid #22304a; border-radius: 18px; background: rgba(17,24,39,.82);
-             backdrop-filter: blur(6px); padding: 16px; box-shadow: 0 30px 70px -30px rgba(0,0,0,.9); }
-    .vhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    /* Shared chips used by the verdict panels (verdictPanel builds these). The rest of
+       the old hero-card block — .vcard/.vhead/.chartbox/.lvl-label/.meters/.meter/.track/
+       .fill/.hint/.vwhy — was orphaned when the single big card became six panels, and
+       is deleted rather than left to rot. */
     .badge { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); display: inline-flex;
              align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: 0 0 auto; }
     .sym { font-size: 17px; font-weight: 700; letter-spacing: .01em; }
     .chip { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: var(--surface2); color: var(--text); }
     .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 8px; border-radius: 6px; background: var(--surface2); }
     .tag.enter { color: var(--up); } .tag.skip { color: var(--down); }
-    .vhead .spacer { flex: 1 1 auto; }
-
-    .chartbox { position: relative; border-radius: 12px; overflow: hidden; background: rgba(10,14,23,.5); }
-    .chartbox svg { display: block; width: 100%; height: auto; }
-    .lvl-label { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; }
-
-    .meters { margin-top: 14px; display: grid; gap: 10px; }
-    .meter .mrow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-    .meter .mk { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-    .meter .mv { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums lining-nums; }
-    .track { margin-top: 5px; height: 6px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
-    .fill { height: 100%; border-radius: 999px; background: var(--accent-strong); }
-    .fill.up { background: var(--up); } .fill.down { background: var(--down); }
-    .hint { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
-    .hint b { font-weight: 700; color: var(--text); }
-    .vwhy { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.5; color: var(--muted); }
-    .vwhy code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--text); }
+    .spacer { flex: 1 1 auto; }
 
     /* ── Light canvas ─────────────────────────────────────────────────────────── */
     .canvas { background: var(--bg); border-radius: 28px 28px 0 0; margin-top: -28px; position: relative; padding-top: 48px; }
@@ -217,9 +214,6 @@
     .disc { font-size: 12px; line-height: 1.6; color: var(--muted); }
     .motto { text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .08em; margin: 28px 0 0; text-transform: uppercase; }
 
-    @media (prefers-reduced-motion: no-preference) {
-      .fill { transition: width .6s cubic-bezier(.22,1,.36,1); }
-    }
   </style>
 </head>
 <body>
@@ -237,24 +231,18 @@
   <div class="band">
     <div class="wrap band-inner">
       <div>
-        <p class="eyebrow"><span class="led"></span> Live engine · unpaywalled</p>
-        <h1>Automated trading that <span class="grad">shows its work</span>.</h1>
+        <h1>A trading engine that publishes the trades it <span class="grad">turns down</span>.</h1>
         <p class="subhead">
-          Every symbol on the watchlist is scored and the whole verdict published —
-          direction, win probability, expected value in R, the stop and both targets.
-          When the engine turns a trade down, you get the rule that vetoed it.
+          Sixteen funds, scored in the open — refusals included, with the rule behind each
+          one. It places no orders; you do.
         </p>
         <div class="cta-row">
-          <a class="cta" href="/stock-trader.html">Open the terminal</a>
-          <a class="cta-ghost home-chat" href="/chat.html">Ask the assistant</a>
+          <a class="cta" href="/stock-trader.html">Open the trader</a>
+          <a class="cta-link home-chat" href="/chat.html">Or ask the assistant →</a>
         </div>
-        <p class="honesty">
-          Straight answer on what this is: the scoring is deterministic technical analysis
-          with a hand-weighted linear model — arithmetic, not a language model, and not
-          something that learns. The AI here is the assistant. The engine places nothing on
-          its own.
-        </p>
+        <p class="microcopy">Free to read. No account.</p>
       </div>
+      <div id="hero-proof"><div class="state">Reading the engine…</div></div>
     </div>
   </div>
 
@@ -271,7 +259,7 @@
       </div>
       <div class="grid g3" id="book"></div>
       <div class="viewall">
-        <a class="cta-line" href="/stock-trader.html">View all tickers in the terminal
+        <a class="cta-line" href="/stock-trader.html">View all tickers in the trader
           <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg>
         </a>
       </div>
@@ -305,11 +293,18 @@
             <path d="M10 24l9 9 19-19"/><path d="M6 38h36" opacity=".35"/>
           </svg>
           <h3>Enter — or refuse</h3>
-          <p>Out comes a win probability, an expected value in R and a verdict. A good
-             score can still be refused by a regime filter, and that refusal is published
-             with the rule that fired.</p>
+          <p>Out comes a win probability, an expected value and a verdict. A good score can
+             still be refused by a regime filter, and that refusal is published with the
+             rule that fired.</p>
         </div>
       </div>
+      <p class="note">
+        Two things worth being plain about. The scoring is deterministic technical analysis
+        with a hand-weighted linear model — arithmetic, not a language model, and not
+        something that learns; the AI here is the assistant. And the sizes are quoted in
+        <b>R</b>, the trade’s own risk: 1&nbsp;R is what you would lose if the stop hit, so an
+        expected value of 0.80&nbsp;R is about $80 for every $100 put at risk.
+      </p>
     </section>
 
     <!-- ── The part that really is AI ── -->
@@ -344,12 +339,12 @@
         <div class="card">
           <p class="csub" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Free — no account</p>
           <h3>Read the engine</h3>
-          <p style="color:var(--muted);font-size:14px;margin:0">Every scored setup, every decline and every reason, signed out. This page, and the terminal behind it.</p>
+          <p style="color:var(--muted);font-size:14px;margin:0">Every scored setup, every decline and every reason, signed out. This page, and the trader behind it.</p>
         </div>
         <div class="card">
           <p class="csub" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Your own keys</p>
           <h3>Paper trading</h3>
-          <p style="color:var(--muted);font-size:14px;margin:0">Connect your own broker paper account and the terminal trades it — real orders and real fills against no real money.</p>
+          <p style="color:var(--muted);font-size:14px;margin:0">Connect your own broker paper account and the trader trades it — real orders and real fills against no real money.</p>
         </div>
         <div class="card">
           <p class="csub" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Deliberate</p>
@@ -386,7 +381,7 @@
       <div class="sec-head"><h2 id="rest-h">The rest of Unisona</h2></div>
       <div class="grid g4">
         <a class="card" href="/chat.html"><h3>Assistant</h3><p style="color:var(--muted);font-size:13px;margin:0">Real tool calls, real sources, and the model named on every answer.</p></a>
-        <a class="card" href="/stock-trader.html"><h3>Terminal</h3><p style="color:var(--muted);font-size:13px;margin:0">Charts, watchlist, the engine's signals, and your account panel.</p></a>
+        <a class="card" href="/stock-trader.html"><h3>Trader</h3><p style="color:var(--muted);font-size:13px;margin:0">Charts, watchlist, the engine's signals, and your account panel.</p></a>
         <a class="card" href="/journal.html"><h3>Journal <span class="chip">account</span></h3><p style="color:var(--muted);font-size:13px;margin:0">Every trade scored — streaks, symbol stats and the monthly report card.</p></a>
         <a class="card" href="/pricing.html"><h3>Plans</h3><p style="color:var(--muted);font-size:13px;margin:0">What is free, what is not, and exactly what each tier unlocks.</p></a>
       </div>
@@ -554,7 +549,7 @@
   /* One compact verdict panel: the same content the hero card carried, at card scale.
      4-6 of these replace the single big card, so a visitor sees the engine's actual
      spread of opinion rather than one cherry-picked symbol. */
-  function verdictPanel(symbol, sig) {
+  function verdictPanel(symbol, sig, lean) {
     var conv = sig.convergence || {}, plan = sig.plan || {};
     var up = String(sig.direction || '').toUpperCase() === 'BULLISH';
     var skipped = !!conv.skip_reason || (conv.decision && conv.decision !== 'ENTER');
@@ -582,7 +577,7 @@
       stats.appendChild(s);
     }
     if (isFinite(Number(conv.p_win))) stat('Win prob.', (Number(conv.p_win) * 100).toFixed(1) + '%');
-    if (isFinite(Number(conv.ev_r))) stat('Exp. value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
+    if (!lean && isFinite(Number(conv.ev_r))) stat('Exp. value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
     if (isFinite(Number(plan.stop))) stat('Stop', fmt(plan.stop, 2));
     a.appendChild(stats);
 
@@ -662,6 +657,25 @@
       else unscored++;
     });
 
+    /* HERO PROOF. The headline claims we publish the trades we turn down, so the hero
+       shows one — on this pass, live. Falls back to the top accepted setup when the pass
+       produced no refusal, and says so, rather than implying a refusal that isn't there. */
+    var proof = byId('hero-proof');
+    if (proof) {
+      proof.innerHTML = '';
+      var pick = skipped[0] || entered[0];
+      if (pick) {
+        var cap = el('p', 'proof-cap');
+        cap.textContent = skipped.length
+          ? 'Turned down on this pass — live, no account needed:'
+          : 'Scored on this pass — nothing refused yet today:';
+        proof.appendChild(cap);
+        proof.appendChild(verdictPanel(pick[0], pick[1], true));   // lean: no R above the fold
+      } else {
+        proof.appendChild(el('div', 'state', 'The engine has not scored this pass yet.'));
+      }
+    }
+
     /* Show BOTH classes on purpose. Ranking the panels purely by expected value would
        fill every slot with accepted setups and quietly bury the refusals, which are the
        one thing here no competitor publishes. Four accepted, two turned down. */
@@ -734,7 +748,7 @@
             .catch(function () {});
         }
       });
-      var link = el('a', 'inlink', 'Open any of these in the terminal'); link.href = '/stock-trader.html';
+      var link = el('a', 'inlink', 'Open any of these in the trader'); link.href = '/stock-trader.html';
       c.appendChild(link);
       return c;
     }
@@ -770,6 +784,7 @@
     .then(function (d) { GATE = (d && d.gate) || null; renderBook((d && d.zones) || {}); })
     .catch(function (e) {
       fail(byId('book'), 'the engine', e);
+      if (byId('hero-proof')) fail(byId('hero-proof'), 'the engine', e);
       byId('book-sub').textContent = '';
     });
 

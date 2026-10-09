@@ -1,0 +1,3 @@
+### Changed
+
+- The home page now leads with one plain sentence — a trading engine that publishes the trades it turns down — and proves it immediately with a real refusal from the current scan. The old hero promised automated trading in its headline and then retracted it forty words later in the same viewport, which is what read as salesy; the retraction has become a closing note in How the decision is made, where it is substance rather than a walk-back. Also removed: a status dot that was bound to no data, a subhead that stacked eight undefined terms, and a second call to action competing with the first. The line now also ships to the title and the social metadata, which the page had none of.
