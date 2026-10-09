@@ -71,12 +71,14 @@ async function drain() {
       const { createNoiseScan } = require(path.join(app, 'lib', 'two-sleeve', 'noise-scan'));
       // The journal-only late-reversal gate: rows to the worker's own log, observations in the runner's state file.
       let lateGate = null;
-      if (process.env.TRADER_NOISE_LATE_GATE_SHADOW === '1') {
+      const lateArmed = process.env.TRADER_NOISE_LATE_GATE === '1';   // the gate as a rule (2026-10-08); the shadow machinery carries it
+      if (lateArmed || process.env.TRADER_NOISE_LATE_GATE_SHADOW === '1') {
         const ownLog = process.env.TRADER_TRADES_LOG || null;
         const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;
         lateGate = {
           stateFile: process.env.TWO_SLEEVE_WORKER_STATE_FILE || (ownLog ? path.join(path.dirname(ownLog), `${process.env.TWO_SLEEVE_WORKER_ID || 'noise'}.scan-state.json`) : null),
           log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); },
+          armed: lateArmed,
         };
       }
       noise = createNoiseScan({
@@ -88,7 +90,7 @@ async function drain() {
       if (!noise.pairs.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=noise needs TRADER_NOISE_LEG_PAIRS (proxy:long:inverse,...)');
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'noise', watchlist: noise.pairs.length * 2,
         pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null,
-        lateGate: lateGate ? 'shadow' : null, stateFile: lateGate ? lateGate.stateFile : null });
+        lateGate: lateGate ? (lateGate.armed ? 'armed' : 'shadow') : null, stateFile: lateGate ? lateGate.stateFile : null });
       drain();
       return;
     }
