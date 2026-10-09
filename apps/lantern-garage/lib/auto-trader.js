@@ -1003,6 +1003,15 @@ const _exitStatus = new Map();  // sym -> broker status of the last exit order (
 // without an autopilot exit of our own, this is the only record of what we held and
 // where it was marked. Persisted, so an overnight stop-out is still landed at boot.
 const _lastPos = new Map();
+// THE LAST PARTIAL FILL'S BASIS (SMH 2026-10-09). A 30-share GTC stop filled 12 / 9 / 9 over three
+// minutes at the open, and each fill row (_reconcileFills) rightly destroyed the per-position state
+// — but the position was still held after the first two, so the next sweep re-adopted it (with the
+// broker's avg_entry_price) and the second row priced fine. The THIRD fill emptied the book: no
+// sweep re-adopted the symbol before the reconcile ran, _lastPos was gone, and the row was
+// journaled with entry:null / pnl:null — the day's booked realized under-counted by the whole
+// partial (+51.35). This map remembers the basis the sweep saw while the symbol was held, and the
+// reconcile falls back to it when _lastPos is empty and no NEWER entry was placed by this engine.
+const _lastBasis = new Map();   // sym -> { entry, ts, openedAt }
 // FEED-FLAP GUARD STATE (#3378). Both maps demand agreement between two
 // consecutive snapshots before anything irreversible happens:
 //   _absentStreak — a tracked position books as externally CLOSED only after it
@@ -1181,7 +1190,15 @@ function _reconcileFills(orders) {
   const done = new Set();
   try {
     const rows = fillLedger.newExitRows(orders, _loggedFills, (sym) => {
-      const lp = _lastPos.get(sym);
+      let lp = _lastPos.get(sym);
+      // The last partial of a stop that filled in pieces (SMH 2026-10-09, see _lastBasis): the
+      // previous partial's row destroyed the state and the book is now empty, so no sweep
+      // re-adopted the symbol. The basis seen while it was held is this position's basis, as
+      // long as this engine placed no NEWER entry for the symbol since it was recorded.
+      if (!lp) {
+        const lb = _lastBasis.get(sym);
+        if (lb && Number(lb.entry) > 0 && !((_entryAt.get(sym) || 0) > lb.ts)) lp = { entry: lb.entry, basisFrom: 'last_basis', openedAt: lb.openedAt };
+      }
       // Excursions (#3241): the placement snapshot when this exit came from
       // closeLong (which clears the live maps), else the live maps — a protective
       // STP fills without ever passing through closeLong.
@@ -1189,7 +1206,7 @@ function _reconcileFills(orders) {
         stopDistPct: _stopDistPct.get(sym) ?? null, openedAt: _entryAt.get(sym) ?? null };
       // openedAt rides along for the ledger's process-start guard: a pre-boot fill of a
       // position we are tracking (entry known, filled after it opened) is our exit, not history.
-      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), openedAt: _entryAt.get(sym) ?? null, ...ex };
+      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), openedAt: _entryAt.get(sym) ?? (lp && lp.openedAt) ?? null, ...ex };
     }, _PROCESS_START);
     for (const row of rows) {
       // Case-insensitive (#3407): IBKR reports 'Stop', Alpaca reports 'stop'.
@@ -2205,7 +2222,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           && (now - (_lastOrderAt.get(k) || 0)) > 10 * 60 * 1000) {
         _driftPending.push({ event: 'position_drift', symbol: k, qty_was: Number(_prev.qty), qty_now: _newQ,
           delta: +(_newQ - Number(_prev.qty)).toFixed(6), entry: p.avg_entry_price ?? null, mark: p.current_price ?? null,
-          reason: _newQ > Number(_prev.qty) ? 'quantity grew with no engine order — external/phantom buy' : 'quantity shrank with no engine order — partial external sell' });
+          reason: _newQ > Number(_prev.qty) ? 'quantity grew with no engine order — external/phantom buy'
+            : _stopOrders.has(k) ? 'quantity shrank with no engine order — the registered stop may have filled in part (see the exit rows)'
+              : 'quantity shrank with no engine order — partial external sell' });
       }
     }
     _lastPos.set(k, {
@@ -2214,6 +2233,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       mark: p.current_price ?? null,
       ts: now,
     });
+    if (Number(p.avg_entry_price ?? p.avg_fill_price) > 0) _lastBasis.set(k, { entry: Number(p.avg_entry_price ?? p.avg_fill_price), ts: now, openedAt: _entryAt.get(k) ?? null });
   }
   // consecutive means CONSECUTIVE: a dwell candidate that skips a scan starts
   // over — otherwise two one-off flap sightings days apart would sum to adoption.
