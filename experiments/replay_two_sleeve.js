@@ -45,11 +45,21 @@ for (const s of SYMS) {
 }
 if (!Object.keys(DATA).length) { console.error("no cached bars"); process.exit(1); }
 
+// REPLAY_CLOCK_AT_BAR_END=1 (2026-10-01, ledger replay-clock-at-bar-end). By default the brains act at tick m on the
+// close of the bar STARTING at m with their clock at m: decision and fill share one price (no look-ahead), but every
+// CLOCK rule fires five minutes late against live, where the clock reads the END of the bar whose close it acts on.
+// The 30-minute exit gate opens on the 10:05 price (live: 10:00), the hourly entry cadence decides on the hh:05 close
+// (live: hh:00-hh:03), the 15:50 de-carry fills at 15:55 (live: 15:50). With the flag the clock reads the bar's END:
+// the bars seen and the fill prices are unchanged, and each clock rule fires on the bar that ends at its clock time,
+// as it does live. The harness's own clock rules (the morning threshold, the Friday-afternoon and M-sleeve start
+// times) move with it; the noise and trend decision bars are bar STARTS by definition and do not.
+const CLOCK_SHIFT_MS = process.env.REPLAY_CLOCK_AT_BAR_END === "1" ? 5 * 60000 : 0;
+const clockMin = (m) => m + CLOCK_SHIFT_MS / 60000;
 let NOW_MS = Math.min(...Object.values(DATA).map((a) => (a[0] && a[0].t) || Infinity));
 const barsUpTo = (sym, n) => {
   const a = DATA[String(sym).toUpperCase()] || [];
   const out = [];
-  for (let i = a.length - 1; i >= 0 && out.length < n; i--) if (a[i].t <= NOW_MS) out.push(a[i]);
+  for (let i = a.length - 1; i >= 0 && out.length < n; i--) if (a[i].t + CLOCK_SHIFT_MS <= NOW_MS) out.push(a[i]);
   return out.reverse().map((b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c, volume: 0 }));
 };
 const stub = {
@@ -271,15 +281,158 @@ function spyTrendPct(day, n) {
   const c1 = _spyDays.close.get(_spyDays.days[j]), c0 = _spyDays.close.get(_spyDays.days[j - n]);
   return c1 && c0 ? (c1 / c0 - 1) * 100 : null;
 }   // raw | none | selective | top (see signalsAt)
-const INV_UNDERLYING = { SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
+// REGIME SWITCH (variant.regime, 2026-09-29; ledger row carry-3x-weeknights-regime200-13-windows):
+//   regime: { n: 200, with: { ENV }, against: { ENV } }
+// sets sleeve S's env for the session by SPY's trend as it stood BEFORE the session opened: the prior
+// session's close against the mean of the n closes ending with it ("with" = above). One window's cache
+// is too short for 200 sessions, so SPY's closes are read from EVERY oos_* cache beside REPLAY_CACHE.
+// Not enough history = the variant's base env for that session (counted as "unknown").
+const _longDailyMemo = new Map();
+function _longDaily(sym) {                                 // a name's session closes across every cached window
+  if (_longDailyMemo.has(sym)) return _longDailyMemo.get(sym);
+  const root = path.dirname(CACHE); const byDay = new Map();
+  let dirs = []; try { dirs = fs.readdirSync(root).filter((d) => /^oos_/.test(d)); } catch (_e) { dirs = []; }
+  for (const d of new Set([...dirs, path.basename(CACHE)])) {
+    const f = path.join(root, d, sym + ".json"); if (!fs.existsSync(f)) continue;
+    let a; try { a = JSON.parse(fs.readFileSync(f, "utf8")); } catch (_e) { continue; }
+    for (const b of a) { const m = MIN(b.t); if (m < 570 || m >= 960) continue; const day = DAY(b.t); const cur = byDay.get(day); if (!cur || b.t >= cur.t) byDay.set(day, { t: b.t, c: Number(b.c) }); }
+  }
+  const days = [...byDay.keys()].sort();
+  const out = { days, close: days.map((d) => byDay.get(d).c) };
+  _longDailyMemo.set(sym, out);
+  return out;
+}
+const _spyLong = () => _longDaily("SPY");
+// The name's own scale for a day: the median |close-to-close move| over the n sessions completed before it.
+// null = not enough history, or a move no split-adjusted series makes (dropped, not guessed).
+const _madMemo = new Map();
+function medianDailyMove(sym, day, n = 60) {
+  const key = sym + ":" + day + ":" + n; if (_madMemo.has(key)) return _madMemo.get(key);
+  const L = _longDaily(sym);
+  let j = L.days.indexOf(day); if (j < 0) { j = L.days.findIndex((d) => d > day); if (j < 0) j = L.days.length; }
+  let out = null;
+  if (j > n) {
+    const abs = []; let bad = false;
+    for (let k = j - n; k < j; k++) { const r1 = L.close[k] / L.close[k - 1] - 1; if (Math.abs(r1) > 0.6) { bad = true; break; } abs.push(Math.abs(r1)); }
+    if (!bad) { abs.sort((a, b) => a - b); out = (abs[n / 2 - 1] + abs[n / 2]) / 2; if (n % 2) out = abs[(n - 1) / 2]; }
+  }
+  _madMemo.set(key, out); return out;
+}
+function spyAboveMean(day, n) {
+  const L = _spyLong();
+  let j = L.days.indexOf(day); if (j < 0) { j = L.days.findIndex((d) => d > day); if (j < 0) j = L.days.length; }   // j = completed sessions before `day`
+  if (j < n) return null;
+  // a hole in the cached history would make "the last n closes" span more than n sessions: refuse rather than guess
+  const spanDays = (Date.parse(L.days[j - 1] + "T00:00:00Z") - Date.parse(L.days[j - n] + "T00:00:00Z")) / 86400000;
+  if (spanDays > n * 1.6) return null;
+  let s = 0; for (let k = j - n; k < j; k++) s += L.close[k];
+  return L.close[j - 1] > s / n;
+}
+const INV_UNDERLYING ={ SQQQ: "QQQ", SOXS: "SMH", SPXS: "SPY", TZA: "IWM" };     // wrapper -> the cached 1x proxy for its underlying
 const M_IBS = Number(process.env.REPLAY_M_IBS) || 0.7;
 const M_FROM = Number(process.env.REPLAY_M_FROM) || 630;
 const M_NO_WEAKNESS = process.env.REPLAY_M_NO_WEAKNESS === "1";   // 2026-09-25: no weakness signal-exit; M exits by ratchet floor / stop / time only
 const M_SYMS = new Set(String(process.env.REPLAY_M_SYMS || SYMS.join(",")).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean));
+// TREND-DAY ENTRY for sleeve M (2026-09-29, ledger row soxl-trend-replay-13-windows): REPLAY_M_CHECKS=<bar starts, ET
+// minutes> and REPLAY_M_RANGE_K=<k>. A name is BULLISH at the FIRST of those bars at which it sits at or above
+// REPLAY_M_IBS of its session range AND that range is at least k x its own median daily move; at that bar only, once
+// per name per session. The rule of experiments/intraday_hold_anatomy.js, expressed where a signal rule lives.
+// NOISE-AREA MOMENTUM for sleeve M (2026-09-30, ledger row noise-leg-beside-book-13-windows): REPLAY_M_NOISE=
+// "SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS" (proxy:long wrapper:inverse wrapper). The noise area of Zarattini,
+// Aziz and Barbon (2024, SSRN 4824172): sigma(t) = the 14-session average of |price(t) / open - 1| at the same time
+// of day; upper = max(open, prevClose) x (1 + sigma), lower = min(open, prevClose) x (1 - sigma). Our deviations:
+// 5m bars, the first bar's midpoint as the open, no VWAP. At the bars closing 10:00 ... 15:30 a flat pair buys its
+// long wrapper with the proxy above the band, its inverse below; a held wrapper stays BULLISH while the proxy stays
+// outside on its side and turns BEARISH (a signal exit) when it comes back. The 15:50 de-carry closes the rest.
+const M_NOISE = String(process.env.REPLAY_M_NOISE || "").split(",").map((p) => { const [proxy, up, dn] = p.split(":").map((x) => String(x || "").trim().toUpperCase()); return proxy && up && dn ? { proxy, up, dn } : null; }).filter(Boolean);
+const NOISE_DECISIONS = new Set(Array.from({ length: 12 }, (_, k) => 595 + 30 * k));
+const _intraMemo = new Map();
+function _longIntraday(sym) {                             // a proxy's regular-session 5m bars from every cached window
+  if (_intraMemo.has(sym)) return _intraMemo.get(sym);
+  const root = path.dirname(CACHE); const byT = new Map();
+  let dirs = []; try { dirs = fs.readdirSync(root).filter((d) => /^oos_/.test(d)); } catch (_e) { dirs = []; }
+  for (const d of new Set([...dirs, path.basename(CACHE)])) {
+    const f = path.join(root, d, sym + ".json"); if (!fs.existsSync(f)) continue;
+    let a; try { a = JSON.parse(fs.readFileSync(f, "utf8")); } catch (_e) { continue; }
+    for (const b of a) { const m = MIN(b.t); if (m < 570 || m >= 960 || byT.has(b.t)) continue; byT.set(b.t, { t: b.t, c: Number(b.c), h: Number(b.h), l: Number(b.l), d: DAY(b.t), m }); }
+  }
+  const sessions = new Map();
+  for (const b of [...byT.values()].sort((x, y) => x.t - y.t)) { if (!sessions.has(b.d)) sessions.set(b.d, []); sessions.get(b.d).push(b); }
+  const days = [...sessions.keys()].sort();
+  for (const d of days) { const s = sessions.get(d); s.byMin = new Map(s.map((b) => [b.m, b])); s.open = (s[0].h + s[0].l) / 2; s.close = s[s.length - 1].c; }
+  const out = { sessions, days, idx: new Map(days.map((d, i) => [d, i])) };
+  _intraMemo.set(sym, out); return out;
+}
+const _bandMemo = new Map();
+function noiseState(sym, day, m) {                        // 'UP' | 'DOWN' | 'IN' | null (no clean 14-session history)
+  const key = sym + ":" + day;
+  let bd = _bandMemo.get(key);
+  if (bd === undefined) {
+    bd = null;
+    const L = _longIntraday(sym); const i = L.idx.get(day);
+    const calDays = (a, b) => (Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000;
+    if (i != null && i > 14 && calDays(L.days[i - 1], day) <= 5 && calDays(L.days[i - 14], day) <= 28 && L.sessions.get(day).length >= 60) {   // no half sessions (as the anatomy)
+      const cur = L.sessions.get(day), prevClose = L.sessions.get(L.days[i - 1]).close;
+      const hiRef = Math.max(cur.open, prevClose), loRef = Math.min(cur.open, prevClose);
+      bd = new Map();
+      for (const b of cur) {
+        const mv = [];
+        for (let k = 1; k <= 14; k++) { const ss = L.sessions.get(L.days[i - k]); const bb = ss.byMin.get(b.m); if (bb) mv.push(Math.abs(bb.c / ss.open - 1)); }
+        if (mv.length < 10) continue;
+        const sg = mv.reduce((x, y) => x + y, 0) / mv.length;
+        bd.set(b.m, { upper: hiRef * (1 + sg), lower: loRef * (1 - sg), c: b.c });
+      }
+    }
+    _bandMemo.set(key, bd);
+  }
+  const lim = bd && bd.get(m); if (!lim) return null;
+  return lim.c > lim.upper ? "UP" : lim.c < lim.lower ? "DOWN" : "IN";
+}
+const M_CHECKS = String(process.env.REPLAY_M_CHECKS || "").split(",").map((s) => Number(s.trim())).filter((x) => Number.isFinite(x) && x > 0);
+const M_RANGE_K = Number(process.env.REPLAY_M_RANGE_K) || 0;
+const _mFired = new Map();                                  // `${day}:${sym}` -> the bar that fired (a replay process runs its variants one after another: cleared per variant)
 function signalsAt(day, m, sleeve) {
   const out = [];
+  if (sleeve === "M" && M_NOISE.length) {
+    const wrapIbs = (s) => { const a = DATA[s] || []; const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m); if (sess.length < 1) return null; const hi = Math.max(...sess.map((b) => b.h)), lo = Math.min(...sess.map((b) => b.l)), cur = sess[sess.length - 1]; return { cur, ibs: hi > lo ? (cur.c - lo) / (hi - lo) : 0.5 }; };
+    for (const pr of M_NOISE) {
+      const st = noiseState(pr.proxy, day, m);
+      const heldUp = _posRef && _posRef[pr.up] && _posRef[pr.up].owner === "M", heldDn = _posRef && _posRef[pr.dn] && _posRef[pr.dn].owner === "M";
+      for (const [sym, side] of [[pr.up, "UP"], [pr.dn, "DOWN"]]) {
+        const w = wrapIbs(sym); if (!w || w.cur.m !== m) continue;
+        const held = side === "UP" ? heldUp : heldDn;
+        let dir = "NEUTRAL";
+        if (held) dir = st === side ? "BULLISH" : (st ? "BEARISH" : "BULLISH");            // no reading: hold
+        else if (!heldUp && !heldDn && NOISE_DECISIONS.has(m) && st === side) dir = "BULLISH";
+        out.push({ symbol: sym, direction: dir, entry_price: w.cur.c, decision_context: { ibs: w.ibs, spy_tape: 0, noise: st },
+          convergence: { decision: dir === "NEUTRAL" ? "SKIP" : "ENTER", p_win: 0.6 } });
+      }
+    }
+    return out;
+  }
+  if (sleeve === "M" && M_CHECKS.length) {
+    for (const s of SYMS) {
+      if (!M_SYMS.has(s)) continue;
+      const a = DATA[s]; if (!a) continue;
+      const sess = a.filter((b) => b.d === day && b.m >= 570 && b.m <= m);
+      if (sess.length < 3) continue;
+      const hi = Math.max(...sess.map((b) => b.h)), lo = Math.min(...sess.map((b) => b.l));
+      if (!(hi > lo)) continue;
+      const cur = sess[sess.length - 1];
+      const ibs = (cur.c - lo) / (hi - lo);
+      const key = day + ":" + s;
+      let bullish = false;
+      if (M_CHECKS.includes(m) && cur.m === m && !_mFired.has(key)) {
+        const mad = M_RANGE_K > 0 ? medianDailyMove(s, day) : 0;
+        if (ibs >= M_IBS && (M_RANGE_K <= 0 || (mad != null && (hi - lo) / lo >= M_RANGE_K * mad))) { bullish = true; _mFired.set(key, m); }
+      }
+      out.push({ symbol: s, direction: bullish ? "BULLISH" : "NEUTRAL", entry_price: cur.c,
+        decision_context: { ibs, spy_tape: 0 }, convergence: { decision: bullish ? "ENTER" : "SKIP", p_win: 0.6 } });
+    }
+    return out;
+  }
   if (sleeve === "M") {
-    if (m < M_FROM) return out;
+    if (clockMin(m) < M_FROM) return out;
     for (const s of SYMS) {
       if (!M_SYMS.has(s)) continue;
       const a = DATA[s]; if (!a) continue;
@@ -296,9 +449,9 @@ function signalsAt(day, m, sleeve) {
     return out;
   }
   const thr = (sleeve === "S" || (sleeve === "R" && process.env.REPLAY_R_SIGNAL_LIKE_S === "1"))   // REPLAY_R_SIGNAL_LIKE_S=1: sleeve R takes the S thresholds (an additive master-brain sleeve, 2026-09-25)
-    ? (m < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
-    : ((sleeve === "R" && m < 660 && process.env.TRADER_LAB_R_MORNING) ? Number(process.env.TRADER_LAB_R_MORNING) : (Number(process.env.TRADER_IBS_MAX) || 0.15));   // TRADER_LAB_R_MORNING (2026-09-27): stable-style morning depth for R
-  const friPm = FRI_PM_INV > 0 && sleeve === "R" && m >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
+    ? (clockMin(m) < 660 ? (Number(process.env.TRADER_IBS_MAX_MORNING) || 0.12) : (ADAPTIVE_PNL ? (() => { const t = trailingPnlPct(ADAPTIVE_PNL.n); return (t == null || t >= ADAPTIVE_PNL.x) ? ADAPTIVE_PNL.up : ADAPTIVE_PNL.dn; })() : ADAPTIVE_IBS ? (() => { const t = spyTrendPct(day, ADAPTIVE_IBS.n); return (t == null || t >= ADAPTIVE_IBS.x) ? ADAPTIVE_IBS.up : ADAPTIVE_IBS.dn; })() : (Number(process.env.TRADER_IBS_MAX) || 0.30)))
+    : ((sleeve === "R" && clockMin(m) < 660 && process.env.TRADER_LAB_R_MORNING) ? Number(process.env.TRADER_LAB_R_MORNING) : (Number(process.env.TRADER_IBS_MAX) || 0.15));   // TRADER_LAB_R_MORNING (2026-09-27): stable-style morning depth for R
+  const friPm = FRI_PM_INV > 0 && sleeve === "R" && clockMin(m) >= FRI_PM_FROM && new _RealDate(day + "T12:00:00Z").getUTCDay() === 5;
   for (const s of SYMS) {
     if (ADAPTIVE_SYM && sleeve === "S") { const tp = symTrailingPnl(s, ADAPTIVE_SYM.n); if (tp && tp.sum < ADAPTIVE_SYM.x) continue; }
     const a = DATA[s]; if (!a) continue;
@@ -352,7 +505,7 @@ function signalsAt(day, m, sleeve) {
 }
 
 function loadArmed(base, src) {
-  const IGNORE = /^TRADER_(TRADES_LOG|STATE_FILE|LOCK_DIR|LIVE|AUTO_EXECUTE|AUTO_USER|SESSION_REVIEW|MANAGE_EXITS)$/;
+  const IGNORE = /^TRADER_(TRADES_LOG|STATE_FILE|LOCK_DIR|LIVE|AUTO_EXECUTE|AUTO_USER|SESSION_REVIEW|MANAGE_EXITS|TREND_SHADOW)$/;   // TREND_SHADOW: a live journal-only shadow, never replayed
   let n = 0;
   for (const line of fs.readFileSync(src, "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*(TRADER_[A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
@@ -390,16 +543,18 @@ function loadArmed(base, src) {
   ];
   if (process.env.REPLAY_VARIANTS) {
     const list = JSON.parse(fs.readFileSync(process.env.REPLAY_VARIANTS, "utf8"));
-    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [], eod: v.eod || null }]);
+    VARIANTS = list.map((v) => [v.name, { active: v.active, S: v.S || {}, R: v.R || {}, M: v.M || {}, order: v.order || "SR", exS: v.exS || [], exR: v.exR || [], exM: v.exM || [], eod: v.eod || null, regime: v.regime || null, mBase: v.mBase || "R" }]);
     console.log(`  [variants] ${VARIANTS.length} from ${process.env.REPLAY_VARIANTS}: ${VARIANTS.map(([n]) => n).join(" ")}`);
   }
-  console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
+  console.log(`\nTWO-SLEEVE ENGINE REPLAY (engine core${CLOCK_SHIFT_MS ? ", clock at bar end" : ""}) — ${days.length} sessions, ${Object.keys(DATA).length} symbols\n`);
   console.log(`  ${"variant".padEnd(18)}${"return".padStart(9)}${"trades".padStart(8)}${"WR".padStart(6)}${"avg win".padStart(9)}${"avg loss".padStart(10)}${"payoff".padStart(8)}   maxDD   per-sleeve`);
 
   for (const [name, v] of VARIANTS) {
     const t0 = _RealDate.now();
     const tag = name.replace(/\W+/g, "") + "-";
-    const envFor = { S: { ...BASE_S, ...v.S }, R: { ...BASE_R, ...v.R }, M: { ...BASE_R, ...(v.M || {}) } };
+    // mBase "S" (2026-09-29): sleeve M starts from the STABLE settings (it runs the master brain); default = the race settings, as before
+    const envFor = { S: { ...BASE_S, ...v.S }, R: { ...BASE_R, ...v.R }, M: { ...(v.mBase === "S" ? BASE_S : BASE_R), ...(v.M || {}) } };
+    _mFired.clear();
     const exc = { S: new Set(v.exS || []), R: new Set(v.exR || []), M: new Set(v.exM || []) };
     const order = (typeof v.order === "string" && v.order.length ? v.order.split("") : ["S", "R"]).filter((sl) => SLEEVES.includes(sl) && v.active.includes(sl));
     for (const sl of v.active) if (!order.includes(sl)) order.push(sl);
@@ -428,11 +583,22 @@ function loadArmed(base, src) {
         const tR = trailingPnlPct(ADAPTIVE_ENV_R.n); const deepR = tR != null && tR < ADAPTIVE_ENV_R.x;
         for (const k of Object.keys(ADAPTIVE_ENV_R.deep)) { const base = envFor.R.__adaptiveBase[k]; if (deepR) envFor.R[k] = ADAPTIVE_ENV_R.deep[k]; else if (base === undefined) delete envFor.R[k]; else envFor.R[k] = base; }
       }
+      if (v.regime && envFor.S) {
+        const keys = [...new Set([...Object.keys(v.regime.with || {}), ...Object.keys(v.regime.against || {})])];
+        if (!envFor.S.__regimeBase) Object.defineProperty(envFor.S, "__regimeBase", { value: Object.fromEntries(keys.map((k) => [k, envFor.S[k]])), enumerable: false });
+        const up = spyAboveMean(day, Number(v.regime.n) || 200);
+        const set = up == null ? {} : ((up ? v.regime.with : v.regime.against) || {});
+        for (const k of keys) { const base = envFor.S.__regimeBase[k]; if (k in set) envFor.S[k] = String(set[k]); else if (base === undefined) delete envFor.S[k]; else envFor.S[k] = base; }
+        state.regimeDays = state.regimeDays || { with: 0, against: 0, unknown: 0 }; state.regimeDays[up == null ? "unknown" : up ? "with" : "against"]++;
+      }
       for (let m = 570; m <= 960; m += 5) {
         const cur = (DATA.SPY || []).find((b) => b.d === day && b.m === m);
         if (!cur) continue;
-        NOW_MS = cur.t;
-        const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0] });
+        NOW_MS = cur.t + CLOCK_SHIFT_MS;
+        // At 16:00 and later the live loop is protective-only: no entries, no signal exits (auto-trader.js,
+        // EXTENDED-HOURS PROTECTIVE MODE). Only the bar-end clock reaches 16:00 here (the 15:55 bar), and before
+        // this guard the brain bought there: 21 entries on Jul-Sep 2026, every one an overnight carry live never takes.
+        const res = await engine.tick((sl) => ({ signals: signalsAt(day, m, sl.id) }), { now: NOW_MS, userId: "replay-" + order[0], protectiveOnly: clockMin(m) >= 960 });
         for (const sl of order) for (const s of (((res[sl] || {}).skipped) || [])) { const k = String(s.why || "?").split(/[—(:]/)[0].trim().slice(0, 26); census[sl][k] = (census[sl][k] || 0) + 1; }
       }
       if (v.eod) applyEodRules(state, v.eod, day, tag, ownership);   // end-of-day rules under measurement, at the day's last bar
@@ -460,6 +626,7 @@ function loadArmed(base, src) {
     const per = order.map((sl) => { const t = tr.filter((x) => x.owner === sl); return `${sl}:${t.length}tr ${(t.reduce((s, x) => s + x.ret, 0) * 100).toFixed(1)}%`; }).join("  ");
     const stops = tr.filter((t) => t.why === "stop").length;
     console.log(`  ${name.padEnd(18)}${((state.equity / 100000 - 1) * 100).toFixed(2).padStart(8)}%${String(tr.length).padStart(8)}${(tr.length ? (w.length / tr.length * 100).toFixed(0) + "%" : "-").padStart(6)}${(avg(w).toFixed(3) + "%").padStart(9)}${(avg(l).toFixed(3) + "%").padStart(10)}${(avg(l) !== 0 ? Math.abs(avg(w) / avg(l)).toFixed(2) : "-").padStart(8)}   ${dd.toFixed(2).padStart(5)}%   ${per}${Object.keys(refused).length ? "   refused " + JSON.stringify(refused) : ""}   stops ${stops}   ${((_RealDate.now() - t0) / 60000).toFixed(1)}min`);
+    if (state.regimeDays) console.log(`      regime days (SPY against the mean of its last ${Number(v.regime.n) || 200} closes): ${JSON.stringify(state.regimeDays)}`);
     if (!tr.length) console.log("      !! TRIPWIRE: zero trades");
     if (!stops) console.log("      !! TRIPWIRE: zero stop fills");
     for (const sl of order) { const c = Object.entries(census[sl]).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k}:${n}`).join("  "); if (c) console.log(`      gates ${sl}: ${c}`); }
