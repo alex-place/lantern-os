@@ -1593,6 +1593,8 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   _exitIntent.set(sym, reason);
   logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status,
+    // the quote the exit was decided on (2026-10-09): exit slippage = ref_px vs the fill, as quote_px vs fill_px on entries
+    ref_px: Number(refPrice) > 0 ? Number(refPrice) : null,
     // #3407: keep the broker's words — status:'error' alone cost a diagnosis round trip on 08-21
     error: (r && /error/i.test(String(r.status || '')) && (r.reason || r.error)) || null });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
@@ -2990,6 +2992,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
         _exitIntent.set(sym, 'signal_exit');
         logTrade({ event: 'exit_intent', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason: 'signal_exit', status: r && r.status,
+          ref_px: Number(price) > 0 ? Number(price) : null,   // the signal's price the exit was decided on (2026-10-09)
           // #3660 B: the WHY is not optional -- this row used to say status:"error"
           // with no cause while the broker rejection text sat unread in r.reason.
           error: (r && r.status === 'error' && (r.reason || r.error)) || undefined });
