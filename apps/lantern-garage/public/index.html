@@ -211,6 +211,23 @@
     .state { padding: 14px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 13px; }
     .state.err { border-color: var(--red); color: var(--red); }
     .rule { border: 0; border-top: 1px solid var(--border); margin: 0 0 20px; }
+    .close { max-width: 72ch; }
+    .close h2 { font-size: 24px; line-height: 1.3; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 18px; }
+    @media (min-width: 561px) { .close h2 { font-size: 30px; } }
+    .close p { font-size: 15.5px; line-height: 1.65; color: var(--text); margin: 0 0 16px; }
+    .close .close-price { color: var(--muted); }
+    .close .close-price b { color: var(--text); font-weight: 700; }
+    .close a { color: var(--accent-strong); text-decoration: none; font-weight: 600; }
+    .close a:hover { color: var(--accent-strong-hover); }
+    .close-cta { margin-top: 26px; }
+    /* .cta was written for the dark band, where --accent-strong is bright cyan and a
+       near-black label reads. On the light canvas --accent-strong is #0369a1, so that
+       same label is invisible. Follow site.css's own tested convention for filled-accent
+       controls: white in light, var(--bg) in dark. */
+    .close-cta .cta { box-shadow: none; color: #fff; }
+    [data-theme="dark"] .close-cta .cta { color: var(--bg); }
+    .close-cta .cta-link { color: var(--muted); }
+    .close-cta .cta-link:hover { color: var(--text); }
     .disc { font-size: 12px; line-height: 1.6; color: var(--muted); }
     .motto { text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .08em; margin: 28px 0 0; text-transform: uppercase; }
 
@@ -384,6 +401,42 @@
         <a class="card" href="/stock-trader.html"><h3>Trader</h3><p style="color:var(--muted);font-size:13px;margin:0">Charts, watchlist, the engine's signals, and your account panel.</p></a>
         <a class="card" href="/journal.html"><h3>Journal <span class="chip">account</span></h3><p style="color:var(--muted);font-size:13px;margin:0">Every trade scored — streaks, symbol stats and the monthly report card.</p></a>
         <a class="card" href="/pricing.html"><h3>Plans</h3><p style="color:var(--muted);font-size:13px;margin:0">What is free, what is not, and exactly what each tier unlocks.</p></a>
+      </div>
+    </section>
+
+    <!-- ── The close: who wrote this, what it costs, what you would actually do ── -->
+    <section class="sec wrap" aria-labelledby="close-h">
+      <div class="close">
+        <h2 id="close-h">We would rather you checked than trusted us.</h2>
+
+        <p>
+          We are the Unisona team. The engine that wrote every verdict above is in a public
+          repository you can read line by line —
+          <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">github.com/alex-place/lantern-os</a>
+          — source-visible, though not open-source licensed. The scoring is arithmetic we
+          published on this page; if you think a weight is wrong, you can go and look at it.
+        </p>
+
+        <p>
+          What a Tuesday looks like: you open this page, read what the engine took and what it
+          refused and why, and decide for yourself. If you disagree with it, you do nothing —
+          it has no opinion about your account. If you agree, you place the order yourself in
+          the trader. That is the whole loop, and for most people it never becomes more than that.
+        </p>
+
+        <p class="close-price">
+          <b>What it costs.</b> Reading everything above is free and needs no account. Connect
+          your own broker and you can trade your own account from the trader on the free tier
+          too — the keys stay yours and we never hold your funds. <b>Pro, $20/month</b>, adds the
+          terminal tools. <b>Pilot, $200/month</b>, is the only tier where the engine can place a
+          trade without you — and even there it stays switched off until it is deliberately
+          turned on. <a href="/pricing.html">See the plans →</a>
+        </p>
+
+        <div class="cta-row close-cta">
+          <a class="cta" href="/auth.html?returnTo=%2Fstock-trader.html">Create a free account</a>
+          <a class="cta-link" href="/stock-trader.html">Or open the trader — free, read-only →</a>
+        </div>
       </div>
     </section>
 
@@ -581,10 +634,10 @@
     if (isFinite(Number(plan.stop))) stat('Stop', fmt(plan.stop, 2));
     a.appendChild(stats);
 
-    if (skipped && conv.skip_reason) {
-      var ex = explainSkip(conv.skip_reason);
+    if (skipped) {
+      var ex = explainSkip(conv.skip_reason || 'the numbers did not clear the bar');
       var why = el('div', 'vp-why');
-      why.title = ex.rule;
+      if (conv.skip_reason) why.title = ex.rule;   // only a real rule goes on the tooltip
       why.appendChild(el('b', null, 'Turned down \u2014 '));
       why.appendChild(document.createTextNode(ex.short + '.'));
       a.appendChild(why);
