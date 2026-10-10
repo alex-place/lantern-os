@@ -609,6 +609,7 @@ function jpPaintCalendar() {
 /* The calendar's measure (#3517): 'account' -- the account's change each session, the
    default -- or 'booked', what closed that day. Remembered per browser; a private window
    just starts on the default. */
+let jpAcctSrc = '';   // where the account series came from: 'alpaca' | 'ibkr' | 'session-rows' | '' (none)
 let jpCalMode = (function () {
   try { return localStorage.getItem('jp-cal-mode') === 'booked' ? 'booked' : 'account'; }
   catch (_e) { return 'account'; }
@@ -732,7 +733,10 @@ function jpCalendarCard(daily, liveToday, acct) {
   const note = !acct ? ''
     : mode === 'account'
       ? '<p class="jp-note">Each day is the account’s change from the previous close, open positions included, '
-        + 'straight from the broker. <b>Booked</b> shows only what closed that day.</p>'
+        + (jpAcctSrc === 'session-rows'
+            ? 'from the autopilot’s own session rows (the broker returned no history for this box). '
+            : 'straight from the broker. ')
+        + '<b>Booked</b> shows only what closed that day.</p>'
       : '<p class="jp-note">Each day is what closed that day: a trade held across days books on the day it closes, '
         + 'so a day spent holding is blank. <b>Account</b> shows every session.</p>';
   return '<h2>P&amp;L calendar' + chips + '</h2>' + jpCalendar(daily, liveToday, acct) + note;
@@ -2618,7 +2622,7 @@ function jpBalanceChart(h, daily, liveToday) {
        same account -- adds today's point, and the readout names it as today. */
     let live = false;
     if (!sim && liveToday && liveToday.equity > 0 && pts.length && pts[pts.length - 1].d < liveToday.date
-        && (!liveToday.source || !h.source || liveToday.source === h.source)) {
+        && (!liveToday.source || !h.source || h.source === 'session-rows' || liveToday.source === h.source)) {
       pts.push({ d: liveToday.date, v: liveToday.equity });
       live = true;
     }
@@ -2627,15 +2631,21 @@ function jpBalanceChart(h, daily, liveToday) {
       const last = pts[pts.length - 1], net = last.v - base;
       return {
         title: sim ? 'Account balance — simulated demo book'
-                   : 'Account balance — all time, from the broker',
-        html: jpPlot(pts, { type: 'line', baseline: base, baselineLabel: 'opened ' + jpAxisMoney(base),
+                   : (h.source === 'session-rows' ? 'Account balance — at each close, from the session rows'
+                                                  : 'Account balance — all time, from the broker'),
+        html: jpPlot(pts, { type: 'line', baseline: base, baselineLabel: (h.source === 'session-rows' ? 'first close ' : 'opened ') + jpAxisMoney(base),
           aria: 'Account balance from ' + pts[0].d + ' to ' + last.d + ', opened ' + jpUsd(base) + ', now ' + jpUsd(last.v) })
-          + '<p class="jp-note">Opened <b>' + jpEsc(jpUsd(base)) + '</b> on ' + jpEsc(pts[0].d)
+          + '<p class="jp-note">' + (h.source === 'session-rows' ? 'First close on record <b>' : 'Opened <b>') + jpEsc(jpUsd(base)) + '</b> on ' + jpEsc(pts[0].d)
           + ' — now <b>' + jpEsc(jpUsd(last.v)) + '</b>' + (live ? ' live' : '') + ' (<span class="' + jpSign(net) + '">'
           + jpEsc((net >= 0 ? '+' : '') + jpUsd(net)) + '</span>). '
           + (sim
               ? 'Simulated sample data for the demo book — not a real account, and not a real track record.'
-              : 'Straight from the broker, so it counts manual trades and deposits too — the calendar '
+              : h.source === 'session-rows'
+                ? 'The broker returned no history for this box, so this is the account’s equity at each close '
+                  + 'from the autopilot’s own session rows — it starts where those rows start, not at the opening '
+                  + 'balance, and it counts everything the account did on those days. The calendar below counts '
+                  + 'only what the autopilot booked.'
+                : 'Straight from the broker, so it counts manual trades and deposits too — the calendar '
                 + 'below counts only what the autopilot booked.')
           + '</p>',
       };
@@ -3194,6 +3204,7 @@ function jpRender(host, data) {
   const liveToday = data.demo ? null : jpLiveToday(data.live);
   // The account's own change per session (#3517); the demo book's series is monthly.
   const acct = data.demo ? null : jpAccountDaily(data.equity);
+  jpAcctSrc = (!data.demo && data.equity && acct) ? String(data.equity.source || '') : '';
   let html = '';
 
   if (data.demo) {
@@ -3207,7 +3218,13 @@ function jpRender(host, data) {
     rangeEl.textContent = (daily.length
       ? ('Realized results, ' + daily[0].date + ' to ' + daily[daily.length - 1].date + '.')
       : 'Realized results, day by day.')
-      + (liveToday ? ' Today so far: ' + (liveToday.pnl > 0 ? '+' : '') + jpUsd(liveToday.pnl) + ', live.' : '');
+      // Today carries BOTH measures by name (2026-10-09): the live figure is the account's change
+      // from the previous close (open positions included), the booked figure is what closed today —
+      // on a day the carries book they differ by exactly the part of those trades that belonged to
+      // yesterday, and an unlabelled "today so far" beside the calendar's cell read as a contradiction.
+      + (liveToday ? ' Today so far: ' + (liveToday.pnl > 0 ? '+' : '') + jpUsd(liveToday.pnl) + ' account change (live)'
+        + (function () { const bt = (daily || []).find(d => d.date === liveToday.date); return bt && isFinite(bt.pnl) ? ', ' + (bt.pnl > 0 ? '+' : '') + jpUsd(bt.pnl) + ' booked.' : ', nothing booked yet.'; })()
+        : '');
   }
 
   if (!s.trades) {

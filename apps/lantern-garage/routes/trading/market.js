@@ -505,6 +505,20 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           else if (ib && ib.reason && (!out || !out.reason)) out = ib;
         } catch (_e) { /* keep the Alpaca answer, whatever it was */ }
       }
+      // THE ACCOUNT MEASURE WITHOUT A BROKER HISTORY (2026-10-09). On the stable box (IBKR) neither
+      // adapter answers, so the journal's calendar was pinned to Booked while the header showed the
+      // live account figure: +$3,145 "today so far" beside a $1,708 cell, two measures and no
+      // toggle. Every brain writes a session row at the close with the account's equity — an
+      // equity series at each close, one point per date — so the Account view comes from those
+      // rows instead. The payload says so (source: 'session-rows') and keeps the broker's reason.
+      if (!out || out.ok === false || !Array.isArray(out.timestamps) || out.timestamps.length < 3) {
+        try {
+          const dayPnlLib = require('../../lib/day-pnl');
+          const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
+          const rows = require('../../lib/session-equity-series').fromLedgers(dayPnlLib.tradesLedgerSources(dataDir));
+          if (rows && rows.ok) out = { ...rows, broker_reason: (out && out.reason) || null };
+        } catch (_e) { /* keep the broker's answer, whatever it was */ }
+      }
       sendJson(res, out, 200);
     } catch (error) {
       sendJson(res, { ok: false, reason: error.message }, 200);
