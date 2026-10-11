@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="observe">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0e17">
+  <title>Markets — Unisona</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/market.css">
+</head>
+<body>
+<header class="band">
+  <div class="band-inner wrap">
+    <a class="sym-back" href="/markets.html" id="cBack">&larr; Markets</a>
+    <h1 class="sym-t" id="cTitle">Markets</h1>
+    <div class="sym-name" id="cSub">loading…</div>
+    <nav class="mk-nav" aria-label="Markets" id="cNav">
+      <a href="/markets.html">Overview</a>
+      <a href="/market.html?c=indices" data-c="indices">Indices</a>
+      <a href="/market.html?c=stocks" data-c="stocks">US stocks</a>
+      <a href="/market.html?c=crypto" data-c="crypto">Crypto</a>
+      <a href="/market.html?c=futures" data-c="futures">Futures</a>
+      <a href="/market.html?c=forex" data-c="forex">Forex</a>
+    </nav>
+  </div>
+</header>
+
+<main id="view"></main>
+
+<section class="sec wrap">
+  <hr class="rule">
+  <p class="disc prose" id="disc">
+    Prices are Yahoo Finance quotes, refreshed about every thirty seconds and delayed as the
+    exchange requires. Each board is a curated list that its page names — not every index,
+    coin, contract or pair, and not a screener. Nothing here is investment advice.
+  </p>
+</section>
+
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/market-ui.js"></script>
+<script>
+/* ── One asset class ─────────────────────────────────────────────────────────────
+   /market.html?c=<class>            the class overview — TradingView's /markets/futures/
+   /market.html?c=<class>&g=<group>  one of its boards in full — /markets/futures/quotes-energy/
+                     &view=perf      the same board, as returns over each window
+                     &session=pre|post   (US stocks) ranked on the extended-hours move
+
+   Everything comes from /api/trading/markets (lib/market-boards). Every heading and "See
+   all" leads to the next page down; every instrument to its own symbol page. */
+(function () {
+  'use strict';
+  var U = window.MarketUI, el = U.el, COL = U.COL;
+  var CLASSES = ['indices', 'stocks', 'crypto', 'futures', 'forex'];
+  var qs = new URLSearchParams(location.search);
+  var C = qs.get('c') || '';
+  var G = qs.get('g') || '';
+  var VIEW = qs.get('view') === 'perf' ? 'perf' : 'overview';
+  var SESSION = qs.get('session') === 'pre' || qs.get('session') === 'post' ? qs.get('session') : 'regular';
+  var view = document.getElementById('view');
+
+  function byId(id) { return document.getElementById(id); }
+  function href(c, g, extra) {
+    var p = '/market.html?c=' + encodeURIComponent(c);
+    if (g) p += '&g=' + encodeURIComponent(g);
+    Object.keys(extra || {}).forEach(function (k) { if (extra[k]) p += '&' + k + '=' + encodeURIComponent(extra[k]); });
+    return p;
+  }
+  function caret() {
+    var s = U.svg('svg', { class: 'caret', viewBox: '0 0 6 11', fill: 'currentColor', 'aria-hidden': 'true' });
+    s.appendChild(U.svg('path', { d: 'M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z' }));
+    return s;
+  }
+  /** A section with its header. A heading with an href leads to the next page down. */
+  function section(title, link, sub) {
+    var sec = el('section', 'sec wrap');
+    var head = el('div', 'sec-head');
+    var h = el('h2', null, title);
+    if (link) { var a = el('a'); a.href = link; a.appendChild(h); a.appendChild(caret()); head.appendChild(a); }
+    else head.appendChild(h);
+    var s = el('span', 'sub', sub || '');
+    head.appendChild(s);
+    sec.appendChild(head);
+    view.appendChild(sec);
+    return { sec: sec, head: head, sub: s };
+  }
+  function seeAll(sec, label, link) {
+    var w = el('div', 'viewall'), a = el('a', 'cta-line', label);
+    a.href = link;
+    w.appendChild(a);
+    sec.appendChild(w);
+  }
+  function asOf(d) {
+    var t = Date.parse(d && d.asOf);
+    return isFinite(t) ? 'as of ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  }
+  function failAll(e) {
+    view.innerHTML = '';
+    var s = section('Could not load this board');
+    s.sec.appendChild(el('div', 'state err', 'The market data did not load (' + e.message + '). Try again in a moment.'));
+    byId('cSub').textContent = '';
+  }
+
+  if (CLASSES.indexOf(C) < 0) {
+    byId('cSub').textContent = 'Pick a market.';
+    var s0 = section('Markets');
+    s0.sec.appendChild(el('div', 'state', 'There is no market called “' + C.slice(0, 40) + '” here. Choose one from the row above.'));
+    return;
+  }
+  [].forEach.call(byId('cNav').querySelectorAll('a[data-c]'), function (a) {
+    if (a.getAttribute('data-c') === C) a.setAttribute('aria-current', 'page');
+  });
+
+  /* ── Columns ──────────────────────────────────────────────────────────────────── */
+  function sessionCols(session) {
+    if (session === 'regular') return [COL.price, COL.chgPct, COL.volume, COL.mcap, COL.trend];
+    var k = session, label = session === 'pre' ? 'Pre-market' : 'After hours';
+    return [COL.price,
+      { label: label, cell: function (r) { return r[k] ? U.price({ price: r[k].price, hint: r.hint }) : '—'; } },
+      { label: label + ' %', cell: function (r) { return U.pct(r[k] && r[k].chg_pct); },
+        cls: function (r) { return U.dirCls(r[k] && r[k].chg_pct); } },
+      COL.chgPct, COL.volume, COL.trend];
+  }
+  function colsFor(cls, v, session) {
+    if (v === 'perf') return [COL.price].concat(U.PERF);
+    if (cls === 'stocks') return sessionCols(session);
+    if (cls === 'crypto') return [COL.price, COL.chgPct, COL.mcap,
+      { label: 'Volume 24h', cell: function (r) { return U.big(r.volume); } }, COL.supply, COL.trend];
+    if (cls === 'futures') return [COL.price, COL.chgPct, COL.chg, COL.high, COL.low, COL.volume, COL.trend];
+    return [COL.price, COL.chgPct, COL.chg, COL.high, COL.low, COL.trend];
+  }
+  var SUMMARY_COLS = [COL.price,
+    { label: 'Today', cell: function (r) { return U.pct(r.chg_pct); }, cls: function (r) { return U.dirCls(r.chg_pct); } },
+    U.PERF[0], U.PERF[1], U.PERF[3], U.PERF[4], U.PERF[5]];
+
+  /* ── A class overview ─────────────────────────────────────────────────────────── */
+  function renderOverview(d) {
+    document.title = d.class.title + ' — Unisona';
+    byId('cTitle').textContent = d.class.title;
+    byId('cSub').textContent = d.class.blurb;
+
+    var sum = section('Market summary', null, asOf(d) + ' · changes are from each market’s latest session');
+    var lc = el('div', 'card');
+    sum.sec.appendChild(lc);
+    U.leadChart(lc, d.lead, ['1D', '5D', '1M', '6M', '1Y'], '1D');
+    var tc = el('div', 'card');
+    tc.style.marginTop = '16px';
+    tc.style.padding = '6px';
+    tc.appendChild(d.summary && d.summary.length ? U.table(d.summary, SUMMARY_COLS) : el('div', 'state', 'Nothing could be priced just now.'));
+    sum.sec.appendChild(tc);
+    if (d.totals && d.totals.mcap) {
+      // Over the coins LISTED here, and said so: not the whole market's capitalisation, and
+      // Bitcoin's share of these coins is not "Bitcoin dominance".
+      sum.sec.appendChild(el('p', 'mk-note',
+        'Market cap of the ' + d.totals.coins + ' coins listed here: $' + U.big(d.totals.mcap)
+        + (d.totals.btcShare != null ? ' · Bitcoin’s share of them: ' + d.totals.btcShare.toFixed(1) + '%' : '')
+        + '. That is these coins, not the whole crypto market.'));
+    }
+
+    (d.groups || []).forEach(function (g) {
+      var s = section(g.title, href(C, g.id), g.priced + ' of ' + g.listed + ' priced');
+      var t = el('div', 'tiles');
+      if (!g.rows.length) t.appendChild(el('div', 'state', 'None of these could be priced just now.'));
+      g.rows.forEach(function (r) { t.appendChild(U.tile(r)); });
+      s.sec.appendChild(t);
+      // "See all" of a one-instrument group would be a button to the same tile; its
+      // heading still leads to the board (high, low, the performance view).
+      if (g.listed > 1) seeAll(s.sec, 'See all ' + g.title.charAt(0).toLowerCase() + g.title.slice(1), href(C, g.id));
+    });
+
+    if (d.cross) {
+      var x = section('Cross rates', null, 'today’s move of each pair, row against column');
+      var card = el('div', 'card');
+      var w = el('div', 'qwrap'), grid = el('div', 'heat');
+      grid.appendChild(el('div', 'hh', ''));
+      d.cross.currencies.forEach(function (c) { grid.appendChild(el('div', 'hh', c)); });
+      d.cross.currencies.forEach(function (base) {
+        grid.appendChild(el('div', 'hh', base));
+        d.cross.currencies.forEach(function (quote) {
+          if (base === quote) { grid.appendChild(el('div', 'hx', '—')); return; }
+          var cell = d.cross.cells.filter(function (k) { return k.base === base && k.quote === quote; })[0];
+          var v = cell ? cell.chg_pct : null;
+          var c = el('div', 'hc ' + U.dirCls(v), U.pct(v));
+          c.title = base + '/' + quote + ' ' + U.pct(v) + ' today';
+          grid.appendChild(c);
+        });
+      });
+      w.appendChild(grid);
+      card.appendChild(w);
+      x.sec.appendChild(card);
+      x.sec.appendChild(el('p', 'mk-note',
+        'Derived, not quoted: each cross is computed from the two currencies’ moves against the US dollar '
+        + '(EUR/JPY moves by the euro’s move over the yen’s), so it can differ slightly from a cross quoted directly.'));
+    }
+  }
+
+  /* ── US stocks ────────────────────────────────────────────────────────────────── */
+  function moverCard(title, sub, rows, link, show) {
+    var c = el('div', 'card');
+    var h = el('a');
+    h.href = link;
+    h.style.color = 'inherit';
+    h.style.textDecoration = 'none';
+    h.appendChild(el('h3', null, title));
+    c.appendChild(h);
+    c.appendChild(el('p', 'csub', sub));
+    if (!rows.length) c.appendChild(el('div', 'state', 'Nothing to show.'));
+    rows.forEach(function (r) {
+      var a = el('a', 'row');
+      a.href = U.symHref(r.symbol);
+      a.appendChild(U.badge(r));
+      var g = el('div', 'grow'), l1 = el('div', 'l1');
+      l1.appendChild(el('span', 'sym', r.symbol));
+      if (r.kind === 'leveraged') l1.appendChild(el('span', 'chip', 'leveraged'));
+      else if (r.kind === 'etf') l1.appendChild(el('span', 'chip', 'ETF'));
+      g.appendChild(l1);
+      g.appendChild(el('div', 'l2', r.name || ''));
+      a.appendChild(g);
+      var n = el('div', 'num');
+      n.appendChild(el('div', 'px', U.price(r)));
+      if (show === 'volume') n.appendChild(el('div', 'ch flat', '$' + U.big(r.price * r.volume) + ' traded'));
+      else n.appendChild(el('div', 'ch ' + U.dirCls(r.chg_pct), U.pct(r.chg_pct)));
+      a.appendChild(n);
+      c.appendChild(a);
+    });
+    var all = el('a', 'inlink', 'See all');
+    all.href = link;
+    c.appendChild(all);
+    return c;
+  }
+  function sectorBars(box, sectors, key) {
+    box.innerHTML = '';
+    var list = sectors.map(function (s) { return { s: s, v: key === 'today' ? s.chg_pct : s[key] }; })
+      .filter(function (x) { return U.isNum(x.v); })
+      .sort(function (a, b) { return b.v - a.v; });
+    if (!list.length) { box.appendChild(el('div', 'state', 'No sector figures just now.')); return; }
+    var max = Math.max.apply(null, list.map(function (x) { return Math.abs(x.v); }).concat([0.5]));
+    list.forEach(function (x) {
+      var a = el('a', 'sbar');
+      a.href = U.symHref(x.s.symbol);
+      a.appendChild(el('span', 'sbn', x.s.name));
+      var t = el('span', 'sbt'), f = el('span', 'sbf ' + U.dirCls(x.v));
+      f.style.width = (Math.abs(x.v) / max * 50).toFixed(1) + '%';
+      t.appendChild(f);
+      a.appendChild(t);
+      a.appendChild(el('span', 'sbv ' + U.dirCls(x.v), U.pct(x.v)));
+      a.title = x.s.name + ' (' + x.s.symbol + ')';
+      box.appendChild(a);
+    });
+  }
+  function renderStocks(d) {
+    document.title = 'US stocks — Unisona';
+    byId('cTitle').textContent = 'US stocks';
+    byId('cSub').textContent = d.class.blurb;
+
+    var sum = section('Market summary', null, asOf(d));
+    var lc = el('div', 'card');
+    sum.sec.appendChild(lc);
+    U.leadChart(lc, d.lead, ['1D', '5D', '1M', '6M', '1Y'], '1D');
+
+    var row = el('div', 'grid');
+    row.style.marginTop = '16px';
+    var sc = el('div', 'card');
+    var sh = el('div', 'mk-lead-h');
+    sh.appendChild(el('h3', null, 'Sector performance'));
+    sh.appendChild(el('span', 'spacer'));
+    var bars = el('div');
+    sh.appendChild(U.rangeBar(['Today', '1M', 'YTD'], 'Today', function (k) {
+      sectorBars(bars, d.sectors || [], k === 'Today' ? 'today' : k === '1M' ? 'm1' : 'ytd');
+    }));
+    sc.appendChild(sh);
+    sc.appendChild(el('p', 'csub', 'the eleven SPDR sector funds'));
+    sc.appendChild(bars);
+    sectorBars(bars, d.sectors || [], 'today');
+    row.appendChild(sc);
+
+    var b = d.breadth || {};
+    var bc = el('div', 'card');
+    bc.appendChild(el('h3', null, 'Market breadth'));
+    bc.appendChild(el('p', 'csub', 'across the ' + (b.n || 0) + ' names we track — not the whole exchange'));
+    var tot = (b.adv || 0) + (b.dec || 0) + (b.unch || 0);
+    var split = el('div', 'split');
+    var sa = el('span', 'a'), sd = el('span', 'd');
+    sa.style.width = tot ? (b.adv / tot * 100).toFixed(1) + '%' : '0';
+    sd.style.width = tot ? (b.dec / tot * 100).toFixed(1) + '%' : '0';
+    split.appendChild(sa);
+    split.appendChild(sd);
+    bc.appendChild(split);
+    var sl = el('div', 'split-l');
+    sl.appendChild(el('span', 'up', (b.adv || 0) + ' advancing'));
+    if (b.unch) sl.appendChild(el('span', 'flat', b.unch + ' unchanged'));
+    sl.appendChild(el('span', 'down', (b.dec || 0) + ' declining'));
+    bc.appendChild(sl);
+    var bs = el('div', 'bstats');
+    function bstat(k, v, n) {
+      var w = el('div');
+      w.appendChild(el('div', 'kk', k));
+      w.appendChild(el('div', 'kv', v == null ? '—' : v + '%'));
+      w.appendChild(el('div', 'csub', 'of the ' + n + ' names'));
+      bs.appendChild(w);
+    }
+    bstat('Above 50-day average', b.above50, b.n50 || 0);
+    bstat('Above 200-day average', b.above200, b.n200 || 0);
+    bc.appendChild(bs);
+    row.appendChild(bc);
+    sum.sec.appendChild(row);
+
+    var mv = section('Biggest moves', href('stocks', 'gainers'), (d.priced || 0) + ' of ' + (d.universe || 0) + ' priced');
+    var g3 = el('div', 'grid g3');
+    g3.appendChild(moverCard('Gainers', 'biggest move up today', d.gainers || [], href('stocks', 'gainers')));
+    g3.appendChild(moverCard('Losers', 'biggest move down today', d.losers || [], href('stocks', 'losers')));
+    g3.appendChild(moverCard('Most active', 'most dollars traded today', d.active || [], href('stocks', 'active'), 'volume'));
+    mv.sec.appendChild(g3);
+    mv.sec.appendChild(el('p', 'mk-note',
+      'Ranked across a curated list of ' + (d.universe || 0) + ' liquid US stocks and index, sector and leveraged '
+      + 'funds — not the whole exchange: there is no screener behind this, so the page names its universe. '
+      + 'Every board here is cut from one snapshot, so they cannot disagree about a price. Leveraged funds are '
+      + 'labelled rather than hidden: a leveraged fund’s big day is not the same event as a stock’s.'));
+    seeAll(mv.sec, 'See all tracked US stocks', href('stocks', 'all'));
+  }
+
+  /* ── One board in full ────────────────────────────────────────────────────────── */
+  function renderBoard(d) {
+    var cls = d.class.title, gt = d.group.title;
+    document.title = gt + ' — ' + cls + ' — Unisona';
+    byId('cTitle').textContent = gt;
+    byId('cSub').textContent = cls;
+    var back = byId('cBack');
+    back.href = href(C);
+    back.textContent = '← ' + cls;
+
+    var s = section(gt, null, (d.priced || 0) + ' of ' + (d.listed || d.universe || 0) + ' priced · ' + asOf(d));
+    var bar = el('div', 'mk-lead-h');
+    // The class's other boards, one click away — TradingView's collection tabs.
+    var tabs = el('span', 'tfbar');
+    (d.groups || []).forEach(function (g) {
+      var a = el('a', 'tf' + (g.id === d.group.id ? ' on' : ''), g.title);
+      a.href = href(C, g.id, { view: VIEW === 'perf' ? 'perf' : '', session: C === 'stocks' && SESSION !== 'regular' ? SESSION : '' });
+      if (g.id === d.group.id) a.setAttribute('aria-current', 'page');
+      a.style.textDecoration = 'none';
+      tabs.appendChild(a);
+    });
+    bar.appendChild(tabs);
+    bar.appendChild(el('span', 'spacer'));
+    if (C === 'stocks' && d.group.id !== 'all') {
+      var ses = el('span', 'tfbar');
+      [['regular', 'Regular'], ['pre', 'Pre-market'], ['post', 'After hours']].forEach(function (p) {
+        var a = el('a', 'tf' + (p[0] === d.session ? ' on' : ''), p[1]);
+        a.href = href(C, d.group.id, { session: p[0] === 'regular' ? '' : p[0], view: VIEW === 'perf' ? 'perf' : '' });
+        if (p[0] === d.session) a.setAttribute('aria-current', 'true');
+        a.style.textDecoration = 'none';
+        ses.appendChild(a);
+      });
+      bar.appendChild(ses);
+    }
+    var vw = el('span', 'tfbar');
+    [['overview', 'Overview'], ['perf', 'Performance']].forEach(function (p) {
+      var a = el('a', 'tf' + (p[0] === d.view ? ' on' : ''), p[1]);
+      a.href = href(C, d.group.id, { view: p[0] === 'perf' ? 'perf' : '', session: C === 'stocks' && d.session !== 'regular' ? d.session : '' });
+      if (p[0] === d.view) a.setAttribute('aria-current', 'true');
+      a.style.textDecoration = 'none';
+      vw.appendChild(a);
+    });
+    bar.appendChild(vw);
+    s.sec.appendChild(bar);
+
+    var card = el('div', 'card');
+    card.style.padding = '6px';
+    var rows = d.rows || [];
+    card.appendChild(rows.length ? U.table(rows, colsFor(C, d.view, d.session))
+      : el('div', 'state', C === 'stocks' && d.session !== 'regular'
+        ? 'No extended-hours moves in this direction right now.' : 'Nothing could be priced just now.'));
+    s.sec.appendChild(card);
+
+    var notes = {
+      stocks: 'Ranked across a curated list of ' + (d.universe || 0) + ' liquid US stocks and funds, not the whole '
+        + 'exchange — there is no screener behind this. “Most active” ranks by dollars traded (price × volume).',
+      crypto: 'Market cap, 24-hour volume and circulating supply are as Yahoo reports them. Coins trade around the clock; '
+        + 'the day’s change is measured from midnight UTC.',
+      futures: 'The front contract of each market, as Yahoo rolls it. Prices are in the unit beside each name — '
+        + 'grains, softs and livestock are quoted in US cents.',
+      forex: 'Each pair is quoted as the second currency per one of the first: EUR/USD 1.12 is 1.12 dollars a euro.',
+      indices: 'Index levels in points, in each market’s own currency. World indices change on their own session’s clock.',
+    };
+    if (d.view === 'perf') s.sec.appendChild(el('p', 'mk-note', 'Performance is the live price against the last close at or before the start of each calendar window.'));
+    if (notes[C]) s.sec.appendChild(el('p', 'mk-note', notes[C]));
+  }
+
+  var url = '/api/trading/markets?c=' + encodeURIComponent(C);
+  if (G) url += '&g=' + encodeURIComponent(G) + (VIEW === 'perf' ? '&view=perf' : '') + (SESSION !== 'regular' ? '&session=' + SESSION : '');
+  view.appendChild(el('div', 'wrap', null)).appendChild(el('div', 'state', 'Loading…'));
+  U.get(url)
+    .then(function (d) {
+      view.innerHTML = '';
+      if (G) renderBoard(d);
+      else if (C === 'stocks') renderStocks(d);
+      else renderOverview(d);
+    })
+    .catch(function (e) {
+      if (/404/.test(e.message) && G) {
+        view.innerHTML = '';
+        var s = section('No such board');
+        s.sec.appendChild(el('div', 'state', 'There is no “' + G.slice(0, 40) + '” board under this market.'));
+        seeAll(s.sec, 'Back to the overview', href(C));
+        byId('cSub').textContent = '';
+        return;
+      }
+      failAll(e);
+    });
+})();
+</script>
+</body>
+</html>
