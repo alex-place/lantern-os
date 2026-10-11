@@ -24,105 +24,189 @@
   <div class="band-inner wrap">
     <a class="sym-back" href="/">&larr; Home</a>
     <h1 class="sym-t">Markets</h1>
-    <div class="sym-name" id="mSub">loading…</div>
-    <div class="pulse" id="pulse" aria-live="polite" style="margin-top:14px"></div>
+    <div class="sym-name">Indices, US stocks, crypto, futures and forex — priced live.</div>
+    <nav class="mk-nav" aria-label="Markets">
+      <a href="/markets.html" aria-current="page">Overview</a>
+      <a href="/market.html?c=indices">Indices</a>
+      <a href="/market.html?c=stocks">US stocks</a>
+      <a href="/market.html?c=crypto">Crypto</a>
+      <a href="/market.html?c=futures">Futures</a>
+      <a href="/market.html?c=forex">Forex</a>
+    </nav>
+    <div class="pulse" id="pulse" aria-live="polite" style="margin-top:18px"></div>
   </div>
 </header>
 
 <main>
-  <section class="sec wrap" aria-labelledby="mv-h">
+  <!-- ── Market summary ── -->
+  <section class="sec wrap" aria-labelledby="sum-h">
     <div class="sec-head">
-      <h2 id="mv-h">Biggest moves</h2>
-      <span class="sub" id="mvSub">loading…</span>
+      <h2 id="sum-h">Market summary</h2>
+      <span class="sub" id="sumSub">loading…</span>
     </div>
-    <div class="grid" id="boards"></div>
-    <p class="disc" id="universeNote"></p>
+    <div class="mk-sum">
+      <div class="card" id="lead"></div>
+      <div class="card" id="majors" style="padding:8px"></div>
+    </div>
+  </section>
+
+  <!-- ── US stocks ── -->
+  <section class="sec wrap" aria-labelledby="st-h">
+    <div class="sec-head">
+      <a href="/market.html?c=stocks"><h2 id="st-h">US stocks</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub" id="stSub">loading…</span>
+    </div>
+    <div class="grid" id="movers"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=stocks">See all US stocks</a></div>
+  </section>
+
+  <!-- ── Crypto ── -->
+  <section class="sec wrap" aria-labelledby="cr-h">
+    <div class="sec-head">
+      <a href="/market.html?c=crypto"><h2 id="cr-h">Crypto</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">the largest coins by market cap</span>
+    </div>
+    <div class="tiles" id="crypto"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=crypto&amp;g=coins">See all coins</a></div>
+  </section>
+
+  <!-- ── Futures ── -->
+  <section class="sec wrap" aria-labelledby="fu-h">
+    <div class="sec-head">
+      <a href="/market.html?c=futures"><h2 id="fu-h">Futures</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">energy, metals and the S&amp;P — the front contract</span>
+    </div>
+    <div class="tiles" id="futures"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=futures">See all futures</a></div>
+  </section>
+
+  <!-- ── Forex ── -->
+  <section class="sec wrap" aria-labelledby="fx-h">
+    <div class="sec-head">
+      <a href="/market.html?c=forex"><h2 id="fx-h">Forex</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">the major pairs and the dollar index</span>
+    </div>
+    <div class="tiles" id="forex"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=forex&amp;g=majors">See all major pairs</a></div>
+  </section>
+
+  <section class="sec wrap">
+    <hr class="rule">
+    <p class="disc prose">
+      Prices are Yahoo Finance quotes, refreshed about every thirty seconds and delayed as the
+      exchange requires. Each board is a curated list that its page names — not every index,
+      coin, contract or pair, and not a screener. Nothing here is investment advice.
+    </p>
   </section>
 </main>
 
 <script src="/js/site-chrome.js" defer></script>
+<script src="/js/market-ui.js"></script>
 <script>
-/* ── Movers board ──────────────────────────────────────────────────────────────
-   The "Markets" heading on the home page led to /stock-trader.html like everything
-   else (founder, 2026-10-11). This is where it goes instead.
+/* ── Markets hub ─────────────────────────────────────────────────────────────────
+   TradingView's /markets, ours: a market summary, then one section per asset class.
+   Every heading and every "See all" leads to that class's own page (/market.html), and
+   every instrument to its own (/symbol.html) — none of them to the trader, which is
+   where every link on the old home page went (founder, 2026-10-11).
 
-   HONEST ABOUT ITS UNIVERSE. We have no screener — the quote client prices a list you
-   hand it — so this ranks lib/market-universe (119 liquid US names and ETFs), and says
-   so on the page rather than implying it swept the exchange. All three boards are cut
-   from ONE snapshot, so they cannot disagree about a price.
-*/
+   One call, /api/trading/markets, carries every section, priced in one batch so the
+   sections cannot disagree about a price. */
 (function () {
   'use strict';
+  var U = window.MarketUI, el = U.el;
   function byId(id) { return document.getElementById(id); }
-  function el(tag, cls, text) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
+  function fail(box, what, e) {
+    box.innerHTML = '';
+    box.appendChild(el('div', 'state err', 'Could not load ' + what + ' (' + e.message + ').'));
   }
-  function get(url) {
-    return fetch(url, { credentials: 'same-origin' }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    });
+  function tiles(box, rows, what) {
+    box.innerHTML = '';
+    if (!rows || !rows.length) { box.appendChild(el('div', 'state', 'No ' + what + ' could be priced just now.')); return; }
+    rows.forEach(function (r) { box.appendChild(U.tile(r)); });
   }
-  function fmt(n, d) {
-    var v = Number(n);
-    if (!isFinite(v)) return '—';
-    return v.toLocaleString(undefined, { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d });
-  }
-  function pct(n) { var v = Number(n); return isFinite(v) ? (v > 0 ? '+' : '') + v.toFixed(2) + '%' : '—'; }
-  function dirCls(n) { var v = Number(n); return !isFinite(v) || v === 0 ? 'flat' : v > 0 ? 'up' : 'down'; }
-  function badge(s) { return el('span', 'badge', String(s).slice(0, 2)); }
-
-  function board(title, sub, rows) {
+  function moverCard(title, sub, rows) {
     var c = el('div', 'card');
     c.appendChild(el('h3', null, title));
     c.appendChild(el('p', 'csub', sub));
     if (!rows.length) { c.appendChild(el('div', 'state', 'Nothing to show.')); return c; }
     rows.forEach(function (r) {
       var a = el('a', 'row');
-      a.href = '/symbol.html?t=' + encodeURIComponent(r.ticker);
-      a.appendChild(badge(r.ticker));
+      a.href = U.symHref(r.symbol);
+      a.appendChild(U.badge(r));
       var g = el('div', 'grow'), l1 = el('div', 'l1');
-      l1.appendChild(el('span', 'sym', r.ticker));
-      // A 3x fund's 9% day is not the same event as a stock's. Label it rather than
-      // hide it, so the ranking stays complete and still reads honestly.
-      if (r.kind === 'leveraged') l1.appendChild(el('span', 'chip', '3x'));
+      l1.appendChild(el('span', 'sym', r.symbol));
+      // A leveraged fund's 9% day is not the same event as a stock's: labelled, not hidden.
+      if (r.kind === 'leveraged') l1.appendChild(el('span', 'chip', 'leveraged'));
       else if (r.kind === 'etf') l1.appendChild(el('span', 'chip', 'ETF'));
-      if (r.session && r.session !== 'regular') l1.appendChild(el('span', 'chip', r.session));
       g.appendChild(l1);
+      g.appendChild(el('div', 'l2', r.name || ''));
       a.appendChild(g);
       var n = el('div', 'num');
-      n.appendChild(el('div', 'px', fmt(r.price, Number(r.price) < 10 ? 4 : 2)));
-      n.appendChild(el('div', 'ch ' + dirCls(r.chg_pct), pct(r.chg_pct)));
+      n.appendChild(el('div', 'px', U.price(r)));
+      n.appendChild(el('div', 'ch ' + U.dirCls(r.chg_pct), U.pct(r.chg_pct)));
       a.appendChild(n);
       c.appendChild(a);
     });
     return c;
   }
 
-  get('/api/trading/movers?limit=10')
+  U.get('/api/trading/markets')
     .then(function (d) {
-      var box = byId('boards');
-      box.innerHTML = '';
-      box.appendChild(board('Gainers', 'biggest move up today', d.gainers || [], 'move'));
-      box.appendChild(board('Losers', 'biggest move down today', d.losers || [], 'move'));
-      byId('mvSub').textContent = (d.priced || 0) + ' of ' + (d.universe || 0) + ' priced';
-      byId('mSub').textContent = 'The biggest moves across ' + (d.universe || 0) + ' liquid US names and funds.';
-      byId('universeNote').textContent =
-        'Ranked across a curated list of ' + (d.universe || 0) + ' liquid US names, index, sector and '
-        + 'leveraged funds — not the whole exchange: there is no screener behind this, so the board names '
-        + 'its universe. All three boards are cut from one snapshot, so they cannot disagree about a price. '
-        + 'Inclusion says a symbol is liquid enough to rank, nothing more.';
+      // Market summary: the S&P 500 drawn large, the major indices beside it.
+      U.leadChart(byId('lead'), d.lead || { symbol: '^GSPC', name: 'S&P 500' }, ['1D', '1M', '1Y'], '1D');
+      var mj = byId('majors');
+      mj.innerHTML = '';
+      var h = el('div', 'sec-head');
+      h.style.margin = '6px 6px 4px';
+      var ha = el('a');
+      ha.href = '/market.html?c=indices';
+      ha.appendChild(el('h3', null, 'Major indices'));
+      h.appendChild(ha);
+      mj.appendChild(h);
+      (d.indices || []).forEach(function (r) {
+        var a = el('a', 'row');
+        a.style.minHeight = '48px';
+        a.href = U.symHref(r.symbol);
+        var g = el('div', 'grow');
+        g.appendChild(el('div', 'sym', r.name));
+        g.appendChild(el('div', 'l2', r.short));
+        a.appendChild(g);
+        var n = el('div', 'num');
+        n.appendChild(el('div', 'px', U.price(r)));
+        n.appendChild(el('div', 'ch ' + U.dirCls(r.chg_pct), U.pct(r.chg_pct)));
+        a.appendChild(n);
+        mj.appendChild(a);
+      });
+      var all = el('a', 'inlink', 'See all indices');
+      all.href = '/market.html?c=indices';
+      all.style.margin = '8px 12px 6px';
+      mj.appendChild(all);
+      byId('sumSub').textContent = 'as of ' + new Date(d.asOf).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+      // US stocks: the day's biggest moves, over a universe the page names.
+      var st = d.stocks || {};
+      var mv = byId('movers');
+      mv.innerHTML = '';
+      mv.appendChild(moverCard('Gainers', 'biggest move up today', st.gainers || []));
+      mv.appendChild(moverCard('Losers', 'biggest move down today', st.losers || []));
+      byId('stSub').textContent = 'across the ' + (st.universe || 0) + ' US names and funds we track — '
+        + (st.priced || 0) + ' priced';
+
+      tiles(byId('crypto'), d.crypto, 'coins');
+      tiles(byId('futures'), d.futures, 'futures');
+      tiles(byId('forex'), d.forex, 'pairs');
     })
     .catch(function (e) {
-      byId('boards').appendChild(el('div', 'state err', 'Could not load the movers (' + e.message + ').'));
-      byId('mvSub').textContent = '';
-      byId('mSub').textContent = '';
+      ['lead', 'majors', 'movers', 'crypto', 'futures', 'forex'].forEach(function (id) { fail(byId(id), 'the markets', e); });
+      byId('sumSub').textContent = '';
+      byId('stSub').textContent = '';
     });
 
-  get('/api/trading/market-status')
+  U.get('/api/trading/market-status')
     .then(function (m) {
       var box = byId('pulse');
       function pill(parts) {
@@ -131,10 +215,9 @@
         box.appendChild(s);
       }
       var open = !!m.market_open;
-      pill([{ cls: 'dot' + (open ? ' on' : '') }, { text: open ? 'Market open' : 'Market closed' }]);
-      if (m.vix != null) pill([{ cls: 'k', text: 'VIX' }, { text: fmt(m.vix, 2) + (m.vix_regime ? ' · ' + m.vix_regime : '') }]);
-      if (m.market) pill([{ cls: 'k', text: 'Trend' }, { text: String(m.market) }]);
-      if (m.spy_1d != null) pill([{ cls: 'k', text: 'SPY 1D' }, { cls: dirCls(m.spy_1d), text: pct(m.spy_1d) }]);
+      pill([{ cls: 'dot' + (open ? ' on' : '') }, { text: open ? 'US market open' : 'US market closed' }]);
+      if (m.vix != null) pill([{ cls: 'k', text: 'VIX' }, { text: U.fmt(m.vix, 2) + (m.vix_regime ? ' · ' + m.vix_regime : '') }]);
+      if (m.spy_1d != null) pill([{ cls: 'k', text: 'SPY 1D' }, { cls: U.dirCls(m.spy_1d), text: U.pct(m.spy_1d) }]);
     })
     .catch(function () { /* the pulse is context, not the point of the page */ });
 })();

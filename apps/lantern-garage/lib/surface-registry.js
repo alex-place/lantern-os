@@ -44,9 +44,11 @@ const CORE = {
   // reason — the rule above asks the next surface to either serve the loop or justify a
   // raise, and this one serves the loop.
   "symbol.html":            "Observe",   // one symbol: price, statistics, news, the engine's read
-  // The same Observe stage across the universe rather than down one symbol: what moved
-  // today, ranked. Reads prices and acts on nothing, exactly as the two above.
-  "markets.html":           "Observe",   // the movers board
+  // The same Observe stage across the markets rather than down one symbol: the hub, and
+  // one page per asset class with its boards. Reads prices and acts on nothing, exactly
+  // as the two above.
+  "markets.html":           "Observe",   // the markets hub
+  "market.html":            "Observe",   // one asset class: its summary and its boards
   // Reading one story is observing too, and this is the surface the news feed points
   // at. It summarises and links out; it takes no action.
   "news-article.html":      "Observe",   // one story, summarised, beside its original

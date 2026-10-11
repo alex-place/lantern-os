@@ -131,7 +131,9 @@ function buildGraph(pages) {
   for (const page of pages) {
     const raw = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8');
     const markup = stripCode(raw);
-    const hrefs = [...markup.matchAll(/href="\/?([a-zA-Z0-9_-]+\.html)"/g)].map((m) => m[1]);
+    // A query string or fragment does not make a link unclickable: /market.html?c=crypto is
+    // a click to market.html. (Matching only a bare `.html"` counted every such page an orphan.)
+    const hrefs = [...markup.matchAll(/href="\/?([a-zA-Z0-9_-]+\.html)(?:[?#][^"]*)?"/g)].map((m) => m[1]);
     // Pages that load site-chrome.js also render the shared nav at runtime.
     const injected = /src="[^"]*site-chrome\.js"/.test(raw) ? SHARED_NAV : [];
     graph[page] = [...new Set([...hrefs, ...injected])].filter(

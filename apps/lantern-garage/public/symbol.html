@@ -25,7 +25,7 @@
 <body>
 <header class="band">
   <div class="band-inner wrap">
-    <a class="sym-back" href="/">&larr; Markets</a>
+    <a class="sym-back" id="sBack" href="/markets.html">&larr; Markets</a>
     <div class="sym-head">
       <span class="badge" id="sBadge">—</span>
       <div class="grow">
@@ -149,9 +149,11 @@
 
   /* The ticker is the whole address of this page, and it lands in fetch URLs, the
      document title and the DOM. Anything that is not a plain symbol is refused
-     outright rather than escaped and used. */
+     outright rather than escaped and used. `^` and `=` are allowed for the market
+     boards' instruments (^GSPC, CL=F, EURUSD=X); the server refuses any of those that
+     is not on a board. */
   var raw = new URLSearchParams(location.search).get('t') || '';
-  var T = raw.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 12);
+  var T = raw.toUpperCase().replace(/[^A-Z0-9.\-^=]/g, '').slice(0, 12);
 
   if (!T) {
     byId('sName').textContent = 'No symbol given.';
@@ -162,6 +164,180 @@
     });
     ['chSub', 'ksSub', 'engSub', 'nwSub'].forEach(function (id) { byId(id).textContent = ''; });
     return;
+  }
+
+  /* ── An index, a future, a currency pair or a coin (2026-10-11) ──────────────────
+     The market boards (/market.html) lead here too, and none of the stock endpoints
+     below can serve them: no engine scan, no fundamentals, no company news. So a board
+     instrument gets the page that fits it — chart, the quote's own statistics, returns
+     and the moving-average read — from /api/trading/markets, and the stock half of the
+     page never runs. Recognised by shape: ^index, =F future, =X pair, -USD coin, .SS. */
+  if (/[\^=]/.test(T) || /-USD$/.test(T) || /\.SS$/.test(T)) {
+    renderInstrument();
+    return;
+  }
+
+  function renderInstrument() {
+    // style.display, not the hidden attribute: .cta sets display:inline-flex, and an
+    // author rule beats the browser's [hidden] rule — the button stayed on screen.
+    ['eng-h', 'nw-h'].forEach(function (id) {
+      var sec = byId(id) && byId(id).closest('section');
+      if (sec) sec.style.display = 'none';
+    });
+    var trade = byId('sTrade');
+    trade.style.display = 'none';              // shown below for a coin the terminal trades
+    byId('sTicker').textContent = T;
+    byId('sBadge').textContent = T.replace(/[^A-Z0-9]/g, '').slice(0, 2);
+    document.title = T + ' — Unisona';
+    // Yahoo's price hint, but never fewer than four significant figures below 1 — a hint
+    // of 5 printed SHIB's 0.00000547 as "0.00001".
+    function dec(q) {
+      var p = Math.abs(Number(q && q.price));
+      var d = q && typeof q.hint === 'number' && q.hint >= 0 ? Math.min(8, q.hint) : 2;
+      if (isFinite(p) && p > 0 && p < 1) d = Math.max(d, Math.min(10, Math.ceil(-Math.log10(p)) + 3));
+      return d;
+    }
+
+    // Chart: the same ranges as a stock, drawn from the board's own series endpoint.
+    var IR = ['1D', '5D', '1M', '6M', '1Y', '5Y'], cur = '1D';
+    function draw() {
+      var box = byId('chart');
+      box.innerHTML = '';
+      box.appendChild(el('div', 'state', 'Loading ' + cur + '…'));
+      get('/api/trading/markets/series?s=' + encodeURIComponent(T) + '&r=' + cur)
+        .then(function (d) {
+          var pts = (d && d.points) || [];
+          box.innerHTML = '';
+          if (pts.length < 2) {
+            box.appendChild(el('div', 'state', 'No price history over this range.'));
+            byId('chSub').textContent = '';
+            return;
+          }
+          box.appendChild(areaChart(pts.map(function (p) { return { close: p[1] }; })));
+          var vals = pts.map(function (p) { return p[1]; });
+          // 1D is measured from the previous close, as the header's change is — and shows
+          // the quote's own change when it has one, so the two never disagree.
+          var a = Number(d.base) > 0 ? Number(d.base) : vals[0], b = vals[vals.length - 1];
+          var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+          var sub = byId('chSub');
+          sub.textContent = '';
+          sub.appendChild(el('span', null, pts.length + ' points · ' + fmt(lo, 2) + '–' + fmt(hi, 2) + ' · '));
+          var ch = a ? ((b - a) / a) * 100 : null;
+          if (cur === '1D' && d.last && d.last.chg_pct != null) ch = d.last.chg_pct;
+          sub.appendChild(el('span', dirCls(ch), pct(ch) + (cur === '1D' && Number(d.base) > 0 ? ' today' : ' over ' + cur)));
+        })
+        .catch(function (e) {
+          byId('chSub').textContent = '';
+          if (!/404/.test(e.message)) { fail(box, 'the chart', e); return; }
+          box.innerHTML = '';
+          box.appendChild(el('div', 'state', 'Nothing to chart: ' + T + ' is not on our market boards.'));
+        });
+    }
+    var tb = byId('tfbar');
+    IR.forEach(function (r) {
+      var b = el('button', 'tf' + (r === cur ? ' on' : ''), r);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', r === cur ? 'true' : 'false');
+      b.onclick = function () {
+        cur = r;
+        [].forEach.call(tb.children, function (c) {
+          var on = c.textContent === r;
+          c.className = 'tf' + (on ? ' on' : '');
+          c.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        draw();
+      };
+      tb.appendChild(b);
+    });
+    draw();
+
+    get('/api/trading/markets/instrument?s=' + encodeURIComponent(T))
+      .then(function (d) {
+        var q = d.quote || {};
+        document.title = d.name + ' — Unisona';
+        byId('sTicker').textContent = d.short || T;
+        byId('sBadge').textContent = String(d.short || T).replace(/[^A-Z0-9]/gi, '').slice(0, 2);
+        var parts = [d.name, d.group.title];
+        if (q.exchange) parts.push(q.exchange);
+        byId('sName').textContent = parts.join(' · ');
+        var back = byId('sBack');
+        back.href = '/market.html?c=' + encodeURIComponent(d.class.id) + '&g=' + encodeURIComponent(d.group.id);
+        back.textContent = '← ' + d.group.title;
+        byId('sAsk').href = '/chat.html?q=' + encodeURIComponent('What is ' + d.name + ' doing today, and why?');
+        byId('sAsk').textContent = 'Ask about ' + d.name;
+        if (d.trade) { trade.style.display = ''; trade.href = '/stock-trader.html?ticker=' + encodeURIComponent(d.trade); }
+
+        if (!d.quote) {
+          byId('kstats').appendChild(el('div', 'state', d.name + ' could not be priced just now.'));
+          byId('ksSub').textContent = '';
+          byId('perf').appendChild(el('div', 'state', 'No return history just now.'));
+          return;
+        }
+        byId('sLast').textContent = fmt(q.price, dec(q)) + (d.unit ? ' ' + d.unit : '');
+        var box = byId('sChg');
+        box.className = 'sym-chg ' + dirCls(q.chg_pct);
+        box.textContent = (q.chg != null && isFinite(Number(q.chg)) ? (q.chg > 0 ? '+' : '') + fmt(q.chg, dec(q)) + '  ' : '')
+          + pct(q.chg_pct) + '  latest session';
+
+        var ks = byId('kstats');
+        function row(k, v, cls) {
+          var w = el('div', 'kst');
+          w.appendChild(el('div', 'kk', k));
+          w.appendChild(el('div', 'kv' + (cls ? ' ' + cls : ''), v));
+          ks.appendChild(w);
+        }
+        function range(lo, hi) {
+          return (lo != null && hi != null && isFinite(Number(lo)) && isFinite(Number(hi)))
+            ? fmt(lo, dec(q)) + ' – ' + fmt(hi, dec(q)) : '—';
+        }
+        var prev = (q.chg != null && isFinite(Number(q.price)) && isFinite(Number(q.chg))) ? q.price - q.chg : null;
+        row('Previous close', prev != null ? fmt(prev, dec(q)) : '—');
+        row("Day's range", range(q.low, q.high));
+        row('52-week range', range(q.w52_low, q.w52_high));
+        row('52-week change', pct(q.w52_chg), dirCls(q.w52_chg));
+        row('50-day average', q.avg50 != null ? fmt(q.avg50, dec(q)) : '—');
+        row('200-day average', q.avg200 != null ? fmt(q.avg200, dec(q)) : '—');
+        if (q.volume) row(d.class.id === 'crypto' ? 'Volume (24h)' : 'Volume', big(q.volume));
+        if (q.mcap) row('Market cap', '$' + big(q.mcap));
+        if (q.supply) row('Circulating supply', big(q.supply));
+        row(d.unit ? 'Quoted in' : 'Currency', d.unit || q.currency || '—');
+        byId('ksSub').textContent = 'from the live quote';
+
+        var pf = byId('perf');
+        var P = d.perf || {};
+        [['1W', 'w1'], ['1M', 'm1'], ['3M', 'm3'], ['6M', 'm6'], ['YTD', 'ytd'], ['1Y', 'y1']].forEach(function (k) {
+          var v = P[k[1]];
+          var c = el('div', 'pf');
+          c.appendChild(el('div', 'pfk', k[0]));
+          c.appendChild(el('div', 'pfv ' + dirCls(v), pct(v)));
+          var trackw = el('div', 'pftrack');
+          var f = el('div', 'pffill ' + dirCls(v));
+          f.style.width = Math.min(100, Math.abs(Number(v) || 0) * 2) + '%';
+          trackw.appendChild(f);
+          c.appendChild(trackw);
+          pf.appendChild(c);
+        });
+
+        // Where the price sits against its own averages: a description, not a call.
+        if (q.avg50 != null && q.avg200 != null) {
+          var a50 = q.price > q.avg50, a200 = q.price > q.avg200;
+          var t = el('div', 'tech');
+          t.appendChild(el('span', 'techk', 'Moving-average read'));
+          t.appendChild(el('span', 'techv ' + (a50 && a200 ? 'up' : !a50 && !a200 ? 'down' : 'flat'),
+            a50 && a200 ? 'Above both' : !a50 && !a200 ? 'Below both' : a200 ? 'Above the 200-day only' : 'Above the 50-day only'));
+          t.appendChild(el('span', 'techn', 'where the price sits against its 50- and 200-day averages'));
+          pf.parentNode.appendChild(t);
+        }
+      })
+      .catch(function (e) {
+        var notListed = /404/.test(e.message);
+        byId('sName').textContent = notListed ? 'Not on our market boards' : 'Could not load';
+        byId('kstats').appendChild(el('div', notListed ? 'state' : 'state err', notListed
+          ? T + ' is not one of the instruments on our market boards, so there is nothing to show for it here.'
+          : 'Could not load ' + T + ' (' + e.message + ').'));
+        byId('ksSub').textContent = '';
+        byId('perf').appendChild(el('div', 'state', '—'));
+      });
   }
 
   document.title = T + ' — Unisona';
