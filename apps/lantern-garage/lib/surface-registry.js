@@ -47,6 +47,9 @@ const CORE = {
   // The same Observe stage across the universe rather than down one symbol: what moved
   // today, ranked. Reads prices and acts on nothing, exactly as the two above.
   "markets.html":           "Observe",   // the movers board
+  // Reading one story is observing too, and this is the surface the news feed points
+  // at. It summarises and links out; it takes no action.
+  "news-article.html":      "Observe",   // one story, summarised, beside its original
   "journal.html":           "Verify",    // trading journal — did the trades do what the plan said? (its own <meta loop-stage> agrees)
   "transparency.html":      "Verify",    // the trader, scored (#3598) — the prediction ledger and live fills, misses kept visible
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)

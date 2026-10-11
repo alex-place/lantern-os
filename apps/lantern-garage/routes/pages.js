@@ -56,6 +56,9 @@ const PUBLIC_PAGES = {
   // The movers board the home page’s Markets heading leads to — public for the same
   // reason the symbol view is: it is the destination of a link on a public page.
   "/markets.html":        "markets.html",
+  // Our summary of one story. Public: it is where the public news feed now points,
+  // and it serves a headline, a few sentences and a link to the original.
+  "/news-article.html":   "news-article.html",
   "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
   "/journal.html":        "journal.html",   // the trading journal — its own page since it outgrew the panel
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status

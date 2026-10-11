@@ -28,6 +28,57 @@ module.exports = async function newsRoutes(req, res, url, ctx) {
     return true;
   }
 
+  // GET /api/trading/news/article?id=<news_id> — one story plus OUR summary of it
+  // (2026-10-11). The reader clicks a headline and lands on our page, not the
+  // publisher's; the original is one clearly-labelled link away from there.
+  //
+  // The summary is generated on first view and cached on disk by news id, so a story
+  // costs one fetch and one model call for its whole life. A failure is cached too and
+  // reported as a failure — never papered over with a summary invented from the
+  // headline, which would be a plausible lie about a real story.
+  if (url.pathname === '/api/trading/news/article' && req.method === 'GET') {
+    try {
+      const id = (url.searchParams.get('id') || '').trim();
+      if (!id) { sendJson(res, { error: 'id required' }, 400); return true; }
+      // Find it in the recent window the feed itself serves — the same rows the home
+      // page and the symbol view link from, so a link can never point at a story the
+      // reader could not have seen.
+      const records = tradingNews.queryRecentNews({ limit: 400 });
+      const rec = records.find((r) => String(r.news_id || r.id) === id);
+      if (!rec) { sendJson(res, { error: 'not_found' }, 404); return true; }
+
+      // TWO CALLS, ON PURPOSE. Without ?summarize=1 this returns instantly with whatever
+      // summary is already cached, so the story itself never waits on a network fetch of
+      // somebody else's website. The page renders, THEN asks for the summary.
+      //
+      // That split is not a micro-optimisation: measured 2026-10-11, every publisher in
+      // the current feed refuses an automated fetch (Yahoo — 100% of our stories — stalls
+      // until timeout; Reuters 401; AP 403). Blocking the article on that would have made
+      // every headline a 15-second wait for a failure.
+      const { summarize, readCached } = require('../../lib/news-summary');
+      const wants = url.searchParams.get('summarize') === '1';
+      const sum = wants
+        ? await summarize(rec)
+        : (readCached(rec.news_id || rec.id) || { pending: true });
+      sendJson(res, {
+        article: {
+          id: rec.news_id || rec.id,
+          headline: rec.headline || rec.text || '',
+          url: rec.url || '',
+          source: rec.source || '',
+          published: rec.published || rec.date || null,
+          symbols: Array.isArray(rec.symbols) ? rec.symbols.slice(0, 8) : [],
+          direction: rec.direction || 'neutral',
+          impact: Number.isFinite(Number(rec.impact)) ? Number(rec.impact) : null,
+        },
+        summary: sum,
+      }, 200);
+    } catch (error) {
+      sendJson(res, { error: 'article_failed', details: error.message }, 500);
+    }
+    return true;
+  }
+
   // GET /api/trading/news/sentiment?ticker=SPY&windowHours=48
   // Directional (bullish/bearish) news sentiment for a symbol over a recent window
   // — the Reason/Verify input the trader can weight. Omit ticker for the whole

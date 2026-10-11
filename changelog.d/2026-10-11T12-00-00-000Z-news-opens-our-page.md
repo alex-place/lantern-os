@@ -1,0 +1,3 @@
+### Added
+
+- news: **a headline opens our page, not the publisher's.** Every story in the market news list now leads to `/news-article.html`, which carries the headline, what the feed tagged it with, its symbols as links to their own pages, our short summary of the article — and a separate, clearly-labelled link to the original. The summary is generated once per story from the publisher's page and cached. Where a publisher refuses an automated fetch the page says so plainly and still gives the original link; it never invents a summary from the headline, which would be a plausible lie about a real story.

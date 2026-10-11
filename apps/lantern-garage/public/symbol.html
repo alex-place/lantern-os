@@ -416,8 +416,13 @@
         return;
       }
       recs.forEach(function (n) {
+        // The headline opens OUR summary of the story; the original is a separate,
+        // labelled link on that page (founder, 2026-10-11). A story with no id has no
+        // page of its own, so it still goes straight to the publisher.
         var a = el('a', 'nrow');
-        if (n.url) { a.href = n.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+        var nid = n.news_id || n.id;
+        if (nid) { a.href = '/news-article.html?id=' + encodeURIComponent(nid); }
+        else if (n.url) { a.href = n.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
         a.appendChild(el('div', 'nh', n.headline || n.text || '(untitled)'));
         var m = el('div', 'nm');
         if (n.source) m.appendChild(el('span', null, n.source));

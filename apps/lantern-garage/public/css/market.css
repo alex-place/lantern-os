@@ -259,3 +259,16 @@
 .techn { color:var(--muted); font-size:12.5px; }
 
 .sec-head .spacer { flex:1 1 auto; }
+
+/* ── News article (news-article.html, 2026-10-11) ────────────────────────────── */
+.art-meta { display:flex; gap:10px; align-items:center; flex-wrap:wrap; color:var(--muted);
+            font-size:12.5px; margin-bottom:8px; }
+.art-h { margin:0; font-size:30px; font-weight:800; letter-spacing:-.015em; line-height:1.22; max-width:40ch; }
+.art-syms { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.art-syms .chip { text-decoration:none; }
+.art-syms .chip:hover { color:var(--accent-strong); border-color:var(--accent-strong); }
+.art-card { max-width:72ch; }
+/* The summary is the page. Set at reading size, not at UI size. */
+.art-sum { font-size:17px; line-height:1.65; margin:0 0 20px; }
+.art-sum.muted { color:var(--muted); font-size:15px; }
+.art-orig { margin-bottom:14px; }
