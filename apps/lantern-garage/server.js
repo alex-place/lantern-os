@@ -169,6 +169,9 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/symbol-info",       // name/exchange/asset_class
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
+  // One story + our summary of it. Same public class as the feed above: it serves a
+  // headline, a link and a few sentences about a public article, and no account data.
+  "/api/trading/news/article",
   "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
   // NOTE deliberately absent: /api/trading/track-record. Product decision
   // (2026-08-11): we do not publish the ledger — the record stays behind
