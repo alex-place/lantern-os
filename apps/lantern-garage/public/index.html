@@ -173,6 +173,16 @@
         <span class="sub" id="mkt-sub">loading…</span>
       </div>
       <div class="pulse" id="pulse" aria-live="polite"></div>
+      <!-- Market summary — TradingView's home strip: one market at a time, each with the
+           "See all" that leads to that market's own page (founder, 2026-10-11). -->
+      <div class="msum">
+        <div class="mk-lead-h">
+          <span id="msumTabs"></span>
+          <span class="spacer"></span>
+          <a class="inlink" id="msumAll" href="/market.html?c=indices">See major indices</a>
+        </div>
+        <div class="tiles" id="msum"></div>
+      </div>
       <div class="grid" id="mkt"></div>
     </section>
 
@@ -217,6 +227,7 @@
 <script src="/js/auth-gate.js" defer></script>
 <script src="/vendor/html2canvas/html2canvas.min.js" defer></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach" defer></script>
+<script src="/js/market-ui.js"></script>
 
 <script>
 (function () {
@@ -593,6 +604,54 @@
   }
   loadMarket();
   setInterval(loadMarket, 60000);
+
+  /* ── Market summary ────────────────────────────────────────────────────────────
+     TradingView's home strip — indices, crypto, futures, forex and the economy, one at a
+     time, each with the "See all" that leads to its own page: "market summary > see major
+     indices > see all crypto" (founder, 2026-10-11). The same data and the same tiles as
+     /markets.html (lib/market-boards, lib/economy), so a price reads alike on both. */
+  var MSUM = [
+    { id: 'indices', label: 'Indices', all: 'See major indices', href: '/market.html?c=indices' },
+    { id: 'crypto', label: 'Crypto', all: 'See all crypto', href: '/market.html?c=crypto&g=coins' },
+    { id: 'futures', label: 'Futures', all: 'See all futures', href: '/market.html?c=futures' },
+    { id: 'forex', label: 'Forex', all: 'See all major pairs', href: '/market.html?c=forex&g=majors' },
+    { id: 'economy', label: 'Economy', all: 'See the US economy', href: '/market.html?c=economy' }
+  ];
+  var _hub = null, _econ = null, _msum = MSUM[0];
+  function drawSummary() {
+    var U = window.MarketUI, box = byId('msum');
+    if (!U || !box) return;
+    var all = byId('msumAll');
+    all.textContent = _msum.all;
+    all.href = _msum.href;
+    box.innerHTML = '';
+    if (_msum.id === 'economy') {
+      var key = _econ && _econ.available ? (_econ.key || []) : null;
+      if (!key || !key.length) { box.appendChild(el('div', 'state', _econ ? 'The economic figures are not available just now.' : 'Loading…')); return; }
+      key.slice(0, 6).forEach(function (ind) { box.appendChild(U.econTile(ind, '/market.html?c=economy&g=' + encodeURIComponent(ind.group))); });
+      return;
+    }
+    var rows = _hub ? (_hub[_msum.id] || []) : null;
+    if (!rows || !rows.length) { box.appendChild(el('div', 'state', _hub ? 'Nothing could be priced just now.' : 'Loading…')); return; }
+    rows.slice(0, 6).forEach(function (r) { box.appendChild(U.tile(r)); });
+  }
+  function loadSummary() {
+    get('/api/trading/markets')
+      .then(function (d) { _hub = d || {}; drawSummary(); })
+      .catch(function () { _hub = {}; drawSummary(); });
+  }
+  if (window.MarketUI && byId('msumTabs')) {
+    byId('msumTabs').appendChild(window.MarketUI.rangeBar(MSUM.map(function (m) { return m.label; }), _msum.label, function (label) {
+      _msum = MSUM.filter(function (m) { return m.label === label; })[0] || MSUM[0];
+      drawSummary();
+    }));
+    drawSummary();
+    loadSummary();
+    setInterval(loadSummary, 60000);
+    get('/api/trading/markets?c=economy')
+      .then(function (d) { _econ = d || {}; if (_msum.id === 'economy') drawSummary(); })
+      .catch(function () { _econ = {}; if (_msum.id === 'economy') drawSummary(); });
+  }
 
   get('/api/trading/news/recent?limit=12')
     .then(function (d) { renderNews((d && d.records) || []); })
