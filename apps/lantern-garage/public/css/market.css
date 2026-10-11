@@ -381,3 +381,9 @@
 .curve-legend i { width:20px; height:0; border-top:2.5px solid var(--accent-strong); display:inline-block; }
 .curve-legend i.m { border-top:1.5px dashed var(--muted); }
 .curve-legend i.y { border-top:1.5px dotted var(--muted); }
+
+/* ── Home market summary (index.html — 2026-10-11) ───────────────────────────────
+   The strip above the watchlist cards: one market at a time, with its "See all". */
+.msum { margin-bottom: 24px; }
+.msum .mk-lead-h { margin-bottom: 14px; }
+.msum .inlink { margin-top: 0; }
