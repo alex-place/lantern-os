@@ -78,6 +78,12 @@ module.exports = async function miscRoutes(req, res, url, ctx) {
   if (url.pathname === '/api/trading/status' && req.method === 'GET') {
     try {
       const data = await bridge.getDashboardData();
+      // getDashboardData reads the env IBKR session — the server's own account and
+      // positions. Only a reader who may see that book gets them (lib/server-book).
+      const uid = (ctx.getEffectiveUserId && ctx.getEffectiveUserId(req)) || null;
+      if (!require('../../lib/server-book').mayReadServerBook(req, uid) && data && data.apis && data.apis.ibkr) {
+        data.apis.ibkr = { connected: false, status: null, account: null, positions: [], restricted: 'server account' };
+      }
       sendJson(res, data, 200);
     } catch (error) {
       sendJson(res, { error: error.message }, 500);

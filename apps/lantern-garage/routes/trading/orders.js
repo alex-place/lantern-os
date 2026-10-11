@@ -387,6 +387,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         sendJson(res, orders, 200);
         return true;
       }
+      // Both fallbacks below are the SERVER's: the legacy agent's env IBKR session (the
+      // operator's live orders wherever it is signed in) and tradingStore, one ledger for the
+      // whole server. A user whose own broker had nothing gets nothing (lib/server-book).
+      if (!require('../../lib/server-book').mayReadServerBook(req, uid)) { sendJson(res, [], 200); return true; }
       if (traderAgent) {
         const r = await traderAgent.getOrders(limitParam > 0 ? limitParam : 50);
         orders = (r && Array.isArray(r.orders)) ? r.orders : [];

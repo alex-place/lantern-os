@@ -10360,6 +10360,19 @@ function _accountDegraded(kind, reason){
       : ' Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
   }
 }
+function _accountNoBroker(){
+  const el = document.getElementById('tpSummary');
+  if (el) { el.style.opacity = ''; el.title = 'No broker connected'; }
+  const b = document.getElementById('staleBadge');
+  if (b && b.parentNode) b.parentNode.removeChild(b);
+  const pe = document.getElementById('hDayPnl');
+  if (pe) { pe.textContent = '—'; pe.className = 'v'; }
+  const pp = document.getElementById('tp-positions');
+  if (pp) {
+    pp.innerHTML = '<div class="tp-empty">No broker connected. '
+      + '<a href="/settings.html#connections">Connect one in Settings</a> to trade and to see your positions here.</div>';
+  }
+}
 function _accountFresh(){
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = ''; el.title = ''; }
@@ -10991,7 +11004,13 @@ async function loadPortfolio(){
     // the one it was given so callers could say "connect a broker" instead of reading an
     // empty {account:{}} as a real $0 book. The ticket gate reads it rather than asking
     // the broker endpoints again.
-    if (d && d.available === false) { _brokerOk = false; _refreshTradeGate(); _accountDegraded('backend', d.reason); return; }
+    if (d && d.available === false) {
+      _brokerOk = false; _refreshTradeGate();
+      // No broker at all is not an outage: no STALE badge, no "unreachable" toast — say
+      // what is true and where to fix it (#2725, lib/server-book).
+      if (d.no_broker) { _accountNoBroker(); return; }
+      _accountDegraded('backend', d.reason); return;
+    }
     _brokerOk = true; _refreshTradeGate();
     const a  = d.account||{};
     _accountFresh(a);
