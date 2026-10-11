@@ -8439,7 +8439,7 @@ async function loadMyList(force){
       // A guest has no AI list to read: the endpoint is trade-gated, so asking only put a
       // 401 in the console on every page load. detectGuestMode() has settled window.GUEST
       // before the dashboard's first list load.
-      window.GUEST ? Promise.resolve({}) : fetch(AI_LIST_API).then(r=>r.json()).catch(()=>({})),
+      (typeof window !== 'undefined' && window.GUEST) ? Promise.resolve({}) : fetch(AI_LIST_API).then(r=>r.json()).catch(()=>({})),
     ]);
     const up = (a)=> (Array.isArray(a) ? a : []).map(x=>String(x).toUpperCase());
     WL_LIST = new Set(up(w && w[LIST_KEY]));
