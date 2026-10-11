@@ -652,6 +652,53 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     return true;
   }
 
+  // GET /api/trading/movers — the biggest moves across lib/market-universe (2026-10-11).
+  //
+  // We have no screener, so the board names its universe and the page says so. One batch
+  // through getQuotes (which caches per symbol and bounds its own concurrency), then three
+  // rankings off the SAME snapshot, so gainers, losers and most-active can never disagree
+  // about a price the way three separate fetches could.
+  //
+  // Leveraged funds are labelled, not excluded: a 3x fund's 9% day would otherwise fill
+  // every slot on an ordinary day and bury the moves a reader actually wants to see.
+  if (url.pathname === '/api/trading/movers' && req.method === 'GET') {
+    try {
+      const { UNIVERSE, kindOf } = require('../../lib/market-universe');
+      const yahoo = require('../../lib/market-data-yahoo');
+      const limit = Math.min(25, Math.max(3, Number(url.searchParams.get('limit')) || 10));
+      const rows = (await yahoo.getQuotes(UNIVERSE) || [])
+        .filter((r) => r && r.ticker && Number.isFinite(Number(r.price)))
+        .map((r) => ({
+          ticker: r.ticker,
+          price: Number(r.price),
+          chg_pct: Number.isFinite(Number(r.chg_pct)) ? Number(r.chg_pct) : null,
+          volume: Number.isFinite(Number(r.volume)) ? Number(r.volume) : null,
+          session: r.session || 'regular',
+          kind: kindOf(r.ticker),
+        }));
+      const moved = rows.filter((r) => r.chg_pct != null);
+      const byMove = (dir) => moved
+        .filter((r) => (dir > 0 ? r.chg_pct > 0 : r.chg_pct < 0))
+        .sort((a, b) => (dir > 0 ? b.chg_pct - a.chg_pct : a.chg_pct - b.chg_pct))
+        .slice(0, limit);
+      // NO "most active" BOARD. getQuotes returns no volume, and the only honest ways to
+      // get it are 119 extra fetches or adding a field to the quote path the ARMED trader
+      // polls — neither is worth a third card. An empty "Most active" would have been
+      // worse than its absence. The bars behind each quote do carry volume, so this is a
+      // few lines away the day someone wants it enough to touch that path deliberately.
+      sendJson(res, {
+        asOf: new Date().toISOString(),
+        universe: UNIVERSE.length,
+        priced: rows.length,
+        gainers: byMove(1),
+        losers: byMove(-1),
+      }, 200);
+    } catch (e) {
+      sendJson(res, { error: 'movers_unavailable', reason: e.message }, 503);
+    }
+    return true;
+  }
+
   // GET /api/trading/symbol-stats?ticker= — returns/volume/technicals from Yahoo
   // daily bars, for the expanded info panel (#1711).
   if (url.pathname === '/api/trading/symbol-stats' && req.method === 'GET') {

@@ -44,6 +44,9 @@ const CORE = {
   // reason — the rule above asks the next surface to either serve the loop or justify a
   // raise, and this one serves the loop.
   "symbol.html":            "Observe",   // one symbol: price, statistics, news, the engine's read
+  // The same Observe stage across the universe rather than down one symbol: what moved
+  // today, ranked. Reads prices and acts on nothing, exactly as the two above.
+  "markets.html":           "Observe",   // the movers board
   "journal.html":           "Verify",    // trading journal — did the trades do what the plan said? (its own <meta loop-stage> agrees)
   "transparency.html":      "Verify",    // the trader, scored (#3598) — the prediction ledger and live fills, misses kept visible
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
