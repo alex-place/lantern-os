@@ -21,6 +21,7 @@
  */
 
 // ── Mega/large-cap equities ──────────────────────────────────────────────────────
+// (Block trades as XYZ since January 2025; SQ no longer prices, and dropped silently.)
 const EQUITIES = [
   'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'AVGO', 'BRK-B', 'LLY',
   'JPM', 'V', 'UNH', 'XOM', 'MA', 'COST', 'HD', 'PG', 'JNJ', 'ABBV',
@@ -28,7 +29,7 @@ const EQUITIES = [
   'CSCO', 'MCD', 'ACN', 'ABT', 'ORCL', 'DIS', 'INTC', 'QCOM', 'TXN', 'INTU',
   'CAT', 'GE', 'VZ', 'AMGN', 'PFE', 'IBM', 'NOW', 'UBER', 'BA', 'GS',
   'MU', 'PLTR', 'COIN', 'SHOP', 'PANW', 'SBUX', 'NKE', 'T', 'F', 'GM',
-  'DAL', 'RIVN', 'SOFI', 'HOOD', 'SNAP', 'PYPL', 'SQ', 'ROKU', 'DKNG', 'CVNA',
+  'DAL', 'RIVN', 'SOFI', 'HOOD', 'SNAP', 'PYPL', 'XYZ', 'ROKU', 'DKNG', 'CVNA',
 ];
 
 // ── Index, sector and commodity ETFs ─────────────────────────────────────────────
@@ -36,16 +37,19 @@ const ETFS = [
   'SPY', 'QQQ', 'IWM', 'DIA', 'EFA', 'VTI',
   'XLK', 'XLF', 'XLE', 'XLV', 'XLI', 'XLY', 'XLP', 'XLU', 'XLB', 'XLRE',
   'SMH', 'SOXX', 'ARKK', 'XBI', 'IBB', 'XOP', 'XME', 'KRE', 'ITB', 'JETS',
-  'GLD', 'SLV', 'USO', 'UNG', 'TLT', 'IEF', 'HYG', 'LQD', 'VXX',
+  'GLD', 'SLV', 'USO', 'UNG', 'TLT', 'IEF', 'HYG', 'LQD', 'VXX', 'GDX',
 ];
 
 // ── Leveraged / inverse — the engine's own working set ───────────────────────────
 // Kept separate because they move several times the market and would otherwise
 // monopolise a "biggest move" ranking on any ordinary day. The board reports them, and
-// labels them, rather than pretending a 3x fund's 9% day is the same event as a stock's.
+// labels them, rather than pretending a leveraged fund's 9% day is the same event as a
+// stock's. Most are 3x; NUGT, JNUG and UCO are 2x, so the label says "leveraged", not
+// "3x". (GDX, the unleveraged gold-miners fund, sat in this list until 2026-10-11 and was
+// labelled as one; it is an ordinary ETF above.)
 const LEVERAGED = [
   'SOXL', 'SOXS', 'TQQQ', 'SQQQ', 'SPXL', 'SPXS', 'TNA', 'TZA',
-  'UPRO', 'LABU', 'NUGT', 'JNUG', 'UCO', 'GDX',
+  'UPRO', 'LABU', 'NUGT', 'JNUG', 'UCO',
 ];
 
 const UNIVERSE = [].concat(EQUITIES, ETFS, LEVERAGED);

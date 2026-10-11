@@ -652,49 +652,57 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     return true;
   }
 
-  // GET /api/trading/movers — the biggest moves across lib/market-universe (2026-10-11).
+  // GET /api/trading/markets[?c=<class>[&g=<group>[&view=perf][&session=pre|post]]]
+  // (2026-10-11). The market pages read this and nothing else: /markets.html with no class,
+  // /market.html with a class (its overview) or a class and a group (that board in full).
   //
-  // We have no screener, so the board names its universe and the page says so. One batch
-  // through getQuotes (which caches per symbol and bounds its own concurrency), then three
-  // rankings off the SAME snapshot, so gainers, losers and most-active can never disagree
-  // about a price the way three separate fetches could.
+  // lib/market-boards prices a board with ONE batch quote, so a page costs Yahoo a request
+  // or two instead of a chart call per row. The /movers route this replaced priced its 119
+  // names one chart call at a time, on the same host and the same Yahoo budget as the armed
+  // trader's quotes.
   //
-  // Leveraged funds are labelled, not excluded: a 3x fund's 9% day would otherwise fill
-  // every slot on an ordinary day and bury the moves a reader actually wants to see.
-  if (url.pathname === '/api/trading/movers' && req.method === 'GET') {
+  // Market data only: no account, no ledger, no engine. Every parameter selects from a fixed
+  // list; an unknown class or group is a 404, never a fetch.
+  if (url.pathname === '/api/trading/markets' && req.method === 'GET') {
+    const boards = require('../../lib/market-boards');
+    const c = url.searchParams.get('c');
+    const g = url.searchParams.get('g');
     try {
-      const { UNIVERSE, kindOf } = require('../../lib/market-universe');
-      const yahoo = require('../../lib/market-data-yahoo');
-      const limit = Math.min(25, Math.max(3, Number(url.searchParams.get('limit')) || 10));
-      const rows = (await yahoo.getQuotes(UNIVERSE) || [])
-        .filter((r) => r && r.ticker && Number.isFinite(Number(r.price)))
-        .map((r) => ({
-          ticker: r.ticker,
-          price: Number(r.price),
-          chg_pct: Number.isFinite(Number(r.chg_pct)) ? Number(r.chg_pct) : null,
-          volume: Number.isFinite(Number(r.volume)) ? Number(r.volume) : null,
-          session: r.session || 'regular',
-          kind: kindOf(r.ticker),
-        }));
-      const moved = rows.filter((r) => r.chg_pct != null);
-      const byMove = (dir) => moved
-        .filter((r) => (dir > 0 ? r.chg_pct > 0 : r.chg_pct < 0))
-        .sort((a, b) => (dir > 0 ? b.chg_pct - a.chg_pct : a.chg_pct - b.chg_pct))
-        .slice(0, limit);
-      // NO "most active" BOARD. getQuotes returns no volume, and the only honest ways to
-      // get it are 119 extra fetches or adding a field to the quote path the ARMED trader
-      // polls — neither is worth a third card. An empty "Most active" would have been
-      // worse than its absence. The bars behind each quote do carry volume, so this is a
-      // few lines away the day someone wants it enough to touch that path deliberately.
-      sendJson(res, {
-        asOf: new Date().toISOString(),
-        universe: UNIVERSE.length,
-        priced: rows.length,
-        gainers: byMove(1),
-        losers: byMove(-1),
-      }, 200);
+      let out = null;
+      if (!c) out = await boards.hub();
+      else if (boards.CLASS_IDS.includes(c)) {
+        out = g
+          ? await boards.board(c, g, { view: url.searchParams.get('view'), session: url.searchParams.get('session') })
+          : await boards.overview(c);
+      }
+      if (!out) { sendJson(res, { error: 'unknown_board' }, 404); return true; }
+      sendJson(res, out, 200);
     } catch (e) {
-      sendJson(res, { error: 'movers_unavailable', reason: e.message }, 503);
+      sendJson(res, { error: 'markets_unavailable', reason: e.message }, 503);
+    }
+    return true;
+  }
+
+  // GET /api/trading/markets/series?s=<symbol>&r=1D|5D|1M|6M|1Y|5Y — one chart line.
+  // GET /api/trading/markets/instrument?s=<symbol> — one board instrument, for its page.
+  // Both refuse a symbol that is not on a board (lib/market-boards LISTED), so neither can
+  // be used to make this host fetch whatever a caller names.
+  if ((url.pathname === '/api/trading/markets/series' || url.pathname === '/api/trading/markets/instrument')
+      && req.method === 'GET') {
+    const boards = require('../../lib/market-boards');
+    const s = String(url.searchParams.get('s') || '');
+    if (!boards.isListed(s)) { sendJson(res, { error: 'not_listed' }, 404); return true; }
+    try {
+      if (url.pathname.endsWith('/series')) {
+        const r = String(url.searchParams.get('r') || '1D').toUpperCase();
+        if (!boards.RANGES.includes(r)) { sendJson(res, { error: 'bad_range' }, 400); return true; }
+        const sr = (await boards.series(s, r)) || {};
+        sendJson(res, { symbol: s, range: r, points: sr.points || [], base: sr.base || null, last: sr.last || null }, 200);
+      } else {
+        sendJson(res, await boards.instrument(s), 200);
+      }
+    } catch (e) {
+      sendJson(res, { error: 'markets_unavailable', reason: e.message }, 503);
     }
     return true;
   }
