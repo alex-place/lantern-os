@@ -19,6 +19,16 @@
 # a BUY), and entries have passed acceptWarnings:true since 3aff30e2 (2026-08-10), so
 # ibkr-cpapi confirms every warning type on entries. Leave it here until the trading
 # lane narrows that change (e.g. benign-list the leveraged-ETF disclosure) or retires P0-8.
+#
+# 2026-10-11 — the thing that was BLOCKING that narrowing is fixed. placeOrder collected
+# the warnings it cleared and then dropped them on the success path, so no auto-confirmed
+# disclosure was ever recorded anywhere; BENIGN_WARNING_TEXT matches on WORDING, so the
+# benign-list could not be written. A submitted order now reports `warnings` and
+# `warningsConfirmed`. The next live entry that clears the leveraged/inverse-ETF notice
+# records its exact text — at which point this becomes: add that one line to
+# BENIGN_WARNING_TEXT, drop acceptWarnings from the two entry sites, and delete this
+# entry. Still a FOUNDER call: it changes live order behaviour on an armed box, and
+# getting it too narrow strands entries at needs_confirmation the way 2026-08-10 did.
 exit-warnings.test.js
 
 # `env:` entries are ENVIRONMENT-DEPENDENT, not broken, and are never ratcheted —
