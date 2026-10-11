@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="observe">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0e17">
+  <title>Markets — Unisona</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/market.css">
+</head>
+<body>
+<header class="band">
+  <div class="band-inner wrap">
+    <a class="sym-back" href="/">&larr; Home</a>
+    <h1 class="sym-t">Markets</h1>
+    <div class="sym-name" id="mSub">loading…</div>
+    <div class="pulse" id="pulse" aria-live="polite" style="margin-top:14px"></div>
+  </div>
+</header>
+
+<main>
+  <section class="sec wrap" aria-labelledby="mv-h">
+    <div class="sec-head">
+      <h2 id="mv-h">Biggest moves</h2>
+      <span class="sub" id="mvSub">loading…</span>
+    </div>
+    <div class="grid" id="boards"></div>
+    <p class="disc" id="universeNote"></p>
+  </section>
+</main>
+
+<script src="/js/site-chrome.js" defer></script>
+<script>
+/* ── Movers board ──────────────────────────────────────────────────────────────
+   The "Markets" heading on the home page led to /stock-trader.html like everything
+   else (founder, 2026-10-11). This is where it goes instead.
+
+   HONEST ABOUT ITS UNIVERSE. We have no screener — the quote client prices a list you
+   hand it — so this ranks lib/market-universe (119 liquid US names and ETFs), and says
+   so on the page rather than implying it swept the exchange. All three boards are cut
+   from ONE snapshot, so they cannot disagree about a price.
+*/
+(function () {
+  'use strict';
+  function byId(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function get(url) {
+    return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function fmt(n, d) {
+    var v = Number(n);
+    if (!isFinite(v)) return '—';
+    return v.toLocaleString(undefined, { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d });
+  }
+  function pct(n) { var v = Number(n); return isFinite(v) ? (v > 0 ? '+' : '') + v.toFixed(2) + '%' : '—'; }
+  function dirCls(n) { var v = Number(n); return !isFinite(v) || v === 0 ? 'flat' : v > 0 ? 'up' : 'down'; }
+  function badge(s) { return el('span', 'badge', String(s).slice(0, 2)); }
+
+  function board(title, sub, rows) {
+    var c = el('div', 'card');
+    c.appendChild(el('h3', null, title));
+    c.appendChild(el('p', 'csub', sub));
+    if (!rows.length) { c.appendChild(el('div', 'state', 'Nothing to show.')); return c; }
+    rows.forEach(function (r) {
+      var a = el('a', 'row');
+      a.href = '/symbol.html?t=' + encodeURIComponent(r.ticker);
+      a.appendChild(badge(r.ticker));
+      var g = el('div', 'grow'), l1 = el('div', 'l1');
+      l1.appendChild(el('span', 'sym', r.ticker));
+      // A 3x fund's 9% day is not the same event as a stock's. Label it rather than
+      // hide it, so the ranking stays complete and still reads honestly.
+      if (r.kind === 'leveraged') l1.appendChild(el('span', 'chip', '3x'));
+      else if (r.kind === 'etf') l1.appendChild(el('span', 'chip', 'ETF'));
+      if (r.session && r.session !== 'regular') l1.appendChild(el('span', 'chip', r.session));
+      g.appendChild(l1);
+      a.appendChild(g);
+      var n = el('div', 'num');
+      n.appendChild(el('div', 'px', fmt(r.price, Number(r.price) < 10 ? 4 : 2)));
+      n.appendChild(el('div', 'ch ' + dirCls(r.chg_pct), pct(r.chg_pct)));
+      a.appendChild(n);
+      c.appendChild(a);
+    });
+    return c;
+  }
+
+  get('/api/trading/movers?limit=10')
+    .then(function (d) {
+      var box = byId('boards');
+      box.innerHTML = '';
+      box.appendChild(board('Gainers', 'biggest move up today', d.gainers || [], 'move'));
+      box.appendChild(board('Losers', 'biggest move down today', d.losers || [], 'move'));
+      byId('mvSub').textContent = (d.priced || 0) + ' of ' + (d.universe || 0) + ' priced';
+      byId('mSub').textContent = 'The biggest moves across ' + (d.universe || 0) + ' liquid US names and funds.';
+      byId('universeNote').textContent =
+        'Ranked across a curated list of ' + (d.universe || 0) + ' liquid US names, index, sector and '
+        + 'leveraged funds — not the whole exchange: there is no screener behind this, so the board names '
+        + 'its universe. All three boards are cut from one snapshot, so they cannot disagree about a price. '
+        + 'Inclusion says a symbol is liquid enough to rank, nothing more.';
+    })
+    .catch(function (e) {
+      byId('boards').appendChild(el('div', 'state err', 'Could not load the movers (' + e.message + ').'));
+      byId('mvSub').textContent = '';
+      byId('mSub').textContent = '';
+    });
+
+  get('/api/trading/market-status')
+    .then(function (m) {
+      var box = byId('pulse');
+      function pill(parts) {
+        var s = el('span', 'pill');
+        parts.forEach(function (p) { s.appendChild(el('span', p.cls || null, p.text)); });
+        box.appendChild(s);
+      }
+      var open = !!m.market_open;
+      pill([{ cls: 'dot' + (open ? ' on' : '') }, { text: open ? 'Market open' : 'Market closed' }]);
+      if (m.vix != null) pill([{ cls: 'k', text: 'VIX' }, { text: fmt(m.vix, 2) + (m.vix_regime ? ' · ' + m.vix_regime : '') }]);
+      if (m.market) pill([{ cls: 'k', text: 'Trend' }, { text: String(m.market) }]);
+      if (m.spy_1d != null) pill([{ cls: 'k', text: 'SPY 1D' }, { cls: dirCls(m.spy_1d), text: pct(m.spy_1d) }]);
+    })
+    .catch(function () { /* the pulse is context, not the point of the page */ });
+})();
+</script>
+</body>
+</html>
