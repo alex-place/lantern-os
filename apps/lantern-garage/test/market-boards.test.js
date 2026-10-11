@@ -303,7 +303,7 @@ test('the pages say what their lists are — curated, not the exchange, not the 
   assert.match(CLS, /not the whole exchange/);
   assert.match(CLS, /there is no screener behind this/);
   assert.match(CLS, /That is these coins, not the whole crypto market/);
-  assert.match(HUB, /not every index,\s*coin, contract or pair, and not a screener/);
+  assert.match(HUB, /not every index,\s*coin, contract or pair, and not a\s+screener/);
   assert.match(CLS, /grains, softs and livestock are quoted in US cents/);
 });
 

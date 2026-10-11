@@ -355,3 +355,29 @@
 .sbf.up { left:50%; background:var(--green); } .sbf.down { right:50%; background:var(--red); }
 .sbv { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
 .mk-note { font-size:12.5px; line-height:1.55; color:var(--muted); margin:12px 0 0; max-width:80ch; }
+
+/* ── The US economy (market.html?c=economy — 2026-10-11) ──────────────────────────
+   Indicator cards and the yield curve. New classes only. */
+.econ-grid { display:grid; gap:16px; grid-template-columns:minmax(0,1fr); }
+@media (min-width:700px)  { .econ-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (min-width:1100px) { .econ-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+.ind { border:1px solid var(--border); border-radius:16px; padding:16px; display:flex; flex-direction:column;
+       gap:3px; min-width:0; }
+.ind .in { font-size:14.5px; font-weight:700; }
+.ind .inote { font-size:12px; color:var(--muted); }
+.ind .iv { font-size:26px; font-weight:800; letter-spacing:-.01em; font-variant-numeric:tabular-nums; margin-top:10px; }
+.ind .iq { font-size:12px; font-weight:600; color:var(--muted); margin-left:6px; letter-spacing:0; }
+.ind .ia { font-size:12px; color:var(--muted); }
+.ind .ic { font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; margin-top:4px; line-height:1.45; }
+.ind .ispark { width:100%; height:64px; display:block; margin-top:10px; }
+.ind .isrc { font-size:11.5px; color:var(--muted); margin-top:10px; text-decoration:none; }
+.ind .isrc:hover { color:var(--accent-strong); }
+
+.curve-chart { width:100%; height:240px; display:block; }
+.curve-x { display:grid; font-size:11px; color:var(--muted); text-align:center; margin-top:4px;
+           font-variant-numeric:tabular-nums; }
+.curve-legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:12px; }
+.curve-legend span { display:inline-flex; align-items:center; gap:7px; }
+.curve-legend i { width:20px; height:0; border-top:2.5px solid var(--accent-strong); display:inline-block; }
+.curve-legend i.m { border-top:1.5px dashed var(--muted); }
+.curve-legend i.y { border-top:1.5px dotted var(--muted); }

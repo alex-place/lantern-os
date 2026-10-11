@@ -249,7 +249,60 @@
     draw(first);
   }
 
+  /* ── Economy figures (lib/economy) ─────────────────────────────────────────────
+     Every figure is printed WITH its date, in the form its frequency calls for: a month
+     ("Aug 2026"), a quarter ("Q2 2026") or a day ("Oct 8, 2026"). A change is shown with a
+     neutral arrow, never green or red — whether a rise is good depends on the figure. */
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function econDate(ind, d) {
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return '';
+    var y = d.slice(0, 4), m = Number(d.slice(5, 7)), day = Number(d.slice(8, 10));
+    if (ind && ind.freq === 'q') return 'Q' + (Math.floor((m - 1) / 3) + 1) + ' ' + y;
+    if (ind && ind.freq === 'm') return MON[m - 1] + ' ' + y;
+    return MON[m - 1] + ' ' + day + ', ' + y;
+  }
+  /** '% y/y' -> ['%', 'y/y']; 'K' -> ['K', '']. */
+  function econUnit(ind) {
+    var u = String((ind && ind.unit) || '');
+    return u.charAt(0) === '%' ? ['%', u.slice(1).trim()] : [u, ''];
+  }
+  function econVal(ind, p, extra) {
+    if (!p || !isNum(p.value)) return '—';
+    var v = Number(p.value), u = econUnit(ind)[0], d = ind.dec + (extra || 0);
+    if (isNum(p.lower)) return fmt(p.lower, d) + '–' + fmt(v, d) + '%';          // a range: the fed funds target
+    if (u === '$B') return (v < 0 ? '−$' : '$') + fmt(Math.abs(v), d) + 'B';
+    var s = fmt(v, d);
+    if (ind.id === 'payrolls' && v > 0) s = '+' + s;
+    if (u === 'pp') return (v > 0 ? '+' : '') + s + ' pp';
+    return s + (u === '%' ? '%' : u === 'K' ? 'K' : '');
+  }
+  /** Extra decimals for the comparison: when the two readings round to the same figure,
+   *  one more — "3.0%, up from 3.0%" said nothing (core PCE, 3.008 against 2.983). */
+  function econCmpDec(ind) {
+    if (!ind || !ind.latest || !ind.prior) return 0;
+    return econVal(ind, ind.latest) === econVal(ind, ind.prior) ? 1 : 0;
+  }
+  function econArrow(ind) {
+    if (!ind || !ind.latest || !ind.prior || !isNum(ind.latest.value) || !isNum(ind.prior.value)) return '';
+    var dv = Number(ind.latest.value) - Number(ind.prior.value);
+    return dv > 0 ? '▲' : dv < 0 ? '▼' : '=';
+  }
+  /** A figure as a tile: name, its date, the value, where it came from. Links to `link`. */
+  function econTile(ind, link) {
+    var a = el('a', 'tile');
+    a.href = link;
+    a.appendChild(el('div', 'tn', ind.name));
+    a.appendChild(el('div', 'tc', ind.latest ? econDate(ind, ind.latest.date) : 'not available'));
+    var p = el('div', 'tp', econVal(ind, ind.latest));
+    var q = econUnit(ind)[1];
+    if (q && ind.latest) p.appendChild(el('span', 'tu', q));
+    a.appendChild(p);
+    if (ind.prior) a.appendChild(el('div', 'tm flat', econArrow(ind) + ' from ' + econVal(ind, ind.prior, econCmpDec(ind))));
+    return a;
+  }
+
   global.MarketUI = {
+    econDate: econDate, econUnit: econUnit, econVal: econVal, econArrow: econArrow, econCmpDec: econCmpDec, econTile: econTile,
     el: el, svg: svg, get: get, isNum: isNum, fmt: fmt, price: price, pct: pct, signed: signed,
     dirCls: dirCls, big: big, decimals: decimals, symHref: symHref, ago: ago, trend: trend,
     trendChip: trendChip, badge: badge, tile: tile, table: table, COL: COL, PERF: PERF,
