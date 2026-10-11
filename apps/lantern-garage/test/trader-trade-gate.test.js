@@ -156,3 +156,12 @@ test('the two facts the gate waits on are actually published', () => {
   assert.match(PAGE, /_brokerOk = false; _refreshTradeGate\(\);/);
   assert.match(PAGE, /_brokerOk = true; _refreshTradeGate\(\);/);
 });
+
+test('a guest is not sent to the trade-gated AI list', () => {
+  // Every guest page load asked /api/trading/tradelist and got a 401 in the console: the
+  // AI list is an account's, and a guest has none to read.
+  const body = fn('loadMyList');
+  assert.match(body, /\(typeof window !== 'undefined' && window\.GUEST\) \? Promise\.resolve\(\{\}\) : fetch\(AI_LIST_API\)/);
+  // ...and that is safe only because the guest check settles BEFORE the dashboard loads.
+  assert.match(PAGE, /await detectGuestMode\(\); startDashboard\(\);/);
+});
