@@ -162,10 +162,13 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/zones",             // S/R zones (derived from bars)
   "/api/trading/symbols/search",    // symbol-search popup (broker asset universe)
   "/api/trading/symbol-stats",      // Yahoo returns/technicals
-  // Movers board (2026-10-11): the same public quotes as watchlist-prices, ranked over
-  // lib/market-universe. Market data only — it reads no account and no ledger, so it
-  // belongs with the reads above rather than behind the trade entitlement.
-  "/api/trading/movers",
+  // The market pages (2026-10-11): the hub, one page per asset class, each class's boards,
+  // a chart line and one instrument — lib/market-boards. Market data only: they read no
+  // account, no ledger and no engine, so they belong with the reads above rather than
+  // behind the trade entitlement. (They replaced /api/trading/movers.)
+  "/api/trading/markets",
+  "/api/trading/markets/series",
+  "/api/trading/markets/instrument",
   "/api/trading/symbol-info",       // name/exchange/asset_class
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed

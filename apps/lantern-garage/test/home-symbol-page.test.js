@@ -62,7 +62,9 @@ test('the ticker from the URL is refused rather than escaped', () => {
   // It lands in fetch URLs, the document title and the DOM, so anything that is not a
   // plain symbol never becomes any of those. Verified in the browser: ?t=<img src=x
   // onerror=alert(1)> rendered as the text IMGSRCXONERR and injected nothing.
-  assert.match(SYM, /replace\(\/\[\^A-Z0-9\.\\-\]\/g, ''\)/, 'a strict allowlist, not an escape');
+  // `^` and `=` joined the allowlist on 2026-10-11 for the market boards' instruments
+  // (^GSPC, CL=F, EURUSD=X). Neither can open markup, and every value still goes in as text.
+  assert.match(SYM, /replace\(\/\[\^A-Z0-9\.\\-\^=\]\/g, ''\)/, 'a strict allowlist, not an escape');
   assert.match(SYM, /\.slice\(0, 12\)/, 'and a length bound');
   // Nothing is ever written as markup. innerHTML appears only to CLEAR a box; every
   // value that reaches the DOM goes through textContent, so there is no sink to escape.

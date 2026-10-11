@@ -53,9 +53,11 @@ const PUBLIC_PAGES = {
   // symbol they clicked — the exact bounce #2610 and #3161 were filed for. It reads
   // prices, statistics and news; it offers no action a guest cannot take.
   "/symbol.html":         "symbol.html",
-  // The movers board the home page’s Markets heading leads to — public for the same
-  // reason the symbol view is: it is the destination of a link on a public page.
+  // The markets hub the home page’s Markets heading leads to, and the page per asset
+  // class it leads to in turn — public for the same reason the symbol view is: each is
+  // the destination of a link on a public page.
   "/markets.html":        "markets.html",
+  "/market.html":         "market.html",
   // Our summary of one story. Public: it is where the public news feed now points,
   // and it serves a headline, a few sentences and a link to the original.
   "/news-article.html":   "news-article.html",

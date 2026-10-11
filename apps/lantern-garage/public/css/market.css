@@ -272,3 +272,86 @@
 .art-sum { font-size:17px; line-height:1.65; margin:0 0 20px; }
 .art-sum.muted { color:var(--muted); font-size:15px; }
 .art-orig { margin-bottom:14px; }
+
+/* ── Market boards (markets.html, market.html — 2026-10-11) ──────────────────────
+   The hub, one page per asset class, and each class's boards in full. New classes only;
+   nothing above is touched. */
+
+/* The class switcher under the band's title — the same row on every market page, the
+   current one marked (TradingView's "Overview · Quotes · …" strip). */
+.mk-nav { display:flex; gap:6px; flex-wrap:wrap; margin-top:18px; }
+.mk-nav a { display:inline-flex; align-items:center; height:32px; padding:0 13px; border-radius:999px;
+            border:1px solid #2b3648; color:var(--text); text-decoration:none; font-size:13px; font-weight:600; }
+.mk-nav a:hover { border-color:var(--muted); background:rgba(255,255,255,.04); }
+.mk-nav a[aria-current="page"] { background:var(--accent-strong); border-color:var(--accent-strong); color:#04121a; }
+
+/* Tiles: one instrument each — name, code, price with its unit, the day's move. */
+.tiles { display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+@media (min-width:700px)  { .tiles { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (min-width:1100px) { .tiles { grid-template-columns:repeat(6,minmax(0,1fr)); } }
+.tile { display:block; border:1px solid var(--border); border-radius:14px; padding:12px 13px;
+        text-decoration:none; color:var(--text); min-width:0; }
+.tile:hover { border-color:var(--muted); background:var(--surface); }
+.tile .tn { font-size:13.5px; font-weight:600; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tile .tc { font-size:11px; color:var(--muted); margin-top:2px; letter-spacing:.02em; }
+.tile .tp { font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:10px; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; }
+.tile .tu { font-size:11px; color:var(--muted); font-weight:500; margin-left:4px; }
+.tile .tm { font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:2px; }
+
+/* The lead chart: name, last price, the move over the window, the range switcher. */
+.mk-lead-h { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.mk-lead-h .ln { font-size:15px; font-weight:700; }
+.mk-lead-h .lp { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+.mk-lead-h .ch { font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+.mk-lead-h .spacer { flex:1 1 auto; }
+.mk-chart { width:100%; height:220px; display:block; }
+.mk-sum { display:grid; gap:16px; }
+@media (min-width:1024px) { .mk-sum { grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); align-items:start; } }
+
+/* Quote tables. A wide one scrolls sideways inside its card on a phone; the page never does. */
+.qwrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.qtable { width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
+.qtable th { text-align:right; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+             color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.qtable td { text-align:right; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.qtable th:first-child, .qtable td:first-child { text-align:left; }
+.qtable tbody tr:hover td { background:var(--surface); }
+.qtable tbody tr:last-child td { border-bottom:0; }
+.qtable a.qn { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text); }
+.qtable a.qn:hover .qnn { color:var(--accent-strong); }
+.qtable .badge { width:26px; height:26px; font-size:9.5px; }
+.qtable .qnn { font-weight:600; }
+.qtable .qns { font-size:11.5px; color:var(--muted); margin-top:1px; }
+.qtable .ql { display:block; }
+
+/* The moving-average read, as words — never as a buy or sell call. */
+.trend { font-size:11.5px; font-weight:600; padding:2px 7px; border-radius:6px; background:var(--surface2); white-space:nowrap; }
+
+/* Cross rates: one cell per pair, tinted by the move. */
+.heat { display:grid; grid-template-columns:repeat(9,minmax(54px,1fr)); gap:2px; font-size:12px;
+        font-variant-numeric:tabular-nums; min-width:540px; }
+.heat div { padding:8px 4px; text-align:center; border-radius:4px; }
+.heat .hh { font-weight:700; color:var(--muted); }
+.heat .hx { background:var(--surface2); color:var(--muted); }
+.heat .hc.up { background:color-mix(in srgb, var(--green) 18%, transparent); color:var(--text); }
+.heat .hc.down { background:color-mix(in srgb, var(--red) 18%, transparent); color:var(--text); }
+.heat .hc.flat { background:var(--surface); color:var(--muted); }
+
+/* Breadth: advancing against declining, one bar. */
+.split { display:flex; height:10px; border-radius:999px; overflow:hidden; background:var(--surface2); margin:10px 0 6px; }
+.split .a { background:var(--green); } .split .d { background:var(--red); }
+.split-l { display:flex; justify-content:space-between; gap:12px; font-size:12.5px; font-variant-numeric:tabular-nums; }
+.bstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; }
+
+/* Sector bars, centred on zero so a fall and a rise read in opposite directions. */
+.sbar { display:grid; grid-template-columns:minmax(0,8.5em) minmax(64px,1fr) 4.4em; gap:10px; align-items:center; padding:6px 0;
+        font-size:13px; text-decoration:none; color:var(--text); }
+.sbar:hover .sbn { color:var(--accent-strong); }
+.sbn { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sbt { position:relative; height:8px; background:var(--surface2); border-radius:4px; }
+.sbt::before { content:''; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:var(--muted); opacity:.5; }
+.sbf { position:absolute; top:0; bottom:0; border-radius:4px; }
+.sbf.up { left:50%; background:var(--green); } .sbf.down { right:50%; background:var(--red); }
+.sbv { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+.mk-note { font-size:12.5px; line-height:1.55; color:var(--muted); margin:12px 0 0; max-width:80ch; }
