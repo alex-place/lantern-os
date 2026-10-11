@@ -670,7 +670,11 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     try {
       let out = null;
       if (!c) out = await boards.hub();
-      else if (boards.CLASS_IDS.includes(c)) {
+      else if (c === 'economy') {
+        // The US economy: FRED's official figures, not quotes (lib/economy).
+        const economy = require('../../lib/economy');
+        out = g ? await economy.board(g) : await economy.overview();
+      } else if (boards.CLASS_IDS.includes(c)) {
         out = g
           ? await boards.board(c, g, { view: url.searchParams.get('view'), session: url.searchParams.get('session') })
           : await boards.overview(c);

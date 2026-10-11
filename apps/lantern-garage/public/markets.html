@@ -32,6 +32,7 @@
       <a href="/market.html?c=crypto">Crypto</a>
       <a href="/market.html?c=futures">Futures</a>
       <a href="/market.html?c=forex">Forex</a>
+      <a href="/market.html?c=economy">Economy</a>
     </nav>
     <div class="pulse" id="pulse" aria-live="polite" style="margin-top:18px"></div>
   </div>
@@ -94,12 +95,24 @@
     <div class="viewall"><a class="cta-line" href="/market.html?c=forex&amp;g=majors">See all major pairs</a></div>
   </section>
 
+  <!-- ── Economy ── -->
+  <section class="sec wrap" aria-labelledby="ec-h">
+    <div class="sec-head">
+      <a href="/market.html?c=economy"><h2 id="ec-h">US economy</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">official figures from FRED, each as of its own release</span>
+    </div>
+    <div class="tiles" id="economy"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=economy">See the US economy</a></div>
+  </section>
+
   <section class="sec wrap">
     <hr class="rule">
     <p class="disc prose">
       Prices are Yahoo Finance quotes, refreshed about every thirty seconds and delayed as the
-      exchange requires. Each board is a curated list that its page names — not every index,
-      coin, contract or pair, and not a screener. Nothing here is investment advice.
+      exchange requires; economic figures are FRED’s, each as of its own release. Each board is a
+      curated list that its page names — not every index, coin, contract or pair, and not a
+      screener. Nothing here is investment advice.
     </p>
   </section>
 </main>
@@ -205,6 +218,17 @@
       byId('sumSub').textContent = '';
       byId('stSub').textContent = '';
     });
+
+  // The economy is a second, separate call: FRED's figures, not quotes (lib/economy).
+  U.get('/api/trading/markets?c=economy')
+    .then(function (d) {
+      var box = byId('economy');
+      box.innerHTML = '';
+      var key = (d && d.available && d.key) || [];
+      if (!key.length) { box.appendChild(el('div', 'state', 'The economic figures are not available just now.')); return; }
+      key.slice(0, 6).forEach(function (ind) { box.appendChild(U.econTile(ind, '/market.html?c=economy&g=' + encodeURIComponent(ind.group))); });
+    })
+    .catch(function (e) { fail(byId('economy'), 'the economy', e); });
 
   U.get('/api/trading/market-status')
     .then(function (m) {

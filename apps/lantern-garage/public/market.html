@@ -32,6 +32,7 @@
       <a href="/market.html?c=crypto" data-c="crypto">Crypto</a>
       <a href="/market.html?c=futures" data-c="futures">Futures</a>
       <a href="/market.html?c=forex" data-c="forex">Forex</a>
+      <a href="/market.html?c=economy" data-c="economy">Economy</a>
     </nav>
   </div>
 </header>
@@ -61,7 +62,7 @@
 (function () {
   'use strict';
   var U = window.MarketUI, el = U.el, COL = U.COL;
-  var CLASSES = ['indices', 'stocks', 'crypto', 'futures', 'forex'];
+  var CLASSES = ['indices', 'stocks', 'crypto', 'futures', 'forex', 'economy'];
   var qs = new URLSearchParams(location.search);
   var C = qs.get('c') || '';
   var G = qs.get('g') || '';
@@ -396,13 +397,233 @@
     if (notes[C]) s.sec.appendChild(el('p', 'mk-note', notes[C]));
   }
 
+  /* ── The US economy ─────────────────────────────────────────────────────────────
+     FRED's official figures (lib/economy), each printed with its own date. Changes carry
+     a neutral arrow: whether a rise is good depends on the figure, so nothing is green or
+     red here. Every card names its source and links to the series on FRED. */
+  function econSpark(ind) {
+    var vals = (ind.history || []).map(function (p) { return Number(p[1]); }).filter(isFinite);
+    var W = 300, H = 64, PAD = 4;
+    var s = U.svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', class: 'ispark',
+                           role: 'img', 'aria-label': ind.name + ', ' + vals.length + ' readings' });
+    if (vals.length < 2) return s;
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), span = (hi - lo) || 1;
+    var x = function (i) { return (i / (vals.length - 1)) * W; };
+    var y = function (v) { return PAD + (1 - (v - lo) / span) * (H - PAD * 2); };
+    // A figure that crosses zero (payrolls, the trade balance, the 10y–2y spread) gets the
+    // zero line, so a negative reading is visibly below it.
+    if (lo < 0 && hi > 0) {
+      s.appendChild(U.svg('line', { x1: '0', x2: String(W), y1: y(0).toFixed(1), y2: y(0).toFixed(1), stroke: 'var(--muted)',
+                                    'stroke-dasharray': '3 4', 'vector-effect': 'non-scaling-stroke', opacity: '.6' }));
+    }
+    s.appendChild(U.svg('path', { d: vals.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' '),
+                                  fill: 'none', stroke: 'var(--accent-strong)', 'stroke-width': '2', 'vector-effect': 'non-scaling-stroke' }));
+    return s;
+  }
+  function econCompare(ind) {
+    var parts = [];
+    if (ind.prior) {
+      parts.push(U.econArrow(ind) + ' from ' + U.econVal(ind, ind.prior, U.econCmpDec(ind)) + ' '
+        + (ind.freq === 'd' ? 'a month earlier' : 'in ' + U.econDate(ind, ind.prior.date)));
+    }
+    if (ind.yearAgo) parts.push(U.econVal(ind, ind.yearAgo) + ' a year earlier');
+    return parts.join(' · ');
+  }
+  function econCard(ind) {
+    var c = el('div', 'ind');
+    c.appendChild(el('div', 'in', ind.name));
+    if (ind.note) c.appendChild(el('div', 'inote', ind.note));
+    var v = el('div', 'iv', U.econVal(ind, ind.latest));
+    var q = U.econUnit(ind)[1];
+    if (q && ind.latest) v.appendChild(el('span', 'iq', q));
+    c.appendChild(v);
+    c.appendChild(el('div', 'ia', ind.latest ? 'as of ' + U.econDate(ind, ind.latest.date) : 'FRED did not return this figure just now'));
+    var cmp = econCompare(ind);
+    if (cmp) c.appendChild(el('div', 'ic', cmp));
+    c.appendChild(econSpark(ind));
+    var src = el('a', 'isrc', ind.source + ' · via FRED (' + ind.series + ') ↗');
+    src.href = ind.href;
+    src.target = '_blank';
+    src.rel = 'noopener noreferrer';
+    c.appendChild(src);
+    return c;
+  }
+  var CURVE_STYLE = [
+    { stroke: 'var(--accent-strong)', width: '2.5', dash: null, cls: '' },
+    { stroke: 'var(--muted)', width: '1.5', dash: '6 6', cls: 'm' },
+    { stroke: 'var(--muted)', width: '1.5', dash: '2 5', cls: 'y' },
+  ];
+  function curveCard(curve, spread) {
+    var card = el('div', 'card');
+    if (!curve || !curve.lines || !curve.lines.length) {
+      card.appendChild(el('div', 'state', 'The yield curve is not available just now.'));
+      return card;
+    }
+    var n = curve.tenors.length, W = 1000, H = 240, PAD = 14;
+    var all = [].concat.apply([], curve.lines.map(function (l) { return l.values; })).filter(function (v) { return U.isNum(v); });
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all), span = (hi - lo) || 1;
+    var x = function (i) { return ((i + 0.5) / n) * W; };
+    var y = function (v) { return PAD + (1 - (v - lo) / span) * (H - PAD * 2); };
+    var s = U.svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', class: 'curve-chart', role: 'img',
+                           'aria-label': 'US Treasury yield curve, ' + curve.tenors[0] + ' to ' + curve.tenors[n - 1] });
+    curve.lines.slice().reverse().forEach(function (line) {           // the latest is drawn last, on top
+      var st = CURVE_STYLE[curve.lines.indexOf(line)] || CURVE_STYLE[2];
+      var d = '';
+      line.values.forEach(function (v, i) { if (U.isNum(v)) d += (d ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(Number(v)).toFixed(1) + ' '; });
+      var attrs = { d: d.trim(), fill: 'none', stroke: st.stroke, 'stroke-width': st.width, 'vector-effect': 'non-scaling-stroke' };
+      if (st.dash) attrs['stroke-dasharray'] = st.dash;
+      s.appendChild(U.svg('path', attrs));
+    });
+    card.appendChild(s);
+    var xs = el('div', 'curve-x');
+    xs.style.gridTemplateColumns = 'repeat(' + n + ', minmax(0, 1fr))';
+    curve.tenors.forEach(function (t) { xs.appendChild(el('span', null, t)); });
+    card.appendChild(xs);
+    var lg = el('div', 'curve-legend');
+    curve.lines.forEach(function (line, i) {
+      var sp = el('span');
+      sp.appendChild(el('i', (CURVE_STYLE[i] || CURVE_STYLE[2]).cls || null));
+      sp.appendChild(document.createTextNode(line.label + ' · ' + U.econDate({ freq: 'd' }, line.date)));
+      lg.appendChild(sp);
+    });
+    lg.appendChild(el('span', null, 'scale ' + U.fmt(lo, 2) + '%–' + U.fmt(hi, 2) + '%'));
+    card.appendChild(lg);
+    // The numbers themselves, so nobody has to read a yield off a line.
+    var w = el('div', 'qwrap'), t = el('table', 'qtable');
+    var hr = el('tr');
+    hr.appendChild(el('th', null, 'Yield'));
+    curve.tenors.forEach(function (tn) { hr.appendChild(el('th', null, tn)); });
+    var th = el('thead'); th.appendChild(hr); t.appendChild(th);
+    var tb = el('tbody');
+    curve.lines.forEach(function (line) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, line.label));
+      line.values.forEach(function (v) { tr.appendChild(el('td', null, U.isNum(v) ? U.fmt(v, 2) + '%' : '—')); });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); w.appendChild(t);
+    w.style.marginTop = '14px';
+    card.appendChild(w);
+    if (spread && spread.latest && U.isNum(spread.latest.value)) {
+      var sv = Number(spread.latest.value);
+      card.appendChild(el('p', 'mk-note', 'The 10-year yields ' + U.fmt(Math.abs(sv), 2) + ' points ' + (sv >= 0 ? 'more' : 'less')
+        + ' than the 2-year (' + U.econDate(spread, spread.latest.date) + '): at that point the curve is '
+        + (sv < 0 ? 'inverted.' : 'not inverted.')));
+    }
+    return card;
+  }
+  function econSource(sec, d) {
+    var p = el('p', 'mk-note');
+    p.appendChild(document.createTextNode('Figures from '));
+    var a = el('a', null, (d.source && d.source.name) || 'FRED');
+    a.href = (d.source && d.source.href) || 'https://fred.stlouisfed.org/';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    p.appendChild(a);
+    p.appendChild(document.createTextNode(', which republishes each agency’s release. A figure is as of its own month, quarter, '
+      + 'week or day — the date beside it — not today. The United States only, and no release calendar: there is no '
+      + 'free source for one, and a calendar of guessed dates would be worse than none.'));
+    sec.appendChild(p);
+  }
+  function findInd(d, id) {
+    var all = [].concat(d.key || [], d.indicators || []);
+    (d.groups || []).forEach(function (g) { all = all.concat(g.indicators || []); });
+    return all.filter(function (i) { return i && i.id === id; })[0] || null;
+  }
+  function renderEconomy(d) {
+    document.title = 'US economy — Unisona';
+    byId('cTitle').textContent = d.class.title;
+    byId('cSub').textContent = d.class.blurb;
+    if (!d.available) {
+      var s0 = section('Not available just now');
+      s0.sec.appendChild(el('div', 'state', 'FRED did not answer. The figures will be back on the next try.'));
+      return;
+    }
+    var k = section('Key indicators', null, 'each as of its own release');
+    var tiles = el('div', 'tiles');
+    (d.key || []).forEach(function (ind) { if (ind) tiles.appendChild(U.econTile(ind, href('economy', ind.group))); });
+    k.sec.appendChild(tiles);
+
+    var cv = section('Treasury yield curve', href('economy', 'rates'), 'what the US government pays to borrow, by term');
+    cv.sec.appendChild(curveCard(d.curve, findInd(d, 'spread')));
+
+    (d.groups || []).forEach(function (g) {
+      var s = section(g.title, href('economy', g.id), g.indicators.length + ' figures');
+      var grid = el('div', 'econ-grid');
+      g.indicators.forEach(function (ind) { grid.appendChild(econCard(ind)); });
+      s.sec.appendChild(grid);
+    });
+    econSource(view.lastChild, d);
+  }
+  function renderEconBoard(d) {
+    var gt = d.group.title;
+    document.title = gt + ' — US economy — Unisona';
+    byId('cTitle').textContent = gt;
+    byId('cSub').textContent = d.class.title;
+    var back = byId('cBack');
+    back.href = href('economy');
+    back.textContent = '← ' + d.class.title;
+    var s = section(gt, null, (d.indicators || []).length + ' figures · each as of its own release');
+    var bar = el('div', 'mk-lead-h');
+    var tabs = el('span', 'tfbar');
+    (d.groups || []).forEach(function (g) {
+      var a = el('a', 'tf' + (g.id === d.group.id ? ' on' : ''), g.title);
+      a.href = href('economy', g.id);
+      a.style.textDecoration = 'none';
+      if (g.id === d.group.id) a.setAttribute('aria-current', 'page');
+      tabs.appendChild(a);
+    });
+    bar.appendChild(tabs);
+    s.sec.appendChild(bar);
+    // The table first — every figure, its date, what it is compared with — then the cards.
+    var card = el('div', 'card');
+    card.style.padding = '6px';
+    var w = el('div', 'qwrap'), t = el('table', 'qtable');
+    var hr = el('tr');
+    ['Figure', 'Latest', 'As of', 'Previous', 'A year earlier', 'Source'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+    var th = el('thead'); th.appendChild(hr); t.appendChild(th);
+    var tb = el('tbody');
+    (d.indicators || []).forEach(function (ind) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, ind.name));
+      tr.appendChild(el('td', null, U.econVal(ind, ind.latest) + (U.econUnit(ind)[1] ? ' ' + U.econUnit(ind)[1] : '')));
+      tr.appendChild(el('td', null, ind.latest ? U.econDate(ind, ind.latest.date) : '—'));
+      tr.appendChild(el('td', null, ind.prior ? U.econVal(ind, ind.prior) + ' (' + U.econDate(ind, ind.prior.date) + ')' : '—'));
+      tr.appendChild(el('td', null, U.econVal(ind, ind.yearAgo)));
+      var td = el('td'), a = el('a', null, ind.series + ' ↗');
+      a.href = ind.href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      td.appendChild(a);
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); w.appendChild(t); card.appendChild(w);
+    s.sec.appendChild(card);
+    var grid = el('div', 'econ-grid');
+    grid.style.marginTop = '16px';
+    (d.indicators || []).forEach(function (ind) { grid.appendChild(econCard(ind)); });
+    s.sec.appendChild(grid);
+    if (d.curve) {
+      var cv = section('Treasury yield curve', null, 'what the US government pays to borrow, by term');
+      cv.sec.appendChild(curveCard(d.curve, findInd(d, 'spread')));
+    }
+    econSource(view.lastChild, d);
+  }
+
   var url = '/api/trading/markets?c=' + encodeURIComponent(C);
-  if (G) url += '&g=' + encodeURIComponent(G) + (VIEW === 'perf' ? '&view=perf' : '') + (SESSION !== 'regular' ? '&session=' + SESSION : '');
+  if (G && C === 'economy') url += '&g=' + encodeURIComponent(G);
+  else if (G) url += '&g=' + encodeURIComponent(G) + (VIEW === 'perf' ? '&view=perf' : '') + (SESSION !== 'regular' ? '&session=' + SESSION : '');
+  if (C === 'economy') {
+    byId('disc').textContent = 'These are official US statistics as FRED republishes them, each as of the date beside it. '
+      + 'Nothing here is investment advice.';
+  }
   view.appendChild(el('div', 'wrap', null)).appendChild(el('div', 'state', 'Loading…'));
   U.get(url)
     .then(function (d) {
       view.innerHTML = '';
-      if (G) renderBoard(d);
+      if (C === 'economy') { if (G) renderEconBoard(d); else renderEconomy(d); }
+      else if (G) renderBoard(d);
       else if (C === 'stocks') renderStocks(d);
       else renderOverview(d);
     })
