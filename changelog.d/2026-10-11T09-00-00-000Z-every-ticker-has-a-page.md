@@ -1,0 +1,3 @@
+### Added
+
+- home: **every ticker on the home page now leads to a page about that ticker.** Each row in the Markets grid and each engine verdict panel linked to `/stock-trader.html` with no symbol on it, so clicking AAPL and clicking TSLA arrived at the same screen. There is a symbol view now — price with a 1D–5Y range switcher, thirteen key statistics, performance over five windows, the moving-average read, the engine's own verdict for symbols it scans, and that symbol's news. The home page's 197-line design system moved out of the page into `css/market.css` so the pages its links lead to can *be* the same page rather than merely resemble it.

@@ -3,9 +3,9 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 31,
+    "pages": 32,
     "reachable": 18,
-    "orphaned": 13,
+    "orphaned": 14,
     "inSitemap": 15
   },
   "graph": {
@@ -187,6 +187,15 @@
       "trader-guide.html",
       "work.html"
     ],
+    "symbol.html": [
+      "budget.html",
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "journal.html",
+      "stock-trader.html",
+      "work.html"
+    ],
     "system-health.html": [
       "budget.html",
       "changelog.html",
@@ -331,6 +340,7 @@
     "metrics.html",
     "reset-password.html",
     "shared.html",
+    "symbol.html",
     "system-health.html",
     "transparency.html",
     "welcome.html",

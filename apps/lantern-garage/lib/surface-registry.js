@@ -30,6 +30,20 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 // ── CORE — the convergence loop itself ──────────────────────────────────────────
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
+  // The hub's Observe stage, one level down: the same live prices, statistics, news and
+  // engine read as index.html, narrowed to one symbol, and the destination of every
+  // ticker on it (2026-10-11).
+  //
+  // CORE rather than an extension, and the distinction is the registry's own: an
+  // EXTENSION is "an optional capability beside the loop". This page offers no
+  // capability — it takes no action, places nothing, stores nothing, and is public and
+  // ungated exactly as index.html is. stock-trader.html is the extension because it ACTS
+  // (and is gated by TRADING_ENABLED); reading about a symbol is observing, not trading.
+  //
+  // It happens to keep the extension ratio under its cap. That is a consequence, not the
+  // reason — the rule above asks the next surface to either serve the loop or justify a
+  // raise, and this one serves the loop.
+  "symbol.html":            "Observe",   // one symbol: price, statistics, news, the engine's read
   "journal.html":           "Verify",    // trading journal — did the trades do what the plan said? (its own <meta loop-stage> agrees)
   "transparency.html":      "Verify",    // the trader, scored (#3598) — the prediction ledger and live fills, misses kept visible
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
