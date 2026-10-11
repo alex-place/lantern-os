@@ -7880,11 +7880,10 @@ function renderSymbolInfo(ticker){
     <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>
     <div class="wi-sect">Alerts</div>
     <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ Alert</button></div>`;
-  if(!_symNames[ticker] && kind==='Equity'){
-    fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
-      if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
-    }).catch(()=>{});
-  }
+  // Through _ensureSymName, which asks once per symbol: this panel re-renders several
+  // times while the answer is in flight (the stats landing, the watchlist redraw), and
+  // each render asked again — three identical symbol-info requests for SPY on every load.
+  if(!_symNames[ticker] && kind==='Equity') _ensureSymName(ticker);
   if(_symStats[ticker]===undefined){
     _symStats[ticker]=null;   // in-flight
     fetch('/api/trading/symbol-stats?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
@@ -10839,7 +10838,11 @@ function _ensureSymName(ticker){
   if(!ticker || typeof fetch !== 'function' || typeof _symNames === 'undefined' || _symNames[ticker] || _symNameInflight.has(ticker)) return;
   _symNameInflight.add(ticker);
   fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
-    if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(_lastPositions.length && !(typeof _armedBtn !== 'undefined' && _armedBtn)) renderPositionsTable(_lastPositions); }
+    if(j&&j.name){
+      _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):'');
+      if(_lastPositions.length && !(typeof _armedBtn !== 'undefined' && _armedBtn)) renderPositionsTable(_lastPositions);
+      if(activeTicker===ticker) renderSymbolInfo(ticker);   // the symbol panel asks through here too
+    }
   }).catch(()=>{}).finally(()=>_symNameInflight.delete(ticker));
 }
 function renderPositionsTable(positions){
