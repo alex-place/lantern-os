@@ -3,8 +3,8 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 32,
-    "reachable": 18,
+    "pages": 33,
+    "reachable": 19,
     "orphaned": 14,
     "inSitemap": 15
   },
@@ -118,6 +118,7 @@
       "chat.html",
       "explore.html",
       "journal.html",
+      "markets.html",
       "pricing.html",
       "stock-trader.html",
       "work.html"
@@ -131,6 +132,15 @@
       "work.html"
     ],
     "kalshi-terminal.html": [
+      "budget.html",
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "journal.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "markets.html": [
       "budget.html",
       "changelog.html",
       "chat.html",
@@ -268,6 +278,7 @@
     "chat.html": 1,
     "explore.html": 1,
     "journal.html": 1,
+    "markets.html": 1,
     "pricing.html": 1,
     "stock-trader.html": 1,
     "work.html": 1,
@@ -291,6 +302,7 @@
       "chat.html",
       "explore.html",
       "journal.html",
+      "markets.html",
       "pricing.html",
       "stock-trader.html",
       "work.html"
@@ -323,6 +335,7 @@
     "index.html",
     "journal.html",
     "kalshi-terminal.html",
+    "markets.html",
     "orchestration.html",
     "pricing.html",
     "settings.html",
@@ -368,6 +381,7 @@
     "auth.html",
     "fallout-radio.html",
     "journal.html",
+    "markets.html",
     "settings.html",
     "trader-guide.html",
     "work.html"

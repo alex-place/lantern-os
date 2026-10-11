@@ -53,6 +53,9 @@ const PUBLIC_PAGES = {
   // symbol they clicked — the exact bounce #2610 and #3161 were filed for. It reads
   // prices, statistics and news; it offers no action a guest cannot take.
   "/symbol.html":         "symbol.html",
+  // The movers board the home page’s Markets heading leads to — public for the same
+  // reason the symbol view is: it is the destination of a link on a public page.
+  "/markets.html":        "markets.html",
   "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
   "/journal.html":        "journal.html",   // the trading journal — its own page since it outgrew the panel
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
