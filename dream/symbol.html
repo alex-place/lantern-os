@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="observe">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0e17">
+  <title>Symbol — Unisona</title>
+  <script>
+    /* Theme bootstrap before first paint — always writes an explicit value, or every
+       html[data-theme="light"] rule silently stops applying in light mode. */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/market.css">
+  <script src="/js/signal-palette.js"></script>
+</head>
+<body>
+<header class="band">
+  <div class="band-inner wrap">
+    <a class="sym-back" href="/">&larr; Markets</a>
+    <div class="sym-head">
+      <span class="badge" id="sBadge">—</span>
+      <div class="grow">
+        <h1 class="sym-t" id="sTicker">—</h1>
+        <div class="sym-name" id="sName">loading…</div>
+      </div>
+      <div class="sym-px">
+        <div class="sym-last" id="sLast">—</div>
+        <div class="sym-chg" id="sChg"></div>
+      </div>
+    </div>
+    <div class="cta-row">
+      <a class="cta" id="sTrade" href="/stock-trader.html">Open in the terminal</a>
+      <a class="cta cta-ghost" href="/chat.html" id="sAsk">Ask about this symbol</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ── Price ── -->
+  <section class="sec wrap" aria-labelledby="ch-h">
+    <div class="sec-head">
+      <h2 id="ch-h">Price</h2>
+      <span class="sub" id="chSub">loading…</span>
+      <span class="spacer"></span>
+      <span class="tfbar" id="tfbar" role="group" aria-label="Chart range"></span>
+    </div>
+    <div class="card sym-chart" id="chart"></div>
+  </section>
+
+  <!-- ── Key statistics ── -->
+  <section class="sec wrap" aria-labelledby="ks-h">
+    <div class="sec-head"><h2 id="ks-h">Key statistics</h2><span class="sub" id="ksSub">loading…</span></div>
+    <div class="card"><div class="kstats" id="kstats"></div></div>
+  </section>
+
+  <!-- ── Performance ── -->
+  <section class="sec wrap" aria-labelledby="pf-h">
+    <div class="sec-head"><h2 id="pf-h">Performance</h2><span class="sub">total return over each window</span></div>
+    <div class="card"><div class="perf" id="perf"></div></div>
+  </section>
+
+  <!-- ── What the engine sees ── -->
+  <section class="sec wrap" aria-labelledby="eng-h">
+    <div class="sec-head"><h2 id="eng-h">What the engine sees</h2><span class="sub" id="engSub">loading…</span></div>
+    <div id="engine"></div>
+  </section>
+
+  <!-- ── News ── -->
+  <section class="sec wrap" aria-labelledby="nw-h">
+    <div class="sec-head"><h2 id="nw-h">News</h2><span class="sub" id="nwSub">loading…</span></div>
+    <div class="card" id="news" style="padding:4px"></div>
+  </section>
+</main>
+
+<script src="/js/site-chrome.js" defer></script>
+<script>
+/* ── Symbol view ───────────────────────────────────────────────────────────────
+   The destination every ticker on the home page used to lack: all of them linked to
+   /stock-trader.html, so clicking AAPL and clicking TSLA arrived at the same screen
+   (founder, 2026-10-11).
+
+   Everything here is live: /api/trading/symbol-info, /symbol-stats, /bars,
+   /news/recent?ticker=, and the engine's own scan from /zones. Nothing is sampled or
+   seeded, and a figure the server does not have renders as "—" rather than as a zero.
+
+   WHAT IT MAY PUBLISH. This page is public, so it shows exactly the envelope the home
+   page already publishes for the engine — direction, decision, win probability,
+   expected value, stop, targets, skip reason — and nothing more. The `position` field
+   on the same payload is deliberately never read here, for the reason index.html
+   states: it would publish operator position sizes to anonymous visitors.
+*/
+(function () {
+  'use strict';
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function byId(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function svg(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+  function get(url) {
+    return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function fail(box, what, err) {
+    box.innerHTML = '';
+    box.appendChild(el('div', 'state err', 'Could not load ' + what + ' (' + err.message + ').'));
+  }
+  function fmt(n, d) {
+    var v = Number(n);
+    if (!isFinite(v)) return '—';
+    return v.toLocaleString(undefined, { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d });
+  }
+  function pct(n) { var v = Number(n); return isFinite(v) ? (v > 0 ? '+' : '') + v.toFixed(2) + '%' : '—'; }
+  function dirCls(n) { var v = Number(n); return !isFinite(v) || v === 0 ? 'flat' : v > 0 ? 'up' : 'down'; }
+  function big(n) {
+    var v = Number(n);
+    if (!isFinite(v)) return '—';
+    var u = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+    for (var i = 0; i < u.length; i++) if (Math.abs(v) >= u[i][0]) return (v / u[i][0]).toFixed(2) + u[i][1];
+    return String(Math.round(v));
+  }
+  function ago(iso) {
+    var t = Date.parse(iso);
+    if (!isFinite(t)) return '';
+    var m = Math.round((Date.now() - t) / 60000);
+    if (m < 60) return m + 'm ago';
+    var h = Math.round(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.round(h / 24) + 'd ago';
+  }
+
+  /* The ticker is the whole address of this page, and it lands in fetch URLs, the
+     document title and the DOM. Anything that is not a plain symbol is refused
+     outright rather than escaped and used. */
+  var raw = new URLSearchParams(location.search).get('t') || '';
+  var T = raw.toUpperCase().replace(/[^A-Z0-9.\-]/g, '').slice(0, 12);
+
+  if (!T) {
+    byId('sName').textContent = 'No symbol given.';
+    byId('sTicker').textContent = '—';
+    ['chart', 'kstats', 'perf', 'engine', 'news'].forEach(function (id) {
+      var b = byId(id); b.innerHTML = '';
+      b.appendChild(el('div', 'state', 'Open this page from a ticker — for example /symbol.html?t=SPY.'));
+    });
+    ['chSub', 'ksSub', 'engSub', 'nwSub'].forEach(function (id) { byId(id).textContent = ''; });
+    return;
+  }
+
+  document.title = T + ' — Unisona';
+  byId('sTicker').textContent = T;
+  byId('sBadge').textContent = T.slice(0, 2);
+  byId('sTrade').href = '/stock-trader.html?ticker=' + encodeURIComponent(T);
+  byId('sAsk').href = '/chat.html?q=' + encodeURIComponent('What is ' + T + ' doing today, and what does the engine think of it?');
+
+  /* ── Chart ─────────────────────────────────────────────────────────────────── */
+  var RANGES = [
+    { id: '1D', tf: '5m',  limit: 110 },
+    { id: '1W', tf: '1h',  limit: 70  },
+    { id: '1M', tf: '1d',  limit: 23  },
+    { id: '6M', tf: '1d',  limit: 130 },
+    { id: '1Y', tf: '1d',  limit: 260 },
+    { id: '5Y', tf: '1wk', limit: 260 }
+  ];
+  var curRange = '6M';
+
+  function areaChart(bars) {
+    var W = 1000, H = 260, PAD = 8;
+    var closes = bars.map(function (b) { return Number(b.close); }).filter(isFinite);
+    var s = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', class: 'bigchart', role: 'img',
+                         'aria-label': T + ' price, ' + closes.length + ' bars' });
+    if (closes.length < 2) return s;
+    var lo = Math.min.apply(null, closes), hi = Math.max.apply(null, closes);
+    var span = (hi - lo) || 1;
+    var up = closes[closes.length - 1] >= closes[0];
+    var c = up ? 'var(--green)' : 'var(--red)';
+    var x = function (i) { return (i / (closes.length - 1)) * W; };
+    var y = function (v) { return PAD + (1 - (v - lo) / span) * (H - PAD * 2); };
+    var d = closes.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' ');
+    var id = 'g' + Math.abs(Math.round(closes[0] * 100)) + '_' + closes.length;
+    var defs = svg('defs', {});
+    var grad = svg('linearGradient', { id: id, x1: '0', y1: '0', x2: '0', y2: '1' });
+    grad.appendChild(svg('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '.26' }));
+    grad.appendChild(svg('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0' }));
+    defs.appendChild(grad); s.appendChild(defs);
+    s.appendChild(svg('path', { d: d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z', fill: 'url(#' + id + ')' }));
+    s.appendChild(svg('path', { d: d, fill: 'none', stroke: c, 'stroke-width': '2', 'stroke-linejoin': 'round' }));
+    return s;
+  }
+
+  function renderChart() {
+    var r = RANGES.filter(function (x) { return x.id === curRange; })[0] || RANGES[3];
+    var box = byId('chart');
+    box.innerHTML = '';
+    box.appendChild(el('div', 'state', 'Loading ' + curRange + '…'));
+    get('/api/trading/bars?ticker=' + encodeURIComponent(T) + '&timeframe=' + r.tf + '&limit=' + r.limit)
+      .then(function (d) {
+        var bars = (d && d.bars) || [];
+        box.innerHTML = '';
+        if (bars.length < 2) {
+          box.appendChild(el('div', 'state', 'No price history for ' + T + ' over this range.'));
+          byId('chSub').textContent = '';
+          return;
+        }
+        box.appendChild(areaChart(bars));
+        var closes = bars.map(function (b) { return Number(b.close); }).filter(isFinite);
+        var lo = Math.min.apply(null, closes), hi = Math.max.apply(null, closes);
+        var chg = closes[0] ? ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100 : null;
+        var sub = byId('chSub');
+        sub.textContent = '';
+        sub.appendChild(el('span', null, bars.length + ' bars · ' + fmt(lo, 2) + '–' + fmt(hi, 2) + ' · '));
+        sub.appendChild(el('span', dirCls(chg), pct(chg) + ' over ' + curRange));
+      })
+      .catch(function (e) { fail(box, 'the chart', e); byId('chSub').textContent = ''; });
+  }
+
+  var bar = byId('tfbar');
+  RANGES.forEach(function (r) {
+    var b = el('button', 'tf' + (r.id === curRange ? ' on' : ''), r.id);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', r.id === curRange ? 'true' : 'false');
+    b.onclick = function () {
+      curRange = r.id;
+      [].forEach.call(bar.children, function (c) {
+        var on = c.textContent === r.id;
+        c.className = 'tf' + (on ? ' on' : '');
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      renderChart();
+    };
+    bar.appendChild(b);
+  });
+  renderChart();
+
+  /* ── Header + key statistics ───────────────────────────────────────────────── */
+  get('/api/trading/symbol-info?ticker=' + encodeURIComponent(T))
+    .then(function (d) {
+      var parts = [];
+      if (d && d.name) parts.push(d.name);
+      if (d && d.exchange) parts.push(d.exchange);
+      byId('sName').textContent = parts.length ? parts.join(' · ') : 'Symbol';
+    })
+    .catch(function () { byId('sName').textContent = 'Symbol'; });
+
+  get('/api/trading/symbol-stats?ticker=' + encodeURIComponent(T))
+    .then(function (d) {
+      if (!d || d.available === false) {
+        byId('kstats').appendChild(el('div', 'state', 'No statistics are available for ' + T + '.'));
+        byId('ksSub').textContent = '';
+        byId('perf').appendChild(el('div', 'state', 'No return history for ' + T + '.'));
+        return;
+      }
+      var q = d.quote || {};
+      if (isFinite(Number(d.price))) byId('sLast').textContent = fmt(d.price, Number(d.price) < 10 ? 4 : 2);
+      if (isFinite(Number(q.previousClose)) && isFinite(Number(d.price)) && Number(q.previousClose)) {
+        var ch = Number(d.price) - Number(q.previousClose);
+        var cp = (ch / Number(q.previousClose)) * 100;
+        var box = byId('sChg');
+        box.className = 'sym-chg ' + dirCls(cp);
+        box.textContent = (ch > 0 ? '+' : '') + fmt(ch, 2) + '  ' + pct(cp) + '  today';
+      }
+
+      var ks = byId('kstats');
+      function row(k, v, cls) {
+        var w = el('div', 'kst');
+        w.appendChild(el('div', 'kk', k));
+        w.appendChild(el('div', 'kv' + (cls ? ' ' + cls : ''), v));
+        ks.appendChild(w);
+      }
+      function range(lo, hi) {
+        return (isFinite(Number(lo)) && isFinite(Number(hi))) ? fmt(lo, 2) + ' – ' + fmt(hi, 2) : '—';
+      }
+      row('Previous close', isFinite(Number(q.previousClose)) ? fmt(q.previousClose, 2) : '—');
+      row('Open', isFinite(Number(q.open)) ? fmt(q.open, 2) : '—');
+      row("Day's range", range(q.dayLow, q.dayHigh));
+      row('52-week range', range(q.fiftyTwoWeekLow, q.fiftyTwoWeekHigh));
+      row('Volume', big(d.volume));
+      // Relative volume is the one number here the raw figures do not give you, and it
+      // is the one a reader actually uses: today against the 30-day average.
+      var rv = (isFinite(Number(d.volume)) && Number(d.avgVolume)) ? Number(d.volume) / Number(d.avgVolume) : null;
+      row('Avg volume (30d)', big(d.avgVolume) + (rv ? '   ×' + rv.toFixed(2) + ' today' : ''));
+      row('Market cap', big(q.marketCap));
+      row('Beta', isFinite(Number(q.beta)) ? fmt(q.beta, 2) : '—');
+      row('P/E (trailing)', isFinite(Number(q.trailingPE)) ? fmt(q.trailingPE, 2) : '—');
+      row('P/E (forward)', isFinite(Number(q.forwardPE)) ? fmt(q.forwardPE, 2) : '—');
+      row('EPS', isFinite(Number(q.eps)) ? fmt(q.eps, 2) : '—');
+      row('Dividend yield', isFinite(Number(q.dividendYield)) ? fmt(q.dividendYield, 2) + '%' : '—');
+      var tgt = Number(q.targetMeanPrice);
+      row('Analyst target (1y)', isFinite(tgt) ? fmt(tgt, 2) : '—',
+          (isFinite(tgt) && isFinite(Number(d.price))) ? dirCls(tgt - Number(d.price)) : null);
+      byId('ksSub').textContent = 'from daily bars and the quote summary';
+
+      // Performance
+      var pf = byId('perf');
+      var R = d.returns || {};
+      ['1M', '3M', 'YTD', '1Y', '3Y'].forEach(function (k) {
+        var v = R[k];
+        var c = el('div', 'pf');
+        c.appendChild(el('div', 'pfk', k));
+        c.appendChild(el('div', 'pfv ' + dirCls(v), pct(v)));
+        var trackw = el('div', 'pftrack');
+        var f = el('div', 'pffill ' + dirCls(v));
+        // Clamped to ±50% so one outlier window does not flatten the others to nothing.
+        f.style.width = Math.min(100, Math.abs(Number(v) || 0) * 2) + '%';
+        trackw.appendChild(f);
+        c.appendChild(trackw);
+        pf.appendChild(c);
+      });
+
+      // Technical read — named for what it is.
+      if (d.technical) {
+        var t = el('div', 'tech');
+        var cls = /Buy/.test(d.technical) ? 'up' : /Sell/.test(d.technical) ? 'down' : 'flat';
+        t.appendChild(el('span', 'techk', 'Moving-average read'));
+        t.appendChild(el('span', 'techv ' + cls, d.technical));
+        var n = Number(d.bullCount);
+        t.appendChild(el('span', 'techn', isFinite(n)
+          ? 'price is above ' + n + ' of its 20, 50 and 200-day averages'
+          : ''));
+        byId('perf').parentNode.appendChild(t);
+      }
+    })
+    .catch(function (e) { fail(byId('kstats'), 'the statistics', e); byId('ksSub').textContent = ''; });
+
+  /* ── The engine's own read ─────────────────────────────────────────────────── */
+  get('/api/trading/zones')
+    .then(function (d) {
+      var z = ((d && d.zones) || {})[T];
+      var box = byId('engine');
+      box.innerHTML = '';
+      if (!z) {
+        // Honest: the engine scans a tradelist, not the whole market.
+        var s = el('div', 'card');
+        s.appendChild(el('div', 'state',
+          T + ' is not on the engine’s tradelist, so it is not scored. The prices, '
+          + 'statistics and news above are live either way.'));
+        box.appendChild(s);
+        byId('engSub').textContent = 'not scanned';
+        return;
+      }
+      var sig = z.last_signal || {}, conv = sig.convergence || {}, plan = sig.plan || {};
+      var card = el('div', 'card');
+
+      var head = el('div', 'vp-head');
+      if (sig.direction) head.appendChild(el('span', 'chip', sig.direction));
+      if (sig.quality) head.appendChild(el('span', 'chip', sig.quality));
+      head.appendChild(el('span', 'spacer'));
+      if (conv.decision) head.appendChild(el('span', 'tag ' + (conv.decision === 'ENTER' ? 'enter' : 'skip'), conv.decision));
+      card.appendChild(head);
+
+      var stats = el('div', 'kstats');
+      function st(k, v, cls) {
+        var w = el('div', 'kst');
+        w.appendChild(el('div', 'kk', k));
+        w.appendChild(el('div', 'kv' + (cls ? ' ' + cls : ''), v));
+        stats.appendChild(w);
+      }
+      if (isFinite(Number(conv.p_win))) st('Win probability', (Number(conv.p_win) * 100).toFixed(1) + '%');
+      if (isFinite(Number(conv.ev_r))) st('Expected value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
+      if (isFinite(Number(sig.confidence))) st('Confidence', Math.round(sig.confidence) + '%');
+      if (isFinite(Number(plan.stop))) st('Stop', fmt(plan.stop, 2));
+      if (isFinite(Number(plan.target1))) st('Target 1', fmt(plan.target1, 2), 'up');
+      if (isFinite(Number(plan.target2))) st('Target 2', fmt(plan.target2, 2), 'up');
+      if (isFinite(Number(sig.rsi))) st('RSI', Math.round(sig.rsi));
+      if (isFinite(Number(sig.volume_ratio))) st('Relative volume', '×' + fmt(sig.volume_ratio, 2));
+      if (isFinite(Number(sig.support))) st('Support', fmt(sig.support, 2));
+      if (isFinite(Number(sig.resistance))) st('Resistance', fmt(sig.resistance, 2));
+      card.appendChild(stats);
+
+      if (sig.reasons) {
+        var why = el('div', 'vp-why');
+        why.appendChild(el('b', null, 'Why — '));
+        why.appendChild(document.createTextNode(String(sig.reasons)));
+        card.appendChild(why);
+      }
+      if (conv.skip_reason) {
+        var sk = el('div', 'vp-why');
+        sk.appendChild(el('b', null, 'Turned down — '));
+        sk.appendChild(document.createTextNode(String(conv.skip_reason)));
+        card.appendChild(sk);
+      }
+      card.appendChild(el('div', 'disc',
+        'Deterministic technical analysis plus a hand-weighted linear model — not a language model. '
+        + 'Published for the same reason the home page publishes it: a refusal is as much of a result as an entry.'));
+      box.appendChild(card);
+      byId('engSub').textContent = conv.decision ? 'scored this pass' : 'on the tradelist, not scored this pass';
+    })
+    .catch(function (e) { fail(byId('engine'), 'the engine', e); byId('engSub').textContent = ''; });
+
+  /* ── News ──────────────────────────────────────────────────────────────────── */
+  get('/api/trading/news/recent?limit=12&ticker=' + encodeURIComponent(T))
+    .then(function (d) {
+      var recs = (d && d.records) || [];
+      var box = byId('news');
+      box.innerHTML = '';
+      if (!recs.length) {
+        box.appendChild(el('div', 'state', 'No stories mentioning ' + T + ' have been collected yet.'));
+        byId('nwSub').textContent = '';
+        return;
+      }
+      recs.forEach(function (n) {
+        var a = el('a', 'nrow');
+        if (n.url) { a.href = n.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+        a.appendChild(el('div', 'nh', n.headline || n.text || '(untitled)'));
+        var m = el('div', 'nm');
+        if (n.source) m.appendChild(el('span', null, n.source));
+        if (n.published) m.appendChild(el('span', null, ago(n.published)));
+        (n.symbols || []).slice(0, 4).forEach(function (s) { m.appendChild(el('span', 'chip', s)); });
+        if (n.direction && n.direction !== 'neutral') {
+          m.appendChild(el('span', 'chip ' + (n.direction === 'bullish' ? 'up' : 'down'), n.direction));
+        }
+        a.appendChild(m);
+        box.appendChild(a);
+      });
+      byId('nwSub').textContent = recs.length + ' recent stories';
+    })
+    .catch(function (e) { fail(byId('news'), 'the news', e); byId('nwSub').textContent = ''; });
+})();
+</script>
+</body>
+</html>
