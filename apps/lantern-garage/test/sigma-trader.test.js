@@ -152,3 +152,12 @@ test('rebalanceNow: NO dedicated account → refuses, places nothing (never touc
     assert.strictEqual(placed.length, 0, 'never places without its own account');
   } finally { if (saved === undefined) delete process.env.SIGMA_ARM; else process.env.SIGMA_ARM = saved; }
 });
+
+test('the FRED benchmark fetch names itself and asks for a month, not since 1954', () => {
+  // With no User-Agent FRED never answered: every plan() waited out its 8s timeout and
+  // used the 4.5% fallback (the real rate was 3.88% on 2026-10-11).
+  const src = require('fs').readFileSync(require.resolve('../lib/sigma-trader'), 'utf8');
+  const call = src.slice(src.indexOf('fredgraph.csv?id=DFF'), src.indexOf("r.on('data'", src.indexOf('fredgraph.csv?id=DFF')));
+  assert.match(call, /'User-Agent': 'Mozilla\/5\.0 \(compatible; unisona\.ai\/1\.0; \+https:\/\/unisona\.ai\)'/);
+  assert.match(call, /&cosd=\$\{since\}/);
+});

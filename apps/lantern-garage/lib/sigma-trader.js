@@ -185,10 +185,16 @@ async function _benchmarkRate() {
   if (_bmCache.rate != null && now - _bmCache.at < 24 * 3600 * 1000) return _bmCache.rate;
   try {
     const https = require('https');
+    // FRED never answers a request with no User-Agent (nor a bare "Mozilla/5.0" one): this
+    // waited out the 8s timeout on EVERY call and fell back to 4.5% — the rate was 3.88% on
+    // 2026-10-11. A self-identifying agent is answered in ~50ms. cosd bounds the reply to a
+    // month of rows; without it FRED sent every day since 1954.
+    const since = new Date(now - 31 * 86400e3).toISOString().slice(0, 10);
     const txt = await new Promise((resolve, reject) => {
-      https.get('https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF', (r) => {
-        let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => resolve(d));
-      }).on('error', reject).setTimeout(8000, function () { this.destroy(); reject(new Error('timeout')); });
+      https.get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF&cosd=${since}`,
+        { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; unisona.ai/1.0; +https://unisona.ai)' } }, (r) => {
+          let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => resolve(d));
+        }).on('error', reject).setTimeout(8000, function () { this.destroy(); reject(new Error('timeout')); });
     });
     const rows = txt.trim().split('\n');
     for (let i = rows.length - 1; i > 0; i--) {
