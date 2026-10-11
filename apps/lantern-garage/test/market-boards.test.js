@@ -67,21 +67,25 @@ function v7Row(sym, price, extra) {
            fiftyDayAverage: price * 0.9, twoHundredDayAverage: price * 1.1, priceHint: 2, ...(extra || {}) };
 }
 function yahooHandler(u) {
-  if (u.startsWith('https://fc.yahoo.com')) return { status: 404, headers: { 'set-cookie': ['A3=x; Path=/'] } };
-  if (u.includes('/v1/test/getcrumb')) return { body: 'crumb123' };
-  if (u.includes('/v7/finance/quote')) {
-    const syms = decodeURIComponent(u.match(/symbols=([^&]+)/)[1]).split(',');
+  // Routed on the parsed host and path, never on a URL substring: a prefix test on
+  // "https://fc.yahoo.com" also matches https://fc.yahoo.com.example.net.
+  const url = new URL(u);
+  if (url.hostname === 'fc.yahoo.com') return { status: 404, headers: { 'set-cookie': ['A3=x; Path=/'] } };
+  if (url.hostname !== 'query1.finance.yahoo.com') return { status: 404 };
+  if (url.pathname === '/v1/test/getcrumb') return { body: 'crumb123' };
+  if (url.pathname === '/v7/finance/quote') {
+    const syms = url.searchParams.get('symbols').split(',');
     return { body: { quoteResponse: { result: syms.map((s, i) => v7Row(s, 100 + i)) } } };
   }
-  if (u.includes('/v8/finance/spark')) {
-    const syms = decodeURIComponent(u.match(/symbols=([^&]+)/)[1]).split(',');
+  if (url.pathname === '/v8/finance/spark') {
+    const syms = url.searchParams.get('symbols').split(',');
     const t0 = Math.floor(Date.now() / 1000) - 700 * 86400;
     const ts = Array.from({ length: 700 }, (_, i) => t0 + i * 86400);
     const body = {};
     for (const sym of syms) body[sym] = { symbol: sym, timestamp: ts, close: ts.map((_, i) => 100 + i * 0.1) };
     return { body };
   }
-  if (u.includes('/v8/finance/chart/')) {
+  if (url.pathname.startsWith('/v8/finance/chart/')) {
     const t0 = Math.floor(Date.now() / 1000) - 400 * 86400;
     const ts = Array.from({ length: 300 }, (_, i) => t0 + i * 86400);
     return { body: { chart: { result: [{ meta: { regularMarketPrice: 120, chartPreviousClose: 100 },
