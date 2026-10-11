@@ -25,6 +25,15 @@ const assert = require('node:assert');
 
 const ordersRoutes = require('../routes/trading/orders');
 
+// Outside the regular session the route prices a resting limit from a live quote, and with
+// no quote it REFUSES before touching the bridge (the 2026-08-28 naked-book rule). So these
+// tests depended on Yahoo answering whoever ran them, whenever they ran: on 2026-10-11 at
+// 23:06Z (a Sunday evening) it did not answer the CI runner, the route refused correctly,
+// and "bridge was called" failed. The quote is pinned here; the route reads the module's
+// getQuotes at call time.
+require('../lib/market-data-yahoo').getQuotes = async (tickers) =>
+  (tickers || []).map((ticker) => ({ ticker, price: 10, chg_pct: 0, session: 'regular' }));
+
 async function drive(payload, { positions, openOrders } = {}) {
   const captured = { orderReq: null, response: null, code: null };
   const ctx = {
