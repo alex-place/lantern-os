@@ -5444,6 +5444,7 @@ function renderCards(){
   applyGridCols();
   grid.innerHTML = list.map(t => buildCard(t, zonesData[t]||{})).join('');
   list.forEach(t => renderZoneLadder(t, zonesData[t]||{}, getCurrentPrice(t)));
+  _markActiveCard();
 }
 
 // Per-slot symbol editor (#1628): click a chart's ticker to retype it. Validates +
@@ -7936,6 +7937,7 @@ function focusTicker(t){
   }
   renderWatchlist();
   renderSymbolInfo(t);
+  _markActiveCard();
   // Read-only guests can't trade, so skip the order panel entirely — otherwise
   // clicking a chart shoves the grid aside to make room for a panel they can't
   // use. They just get the fullscreen chart. #guest-no-order-panel
@@ -7947,34 +7949,36 @@ function focusTicker(t){
   }
 }
 
-// Click a chart in the grid to FOCUS it (#focus-chart): mark that card selected
-// (a slightly darker grey) and point the rest of the screen — symbol details,
-// order panel, watchlist highlight — at it, WITHOUT going fullscreen (that's what
-// the watchlist click / expand control do). Desktop-oriented; harmless on mobile
-// (single chart, order panel stays closed via the isNarrowTrader guard).
+// Click a chart in the grid to FOCUS it (#focus-chart): point the rest of the screen —
+// symbol details, the order ticket, the watchlist highlight — at it, and mark the card
+// when there is more than one on screen. ←/→ walk the same focus through the deck
+// (#2438). It never opens a fullscreen chart; that went with #3141.
+// It was switched off whole on 2026-08-01 as "a diagnostic step" while a double-click
+// fullscreen was hunted down (it lived elsewhere and went in 74132fd5), and it was never
+// switched back on: for two months a click on the second chart of a deck pointed nothing
+// at it and ←/→ did nothing, while B and S kept opening a ticket for whichever row was
+// picked last.
 function selectChart(t, ev){
-  // DISABLED: All click-based fullscreen removed per #3141 - do nothing
-  return;
-  /*
   if(!t) return;
   // Clicks that land on a control inside the card (buy/sell, change-symbol, drag
-  // handle) do their own thing — never focus or fullscreen from those.
+  // handle) do their own thing.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
-  // Click → focus it in the grid (darker grey) + point the peripherals at it.
-  // (removed fullscreen behavior entirely per #3141)
+  if(activeTicker === t) return;
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}
-  document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
-  const card = document.getElementById('card-'+t);
-  if(card) card.classList.add('active');
-  renderWatchlist();                       // sidebar highlight follows the selection
+  renderWatchlist();                        // sidebar highlight follows the selection
   renderSymbolInfo(t);                      // detail panel follows the selection
-  if(!document.body.classList.contains('guest')){
-    setOrderSymbol(t);                       // order ticket follows the selection
-    // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
-  }
-  */
+  _markActiveCard();
+  // The ticket follows the selection; opening it stays with the BUY/SELL affordances
+  // (operator UI pass 2026-07-28).
+  if(!document.body.classList.contains('guest')) setOrderSymbol(t);
+}
+/* The focused chart is marked only when there is more than one to tell it from: a lone
+   card lit up read as a stuck state (31f580e6). */
+function _markActiveCard(){
+  const cards = document.querySelectorAll('#cardsGrid .card');
+  cards.forEach(c => c.classList.toggle('active', cards.length > 1 && c.dataset.ticker === activeTicker));
 }
 
 // ── Zoom a ticker (#1629) ─────────────────────────────────────────────────────
@@ -11433,6 +11437,7 @@ function startDashboard(){
                    : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
       renderSymbolInfo(activeTicker);
       renderWatchlist();
+      _markActiveCard();
     }
     if(!window.GUEST && wlPrices.length){
       setOrderSymbol(activeTicker || wlPrices[0].ticker);
