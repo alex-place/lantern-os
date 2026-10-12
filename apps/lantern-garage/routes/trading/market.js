@@ -144,12 +144,18 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
 
       // Reshape into the per-ticker shape trader-dashboard.html expects:
       // { zones: [...], position, last_signal, confidence, direction, catalyst }
+      // `position` is the SERVER's book (the legacy agent's env IBKR session) — the
+      // operator's positions wherever that gateway is signed in — and this read is PUBLIC.
+      // The pages that render it hid the field from guests; hiding is not withholding, so
+      // only a reader who may see the server's book is sent it (lib/server-book).
       let positions = [];
-      try {
-        const posData = await traderAgent.getPositions();
-        positions = (posData && posData.positions) || [];
-      } catch (e) {
-        console.error('[Trading] /zones positions fetch failed:', e.message);
+      if (require('../../lib/server-book').mayReadServerBook(req, getEffectiveUserId(req))) {
+        try {
+          const posData = await traderAgent.getPositions();
+          positions = (posData && posData.positions) || [];
+        } catch (e) {
+          console.error('[Trading] /zones positions fetch failed:', e.message);
+        }
       }
       const reshaped = {};
       const tickers = new Set([
@@ -457,6 +463,17 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         }
       }
     } catch (_e) { /* fall through to the legacy agent */ }
+    // THE LEGACY AGENT IS THE SERVER'S BOOK (2026-10-11, lib/server-book). It reads the env
+    // IBKR session — the operator's account wherever that gateway is signed in — and every
+    // user whose own broker did not answer used to land on it: a Pro user with no broker was
+    // shown that book, or told "the broker could not be reached" where there is no gateway
+    // (a broker they never had). Only an admin / the operator profile reaches it now; anyone
+    // else is told which of the two is true.
+    {
+      const sb = require('../../lib/server-book');
+      const _uid = getEffectiveUserId(req);
+      if (!sb.mayReadServerBook(req, _uid)) { sendJson(res, sb.noServerBook(_uid), 200); return true; }
+    }
     // No broker connected (no IBKR, no Alpaca account, no legacy agent). Emit an
     // explicit `available:false` + reason so callers — the chat's trader_positions
     // tool especially — can degrade honestly ("connect a broker") instead of
@@ -497,7 +514,11 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       let out = await alpaca.getPortfolioHistory(uid, range);
       // Fall through to IBKR when this account has no Alpaca side. Same return shape
       // from both adapters, so the route and the journal card are broker-agnostic.
-      if (!out || out.ok === false) {
+      // The two fallbacks below are the SERVER's book — the env IBKR session's history, then
+      // the server's own trade ledgers' session rows — so they answer only a reader who may
+      // see it (lib/server-book). Anyone else gets their own broker's answer, or its reason.
+      const _serverBook = require('../../lib/server-book').mayReadServerBook(req, uid);
+      if (_serverBook && (!out || out.ok === false)) {
         try {
           const IbkrCpapi = require('../../lib/ibkr-cpapi');
           const ib = await new IbkrCpapi().getPortfolioHistory();
@@ -511,7 +532,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       // toggle. Every brain writes a session row at the close with the account's equity — an
       // equity series at each close, one point per date — so the Account view comes from those
       // rows instead. The payload says so (source: 'session-rows') and keeps the broker's reason.
-      if (!out || out.ok === false || !Array.isArray(out.timestamps) || out.timestamps.length < 3) {
+      if (_serverBook && (!out || out.ok === false || !Array.isArray(out.timestamps) || out.timestamps.length < 3)) {
         try {
           const dayPnlLib = require('../../lib/day-pnl');
           const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
