@@ -8843,6 +8843,9 @@ function _feedStatus(ok){
 // Session clock: US equities phases in ET (pre 4:00–9:30 · open 9:30–16:00 ·
 // after 16:00–20:00 · closed). Countdown to the next phase edge. Weekends roll to
 // Monday. (Exchange holidays are out of scope — the label is a clock, not an oracle.)
+// After 20:00 the next edge is tomorrow's 04:00 pre-market, Monday to Thursday; only
+// Friday night rolls into the weekend. That branch left no countdown, so every weekday
+// evening read "Closed · wknd" (2026-10-11).
 function _updateMktClock(){
   const lab=document.getElementById('mktClockLabel'), val=document.getElementById('mktClock');
   if(!lab||!val) return;
@@ -8856,7 +8859,7 @@ function _updateMktClock(){
   else if(mins<570){ phase='Pre-mkt'; cls='pre'; left=570-mins; }
   else if(mins<960){ phase='Open'; cls='open'; left=960-mins; }
   else if(mins<1200){ phase='After-hrs'; cls='after'; left=1200-mins; }
-  else { phase='Closed'; cls=''; left=null; }
+  else { phase='Closed'; cls=''; left = day===5 ? null : (1440-mins)+240; }
   lab.textContent=phase; lab.className='l '+cls;
   const suffix = phase==='Open' ? ' to close' : phase==='Pre-mkt' ? ' to open' : phase==='After-hrs' ? ' left' : ' to pre';
   val.textContent = left!=null ? fmtC(left)+suffix : 'wknd';
