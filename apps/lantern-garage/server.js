@@ -154,7 +154,7 @@ const { requireEntitlement, isAdmin, requireAuth, requireRole } = require("./lib
 // layer). Everything NOT on this list (positions, orders, order placement,
 // agent-log, calibration, overnight-scan, all mutations) stays trade-gated.
 const PUBLIC_TRADING_READS = new Set([
-  "/api/trading/watchlist",         // GET → server default watchlist (not per-user)
+  "/api/trading/watchlist",         // GET → your own list; signed out, the starter list
   "/api/trading/watchlist-prices",  // live quotes
   "/api/trading/bars-multi",        // OHLCV for the charts (whole watchlist, heavy)
   "/api/trading/bars",              // OHLCV for ONE symbol, tail-limited (landing-page charts)
@@ -200,9 +200,11 @@ function tradeApiGuard(req, res, url) {
        // empty card on an otherwise populated demo journal.
        url.pathname === "/api/trading/trades") &&
       url.searchParams.get("demo") === "champion") return false;
-  // Watchlist add/remove is available to everyone incl. read-only guests — it is
-  // "which symbols to chart", not a trade, so it isn't behind the trade gate.
-  // (The list is the shared server watchlist.) #guest-watchlist
+  // Watchlist add/remove is open to every ACCOUNT incl. read-only (free) ones — it is
+  // "which symbols to chart", not a trade, so it isn't behind the trade gate. A
+  // signed-out visitor is refused in the route itself: with no user id the write would
+  // land on the one list every signed-out visitor shares (routes/trading/watchlist.js).
+  // #guest-watchlist
   if (url.pathname === "/api/trading/watchlist" && req.method === "POST") return false;
   if (url.pathname.startsWith("/api/trading/watchlist/") && req.method === "DELETE") return false;
   // Champion paper-trading CONTEST (#2552) is open to ALL tiers, not just Pro+ —
