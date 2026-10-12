@@ -713,6 +713,8 @@
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
+  .badge-live{background:rgba(255,95,109,.16);color:var(--red);border:1px solid rgba(255,95,109,.45)}
+  .badge-none{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
@@ -1617,8 +1619,8 @@
        the panel below (positions, orders, order history); the chevron beside it opens the
        account menu (trading settings, broker settings) and turns up while it is open. -->
   <div class="acct-corner" id="acctCorner">
-    <button type="button" class="badge badge-paper" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel()"
-      data-desc="Paper trading — simulated money; orders are practice, not real." title="Paper trading — simulated money; orders are practice, not real. Click to hide the account panel.">PAPER</button>
+    <button type="button" class="badge badge-none" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel()"
+      data-desc="Your account — checking whether it is paper or live." title="Your account — checking whether it is paper or live. Click to hide the account panel.">ACCOUNT</button>
     <button type="button" class="acct-caret" id="acctMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" onclick="togglePickMenu('acct', this)"
       title="Account menu — trading settings, broker settings"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
@@ -9202,7 +9204,7 @@ function _pickMenuHtml(kind){
   } else if(kind === 'acct') {
     // TradingView's account menu: the trading settings (the dialog's Trading tab) and the
     // broker page (Settings › Connections, where accounts are added and traders switched).
-    h += '<div class="pat-menu-group">' + (document.body.classList.contains('demo') ? 'Demo account' : 'Paper trading') + '</div>';
+    h += '<div class="pat-menu-group">' + (ACCT_BADGE[_acctMode] || ACCT_BADGE.unknown).menu + '</div>';
     h += '<div class="pat-menu-item pick-row" role="menuitem" onclick="_closePickMenu(\'acct\');openChartSettings(\'trading\')">'
       + '<span class="pick-name"><span>Trading settings…<span class="pick-sub">P&amp;L display and order labels on the chart</span></span></span></div>';
     h += '<a class="pat-menu-item pick-row" role="menuitem" href="/settings.html#connections">'
@@ -10368,6 +10370,7 @@ function _accountDegraded(kind, reason){
   }
 }
 function _accountNoBroker(){
+  _paintAcctBadge('none');
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = ''; el.title = 'No broker connected'; }
   const b = document.getElementById('staleBadge');
@@ -11024,6 +11027,7 @@ async function loadPortfolio(){
     }
     _brokerOk = true; _refreshTradeGate();
     const a  = d.account||{};
+    _paintAcctBadge(a.mode);
     _accountFresh(a);
     // Day P&L: the SERVER figure is authoritative (2026-08-10). It is realized
     // (ET-dated ledger fills) + today's unrealized change with the correct basis
@@ -11147,6 +11151,32 @@ function _setTradePanel(open){
   b.setAttribute('aria-expanded', open ? 'true' : 'false');
   b.title = (b.dataset.desc || '') + (open ? ' Click to hide the account panel.' : ' Click to show the account panel.');
 }
+/* The badge says what the account IS (2026-10-11). It was static markup — "PAPER — simulated
+   money; orders are practice, not real" — whatever was connected, though both adapters report
+   the mode (Alpaca from its env, IBKR from the account id: DU… paper, U… live). On a live
+   account that sentence is the most dangerous one on the page. It starts neutral (or as the
+   last mode this device saw) and is painted from each account answer. */
+const ACCT_BADGE = {
+  paper:   { text:'PAPER',     cls:'badge-paper', menu:'Paper trading',       desc:'Paper trading — simulated money; orders are practice, not real.' },
+  live:    { text:'LIVE',      cls:'badge-live',  menu:'Live trading',        desc:'Live trading — a real-money account; orders execute with real funds.' },
+  none:    { text:'NO BROKER', cls:'badge-none',  menu:'No broker connected', desc:'No broker connected — connect one in Settings to trade.' },
+  unknown: { text:'ACCOUNT',   cls:'badge-none',  menu:'Account',             desc:'Your account — the broker did not say whether it is paper or live.' },
+};
+let _acctMode = null;
+// Remembered per USER, not per device: one person's LIVE must not open as someone else's badge.
+function _acctModeKey(){ return 'trader.acctMode:' + ((typeof window !== 'undefined' && window.SESSION_UID) || ''); }
+function _paintAcctBadge(mode){
+  const k = (mode === 'paper' || mode === 'live' || mode === 'none') ? mode : 'unknown';
+  _acctMode = k;
+  try{ if(mode === 'paper' || mode === 'live' || mode === 'none') localStorage.setItem(_acctModeKey(), k); }catch(_e){}
+  const b = document.getElementById('acctBadge'); if(!b) return;
+  const m = ACCT_BADGE[k];
+  b.textContent = m.text;
+  b.classList.remove('badge-paper', 'badge-live', 'badge-none');
+  b.classList.add(m.cls);
+  b.dataset.desc = m.desc;
+  _setTradePanel(!document.body.classList.contains('panel-collapsed'));   // re-title with the new description
+}
 function toggleTradePanel(){
   // A phone has no panel row to collapse: there the badge opens the Positions view, which
   // is where the account panel lives on a small screen.
@@ -11155,7 +11185,11 @@ function toggleTradePanel(){
   _setTradePanel(openIt);
   try{ localStorage.setItem('trader.panelOpen', openIt ? '1' : '0'); }catch(_e){}
 }
-function initTradePanel(){ _setTradePanel(_tradePanelOpen()); }
+function initTradePanel(){
+  _setTradePanel(_tradePanelOpen());
+  let last = null; try{ last = localStorage.getItem(_acctModeKey()); }catch(_e){}
+  if(last === 'paper' || last === 'live' || last === 'none') _paintAcctBadge(last);
+}
 function initFooterResize(){
   const handle = document.getElementById('footerResize');
   const layout = document.querySelector('.layout');
@@ -11402,6 +11436,7 @@ async function detectGuestMode(){
     const s = await (await fetch('/api/auth/session',{cache:'no-store'})).json();
     const ent = (s && s.entitlements) || {};
     authed = !!(s && s.authenticated);
+    window.SESSION_UID = (s && s.user && s.user.id) || null;   // keys per-user device memory (the account badge)
     window.GUEST = !(s && (s.role === 'admin' || ent.trade === true));
   }catch(e){ window.GUEST = true; }
   // Signed-in-ness is its own fact, separate from the trade entitlement: a supporter is

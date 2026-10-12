@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: the account badge says what the account is. It always read 'PAPER — simulated money; orders are practice, not real', whatever was connected, though both brokers report the mode (Alpaca's environment; IBKR's account id, DU… paper, U… live) — so a live account was told its real-money orders were practice. It now reads PAPER, LIVE (red: 'a real-money account; orders execute with real funds'), NO BROKER, or a neutral ACCOUNT when the broker does not say, and the account menu's heading follows. It never opens as PAPER before the account has answered: it starts neutral, or as the last mode that user's account reported on this device.
