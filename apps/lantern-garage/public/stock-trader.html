@@ -7942,7 +7942,11 @@ function focusTicker(t){
   // clicking a chart shoves the grid aside to make room for a panel they can't
   // use. They just get the fullscreen chart. #guest-no-order-panel
   if(!document.body.classList.contains('guest')){
-    setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
+    // #1695: the order panel follows the selected symbol -- but not onto the symbol it is
+    // already on. setOrderSymbol starts a fresh ticket (quantity 1, no take-profit, no
+    // stop), so picking the row or the chart of the symbol being entered wiped the
+    // quantity and the stop without a word, and the order could go in without them.
+    if(otTicker !== t) setOrderSymbol(t);
     // Desktop: keep the docked panel open unless the user dismissed it (Esc). Phone:
     // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
     // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
@@ -7970,9 +7974,11 @@ function selectChart(t, ev){
   renderWatchlist();                        // sidebar highlight follows the selection
   renderSymbolInfo(t);                      // detail panel follows the selection
   _markActiveCard();
-  // The ticket follows the selection; opening it stays with the BUY/SELL affordances
-  // (operator UI pass 2026-07-28).
-  if(!document.body.classList.contains('guest')) setOrderSymbol(t);
+  // The ticket follows the selection, never onto the symbol it is already on (see
+  // focusTicker); opening it stays with the BUY/SELL affordances (operator UI pass
+  // 2026-07-28). A card's BUY opens a ticket without moving the focus, so a click on that
+  // same chart came here and cleared the stop just entered.
+  if(!document.body.classList.contains('guest') && otTicker !== t) setOrderSymbol(t);
 }
 /* The focused chart is marked only when there is more than one to tell it from: a lone
    card lit up read as a stuck state (31f580e6). */
