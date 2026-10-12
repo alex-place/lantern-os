@@ -566,6 +566,12 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
 
   // GET /api/trading/symbols/search?q=SP — symbol-search popup (#1692). Filters the
   // cached all-Alpaca-assets list by symbol/name, ranked (exact > prefix > contains).
+  // A name that starts with the query AS A WORD ("Intel Corporation" for INTEL) beats one
+  // that only starts with its letters ("Intellicheck"), and equal matches go to the
+  // shorter name -- the company's own listing, not a fund named after it ("Apple Inc."
+  // before "Apple Hospitality REIT", NVDA before the NVDA income ETFs). Ties used to fall
+  // to list order: "intel" put Intellicheck and Intelligent Protection above INTC, and
+  // "apple" put APLE above AAPL (2026-10-12).
   if (url.pathname === '/api/trading/symbols/search' && req.method === 'GET') {
     if (!traderAgent) { sendJson(res, { results: [], error: 'TraderAgent not initialized' }, 503); return true; }
     const q = (url.searchParams.get('q') || '').trim().toUpperCase();
@@ -598,19 +604,20 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         results = pool.slice(0, limit);
       } else {
         const scored = [];
+        const wordEnds = (s, i) => i >= s.length || !/[A-Z0-9]/.test(s[i]);
         for (const a of pool) {
           const sym = (a.symbol || '').toUpperCase();
           const name = (a.name || '').toUpperCase();
           let score = -1;
           if (sym === q) score = 0;
           else if (sym.startsWith(q)) score = 1;
-          else if (name.startsWith(q)) score = 2;
+          else if (name.startsWith(q)) score = wordEnds(name, q.length) ? 2 : 2.5;
           else if (sym.includes(q)) score = 3;
           else if (name.includes(q)) score = 4;
-          if (score >= 0) scored.push([score, sym.length, a]);
+          if (score >= 0) scored.push([score, sym.length, name.length, a]);
         }
-        scored.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-        results = scored.slice(0, limit).map((s) => s[2]);
+        scored.sort((x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2]);
+        results = scored.slice(0, limit).map((s) => s[3]);
       }
       // Fallback (#1860): when the broker asset universe is unavailable (no
       // Alpaca creds → empty pool) but the user typed a query, validate it as an
