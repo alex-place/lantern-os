@@ -527,6 +527,22 @@
     body.leftdock-closed .dockL,body.rightdock-closed .dockR{display:none}
     .ticket-dock{height:auto}
   }
+  /* Tablet band (581–760px, 2026-10-11). The right dock is permanent — it holds the
+     watchlist, and a closed one once could not be reopened — and the rule above makes it a
+     bottom sheet here. Together that left a sheet OPEN over 62% of the screen with nothing
+     that could move it: at 671px it covered the lower 56% of the chart, where the latest
+     price is, and the whole account panel. Below 580px the phone shell shows one view at a
+     time, so only this band had it. The sheet now rests collapsed to its header — a strip
+     the layout keeps clear — and the header opens it; a dock tab opens it too, and picking
+     a symbol closes it again so the chart you chose is the one you see. */
+  @media (min-width:581px) and (max-width:760px){
+    .layout{padding-bottom:46px}
+    body:not(.rsheet-open) .dockR{height:46px;overflow:hidden}
+    body:not(.rsheet-open) .dockR .dock-body{display:none}
+    .dockR .dock-head{cursor:pointer;user-select:none}
+    .dockR .dock-head::after{content:'\25B4';margin-left:auto;padding-left:10px;color:var(--text2);font-size:12px}
+    body.rsheet-open .dockR .dock-head::after{content:'\25BE'}
+  }
 
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
      A thin ew-resize strip with a centred grip; min/max are enforced in
@@ -7900,6 +7916,22 @@ function renderSymbolInfo(ticker){
 function focusTicker(t){
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}   // remember the selected symbol
+  // A ONE-chart deck shows the symbol you picked (2026-10-11). The row says "View X chart",
+  // and it did while a click opened a fullscreen chart; when that went (#3141) the click kept
+  // changing the highlight, the details and the ticket — everything but the chart, so with
+  // QQQ charted, picking DIA left QQQ on screen beside DIA's details. The phone shell already
+  // puts the pick in slot 0; this keeps the same promise on a wider screen. Only a symbol on
+  // the watchlist: slots are pruned to the list (#3514), so anything else would snap back.
+  // A multi-chart deck is the reader's own arrangement and is left alone (drag a row onto a
+  // chart to swap it); the swap below keeps that arrangement for when they go back to it.
+  if (slotCount === 1 && chartSlots[0] !== t && wlPrices.some((w) => w.ticker === t)) {
+    const i = chartSlots.indexOf(t);
+    if (i > 0) chartSlots[i] = chartSlots[0];
+    chartSlots[0] = t;
+    persistSlots();
+    lastCardOrder = '';
+    renderCards();
+  }
   renderWatchlist();
   renderSymbolInfo(t);
   // Read-only guests can't trade, so skip the order panel entirely — otherwise
@@ -9788,8 +9820,24 @@ function setRightWidget(name) {
   // Without this the bell is a one-way trip and the watchlist is unreachable.
   _rwPanel = (_rightOpen && _rwPanel === name && name !== 'watchlist') ? 'watchlist' : name;
   _rightOpen = true;
+  if (_isSheetBand()) document.body.classList.add('rsheet-open');   // a tab that opens a panel opens the sheet it lives in
   _saveDocks(); _applyDocks();
 }
+/* Tablet band (581–760px): the right dock is a bottom sheet that rests collapsed to its
+   header (see the CSS of the same name). The header opens and closes it; picking a symbol
+   closes it, so the chart that was just chosen is the one on screen. Header controls and
+   the row's own buttons (AI, remove) keep their jobs. CAPTURE phase: a row's own click
+   re-renders the watchlist, which detaches the clicked node before a bubbling listener
+   could ask where it was. */
+function _isSheetBand() {
+  try { return window.matchMedia('(min-width:581px) and (max-width:760px)').matches; } catch (_e) { return false; }
+}
+document.addEventListener('click', (e) => {
+  if (!_isSheetBand() || !e.target || !e.target.closest) return;
+  if (e.target.closest('#dockR button, #dockR a, #dockR select, #dockR input')) return;
+  if (e.target.closest('#dockR .dock-head')) { document.body.classList.toggle('rsheet-open'); return; }
+  if (e.target.closest('#dockR .wl-item')) document.body.classList.remove('rsheet-open');
+}, true);
 /* Kept as a deliberate no-op: the column cannot be closed, but leaving the function
    defined means any remaining caller fails harmlessly instead of throwing. */
 function closeRightWidget() { /* the right column is permanent -- see _rightOpen */ }
