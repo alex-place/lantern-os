@@ -7916,6 +7916,22 @@ function renderSymbolInfo(ticker){
 function focusTicker(t){
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}   // remember the selected symbol
+  // A ONE-chart deck shows the symbol you picked (2026-10-11). The row says "View X chart",
+  // and it did while a click opened a fullscreen chart; when that went (#3141) the click kept
+  // changing the highlight, the details and the ticket — everything but the chart, so with
+  // QQQ charted, picking DIA left QQQ on screen beside DIA's details. The phone shell already
+  // puts the pick in slot 0; this keeps the same promise on a wider screen. Only a symbol on
+  // the watchlist: slots are pruned to the list (#3514), so anything else would snap back.
+  // A multi-chart deck is the reader's own arrangement and is left alone (drag a row onto a
+  // chart to swap it); the swap below keeps that arrangement for when they go back to it.
+  if (slotCount === 1 && chartSlots[0] !== t && wlPrices.some((w) => w.ticker === t)) {
+    const i = chartSlots.indexOf(t);
+    if (i > 0) chartSlots[i] = chartSlots[0];
+    chartSlots[0] = t;
+    persistSlots();
+    lastCardOrder = '';
+    renderCards();
+  }
   renderWatchlist();
   renderSymbolInfo(t);
   // Read-only guests can't trade, so skip the order panel entirely — otherwise
