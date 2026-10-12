@@ -19,7 +19,7 @@ const path = require('node:path');
 const PAGE = fs.readFileSync(path.join(__dirname, '..', 'public', 'stock-trader.html'), 'utf8').replace(/\r\n/g, '\n');
 const SRC = PAGE.slice(PAGE.indexOf('function selectChart(t, ev){'), PAGE.indexOf('\n// ── Zoom a ticker (#1629)'));
 
-function deck(tickers, { guest = false, active = null } = {}) {
+function deck(tickers, { guest = false, active = null, ticket = null } = {}) {
   const cards = tickers.map((ticker) => {
     const cls = new Set(['card']);
     return { dataset: { ticker }, cls, classList: { toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)) } };
@@ -27,7 +27,7 @@ function deck(tickers, { guest = false, active = null } = {}) {
   const calls = { watchlist: 0, info: [], order: [] };
   const store = {};
   const fns = new Function('document', 'localStorage', 'renderWatchlist', 'renderSymbolInfo', 'setOrderSymbol',
-    'let activeTicker = ' + JSON.stringify(active) + ';\n' + SRC + '\nreturn { selectChart, _markActiveCard, active: () => activeTicker };')(
+    'let activeTicker = ' + JSON.stringify(active) + ', otTicker = ' + JSON.stringify(ticket) + ';\n' + SRC + '\nreturn { selectChart, _markActiveCard, active: () => activeTicker };')(
     { querySelectorAll: () => cards, body: { classList: { contains: (c) => c === 'guest' && guest } } },
     { setItem: (k, v) => { store[k] = v; } },
     () => { calls.watchlist++; }, (t) => calls.info.push(t), (t) => calls.order.push(t));
