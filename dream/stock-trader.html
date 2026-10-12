@@ -5465,11 +5465,16 @@ function editSlot(oldTicker){
 }
 async function commitSlotSymbol(oldTicker, sym){
   if(!sym || sym===oldTicker) return;
-  if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
   // The symbol is already Alpaca-validated by the search; charting it also adds it to
   // the watchlist so price/zone data flows (tracking only -- the AI trader's list is the
-  // row's own toggle).
-  try{ await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); await loadMyList(true); }catch(e){}
+  // row's own toggle). A slot off the list charts nothing, so the slot changes once the
+  // symbol is on it: signed out there is no list to put it on, and the server says so.
+  try{
+    const r = await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    if(r.status === 401){ _alertToast(SIGN_IN_FOR_LIST); return; }
+    await loadMyList(true);
+  }catch(e){}
+  if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
   lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
 
@@ -8523,6 +8528,9 @@ document.addEventListener('dblclick', function(e){
 // watchlist, and each row's AI toggle puts it on or takes it off the tradelist.
 // /api/trading/watchlist-prices returns the UNION across users so data exists for all.
 const LIST_API='/api/trading/watchlist'; const LIST_KEY='watchlist';
+// Signed out, the list on the page is the starter list every visitor shares, and the
+// server refuses changes to it (401): a list of your own comes with an account.
+const SIGN_IN_FOR_LIST = 'Sign in to keep your own watchlist.';
 const AI_LIST_API='/api/trading/tradelist'; const AI_LIST_KEY='tradelist';
 let MY_LIST=null, AI_LIST=new Set(), WL_LIST=new Set();
 async function loadMyList(force){
@@ -8584,7 +8592,8 @@ async function addWatchlistTicker(){
 async function addWatchlistSymbol(sym){
   if(!sym) return;
   try{
-    await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    const r = await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    if(r.status === 401){ _alertToast(SIGN_IN_FOR_LIST); return; }
     await loadMyList(true);
     await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
