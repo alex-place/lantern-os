@@ -5061,12 +5061,15 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   } // end patternPrefs.levels (P&L / entry-stop-TP)
 
   // Scales › previous day close, on intraday charts: the level the day's change is
-  // measured from, derived the same way the watchlist derives its day %.
+  // measured from -- the feed's own previous close. It was rebuilt from the percent,
+  // which is rounded to two places, so the line and its label could sit cents off;
+  // the rebuild stays as the fallback for a row without one.
   if(_cs('scales.prevClose') === true && _INTRADAY.indexOf(chartTimeframe) !== -1){
     const wl = (wlPrices||[]).find(t=> t.ticker === ticker);
     const chg = wl ? Number(wl.chg_pct) : NaN;
-    if(wl && Number.isFinite(chg) && (1 + chg/100) !== 0){
-      const pc = Number(wl.price) / (1 + chg/100);
+    const sent = wl ? Number(wl.prev_close) : NaN;
+    if(wl && (sent > 0 || (Number.isFinite(chg) && (1 + chg/100) !== 0))){
+      const pc = sent > 0 ? sent : Number(wl.price) / (1 + chg/100);
       if(pc >= rMin && pc <= rMax){
         const col = _cs('scales.prevCloseColor') || 'var(--text2)';
         html += zlLine(pct(pc), col, 'Prev close ' + fmt(pc, _priceDec(pc>=100?2:4)), col);
@@ -5276,7 +5279,7 @@ function updateCardChg(t){
   if(!isFinite(chg)){ el.textContent=''; el.className='card-chg'; return; }
   const cls = chg>0?'up':chg<0?'dn':'flat';
   el.className = 'card-chg '+cls;
-  el.textContent = (chg>0?'▲ +':chg<0?'▼ ':'· ')+chg+'%';
+  el.textContent = (chg>0?'▲ +':chg<0?'▼ ':'· ')+_pct2(chg)+'%';
 }
 
 // ── Update an existing card's meta in place (no DOM rebuild) ────────────────
@@ -5813,7 +5816,7 @@ function renderOrderTicket(){
   const wl  = wlPrices.find(x=>x.ticker===otTicker);
   const chg = wl && wl.chg_pct!=null ? Number(wl.chg_pct) : null;
   document.getElementById('otHeadQuote').innerHTML = price
-    ? `$${fmt(price)}${chg==null?'':` <span style="color:${chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)'}">${chg>=0?'+':''}${chg}%</span>`}`
+    ? `$${fmt(price)}${chg==null?'':` <span style="color:${chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)'}">${chg>=0?'+':''}${_pct2(chg)}%</span>`}`
     : '—';
 
   document.getElementById('otSellBtn').classList.toggle('active', otSide === 'sell');
@@ -7806,6 +7809,10 @@ function adaptLogoBg(img){
 // names still need 4dp to say anything at all.
 const _wlPx = (p)=> p==null ? '—' : (p < 1 ? p.toFixed(4)
   : p.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+/* A day change in percent, always two places. The feed's number went out as it came, so
+   one column read "+0.6%" over "+0.51%" and "-1.7%" (TradingView: +0.60%). A function, not
+   a const: the card and ticket painters above it call it too. */
+function _pct2(v){ return Number(v).toFixed(2); }
 
 function renderWatchlist(){
   document.getElementById('wlList').innerHTML = _sortedWlPrices().map(t=>{
@@ -7821,8 +7828,8 @@ function renderWatchlist(){
       ${tickerLogoHtml(t.ticker)}
       <span class="wl-sym">${t.ticker}</span>
       <span class="wl-price">${_wlPx(t.price)}</span>
-      <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
-      <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
+      <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct, t.prev_close)}</span>
+      <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${_pct2(t.chg_pct)}%</span>
       <button class="wl-ai${ai?' on':''}" aria-pressed="${ai}" aria-label="AI trader ${ai?'on':'off'} for ${t.ticker}" title="${ai ? 'The AI trader may trade '+t.ticker+'. Click to take it off the AI list.' : 'Let the AI trader trade '+t.ticker+'. Click to put it on the AI list.'}" onclick="toggleAiTicker('${t.ticker}',event)">AI</button>
       <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
@@ -7852,13 +7859,19 @@ function _syncWlScrollbar() {
 }
 window.addEventListener('resize', _syncWlScrollbar);
 
-function _wlAbs(price, pct) {
-  const p = Number(price), c = Number(pct);
-  if (!Number.isFinite(p) || !Number.isFinite(c)) return '—';
-  const prev = p / (1 + c / 100);
+/* The change in dollars, at the price column's decimals (_wlPx). It was rebuilt from the
+   percent, which the feed rounds to two places, so it was only ever approximate -- SPY's
+   could be off by four cents -- and under $100 it printed a third decimal of pure rounding
+   ("+0.093" beside 77.97). The feed now sends the previous close it measures from; the
+   rebuild is the fallback for a row without one (the demo book, an older server). */
+function _wlAbs(price, pct, prevClose) {
+  const num = (v) => (v == null ? NaN : Number(v));   // null is unknown, not zero
+  const p = num(price), c = num(pct), pc = num(prevClose);
+  if (!Number.isFinite(p)) return '—';
+  const prev = pc > 0 ? pc : (Number.isFinite(c) ? p / (1 + c / 100) : NaN);
   if (!Number.isFinite(prev) || prev <= 0) return '—';
   const d = p - prev;
-  return (d >= 0 ? '+' : '') + d.toFixed(Math.abs(p) >= 100 ? 2 : 3);
+  return (d >= 0 ? '+' : '') + d.toFixed(Math.abs(p) < 1 ? 4 : 2);
 }
 
 function renderSymbolInfo(ticker){
@@ -7882,7 +7895,7 @@ function renderSymbolInfo(ticker){
   el.innerHTML = `
     <div class="wi-sym">${ticker}</div>
     <div class="wi-name">${_symNames[ticker]||kind}</div>
-    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span>${rvol>0?`<span class="wi-rvol${rvol>=1.5?' hot':''}" title="Relative volume — recent bar volume vs its average">RVOL ${rvol.toFixed(2)}×</span>`:''}</div>
+    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${_pct2(chg)}%</span>${rvol>0?`<span class="wi-rvol${rvol>=1.5?' hot':''}" title="Relative volume — recent bar volume vs its average">RVOL ${rvol.toFixed(2)}×</span>`:''}</div>
     ${(st&&st.available)?`
     <div class="wi-sect">Technicals</div>
     <div class="wi-tech ${techCls}">${st.technical}</div>
