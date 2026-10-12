@@ -73,5 +73,6 @@ test('every account answer paints it, and the menu heading follows', () => {
   assert.match(handler, /_paintAcctBadge\(a\.mode\);/);
   assert.match(PAGE, /function _accountNoBroker\(\)\{\n  _paintAcctBadge\('none'\);/);
   assert.match(PAGE, /'<div class="pat-menu-group">' \+ \(ACCT_BADGE\[_acctMode\] \|\| ACCT_BADGE\.unknown\)\.menu \+ '<\/div>'/);
-  assert.match(PAGE, /\.badge-live\{background:rgba\(255,95,109,\.16\);color:var\(--red\)/);
+  // Its wash is mixed from the tint token, as every wash on the page is (signal-palette.test).
+  assert.match(PAGE, /\.badge-live\{background:color-mix\(in srgb, var\(--tint-neg\) 16%, transparent\);color:var\(--red\)/);
 });

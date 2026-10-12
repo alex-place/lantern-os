@@ -713,7 +713,7 @@
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
-  .badge-live{background:rgba(255,95,109,.16);color:var(--red);border:1px solid rgba(255,95,109,.45)}
+  .badge-live{background:color-mix(in srgb, var(--tint-neg) 16%, transparent);color:var(--red);border:1px solid color-mix(in srgb, var(--tint-neg) 45%, transparent)}
   .badge-none{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
