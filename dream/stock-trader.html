@@ -7997,6 +7997,24 @@ document.addEventListener('keydown', e=>{
   // Fullscreen zoom removed per #3141
 });
 
+/* "/" jumps to ANY symbol, not only one on the list. A chart needs its symbol on the list --
+   slots are pruned to it (#3514), and the list is how a symbol's price and zones arrive --
+   so a symbol not on it yet goes on first, as the chart's own symbol search does
+   (commitSlotSymbol): tracking only, never the AI trader's list. Then it is focused like a
+   watchlist pick, which in a one-chart deck charts it (#3759). It went straight to
+   focusTicker: the details and the ticket moved to the new symbol, priced "$—", while the
+   chart stayed on the old one, so B/S opened a ticket for a symbol that was not on screen.
+   If it does not go on (refused, or the add failed) nothing moves. */
+async function jumpToSymbol(sym){
+  if(!sym) return;
+  const listed = () => !!(MY_LIST && MY_LIST.has(String(sym).toUpperCase()));
+  if(!listed()){
+    await addWatchlistSymbol(sym);
+    if(!listed()) return;
+  }
+  focusTicker(sym);
+}
+
 // ── Keyboard-first trading (#2438) ───────────────────────────────────────────
 // `/` jump-to-symbol · B/S buy/sell ticket for the focused symbol · ←/→ move
 // focus through the visible deck · 1-6 set the chart layout. Never fires while
@@ -8006,7 +8024,7 @@ document.addEventListener('keydown', e=>{
   if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
   if(e.ctrlKey || e.metaKey || e.altKey) return;
   const guest=document.body.classList.contains('guest');
-  if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>focusTicker(sym), {title:'Jump to symbol'}); return; }
+  if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>jumpToSymbol(sym), {title:'Jump to symbol'}); return; }
   // #2445: Shift+B/S in rapid mode = instant market order at the last-used qty.
   // Plain B/S (or rapid mode off) = open the ticket as before.
   if(e.key==='b'||e.key==='B'){ if(activeTicker && !guest){ e.preventDefault();
