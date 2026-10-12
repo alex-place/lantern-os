@@ -2242,7 +2242,12 @@ function marketRegime(ticker){
   let volSum = 0;
   for(let i=bars.length-1-volCount; i<bars.length-1; i++) volSum += bars[i].volume || 0;
   const avgVol = volCount > 0 ? volSum/volCount : 0;
-  const volumeRatio = avgVol > 0 ? recentVol/avgVol : 1;
+  // No average volume means no ratio — 0, the same "nothing to show" the short-history
+  // branch above returns. The fallback was 1, and Yahoo reports every extended-hours and
+  // weekend 5m bar with volume 0, so off-hours EVERY symbol read "RVOL 1.00×" in the
+  // symbol panel, the RVOL sort was a tie, and an order placed then was journaled with a
+  // relative volume nobody measured.
+  const volumeRatio = avgVol > 0 ? recentVol/avgVol : 0;
 
   // Trend strength — % of recent bars moving in the dominant direction
   const dirCount = Math.min(10, bars.length-1);
