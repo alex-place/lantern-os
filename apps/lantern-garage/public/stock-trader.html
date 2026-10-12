@@ -5394,6 +5394,10 @@ function setSlotCount(v){
   // (a bare `.value =` fires no 'change'). Every way in -- the chip itself, the 0-6 keys,
   // "Back to grid", the phone migration -- lands here, so the chip is told here.
   _setSelectValue('chartLayoutSelect', String(slotCount));
+  // Down to one chart, the chart kept is the focused one, as TradingView keeps the active
+  // chart. It kept slot 0 whatever was focused: from two charts with the right-hand one
+  // focused, one chart showed the left-hand symbol beside the other's details and ticket.
+  _chartInSlotZero(activeTicker);
   persistSlots();
   lastCardOrder = '';            // force a full rebuild
   applyGridCols();
@@ -5451,7 +5455,10 @@ function renderCards(){
 // resolves via the same Alpaca-backed watchlist endpoint (#1624), then swaps the slot.
 // Clicking a chart's ticker opens the symbol-search popup (#1692) to switch it.
 function editSlot(oldTicker){
-  openSymbolSearch((sym)=>commitSlotSymbol(oldTicker, sym), { title: 'Change chart symbol' });
+  // The chart whose symbol was just changed is the one being looked at, so the details, the
+  // ticket and the watchlist highlight follow it. They stayed on the old symbol -- in a
+  // one-chart deck no longer on screen at all.
+  openSymbolSearch(async (sym)=>{ await commitSlotSymbol(oldTicker, sym); if(visibleTickers().includes(sym)) focusTicker(sym); }, { title: 'Change chart symbol' });
 }
 async function commitSlotSymbol(oldTicker, sym){
   if(!sym || sym===oldTicker) return;
@@ -7927,10 +7934,7 @@ function focusTicker(t){
   // the watchlist: slots are pruned to the list (#3514), so anything else would snap back.
   // A multi-chart deck is the reader's own arrangement and is left alone (drag a row onto a
   // chart to swap it); the swap below keeps that arrangement for when they go back to it.
-  if (slotCount === 1 && chartSlots[0] !== t && wlPrices.some((w) => w.ticker === t)) {
-    const i = chartSlots.indexOf(t);
-    if (i > 0) chartSlots[i] = chartSlots[0];
-    chartSlots[0] = t;
+  if (_chartInSlotZero(t)) {
     persistSlots();
     lastCardOrder = '';
     renderCards();
@@ -7947,6 +7951,17 @@ function focusTicker(t){
     // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
     // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
+}
+/* In a one-chart deck the chart IS the focused symbol: put t in slot 0, swapping it out of
+   another slot so a multi-chart arrangement survives for the way back. Only a symbol on
+   the list -- slots are pruned to it (#3514), so anything else would snap back. Says
+   whether the slots changed. Shared by a pick (focusTicker) and a switch to one chart. */
+function _chartInSlotZero(t){
+  if (slotCount !== 1 || !t || chartSlots[0] === t || !wlPrices.some((w) => w.ticker === t)) return false;
+  const i = chartSlots.indexOf(t);
+  if (i > 0) chartSlots[i] = chartSlots[0];
+  chartSlots[0] = t;
+  return true;
 }
 
 // Click a chart in the grid to FOCUS it (#focus-chart): point the rest of the screen —
@@ -11396,7 +11411,8 @@ function initChartDrag(){
       if(_dragWlTk){
         // #1700: replace this slot with the dragged watchlist symbol
         const idx = chartSlots.indexOf(dropTk);
-        if(idx >= 0 && dropTk !== _dragWlTk){ chartSlots[idx] = _dragWlTk; persistSlots(); lastCardOrder=''; renderCards(); }
+        // ...and focus it: the symbol just put on screen is the one being looked at.
+        if(idx >= 0 && dropTk !== _dragWlTk){ chartSlots[idx] = _dragWlTk; persistSlots(); lastCardOrder=''; renderCards(); focusTicker(_dragWlTk); }
       } else if(dragTk){
         const i = chartSlots.indexOf(dragTk), j = chartSlots.indexOf(dropTk);
         if(dropTk && dropTk!==dragTk && i>=0 && j>=0){ chartSlots[i]=dropTk; chartSlots[j]=dragTk; persistSlots(); lastCardOrder=''; renderCards(); }
@@ -11431,10 +11447,15 @@ function startDashboard(){
     // Info-only: sets the active ticker + renders the panel, but does NOT open the
     // order panel or zoom a chart (so it works for read-only users too).
     if(wlPrices.length && !activeTicker){
-      // Prefer the symbol the user was last on (if still in the watchlist), else SPY.
+      // Prefer the symbol the user was last on (if still in the watchlist), else SPY --
+      // except in a one-chart deck, which focuses the symbol it charts. The two could
+      // disagree (an older page; a deck narrowed to one chart), and the page opened on one
+      // symbol's chart beside another's details and ticket.
       let saved=null; try{ saved=localStorage.getItem('trader.ticker'); }catch(e){}
-      activeTicker = (saved && wlPrices.some(w=>w.ticker===saved)) ? saved
-                   : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
+      const charted = (slotCount === 1 && chartSlots[0] && wlPrices.some(w=>w.ticker===chartSlots[0])) ? chartSlots[0] : null;
+      activeTicker = charted
+                   || ((saved && wlPrices.some(w=>w.ticker===saved)) ? saved
+                   : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker);
       renderSymbolInfo(activeTicker);
       renderWatchlist();
       _markActiveCard();
