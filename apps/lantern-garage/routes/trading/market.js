@@ -567,11 +567,12 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
   // GET /api/trading/symbols/search?q=SP — symbol-search popup (#1692). Filters the
   // cached all-Alpaca-assets list by symbol/name, ranked (exact > prefix > contains).
   // A name that starts with the query AS A WORD ("Intel Corporation" for INTEL) beats one
-  // that only starts with its letters ("Intellicheck"), and equal matches go to the
-  // shorter name -- the company's own listing, not a fund named after it ("Apple Inc."
-  // before "Apple Hospitality REIT", NVDA before the NVDA income ETFs). Ties used to fall
-  // to list order: "intel" put Intellicheck and Intelligent Protection above INTC, and
-  // "apple" put APLE above AAPL (2026-10-12).
+  // that only starts with its letters ("Intellicheck"), and equal NAME matches go to the
+  // shorter name -- the company's own listing, not one named after it ("Apple Inc." before
+  // "Apple Hospitality REIT"). Ties used to fall to list order: "intel" put Intellicheck
+  // and Intelligent Protection above INTC, and "apple" put APLE above AAPL (2026-10-12).
+  // Symbol matches keep the list's order: fund names are often the SHORT ones ("ProShares
+  // Ultra NVDA"), so a name-length tie-break put NVDA fourth for "NVD" (#3768).
   if (url.pathname === '/api/trading/symbols/search' && req.method === 'GET') {
     if (!traderAgent) { sendJson(res, { results: [], error: 'TraderAgent not initialized' }, 503); return true; }
     const q = (url.searchParams.get('q') || '').trim().toUpperCase();
@@ -614,7 +615,8 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           else if (name.startsWith(q)) score = wordEnds(name, q.length) ? 2 : 2.5;
           else if (sym.includes(q)) score = 3;
           else if (name.includes(q)) score = 4;
-          if (score >= 0) scored.push([score, sym.length, name.length, a]);
+          const byName = score === 2 || score === 2.5 || score === 4;
+          if (score >= 0) scored.push([score, sym.length, byName ? name.length : 0, a]);
         }
         scored.sort((x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2]);
         results = scored.slice(0, limit).map((s) => s[3]);
