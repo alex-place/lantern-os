@@ -844,7 +844,9 @@
     const sym = btn.dataset.sym;
     btn.disabled = true;
     try {
-      await fetch('/api/trading/watchlist/' + encodeURIComponent(sym), { method: 'DELETE' });
+      const r = await fetch('/api/trading/watchlist/' + encodeURIComponent(sym), { method: 'DELETE' });
+      // Signed out, the list is the starter list every visitor shares; the server refuses.
+      if (r.status === 401) { btn.disabled = false; alert('Sign in to keep your own watchlist.'); return; }
       loadWatchlist();
     } catch (_e) { btn.disabled = false; }
   });

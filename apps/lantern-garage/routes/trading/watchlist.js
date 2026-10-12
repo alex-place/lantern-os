@@ -13,6 +13,13 @@ const { getEffectiveUserId } = require('../../lib/session-identity');
 module.exports = async function watchlistRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent } = ctx;
   const uid = getEffectiveUserId(req); // per-user watchlist (the signed-in user's own list)
+  // A signed-out visitor has no list of their own. With no user id the store files a
+  // write under "default" -- the one list every signed-out visitor is shown -- so one
+  // visitor's add or remove changed every other visitor's trader page, and each add put
+  // one more symbol on the collectors' rounds (allTickers). Reading it stays open: it is
+  // the starter list a guest sees. Changing a list takes an account; signed-in accounts,
+  // free ones included, keep editing their own (#guest-watchlist).
+  const refuseSignedOut = () => sendJson(res, { error: 'sign in to keep your own watchlist', signin: true }, 401);
 
   // GET /api/trading/watchlist — this user's own list
   if (url.pathname === '/api/trading/watchlist' && req.method === 'GET') {
@@ -23,6 +30,7 @@ module.exports = async function watchlistRoutes(req, res, url, ctx) {
   // POST /api/trading/watchlist
   // Body: { ticker } — add a ticker to the persisted watchlist
   if (url.pathname === '/api/trading/watchlist' && req.method === 'POST') {
+    if (!uid) { refuseSignedOut(); return true; }
     if (!traderAgent) {
       sendJson(res, { watchlist: [], error: 'TraderAgent not initialized' }, 503);
       return true;
@@ -55,6 +63,7 @@ module.exports = async function watchlistRoutes(req, res, url, ctx) {
   if (req.method === 'DELETE') {
     const watchlistMatch = url.pathname.match(/^\/api\/trading\/watchlist\/([A-Za-z]{1,10})$/);
     if (watchlistMatch) {
+      if (!uid) { refuseSignedOut(); return true; }
       const watchlist = watchlistStore.removeTicker(uid, watchlistMatch[1]);
       if (traderAgent) traderAgent.clearCache();
       sendJson(res, { watchlist }, 200);
