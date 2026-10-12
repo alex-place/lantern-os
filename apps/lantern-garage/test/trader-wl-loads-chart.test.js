@@ -21,10 +21,10 @@ const SRC = PAGE.slice(PAGE.indexOf('function focusTicker(t){'), PAGE.indexOf('\
 function deck({ slotCount, slots, watchlist }) {
   const calls = { renderCards: 0, persist: 0 };
   const focusTicker = new Function('slotCount', 'chartSlots', 'wlPrices', 'persistSlots', 'renderCards', 'renderWatchlist',
-    'renderSymbolInfo', 'setOrderSymbol', 'localStorage', 'document',
+    'renderSymbolInfo', 'setOrderSymbol', 'localStorage', 'document', '_markActiveCard',
     'let activeTicker, lastCardOrder;\n' + SRC + '\nreturn focusTicker;')(
     slotCount, slots, watchlist.map((ticker) => ({ ticker })), () => { calls.persist++; }, () => { calls.renderCards++; },
-    () => {}, () => {}, () => {}, { setItem() {} }, { body: { classList: { contains: () => true } } });
+    () => {}, () => {}, () => {}, { setItem() {} }, { body: { classList: { contains: () => true } } }, () => {});
   return { focusTicker, slots, calls };
 }
 
