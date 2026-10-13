@@ -33,7 +33,7 @@
     "busboy": "^1.6.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.0",
     "jsdom": "^30.1.1",
     "playwright": "^1.63.0"
   }
