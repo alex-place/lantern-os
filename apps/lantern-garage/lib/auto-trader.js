@@ -3744,16 +3744,10 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
               // observable in this engine is queryable there, and a finding that
               // only exists in a console line is invisible to any post-mortem.
               // The findings themselves stay in session-reviews.jsonl; this row
-              // is the pointer that shows up when you read the day back.
-              if (r && !r.degraded && r.findings.length) {
-                logTrade({
-                  ts: new Date(now).toISOString(), user: userId, event: 'session_review',
-                  date: _day, findings: r.findings.length,
-                  high: r.findings.filter((f) => f.severity === 'high').length,
-                  categories: [...new Set(r.findings.map((f) => f.category))].slice(0, 8),
-                  summary: String(r.summary || '').slice(0, 200),
-                });
-              }
+              // is the pointer that shows up when you read the day back (machine
+              // checks included, even when the model failed: session-review.pointerRow).
+              const _ptr = _rev.pointerRow(r, { ts: new Date(now).toISOString(), user: userId, date: _day });
+              if (_ptr) logTrade(_ptr);
             })
             .catch(() => { /* the reviewer never escalates */ });
         }

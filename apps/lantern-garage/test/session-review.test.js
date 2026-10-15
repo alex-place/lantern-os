@@ -205,3 +205,121 @@ test('WIRED: the reviewer is gated so a disabled flag costs nothing', async () =
   });
   assert.strictEqual(called, false, 'enabled() is the gate auto-trader checks');
 });
+
+// ── MACHINE CHECKS (2026-10-15) ──────────────────────────────────────────────
+// From 2026-09-24 every review failed on the API account's balance, and three defects sat
+// unflagged: a 100-share USO SHORT in a long-only book from 10-08, an SLV stop fill of
+// -$8,132 found on 10-14 but stamped with its order's 10-12 placement time (the 10-14
+// session row said realized +$196 and stops_fired 0), and every AI read failing. None needs
+// judgement, so code finds them before the model is called and journals them regardless.
+// The fixture below is the real 2026-10-14 shape.
+const OCT14 = [
+  row({ ts: '2026-10-12T16:07:13.000Z', discovered_at: '2026-10-14T13:30:25.438Z', event: 'exit', symbol: 'SLV', qty: 2607, entry: 54.445, exit: 51.325669, pnl: -8132.1, reason: 'broker fill', order_type: 'Stop', source: 'fill' }),
+  row({ ts: '2026-10-14T14:10:00Z', event: 'entry', symbol: 'GDX', qty: 1770, entry: 83.47, notional: 147742, stop: 81, tier: 'A' }),
+  row({ ts: '2026-10-14T15:30:00Z', discovered_at: '2026-10-14T15:31:00Z', event: 'exit', symbol: 'GLD', qty: 100, exit: 400.1, pnl: 195.95, reason: 'signal_exit' }),
+  row({ ts: '2026-10-14T20:01:26.493Z', event: 'session', date: '2026-10-14', equity: 979952.44, day_pnl: -3325.66, realized_today: 195.95, entries: 3, exits: 1, stops_fired: 0,
+    carried_out: [{ symbol: 'GDX', qty: 1770, mark: 83.21, unrealized: -455.11 }, { symbol: 'SOXS', qty: 0.8, mark: 42.37, unrealized: 8.95 },
+      { symbol: 'USO', qty: -100, mark: 153.57, unrealized: -649.3 }] }),
+].join('\n');
+const SHADOW_OCT14 = [
+  { date: '2026-10-14', read: 'open', provider: 'claude', degraded: true, reason: 'http 400', ts: '2026-10-14T13:36:00Z' },
+  { date: '2026-10-14', read: 'open', provider: 'local', degraded: true, reason: 'fetch failed', ts: '2026-10-14T13:36:00Z' },
+  { date: '2026-10-14', read: 'mid', provider: 'claude', degraded: true, reason: 'http 400', ts: '2026-10-14T14:35:00Z' },
+  { date: '2026-10-13', read: 'close', provider: 'claude', degraded: true, reason: 'http 400', ts: '2026-10-13T20:05:00Z' },
+].map((r) => JSON.stringify(r)).join('\n');
+const REVIEWS_BEFORE = [
+  { date: '2026-09-23', degraded: false, findings: [] },
+  { date: '2026-10-09', degraded: true, reason: 'http 400' },
+  { date: '2026-10-12', degraded: true, reason: 'http 400' },
+  { date: '2026-10-12', degraded: true, reason: 'disabled' },
+  { date: '2026-10-13', degraded: true, reason: 'http 400' },
+].map((r) => JSON.stringify(r)).join('\n');
+const byCat = (checks) => Object.fromEntries(checks.map((c) => [c.category, c]));
+
+test('machine checks: a short in a long-only book is HIGH, a fractional leftover is low, a long is nothing', () => {
+  const c = byCat(sr.buildChecks(OCT14, '2026-10-14'));
+  assert.strictEqual(c.negative_position.severity, 'high');
+  assert.match(c.negative_position.claim, /USO is held SHORT \(-100 shares\)/);
+  assert.match(c.negative_position.evidence, /unrealized -649\.3/);
+  assert.strictEqual(c.dust_position.severity, 'low');
+  assert.match(c.dust_position.claim, /SOXS holds a fractional 0\.8 share/);
+  assert.ok(!sr.buildChecks(OCT14, '2026-10-14').some((x) => /GDX/.test(x.claim)), 'a normal long is not a finding');
+});
+
+test('machine checks: an exit found today but booked to an earlier day is HIGH, on the day it was found only', () => {
+  const c = byCat(sr.buildChecks(OCT14, '2026-10-14'));
+  assert.strictEqual(c.backdated_fill.severity, 'high');
+  assert.match(c.backdated_fill.claim, /SLV exit found today \(-8132\.1\) was booked to 2026-10-12/);
+  assert.match(c.backdated_fill.evidence, /discovered 2026-10-14 09:30 ET/);
+  assert.match(c.backdated_fill.evidence, /realized_today 195\.95, stops_fired 0/, 'the session figures it contradicts');
+  assert.ok(!sr.buildChecks(OCT14, '2026-10-12').some((x) => x.category === 'backdated_fill'), 'not on the day it was stamped');
+  assert.ok(!sr.buildChecks(OCT14, '2026-10-15').some((x) => x.category === 'backdated_fill'), 'not the day after');
+  const d = sr.buildDigest(OCT14, '2026-10-14');
+  const slv = d.exits.find((x) => x.symbol === 'SLV');
+  assert.ok(slv, 'the reviewer sees the back-dated exit on the day it was found');
+  assert.deepStrictEqual([slv.booked_to, slv.discovered, slv.pnl], ['2026-10-12', '2026-10-14 09:30', -8132.1]);
+  assert.ok(!('booked_to' in d.exits.find((x) => x.symbol === 'GLD')), 'a same-day exit carries no back-dating mark');
+});
+
+test('machine checks: today\'s failed AI reads, and the reviewer\'s own failure streak (which it cannot report while failing)', () => {
+  const c = byCat(sr.buildChecks(OCT14, '2026-10-14', { shadowText: SHADOW_OCT14, reviewText: REVIEWS_BEFORE }));
+  assert.strictEqual(c.ai_reads_failed.severity, 'medium', 'all of today\'s claude reads failed');
+  assert.match(c.ai_reads_failed.claim, /2 of 2 of today's AI reads failed \(http 400\)/, 'the local model and other days are not counted');
+  assert.match(c.ai_reads_failed.check, /account balance/);
+  assert.strictEqual(c.review_failing.severity, 'medium');
+  assert.match(c.review_failing.claim, /the last 3 session reviews failed \(http 400\)/, 'a disabled day neither counts nor breaks the streak');
+  const one = sr.buildChecks(OCT14, '2026-10-14', { reviewText: REVIEWS_BEFORE.split('\n').slice(0, 2).join('\n') });
+  assert.ok(!one.some((x) => x.category === 'review_failing'), 'one failure is not a streak');
+});
+
+test('machine checks: a clean session has none', () => {
+  assert.deepStrictEqual(sr.buildChecks(LEDGER, '2026-08-18', { shadowText: '', reviewText: '' }), []);
+});
+
+test('machine checks survive the model failing: an http 400 review still journals and returns them', async () => {
+  const r = await withEnv(ON, () => sr.review({ ledgerText: OCT14, day: '2026-10-14', shadowText: SHADOW_OCT14, reviewText: '',
+    fetchImpl: async () => ({ ok: false, status: 400 }) }));
+  assert.strictEqual(r.degraded, true);
+  assert.deepStrictEqual(r.findings, []);
+  assert.deepStrictEqual(r.checks.map((x) => x.category).sort(), ['ai_reads_failed', 'backdated_fill', 'dust_position', 'negative_position']);
+  const rows = fs.readFileSync(LOG, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+  const last = rows[rows.length - 1];
+  assert.match(last.reason, /400/);
+  assert.strictEqual(last.checks.length, 4, 'journalled with the failed review');
+  const noKey = await withEnv({ ...ON, ANTHROPIC_API_KEY: null }, () => sr.review({ ledgerText: OCT14, day: '2026-10-14', shadowText: '', reviewText: '' }));
+  assert.strictEqual(noKey.reason, 'no api key');
+  assert.ok(noKey.checks.some((x) => x.category === 'negative_position'), 'no key, still checked');
+});
+
+test('the model gets the machine checks as context and is told not to repeat them', async () => {
+  let prompt = null;
+  await withEnv(ON, () => sr.review({ ledgerText: OCT14, day: '2026-10-14', shadowText: '', reviewText: '',
+    fetchImpl: async (_u, o) => { prompt = JSON.parse(o.body).messages[0].content; return reply({ summary: 's', findings: [] }); } }));
+  assert.match(prompt, /MACHINE CHECKS \(computed by code/);
+  assert.match(prompt, /do not repeat them/);
+  assert.match(prompt, /USO is held SHORT/);
+  const dataPart = prompt.slice(prompt.indexOf('DATA:'), prompt.indexOf('MACHINE CHECKS'));
+  assert.ok(!dataPart.includes('machine_checks'), 'the checks travel apart from the DATA');
+  const quiet = sr.buildPrompt(sr.buildDigest(LEDGER, '2026-08-18'));
+  assert.ok(!quiet.includes('MACHINE CHECKS'), 'no section when nothing fired');
+});
+
+test('pointer row: machine checks reach the trade ledger even when the model failed; nothing to point at = no row', () => {
+  const failed = { degraded: true, reason: 'http 400', findings: [], checks: sr.buildChecks(OCT14, '2026-10-14') };
+  const p = sr.pointerRow(failed, { ts: 't', user: 'u', date: '2026-10-14' });
+  assert.deepStrictEqual([p.event, p.findings, p.checks, p.checks_high, p.review_degraded], ['session_review', 0, 3, 2, 'http 400']);
+  assert.deepStrictEqual(p.check_categories.sort(), ['backdated_fill', 'dust_position', 'negative_position']);
+  assert.match(p.summary, /USO is held SHORT/, 'with no model summary the first check speaks');
+  const ok = sr.pointerRow({ degraded: false, summary: 'quiet', findings: [{ severity: 'high', category: 'x', claim: 'c' }], checks: [] }, { date: 'd' });
+  assert.deepStrictEqual([ok.findings, ok.high, ok.checks, ok.summary, 'review_degraded' in ok], [1, 1, 0, 'quiet', false]);
+  assert.strictEqual(sr.pointerRow({ degraded: false, findings: [], checks: [] }, {}), null);
+  assert.strictEqual(sr.pointerRow(null, {}), null);
+});
+
+test('WIRED: the close writes the pointer through pointerRow, so failed reviews with checks still leave a row', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'auto-trader.js'), 'utf8');
+  const seg = src.slice(src.indexOf("require('./session-review')"), src.indexOf("require('./session-review')") + 1600);
+  assert.match(seg, /_rev\.pointerRow\(r, \{/);
+  assert.match(seg, /if \(_ptr\) logTrade\(_ptr\)/);
+  assert.ok(!/!r\.degraded && r\.findings\.length/.test(seg), 'the old findings-only condition is gone');
+});

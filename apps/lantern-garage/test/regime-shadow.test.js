@@ -286,3 +286,142 @@ test('v2 track record: its own earlier calls with what followed, read from the j
   assert.strictEqual(t[0].spyRetPct, +((y.yesterday.c / 770 - 1) * 100).toFixed(2));
   assert.deepStrictEqual(t[0].picks.map((p) => p.symbol), ['SPY']);
 });
+
+// ── v3 (2026-10-15): the pre-open read sets SIZE, from what a trader has before the bell ──
+// The operator: "add the missing brain: news, earnings calls, the judgment a human uses".
+// Every direction call measured at chance, so this read answers normal / half / stand aside
+// for the day's new entries, from the pre-market, the futures, the headlines since the close
+// and its own earlier calls with how the ACCOUNT then did. Still journal-only.
+const NOW_0915 = Date.parse('2026-09-01T13:15:00Z');   // Tue 09:15 ET
+function fakePreopenYahoo() {
+  const y = fakeYahoo();
+  const ymd = (h, m) => Date.parse(`2026-09-01T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`) / 1000;
+  const pre = [
+    { t: ymd(12, 0), o: 764.8, h: 765.2, l: 764.5, c: 765.0 },     // 08:00 ET
+    { t: ymd(13, 5), o: 765.9, h: 766.2, l: 765.8, c: 766.0 },     // 09:05 ET
+    { t: ymd(13, 10), o: 766.0, h: 766.5, l: 765.9, c: 766.4 },    // 09:10 ET: completes at 09:15, the last one shown
+    { t: ymd(13, 30), o: 770, h: 771, l: 769, c: 770.5 },          // 09:30 ET: a regular-session bar must never appear
+  ];
+  const futures = { chart: { result: [{ meta: { regularMarketPrice: 6000, chartPreviousClose: 6030 }, timestamp: [], indicators: { quote: [{}] } }] } };
+  return { yesterday: y.yesterday, getJson: async (url) => {
+    if (url.includes('%3DF')) return futures;
+    if (url.includes('includePrePost=true')) return yahooChart(pre);
+    return y.getJson(url);
+  } };
+}
+
+test('v3 pre-open context: the pre-market and the futures against the last close, never a regular-session print', async () => {
+  fs.writeFileSync(LOG, '');
+  fs.writeFileSync(NEWS, '');
+  const y = fakePreopenYahoo();
+  const ctx = await rs.buildContext('preopen', { getJson: y.getJson, now: NOW_0915 });
+  assert.strictEqual(ctx.v, rs.PREOPEN_V);
+  assert.strictEqual(ctx.asOf, '09:15');
+  assert.deepStrictEqual(ctx.premarket[0], { sym: 'SPY', px: 766.4, chgPct: +((766.4 / y.yesterday.c - 1) * 100).toFixed(2), asOf: '09:15' });
+  assert.deepStrictEqual(ctx.futures.map((f) => [f.sym, f.chgPct]), [['ES=F', -0.5], ['NQ=F', -0.5]]);
+  assert.strictEqual(ctx.gapPct, null, 'no 09:30 print exists at 09:15');
+  assert.ok(ctx.spy.every((b) => b.d < '2026-09-01'), 'history ends yesterday');
+  assert.strictEqual(ctx.newsHours, 17, 'headlines since Monday 16:00, 17.25 hours');
+  const p = rs.buildPrompt(ctx);
+  for (const want of [/09:15 ET on 2026-09-01/, /Pre-market now:/, /SPY\s+766\.40\s+[+-][\d.]+% vs yesterday’s close \(as of 09:15\)/,
+    /S&P 500 \(ES\) -0\.5%/, /"stance":"normal"\|"half"\|"stand_aside"/, /none yet: this is your first/]) assert.match(p, want);
+  assert.ok(!p.includes('770.5') && !p.includes('2026-09-01  O'), 'nothing from the regular session of today');
+  assert.ok(!/falling|knife|trap|crash/i.test(p), 'the prompt names no failure mode (#3370)');
+});
+
+test('v3 headline window: everything since the last close, never anything after now', async () => {
+  fs.writeFileSync(LOG, '');
+  const row = (iso, headline) => JSON.stringify({ headline, source: 'Reuters', published: iso, symbols: [] });
+  fs.writeFileSync(NEWS, [row('2026-08-31T19:30:00Z', 'before the close'), row('2026-08-31T20:30:00Z', 'Chip stocks slide after hours'),
+    row('2026-09-01T12:31:00Z', 'Futures slip after the jobs report'), row('2026-09-01T13:40:00Z', 'FROM THE FUTURE')].join('\n') + '\n');
+  const ctx = await rs.buildContext('preopen', { getJson: fakePreopenYahoo().getJson, now: NOW_0915 });
+  const shown = ctx.headlines.map((h) => h.headline);
+  assert.deepStrictEqual(shown, ['Chip stocks slide after hours', 'Futures slip after the jobs report'],
+    'since the 16:00 close (17.25 h), not the 15:30 row before it');
+  assert.ok(!shown.includes('FROM THE FUTURE'), 'no look-ahead');
+});
+
+test('v3 replies: stance + conviction required, the rest bounded; garbage degrades', () => {
+  const longEvent = 'x' + 'y'.repeat(200);
+  const reply = JSON.stringify({ stance: 'stand_aside', range: 'huge', regime: 'trend_down', conviction: 140,
+    events: ['CPI 08:30', longEvent, '', 'a', 'b', 'c', 'd', 'e', 'f'], reason: 'CPI day' });
+  const good = rs.parsePreopen('ok ' + reply + ' tail');
+  assert.deepStrictEqual([good.stance, good.range, good.regime, good.conviction, good.degraded], ['stand_aside', null, 'trend_down', 100, false]);
+  assert.strictEqual(good.events.length, 6, 'at most six events');
+  assert.ok(good.events.every((e) => e.length <= 80), 'each event bounded');
+  for (const bad of ['not json', '{"stance":"short","conviction":50}', '{"stance":"half"}', '{}', '']) {
+    assert.strictEqual(rs.parsePreopen(bad).degraded, true, JSON.stringify(bad.slice(0, 30)));
+  }
+  assert.strictEqual(rs.preopenEnabled(), process.env.TRADER_REGIME_PREOPEN !== '0', 'on with the shadow unless opted out');
+});
+
+test('v3 run: journals the stance, what it was shown, and the tokens it cost; the local model degrades', async () => {
+  fs.writeFileSync(LOG, '');
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const ctx = { read: 'preopen', v: rs.PREOPEN_V, date: today, asOf: '09:15', vix: 15.1, gapPct: null,
+    spy: [{ d: '2026-08-31', o: 771, h: 774, l: 769, c: 772, ibs: 0.6 }], qqq5: [], iwm5: [],
+    premarket: [{ sym: 'SPY', px: 766.4, chgPct: 0.3, asOf: '09:15' }, { sym: 'QQQ', unavailable: true }],
+    futures: [{ sym: 'ES=F', name: 'S&P 500 (ES)', chgPct: -0.5 }, { sym: 'NQ=F', name: 'Nasdaq 100 (NQ)', unavailable: true }],
+    headlines: [], track: [], newsHours: 17 };
+  let body = null;
+  const fetchImpl = async (url, opts) => {
+    if (!String(url).includes('anthropic')) throw new Error('ECONNREFUSED');
+    body = JSON.parse(opts.body);
+    return { ok: true, json: async () => ({ usage: { input_tokens: 2100, output_tokens: 90 }, content: [{ type: 'text',
+      text: '{"stance":"half","range":"wide","regime":"chop","conviction":62,"events":["CPI 08:30 ET"],"reason":"hot CPI, futures lower"}' }] }) };
+  };
+  await withEnv({ TRADER_REGIME_SHADOW: '1', ANTHROPIC_API_KEY: 'test-key', TRADER_REGIME_MODEL: null }, () =>
+    rs.run('preopen', { ctx, fetchImpl }));
+  const rows = readLog();
+  const row = rows.find((r) => r.provider === 'claude');
+  assert.match(body.messages[0].content, /pre-open risk desk/);
+  assert.deepStrictEqual([row.read, row.prompt_v, row.stance, row.range, row.conviction], ['preopen', rs.PREOPEN_V, 'half', 'wide', 62]);
+  assert.deepStrictEqual(row.events, ['CPI 08:30 ET']);
+  assert.deepStrictEqual(row.usage, { in: 2100, out: 90 });
+  assert.deepStrictEqual(row.premarket, { SPY: 0.3 });
+  assert.deepStrictEqual(row.futures, { 'ES=F': -0.5 });
+  assert.strictEqual(row.inputs.news_hours, 17);
+  assert.ok(!('posture' in row) && !('picks' in row), 'a size call, not a direction or a pick');
+  const local = rows.find((r) => r.provider === 'local');
+  assert.ok(local.degraded && local.prompt_v === rs.PREOPEN_V);
+  const again = await withEnv({ TRADER_REGIME_SHADOW: '1', ANTHROPIC_API_KEY: 'test-key' }, () =>
+    rs.run('preopen', { ctx, fetchImpl: async () => { throw new Error('must not be called'); } }));
+  assert.strictEqual(again.skipped, 'already logged', 'once a day, restarts included');
+});
+
+test('v3 track record: its own earlier pre-open calls with SPY\'s day and the account\'s day that followed', async () => {
+  const LEDGER_FILE = path.join(path.dirname(LOG), 'ledger.jsonl');
+  fs.writeFileSync(LEDGER_FILE, [
+    { ts: '2026-08-31T20:00:00Z', event: 'entry', symbol: 'SPY' },
+    { ts: '2026-08-31T20:01:00Z', event: 'session', date: '2026-08-31', equity: 101000, day_pnl: 1000 },
+  ].map((r) => JSON.stringify(r)).join('\n') + '\n');
+  fs.writeFileSync(LOG, [
+    { date: '2026-08-31', read: 'preopen', provider: 'claude', prompt_v: 3, degraded: false, stance: 'half', range: 'wide', conviction: 60 },
+    { date: '2026-08-31', read: 'preopen', provider: 'local', prompt_v: 3, degraded: true },
+    { date: '2026-08-31', read: 'open', provider: 'claude', prompt_v: 2, degraded: false, regime: 'chop', posture: 'flat', conviction: 50 },
+    { date: '2026-09-01', read: 'preopen', provider: 'claude', prompt_v: 3, degraded: false, stance: 'normal', conviction: 50 },
+  ].map((r) => JSON.stringify(r)).join('\n') + '\n');
+  const t = await withEnv({ TRADER_REGIME_LEDGER: LEDGER_FILE }, () => rs.preopenTrackOf(NOW_0915, fakeYahoo().getJson));
+  assert.strictEqual(t.length, 1, 'claude pre-open reads before today only');
+  // fakeYahoo's 2026-08-31 bar: O 771 H 774 L 769 C 772; the session: +1,000 on 100,000 at the open
+  assert.deepStrictEqual(t[0], { date: '2026-08-31', stance: 'half', range: 'wide', conviction: 60,
+    spyOcPct: +((772 / 771 - 1) * 100).toFixed(2), spyRangePct: +((5 / 771) * 100).toFixed(2), acctPct: 1 });
+  assert.match(rs.buildPrompt({ read: 'preopen', v: rs.PREOPEN_V, date: '2026-09-01', asOf: '09:15', spy: [], qqq5: [], iwm5: [], vix: null, track: t }),
+    /2026-08-31: stance half, range wide \(conviction 60\); SPY then \+0\.13% open to close on a 0\.65% range; the account \+1% on the day/);
+});
+
+test('v3 clock: ET wall time to epoch across both offsets', () => {
+  assert.strictEqual(rs.etWallMs('2026-09-01', 960), Date.parse('2026-09-01T20:00:00Z'), 'EDT');
+  assert.strictEqual(rs.etWallMs('2026-12-01', 960), Date.parse('2026-12-01T21:00:00Z'), 'EST');
+});
+
+test('WIRED: the pre-open read fires from the scan loop ABOVE the market-hours gate, flag-gated and fire-and-forget', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'trading.js'), 'utf8');
+  const fire = src.indexOf("_rs.run('preopen')");
+  const gate = src.indexOf('if (marketHours || extNow || extManageNow)');
+  assert.ok(fire > 0 && gate > 0 && fire < gate, 'before the bell the loop is idle below the gate, so the read must sit above it');
+  const seg = src.slice(src.lastIndexOf('try {', fire), fire + 200);
+  assert.match(seg, /_rs\.enabled\(\) && _rs\.preopenEnabled\(\)/);
+  assert.match(seg, /_m >= 550 && _m < 570/, '09:10-09:29 ET');
+  assert.match(seg, /\.catch\(/, 'never awaited, never throws into the loop');
+});
