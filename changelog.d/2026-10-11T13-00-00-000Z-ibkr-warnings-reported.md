@@ -1,0 +1,3 @@
+### Fixed
+
+- trading: **an IBKR order warning the engine auto-confirms is now recorded, not swallowed.** `placeOrder` collected the warnings it cleared and dropped them on the success path, so no auto-confirmed disclosure was ever written down anywhere. That is why a known open safety item — narrowing entries from "confirm every warning type" to "benign-list the leveraged/inverse-ETF disclosure" — has been stuck since 2026-08-10: the benign-list matches on message wording, and nobody had the wording. A submitted order now reports `warnings` and `warningsConfirmed`. No behaviour changes and no order is blocked.

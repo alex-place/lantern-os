@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: the watchlist's CHG column is the change in dollars, exactly. It was rebuilt from the day percent, which the feed rounds to two places, so it was only ever approximate — QQQ read +3.81 for a +3.80 day, GLD +5.869 for +5.88 — and under $100 it printed a third decimal of pure rounding (TLT "+0.093" beside 77.97, really +0.10). The quote feed now sends the previous close it measures the day from (`prev_close`), the column uses it at the price column's decimals, and the chart's previous-close line uses it too. Day percents print two places everywhere (the column read "+0.6%" over "+0.51%").

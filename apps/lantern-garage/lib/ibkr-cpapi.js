@@ -668,6 +668,21 @@ class IbkrCpapi {
       order,
       ibkr: first,
       orderId: (first && (first.order_id || first.orderId || first.id)) || null,
+      // WHAT WAS CONFIRMED ON THE WAY THROUGH. These were collected and then dropped on
+      // the success path, so every warning the engine auto-confirmed vanished the moment
+      // the order went in. That is why the IBKR leveraged/inverse-ETF disclosure — the
+      // notice 3aff30e2 opted entries into clearing on 2026-08-10 — has never been
+      // written down anywhere, and why the standing item in test/.quarantine ("narrow
+      // that change: benign-list the leveraged-ETF disclosure") cannot be closed: nobody
+      // has its wording, and BENIGN_WARNING_TEXT has to match the wording.
+      //
+      // Reporting them changes no behaviour and blocks no order. It just means the next
+      // entry that clears a disclosure records which one, so the benign-list can be
+      // written from evidence instead of a guess — and a guess here is costly in both
+      // directions: too narrow strands entries at needs_confirmation again, too broad is
+      // the blanket auto-confirm P0-8 exists to prevent.
+      warnings: warnings.length ? warnings : undefined,
+      warningsConfirmed: confirms || undefined,
     };
   }
 

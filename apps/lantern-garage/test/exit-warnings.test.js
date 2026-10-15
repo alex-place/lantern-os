@@ -44,3 +44,18 @@ test('ENTRIES do NOT auto-accept warnings (P0-8 intent preserved)', () => {
     assert.doesNotMatch(b, /acceptWarnings/, `an ENTRY must not auto-confirm warnings: ${b.slice(0, 90)}`);
   }
 });
+
+test('a confirmed warning is REPORTED, not swallowed', () => {
+  // The success path collected `warnings` and dropped them, so every disclosure the
+  // engine auto-confirmed vanished. That is why the IBKR leveraged/inverse-ETF notice —
+  // the one 3aff30e2 opted entries into clearing — has never been written down, and why
+  // the standing item in test/.quarantine (narrow that change: benign-list the
+  // leveraged-ETF disclosure) cannot be closed: BENIGN_WARNING_TEXT matches on WORDING,
+  // and nobody has the wording.
+  const submitted = CP.slice(CP.indexOf("status: 'submitted',"), CP.indexOf('/** GET /iserver/account/orders'));
+  assert.match(submitted, /warnings: warnings\.length \? warnings : undefined/,
+    'a submitted order must say which warnings it cleared');
+  assert.match(submitted, /warningsConfirmed: confirms \|\| undefined/);
+  // It must stay a REPORT: nothing here may decide anything.
+  assert.doesNotMatch(submitted, /acceptWarnings/, 'reporting must not touch the policy');
+});

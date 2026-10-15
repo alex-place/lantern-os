@@ -1,0 +1,431 @@
+/* market.css — the shared look of Unisona's market surface.
+ *
+ * Lifted out of index.html unchanged (2026-10-11) so the pages its links lead to can
+ * BE the same page rather than resemble it: the symbol view, the movers board and the
+ * news reader all draw on these components.
+ *
+ * Structure after TradingView: a dark brand band, a light canvas that overlaps it, then
+ * a section-header + grid rhythm. The rules below are the home page's own, in its own
+ * order — relocating them must not restyle anything, so anything genuinely new to a
+ * later page is added at the END, under its own heading, never by editing these.
+ */
+    /* ── UnisonaHome ─────────────────────────────────────────────────────────────
+       Structure after TradingView: a dark brand band, a light canvas that overlaps
+       it, then a section-header + grid rhythm. Every chart on this page is drawn
+       from real bars (/api/trading/bars) and every number from the live scan
+       (/api/trading/zones) — nothing is sampled, seeded or decorative-with-fake-data.
+
+       The scoring engine is never called AI: it is deterministic technical analysis
+       plus a hand-weighted linear model. "AI" appears only where a language model is
+       genuinely involved. The `position` field on the public payload is never
+       rendered — it would publish operator position sizes to anonymous visitors. */
+
+    .wrap { padding: 0 16px; }
+    @media (min-width: 769px)  { .wrap { padding: 0 24px; } }
+    @media (min-width: 1280px) { .wrap { padding: 0 40px; } }
+    @media (min-width: 1600px) { .wrap { padding: 0 72px; } }
+    .prose { max-width: 72ch; }
+
+    /* ── Dark brand band — dark in BOTH themes ───────────────────────────────────
+       Palette pinned locally so shared components work unchanged inside it.
+       --up/--down are band-local: the AA-tuned light --green (#00735c) measures
+       ~2.3:1 on this background. */
+    .band {
+      --bg:#0a0e17; --surface:#111827; --surface2:#1a2332; --border:#1f2937;
+      --text:#f3f4f6; --muted:#9ca3af; --accent-strong:#22d3ee; --accent-strong-hover:#0e7490;
+      --up:#34d399; --down:#ff5f6d;
+      position: relative; overflow: hidden; isolation: isolate;
+      background: var(--bg); color: var(--text); padding: 44px 0 84px;
+    }
+    /* Depth, drawn not imported: two soft lights + a faint engineering grid. */
+    .band::before {
+      content: ''; position: absolute; inset: -20% -10% auto -10%; height: 150%; z-index: -2;
+      background:
+        radial-gradient(60% 55% at 78% 18%, rgba(34,211,238,.20), transparent 70%),
+        radial-gradient(45% 45% at 12% 8%, rgba(99,102,241,.16), transparent 72%);
+    }
+    .band::after {
+      content: ''; position: absolute; inset: 0; z-index: -1; opacity: .5;
+      background-image:
+        linear-gradient(to right, rgba(148,163,184,.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148,163,184,.07) 1px, transparent 1px);
+      background-size: 56px 56px;
+      -webkit-mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
+      mask-image: radial-gradient(75% 65% at 50% 30%, #000 40%, transparent 100%);
+    }
+    .band-inner { position: relative; max-width: 68ch; }
+
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700;
+               letter-spacing: .14em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 16px; }
+    .eyebrow .led { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-strong);
+                    box-shadow: 0 0 0 4px rgba(34,211,238,.16); }
+    .band h1 { font-size: 34px; line-height: 1.12; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 16px; }
+    @media (min-width: 561px)  { .band h1 { font-size: 44px; } }
+    @media (min-width: 1024px) { .band h1 { font-size: 56px; line-height: 1.08; } }
+    .band h1 .grad {
+      background-image: linear-gradient(96deg, #22d3ee 0%, #818cf8 52%, #fbbf24 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .subhead { font-size: 16px; line-height: 1.6; color: var(--muted); margin: 0 0 26px; max-width: 58ch; }
+    @media (min-width: 561px) { .subhead { font-size: 18px; } }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .cta { display: inline-flex; align-items: center; justify-content: center; height: 50px; padding: 0 28px;
+           border-radius: 12px; background: var(--accent-strong); color: #04121a; font-size: 16px; font-weight: 700;
+           text-decoration: none; box-shadow: 0 8px 24px -10px rgba(34,211,238,.7); }
+    .cta:hover { background: #67e8f9; }
+    .cta-ghost { display: inline-flex; align-items: center; height: 50px; padding: 0 20px; border-radius: 12px;
+                 border: 1px solid #2b3648; color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; }
+    .cta-ghost:hover { border-color: var(--muted); background: rgba(255,255,255,.03); }
+    .honesty { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 20px 0 0; max-width: 62ch; }
+
+    /* ── The live verdict card (the hero graphic) ─────────────────────────────── */
+    .vcard { border: 1px solid #22304a; border-radius: 18px; background: rgba(17,24,39,.82);
+             backdrop-filter: blur(6px); padding: 16px; box-shadow: 0 30px 70px -30px rgba(0,0,0,.9); }
+    .vhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .badge { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); display: inline-flex;
+             align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: 0 0 auto; }
+    .sym { font-size: 17px; font-weight: 700; letter-spacing: .01em; }
+    .chip { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: var(--surface2); color: var(--text); }
+    .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 8px; border-radius: 6px; background: var(--surface2); }
+    .tag.enter { color: var(--up); } .tag.skip { color: var(--down); }
+    .vhead .spacer { flex: 1 1 auto; }
+
+    .chartbox { position: relative; border-radius: 12px; overflow: hidden; background: rgba(10,14,23,.5); }
+    .chartbox svg { display: block; width: 100%; height: auto; }
+    .lvl-label { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; }
+
+    .meters { margin-top: 14px; display: grid; gap: 10px; }
+    .meter .mrow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .meter .mk { font-size: 10.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .meter .mv { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums lining-nums; }
+    .track { margin-top: 5px; height: 6px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
+    .fill { height: 100%; border-radius: 999px; background: var(--accent-strong); }
+    .fill.up { background: var(--up); } .fill.down { background: var(--down); }
+    .hint { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+    .hint b { font-weight: 700; color: var(--text); }
+    .vwhy { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+    .vwhy code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--text); }
+
+    /* ── Light canvas ─────────────────────────────────────────────────────────── */
+    .canvas { background: var(--bg); border-radius: 28px 28px 0 0; margin-top: -28px; position: relative; padding-top: 48px; }
+    section.sec { margin-bottom: 56px; }
+    @media (min-width: 769px) { section.sec { margin-bottom: 96px; } }
+    .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .sec-head h2 { font-size: 24px; line-height: 1.33; font-weight: 700; letter-spacing: -0.2px; margin: 0; }
+    @media (min-width: 561px) { .sec-head h2 { font-size: 28px; } }
+    .sec-head a { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; }
+    .sec-head a:hover h2 { color: var(--accent-strong); }
+    .sec-head .sub { font-size: 12px; color: var(--muted); }
+    .caret { width: 9px; height: 16px; flex: 0 0 auto; }
+
+    .card { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: transparent; }
+    .card:hover { border-color: var(--muted); }
+    a.card { display: block; text-decoration: none; color: var(--text); }
+    a.card:hover { background: var(--surface); }
+    .card h3 { font-size: 16px; line-height: 1.5; font-weight: 600; margin: 0 0 4px; }
+    .card .csub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 561px)  { .grid { gap: 20px; grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (min-width: 1024px) { .grid.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+                                 .grid.g4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+
+    /* Rows — fixed density, sparkline in the middle. */
+    .row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; border-radius: 8px;
+           text-decoration: none; color: var(--text); }
+    .row:hover { background: var(--surface2); }
+    .row .grow { flex: 1 1 auto; min-width: 0; }
+    .row .l1 { display: flex; align-items: center; gap: 8px; }
+    .row .l2 { margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .spark { width: 84px; height: 30px; flex: 0 0 auto; }
+    @media (max-width: 400px) { .spark { display: none; } }
+    .num { text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+    .num .px { font-size: 16px; font-weight: 600; }
+    .num .ch { font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
+
+    /* Pipeline — the decision path, drawn instead of described in three equal paragraphs. */
+    .pipe { display: grid; gap: 14px; }
+    @media (min-width: 900px) { .pipe { grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; } }
+    .step { border: 1px solid var(--border); border-radius: 16px; padding: 18px; background: transparent; }
+    .step .glyph { width: 40px; height: 40px; margin-bottom: 12px; color: var(--accent-strong); }
+    .step h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+    .step p { font-size: 13.5px; line-height: 1.55; color: var(--muted); margin: 0; }
+    .arrow { display: none; align-self: center; color: var(--border); }
+    @media (min-width: 900px) { .arrow { display: block; width: 24px; } }
+
+    /* Compact verdict panel — the hero card's content at card scale, 4-6 per grid. */
+    .vp { border: 1px solid var(--border); border-radius: 14px; padding: 13px; background: transparent;
+          text-decoration: none; color: var(--text); display: block; }
+    .vp:hover { border-color: var(--muted); background: var(--surface); }
+    .vp-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 9px; }
+    .vp-head .spacer { flex: 1 1 auto; }
+    .vp .badge { width: 24px; height: 24px; font-size: 10px; }
+    .vp .sym { font-size: 14px; font-weight: 700; }
+    .vp .chip, .vp .tag { font-size: 10px; padding: 2px 6px; }
+    .vp-chart { border-radius: 9px; overflow: hidden; background: var(--surface2); }
+    .vp-chart svg { display: block; width: 100%; height: auto; }
+    .vp-cap { display: flex; align-items: center; gap: 6px; margin-top: 6px;
+              font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+    .vp-cap .tf { padding: 1px 6px; border-radius: 4px; background: var(--surface2); color: var(--text); letter-spacing: .04em; }
+    .vp-stats { display: flex; gap: 14px; margin-top: 10px; }
+    .vp-stats .s { min-width: 0; }
+    .vp-stats .sk { font-size: 9.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .vp-stats .sv { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums lining-nums; margin-top: 1px; }
+    .vp-why { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border);
+              font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+    .vp-why b { color: var(--text); font-weight: 700; }
+    .viewall { display: flex; justify-content: center; margin-top: 24px; }
+    .cta-line { display: inline-flex; align-items: center; gap: 7px; height: 46px; padding: 0 24px;
+                border: 1px solid var(--border); border-radius: 999px; text-decoration: none;
+                font-size: 15px; font-weight: 600; color: var(--text); }
+    .cta-line:hover { border-color: var(--accent-strong); color: var(--accent-strong); background: var(--surface); }
+
+    .pulse { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border);
+            border-radius: 999px; font-size: 12px; white-space: nowrap; }
+    .pill .k { color: var(--muted); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+    .dot.on { background: var(--green); }
+
+    .inlink { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 15px; font-weight: 600;
+              color: var(--accent-strong); text-decoration: none; }
+    .inlink:hover { color: var(--accent-strong-hover); }
+
+    .nrow { display: block; padding: 12px; border-radius: 10px; text-decoration: none; color: inherit; }
+    .nrow:hover { background: var(--surface2); }
+    .nrow .nh { font-size: 15px; line-height: 1.4; font-weight: 600; }
+    .nrow .nm { margin-top: 5px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+    .state { padding: 14px; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-size: 13px; }
+    .state.err { border-color: var(--red); color: var(--red); }
+    .rule { border: 0; border-top: 1px solid var(--border); margin: 0 0 20px; }
+    .disc { font-size: 12px; line-height: 1.6; color: var(--muted); }
+    .motto { text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .08em; margin: 28px 0 0; text-transform: uppercase; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .fill { transition: width .6s cubic-bezier(.22,1,.36,1); }
+    }
+
+/* ── Symbol view (symbol.html, 2026-10-11) ───────────────────────────────────
+   Added at the END, as the header above requires: nothing a page already shipped
+   depends on is touched. Every class here is new to this file. */
+.sym-back { display:inline-block; color:var(--muted); text-decoration:none; font-size:13px; margin-bottom:14px; }
+.sym-back:hover { color:var(--text); }
+.sym-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.sym-head .badge { width:44px; height:44px; font-size:15px; flex:0 0 auto; }
+.sym-t { margin:0; font-size:34px; font-weight:800; letter-spacing:-.02em; line-height:1.1; }
+.sym-name { color:var(--muted); font-size:14px; margin-top:2px; }
+.sym-px { margin-left:auto; text-align:right; }
+.sym-last { font-size:30px; font-weight:700; font-variant-numeric:tabular-nums; }
+.sym-chg { font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:2px; }
+.sym-chart { padding:10px 6px; }
+.bigchart { width:100%; height:260px; display:block; }
+
+/* Range switcher — pressed state carries the colour, so it survives a forced-colours
+   mode where a background alone would vanish. */
+.tfbar { display:inline-flex; gap:2px; padding:3px; border:1px solid var(--border); border-radius:10px; }
+.tf { appearance:none; border:0; background:none; color:var(--muted); font:inherit; font-size:12px;
+      font-weight:600; padding:5px 11px; border-radius:7px; cursor:pointer; }
+.tf:hover { color:var(--text); }
+.tf.on { background:var(--surface2); color:var(--accent-strong); }
+
+/* Statistics: a plain definition grid. Two columns on a phone, up to four on a desk —
+   a 13-row single column was a scroll, and six across made every value a fragment.
+
+   The rules are drawn by the CELLS, not by a 1px grid gap over a coloured container:
+   a count that does not divide by the column count (13 statistics across 4) left the
+   unfilled tail of the last row showing the container's border colour as a grey void. */
+.kstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+          background:var(--surface); border:1px solid var(--border);
+          border-radius:10px; overflow:hidden; }
+@media (min-width:700px)  { .kstats { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (min-width:1100px) { .kstats { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+.kst { padding:11px 13px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+.kk { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.kv { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:3px; }
+
+/* Performance: the number leads and the bar is the sense-check beside it. */
+.perf { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px; }
+.pfk { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.pfv { font-size:19px; font-weight:700; font-variant-numeric:tabular-nums; margin:2px 0 6px; }
+.pftrack { height:5px; border-radius:3px; background:var(--surface2); overflow:hidden; }
+.pffill { height:100%; border-radius:3px; }
+.pffill.up { background:var(--green); } .pffill.down { background:var(--red); } .pffill.flat { background:var(--muted); }
+
+.tech { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:16px; padding-top:14px;
+        border-top:1px solid var(--border); }
+.techk { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.techv { font-size:16px; font-weight:700; }
+.techn { color:var(--muted); font-size:12.5px; }
+
+.sec-head .spacer { flex:1 1 auto; }
+
+/* ── News article (news-article.html, 2026-10-11) ────────────────────────────── */
+.art-meta { display:flex; gap:10px; align-items:center; flex-wrap:wrap; color:var(--muted);
+            font-size:12.5px; margin-bottom:8px; }
+.art-h { margin:0; font-size:30px; font-weight:800; letter-spacing:-.015em; line-height:1.22; max-width:40ch; }
+.art-syms { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.art-syms .chip { text-decoration:none; }
+.art-syms .chip:hover { color:var(--accent-strong); border-color:var(--accent-strong); }
+.art-card { max-width:72ch; }
+/* The summary is the page. Set at reading size, not at UI size. */
+.art-sum { font-size:17px; line-height:1.65; margin:0 0 20px; }
+.art-sum.muted { color:var(--muted); font-size:15px; }
+.art-orig { margin-bottom:14px; }
+
+/* ── Market boards (markets.html, market.html — 2026-10-11) ──────────────────────
+   The hub, one page per asset class, and each class's boards in full. New classes only;
+   nothing above is touched. */
+
+/* The class switcher under the band's title — the same row on every market page, the
+   current one marked (TradingView's "Overview · Quotes · …" strip). */
+.mk-nav { display:flex; gap:6px; flex-wrap:wrap; margin-top:18px; }
+.mk-nav a { display:inline-flex; align-items:center; height:32px; padding:0 13px; border-radius:999px;
+            border:1px solid #2b3648; color:var(--text); text-decoration:none; font-size:13px; font-weight:600; }
+.mk-nav a:hover { border-color:var(--muted); background:rgba(255,255,255,.04); }
+.mk-nav a[aria-current="page"] { background:var(--accent-strong); border-color:var(--accent-strong); color:#04121a; }
+
+/* Tiles: one instrument each — name, code, price with its unit, the day's move. */
+.tiles { display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+@media (min-width:700px)  { .tiles { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (min-width:1100px) { .tiles { grid-template-columns:repeat(6,minmax(0,1fr)); } }
+.tile { display:block; border:1px solid var(--border); border-radius:14px; padding:12px 13px;
+        text-decoration:none; color:var(--text); min-width:0; }
+.tile:hover { border-color:var(--muted); background:var(--surface); }
+.tile .tn { font-size:13.5px; font-weight:600; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tile .tc { font-size:11px; color:var(--muted); margin-top:2px; letter-spacing:.02em; }
+.tile .tp { font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:10px; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; }
+.tile .tu { font-size:11px; color:var(--muted); font-weight:500; margin-left:4px; }
+.tile .tm { font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:2px; }
+
+/* The lead chart: name, last price, the move over the window, the range switcher. */
+.mk-lead-h { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.mk-lead-h .ln { font-size:15px; font-weight:700; }
+.mk-lead-h .lp { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+.mk-lead-h .ch { font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+.mk-lead-h .spacer { flex:1 1 auto; }
+.mk-chart { width:100%; height:220px; display:block; }
+.mk-sum { display:grid; gap:16px; }
+@media (min-width:1024px) { .mk-sum { grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); align-items:start; } }
+
+/* Quote tables. A wide one scrolls sideways inside its card on a phone; the page never does. */
+.qwrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.qtable { width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
+.qtable th { text-align:right; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+             color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.qtable td { text-align:right; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.qtable th:first-child, .qtable td:first-child { text-align:left; }
+.qtable tbody tr:hover td { background:var(--surface); }
+.qtable tbody tr:last-child td { border-bottom:0; }
+.qtable a.qn { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text); }
+.qtable a.qn:hover .qnn { color:var(--accent-strong); }
+.qtable .badge { width:26px; height:26px; font-size:9.5px; }
+.qtable .qnn { font-weight:600; }
+.qtable .qns { font-size:11.5px; color:var(--muted); margin-top:1px; }
+.qtable .ql { display:block; }
+
+/* The moving-average read, as words — never as a buy or sell call. */
+.trend { font-size:11.5px; font-weight:600; padding:2px 7px; border-radius:6px; background:var(--surface2); white-space:nowrap; }
+
+/* Cross rates: one cell per pair, tinted by the move. */
+.heat { display:grid; grid-template-columns:repeat(9,minmax(54px,1fr)); gap:2px; font-size:12px;
+        font-variant-numeric:tabular-nums; min-width:540px; }
+.heat div { padding:8px 4px; text-align:center; border-radius:4px; }
+.heat .hh { font-weight:700; color:var(--muted); }
+.heat .hx { background:var(--surface2); color:var(--muted); }
+.heat .hc.up { background:color-mix(in srgb, var(--green) 18%, transparent); color:var(--text); }
+.heat .hc.down { background:color-mix(in srgb, var(--red) 18%, transparent); color:var(--text); }
+.heat .hc.flat { background:var(--surface); color:var(--muted); }
+
+/* Breadth: advancing against declining, one bar. */
+.split { display:flex; height:10px; border-radius:999px; overflow:hidden; background:var(--surface2); margin:10px 0 6px; }
+.split .a { background:var(--green); } .split .d { background:var(--red); }
+.split-l { display:flex; justify-content:space-between; gap:12px; font-size:12.5px; font-variant-numeric:tabular-nums; }
+.bstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; }
+
+/* Sector bars, centred on zero so a fall and a rise read in opposite directions. */
+.sbar { display:grid; grid-template-columns:minmax(0,8.5em) minmax(64px,1fr) 4.4em; gap:10px; align-items:center; padding:6px 0;
+        font-size:13px; text-decoration:none; color:var(--text); }
+.sbar:hover .sbn { color:var(--accent-strong); }
+.sbn { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sbt { position:relative; height:8px; background:var(--surface2); border-radius:4px; }
+.sbt::before { content:''; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:var(--muted); opacity:.5; }
+.sbf { position:absolute; top:0; bottom:0; border-radius:4px; }
+.sbf.up { left:50%; background:var(--green); } .sbf.down { right:50%; background:var(--red); }
+.sbv { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+.mk-note { font-size:12.5px; line-height:1.55; color:var(--muted); margin:12px 0 0; max-width:80ch; }
+
+/* ── The US economy (market.html?c=economy — 2026-10-11) ──────────────────────────
+   Indicator cards and the yield curve. New classes only. */
+.econ-grid { display:grid; gap:16px; grid-template-columns:minmax(0,1fr); }
+@media (min-width:700px)  { .econ-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (min-width:1100px) { .econ-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+.ind { border:1px solid var(--border); border-radius:16px; padding:16px; display:flex; flex-direction:column;
+       gap:3px; min-width:0; }
+.ind .in { font-size:14.5px; font-weight:700; }
+.ind .inote { font-size:12px; color:var(--muted); }
+.ind .iv { font-size:26px; font-weight:800; letter-spacing:-.01em; font-variant-numeric:tabular-nums; margin-top:10px; }
+.ind .iq { font-size:12px; font-weight:600; color:var(--muted); margin-left:6px; letter-spacing:0; }
+.ind .ia { font-size:12px; color:var(--muted); }
+.ind .ic { font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; margin-top:4px; line-height:1.45; }
+.ind .ispark { width:100%; height:64px; display:block; margin-top:10px; }
+.ind .isrc { font-size:11.5px; color:var(--muted); margin-top:10px; text-decoration:none; }
+.ind .isrc:hover { color:var(--accent-strong); }
+
+.curve-chart { width:100%; height:240px; display:block; }
+.curve-x { display:grid; font-size:11px; color:var(--muted); text-align:center; margin-top:4px;
+           font-variant-numeric:tabular-nums; }
+.curve-legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:12px; }
+.curve-legend span { display:inline-flex; align-items:center; gap:7px; }
+.curve-legend i { width:20px; height:0; border-top:2.5px solid var(--accent-strong); display:inline-block; }
+.curve-legend i.m { border-top:1.5px dashed var(--muted); }
+.curve-legend i.y { border-top:1.5px dotted var(--muted); }
+
+/* ── Home market summary (index.html — 2026-10-11) ───────────────────────────────
+   The strip above the watchlist cards: one market at a time, with its "See all". */
+.msum { margin-bottom: 24px; }
+.msum .mk-lead-h { margin-bottom: 14px; }
+.msum .inlink { margin-top: 0; }
+
+    /* ── Hero proof + the signed close ────────────────────────────────────────
+       Added when the hero rewrite merged with the market-summary work. The page
+       styles live here now rather than inline in index.html, so these follow the
+       same home. */
+
+    /* The band carries a live refusal beside the claim, so it needs a second column
+       above 1024px. Below that it stacks, which is why this overrides rather than
+       replaces the 68ch measure used when the band was copy-only. */
+    .band-inner { max-width: none; display: grid; gap: 32px; align-items: center; }
+    @media (min-width: 1024px) { .band-inner { grid-template-columns: 1.05fr .95fr; gap: 48px; } }
+
+    .cta-link { display: inline-flex; align-items: center; height: 50px; padding: 0 6px; color: var(--muted);
+                text-decoration: none; font-size: 15px; font-weight: 600; }
+    .cta-link:hover { color: var(--text); }
+    .microcopy { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+    .proof-cap { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+                 color: var(--muted); margin: 0 0 10px; }
+    #hero-proof .vp { background: rgba(17,24,39,.72); border-color: #22304a;
+                      box-shadow: 0 30px 70px -32px rgba(0,0,0,.9); }
+    #hero-proof .vp:hover { background: rgba(17,24,39,.9); border-color: var(--muted); }
+
+    /* The honesty note, which sits at the end of "How the decision is made". */
+    .note { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 18px 0 0; max-width: 72ch; }
+
+    /* The close — the one place the page speaks in first person. */
+    .close { max-width: 72ch; }
+    .close h2 { font-size: 24px; line-height: 1.3; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 18px; }
+    @media (min-width: 561px) { .close h2 { font-size: 30px; } }
+    .close p { font-size: 15.5px; line-height: 1.65; color: var(--text); margin: 0 0 16px; }
+    .close .close-price { color: var(--muted); }
+    .close .close-price b { color: var(--text); font-weight: 700; }
+    .close a { color: var(--accent-strong); text-decoration: none; font-weight: 600; }
+    .close a:hover { color: var(--accent-strong-hover); }
+    .close-cta { margin-top: 26px; }
+    /* .cta is written for the dark band, where --accent-strong is bright cyan and a
+       near-black label reads. On the light canvas --accent-strong is #0369a1 and that
+       label vanishes, so follow site.css's own convention for filled-accent controls. */
+    .close-cta .cta { box-shadow: none; color: #fff; }
+    [data-theme="dark"] .close-cta .cta { color: var(--bg); }
+    .close-cta .cta-link { color: var(--muted); }
+    .close-cta .cta-link:hover { color: var(--text); }

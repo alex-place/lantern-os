@@ -85,6 +85,19 @@ test('the page list is the watchlist with the AI list marked on it', () => {
   });
 });
 
+test('a guest gets the watchlist and is not sent to the trade-gated AI list', () => {
+  const src = slice('let MY_LIST=null, AI_LIST=new Set(), WL_LIST=new Set();', '// ── Watchlist add/remove');
+  const calls = [];
+  const fetchStub = (url) => { calls.push(url); return Promise.resolve({ json: () => Promise.resolve(url.endsWith('watchlist') ? { watchlist: ['spy', 'AAPL'] } : { tradelist: ['SPY', 'SOXL'] }) }); };
+  const fns = new Function('fetch', 'window', 'LIST_API', 'LIST_KEY', 'AI_LIST_API', 'AI_LIST_KEY', src + '; return { loadMyList, lists: () => ({ MY_LIST, AI_LIST, WL_LIST }) };')(
+    fetchStub, { GUEST: true }, '/api/trading/watchlist', 'watchlist', '/api/trading/tradelist', 'tradelist');
+  return fns.loadMyList(true).then((ml) => {
+    assert.deepStrictEqual([...ml].sort(), ['AAPL', 'SPY'], 'the watchlist alone');
+    assert.strictEqual(fns.lists().AI_LIST.size, 0);
+    assert.deepStrictEqual(calls, ['/api/trading/watchlist'], 'one request: no 401 in the console');
+  });
+});
+
 test('every row has an AI toggle; tracking needs no warning, the AI list gets one', () => {
   assert.match(PAGE, /const ai = AI_LIST\.has\(String\(t\.ticker\)\.toUpperCase\(\)\);/);
   assert.match(PAGE, /<button class="wl-ai\$\{ai\?' on':''\}" aria-pressed="\$\{ai\}" aria-label="AI trader \$\{ai\?'on':'off'\} for \$\{t\.ticker\}"/);

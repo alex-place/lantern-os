@@ -154,7 +154,7 @@ const { requireEntitlement, isAdmin, requireAuth, requireRole } = require("./lib
 // layer). Everything NOT on this list (positions, orders, order placement,
 // agent-log, calibration, overnight-scan, all mutations) stays trade-gated.
 const PUBLIC_TRADING_READS = new Set([
-  "/api/trading/watchlist",         // GET → server default watchlist (not per-user)
+  "/api/trading/watchlist",         // GET → your own list; signed out, the starter list
   "/api/trading/watchlist-prices",  // live quotes
   "/api/trading/bars-multi",        // OHLCV for the charts (whole watchlist, heavy)
   "/api/trading/bars",              // OHLCV for ONE symbol, tail-limited (landing-page charts)
@@ -162,9 +162,19 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/zones",             // S/R zones (derived from bars)
   "/api/trading/symbols/search",    // symbol-search popup (broker asset universe)
   "/api/trading/symbol-stats",      // Yahoo returns/technicals
+  // The market pages (2026-10-11): the hub, one page per asset class, each class's boards,
+  // a chart line and one instrument — lib/market-boards. Market data only: they read no
+  // account, no ledger and no engine, so they belong with the reads above rather than
+  // behind the trade entitlement. (They replaced /api/trading/movers.)
+  "/api/trading/markets",
+  "/api/trading/markets/series",
+  "/api/trading/markets/instrument",
   "/api/trading/symbol-info",       // name/exchange/asset_class
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
+  // One story + our summary of it. Same public class as the feed above: it serves a
+  // headline, a link and a few sentences about a public article, and no account data.
+  "/api/trading/news/article",
   "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
   // NOTE deliberately absent: /api/trading/track-record. Product decision
   // (2026-08-11): we do not publish the ledger — the record stays behind
@@ -190,9 +200,11 @@ function tradeApiGuard(req, res, url) {
        // empty card on an otherwise populated demo journal.
        url.pathname === "/api/trading/trades") &&
       url.searchParams.get("demo") === "champion") return false;
-  // Watchlist add/remove is available to everyone incl. read-only guests — it is
-  // "which symbols to chart", not a trade, so it isn't behind the trade gate.
-  // (The list is the shared server watchlist.) #guest-watchlist
+  // Watchlist add/remove is open to every ACCOUNT incl. read-only (free) ones — it is
+  // "which symbols to chart", not a trade, so it isn't behind the trade gate. A
+  // signed-out visitor is refused in the route itself: with no user id the write would
+  // land on the one list every signed-out visitor shares (routes/trading/watchlist.js).
+  // #guest-watchlist
   if (url.pathname === "/api/trading/watchlist" && req.method === "POST") return false;
   if (url.pathname.startsWith("/api/trading/watchlist/") && req.method === "DELETE") return false;
   // Champion paper-trading CONTEST (#2552) is open to ALL tiers, not just Pro+ —

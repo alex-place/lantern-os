@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: the focused symbol — the one the details panel, the order ticket and B/S act on — is the one on screen. Four ways in left it on a symbol no longer charted: switching to one chart kept the left-hand chart whatever was focused; changing a chart's symbol and dropping a watchlist row onto a chart never moved the focus (in a one-chart deck the old symbol's details and ticket stayed beside the new chart); and the page restored the saved symbol beside whatever a one-chart deck charted. Going to one chart now keeps the focused chart, a changed or dropped symbol is focused, and a one-chart deck opens focused on what it shows.

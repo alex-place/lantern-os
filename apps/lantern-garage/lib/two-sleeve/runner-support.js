@@ -128,7 +128,8 @@ class ScanWorker {
   constructor({ id, app, envFile, env, universe, dir, timeoutMs = 45000, log = () => {}, workerPath, scan = null, fakeNow = null } = {}) {
     this.id = id; this.app = app; this.envFile = envFile; this.env = env || {}; this.universe = universe || [];
     this.dir = dir; this.timeoutMs = timeoutMs; this.log = log;
-    // A sleeve whose signals are not the tree s trader-agent scan: 'noise' = the noise-area leg (lib/two-sleeve/noise-scan.js).
+    // A sleeve whose signals are not the tree s trader-agent scan: 'noise' = the noise-area leg (lib/two-sleeve/noise-scan.js),
+    // 'closeibs' = the close-IBS sleeve, 'overnight' = the overnight book (lib/two-sleeve/overnight-scan.js).
     this.scanMode = scan ? String(scan).toLowerCase() : null;
     // DRY RUNS ONLY (the runner passes it only with --dry): the clock the custom scans (noise, closeibs) read, so an
     // after-hours rehearsal can replay a session bar; the trader-agent scans keep the real clock.
@@ -175,7 +176,7 @@ class ScanWorker {
     if (m.ready !== undefined) {
       this.ready = !!m.ready; this.info = m;
       this.log({ event: m.ready ? 'scan_worker_ready' : 'scan_worker_failed', sleeve: this.id, pid: cp.pid, app: this.app,
-        watchlist: m.watchlist, ibsMax: m.ibsMax, pMin: m.pMin, shortEdge: m.shortEdge, scan: m.scan, pairs: m.pairs, symbols: m.symbols, lateGate: m.lateGate, error: m.error });
+        watchlist: m.watchlist, ibsMax: m.ibsMax, pMin: m.pMin, shortEdge: m.shortEdge, scan: m.scan, pairs: m.pairs, symbols: m.symbols, lateGate: m.lateGate, overnight: m.overnight, trendN: m.trendN, error: m.error });
       return;
     }
     if (m.seq != null && this.pending.has(m.seq)) {
@@ -218,7 +219,7 @@ class ScanWorker {
 
   status() {
     return { pid: this.child ? this.child.pid : null, ready: this.ready, scans: this.scans, failures: this.failures, spawns: this.spawns,
-      ibsMax: this.info && this.info.ibsMax, pMin: this.info && this.info.pMin, watchlist: this.info && this.info.watchlist, scan: this.scanMode || undefined };
+      ibsMax: this.info && this.info.ibsMax, pMin: this.info && this.info.pMin, watchlist: this.info && this.info.watchlist, scan: this.scanMode || undefined, overnight: (this.info && this.info.overnight) || undefined };
   }
 }
 

@@ -3,13 +3,14 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 31,
-    "reachable": 18,
-    "orphaned": 13,
+    "pages": 35,
+    "reachable": 20,
+    "orphaned": 15,
     "inSitemap": 15
   },
   "graph": {
     "accounts.html": [
+      "auth.html",
       "budget.html",
       "changelog.html",
       "chat.html",
@@ -109,6 +110,7 @@
       "chat.html",
       "explore.html",
       "journal.html",
+      "orchestration.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -118,6 +120,7 @@
       "chat.html",
       "explore.html",
       "journal.html",
+      "markets.html",
       "pricing.html",
       "stock-trader.html",
       "work.html"
@@ -139,6 +142,26 @@
       "stock-trader.html",
       "work.html"
     ],
+    "market.html": [
+      "budget.html",
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "journal.html",
+      "markets.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "markets.html": [
+      "budget.html",
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "journal.html",
+      "market.html",
+      "stock-trader.html",
+      "work.html"
+    ],
     "metrics.html": [
       "budget.html",
       "changelog.html",
@@ -148,7 +171,17 @@
       "stock-trader.html",
       "work.html"
     ],
+    "news-article.html": [
+      "budget.html",
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "journal.html",
+      "stock-trader.html",
+      "work.html"
+    ],
     "orchestration.html": [
+      "auth.html",
       "budget.html",
       "changelog.html",
       "chat.html",
@@ -159,6 +192,7 @@
       "work.html"
     ],
     "pricing.html": [
+      "auth.html",
       "budget.html",
       "changelog.html",
       "chat.html",
@@ -179,12 +213,23 @@
     ],
     "shared.html": [],
     "stock-trader.html": [
+      "auth.html",
       "budget.html",
       "changelog.html",
       "chat.html",
       "explore.html",
       "journal.html",
       "trader-guide.html",
+      "work.html"
+    ],
+    "symbol.html": [
+      "budget.html",
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "journal.html",
+      "markets.html",
+      "stock-trader.html",
       "work.html"
     ],
     "system-health.html": [
@@ -202,7 +247,8 @@
     "trader-guide.html": [
       "auth.html",
       "chat.html",
-      "pricing.html"
+      "pricing.html",
+      "settings.html"
     ],
     "transparency.html": [
       "budget.html",
@@ -259,6 +305,7 @@
     "chat.html": 1,
     "explore.html": 1,
     "journal.html": 1,
+    "markets.html": 1,
     "pricing.html": 1,
     "stock-trader.html": 1,
     "work.html": 1,
@@ -266,11 +313,12 @@
     "kalshi-terminal.html": 2,
     "orchestration.html": 2,
     "settings.html": 2,
+    "market.html": 2,
+    "auth.html": 2,
     "trader-guide.html": 2,
     "ibkr-setup-guide.html": 3,
-    "auth.html": 3,
-    "faq.html": 4,
-    "terms.html": 4
+    "faq.html": 3,
+    "terms.html": 3
   },
   "byDepth": {
     "0": [
@@ -282,23 +330,23 @@
       "chat.html",
       "explore.html",
       "journal.html",
+      "markets.html",
       "pricing.html",
       "stock-trader.html",
       "work.html"
     ],
     "2": [
+      "auth.html",
       "fallout-radio.html",
       "kalshi-terminal.html",
+      "market.html",
       "orchestration.html",
       "settings.html",
       "trader-guide.html"
     ],
     "3": [
-      "auth.html",
-      "ibkr-setup-guide.html"
-    ],
-    "4": [
       "faq.html",
+      "ibkr-setup-guide.html",
       "terms.html"
     ]
   },
@@ -314,6 +362,8 @@
     "index.html",
     "journal.html",
     "kalshi-terminal.html",
+    "market.html",
+    "markets.html",
     "orchestration.html",
     "pricing.html",
     "settings.html",
@@ -329,8 +379,10 @@
     "create.html",
     "entry.html",
     "metrics.html",
+    "news-article.html",
     "reset-password.html",
     "shared.html",
+    "symbol.html",
     "system-health.html",
     "transparency.html",
     "welcome.html",
@@ -358,6 +410,8 @@
     "auth.html",
     "fallout-radio.html",
     "journal.html",
+    "market.html",
+    "markets.html",
     "settings.html",
     "trader-guide.html",
     "work.html"

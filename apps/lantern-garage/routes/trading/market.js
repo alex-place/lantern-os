@@ -144,12 +144,18 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
 
       // Reshape into the per-ticker shape trader-dashboard.html expects:
       // { zones: [...], position, last_signal, confidence, direction, catalyst }
+      // `position` is the SERVER's book (the legacy agent's env IBKR session) — the
+      // operator's positions wherever that gateway is signed in — and this read is PUBLIC.
+      // The pages that render it hid the field from guests; hiding is not withholding, so
+      // only a reader who may see the server's book is sent it (lib/server-book).
       let positions = [];
-      try {
-        const posData = await traderAgent.getPositions();
-        positions = (posData && posData.positions) || [];
-      } catch (e) {
-        console.error('[Trading] /zones positions fetch failed:', e.message);
+      if (require('../../lib/server-book').mayReadServerBook(req, getEffectiveUserId(req))) {
+        try {
+          const posData = await traderAgent.getPositions();
+          positions = (posData && posData.positions) || [];
+        } catch (e) {
+          console.error('[Trading] /zones positions fetch failed:', e.message);
+        }
       }
       const reshaped = {};
       const tickers = new Set([
@@ -457,6 +463,17 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         }
       }
     } catch (_e) { /* fall through to the legacy agent */ }
+    // THE LEGACY AGENT IS THE SERVER'S BOOK (2026-10-11, lib/server-book). It reads the env
+    // IBKR session — the operator's account wherever that gateway is signed in — and every
+    // user whose own broker did not answer used to land on it: a Pro user with no broker was
+    // shown that book, or told "the broker could not be reached" where there is no gateway
+    // (a broker they never had). Only an admin / the operator profile reaches it now; anyone
+    // else is told which of the two is true.
+    {
+      const sb = require('../../lib/server-book');
+      const _uid = getEffectiveUserId(req);
+      if (!sb.mayReadServerBook(req, _uid)) { sendJson(res, sb.noServerBook(_uid), 200); return true; }
+    }
     // No broker connected (no IBKR, no Alpaca account, no legacy agent). Emit an
     // explicit `available:false` + reason so callers — the chat's trader_positions
     // tool especially — can degrade honestly ("connect a broker") instead of
@@ -497,13 +514,31 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       let out = await alpaca.getPortfolioHistory(uid, range);
       // Fall through to IBKR when this account has no Alpaca side. Same return shape
       // from both adapters, so the route and the journal card are broker-agnostic.
-      if (!out || out.ok === false) {
+      // The two fallbacks below are the SERVER's book — the env IBKR session's history, then
+      // the server's own trade ledgers' session rows — so they answer only a reader who may
+      // see it (lib/server-book). Anyone else gets their own broker's answer, or its reason.
+      const _serverBook = require('../../lib/server-book').mayReadServerBook(req, uid);
+      if (_serverBook && (!out || out.ok === false)) {
         try {
           const IbkrCpapi = require('../../lib/ibkr-cpapi');
           const ib = await new IbkrCpapi().getPortfolioHistory();
           if (ib && ib.ok) out = ib;
           else if (ib && ib.reason && (!out || !out.reason)) out = ib;
         } catch (_e) { /* keep the Alpaca answer, whatever it was */ }
+      }
+      // THE ACCOUNT MEASURE WITHOUT A BROKER HISTORY (2026-10-09). On the stable box (IBKR) neither
+      // adapter answers, so the journal's calendar was pinned to Booked while the header showed the
+      // live account figure: +$3,145 "today so far" beside a $1,708 cell, two measures and no
+      // toggle. Every brain writes a session row at the close with the account's equity — an
+      // equity series at each close, one point per date — so the Account view comes from those
+      // rows instead. The payload says so (source: 'session-rows') and keeps the broker's reason.
+      if (_serverBook && (!out || out.ok === false || !Array.isArray(out.timestamps) || out.timestamps.length < 3)) {
+        try {
+          const dayPnlLib = require('../../lib/day-pnl');
+          const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
+          const rows = require('../../lib/session-equity-series').fromLedgers(dayPnlLib.tradesLedgerSources(dataDir));
+          if (rows && rows.ok) out = { ...rows, broker_reason: (out && out.reason) || null };
+        } catch (_e) { /* keep the broker's answer, whatever it was */ }
       }
       sendJson(res, out, 200);
     } catch (error) {
@@ -531,6 +566,13 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
 
   // GET /api/trading/symbols/search?q=SP — symbol-search popup (#1692). Filters the
   // cached all-Alpaca-assets list by symbol/name, ranked (exact > prefix > contains).
+  // A name that starts with the query AS A WORD ("Intel Corporation" for INTEL) beats one
+  // that only starts with its letters ("Intellicheck"), and equal NAME matches go to the
+  // shorter name -- the company's own listing, not one named after it ("Apple Inc." before
+  // "Apple Hospitality REIT"). Ties used to fall to list order: "intel" put Intellicheck
+  // and Intelligent Protection above INTC, and "apple" put APLE above AAPL (2026-10-12).
+  // Symbol matches keep the list's order: fund names are often the SHORT ones ("ProShares
+  // Ultra NVDA"), so a name-length tie-break put NVDA fourth for "NVD" (#3768).
   if (url.pathname === '/api/trading/symbols/search' && req.method === 'GET') {
     if (!traderAgent) { sendJson(res, { results: [], error: 'TraderAgent not initialized' }, 503); return true; }
     const q = (url.searchParams.get('q') || '').trim().toUpperCase();
@@ -563,19 +605,21 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         results = pool.slice(0, limit);
       } else {
         const scored = [];
+        const wordEnds = (s, i) => i >= s.length || !/[A-Z0-9]/.test(s[i]);
         for (const a of pool) {
           const sym = (a.symbol || '').toUpperCase();
           const name = (a.name || '').toUpperCase();
           let score = -1;
           if (sym === q) score = 0;
           else if (sym.startsWith(q)) score = 1;
-          else if (name.startsWith(q)) score = 2;
+          else if (name.startsWith(q)) score = wordEnds(name, q.length) ? 2 : 2.5;
           else if (sym.includes(q)) score = 3;
           else if (name.includes(q)) score = 4;
-          if (score >= 0) scored.push([score, sym.length, a]);
+          const byName = score === 2 || score === 2.5 || score === 4;
+          if (score >= 0) scored.push([score, sym.length, byName ? name.length : 0, a]);
         }
-        scored.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-        results = scored.slice(0, limit).map((s) => s[2]);
+        scored.sort((x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2]);
+        results = scored.slice(0, limit).map((s) => s[3]);
       }
       // Fallback (#1860): when the broker asset universe is unavailable (no
       // Alpaca creds → empty pool) but the user typed a query, validate it as an
@@ -635,6 +679,65 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     };
     const sendFmp = () => pipeFrom(fmpUrl, () => { if (!res.headersSent) { res.writeHead(404); res.end(); } });
     if (ldUrl) pipeFrom(ldUrl, sendFmp); else sendFmp();
+    return true;
+  }
+
+  // GET /api/trading/markets[?c=<class>[&g=<group>[&view=perf][&session=pre|post]]]
+  // (2026-10-11). The market pages read this and nothing else: /markets.html with no class,
+  // /market.html with a class (its overview) or a class and a group (that board in full).
+  //
+  // lib/market-boards prices a board with ONE batch quote, so a page costs Yahoo a request
+  // or two instead of a chart call per row. The /movers route this replaced priced its 119
+  // names one chart call at a time, on the same host and the same Yahoo budget as the armed
+  // trader's quotes.
+  //
+  // Market data only: no account, no ledger, no engine. Every parameter selects from a fixed
+  // list; an unknown class or group is a 404, never a fetch.
+  if (url.pathname === '/api/trading/markets' && req.method === 'GET') {
+    const boards = require('../../lib/market-boards');
+    const c = url.searchParams.get('c');
+    const g = url.searchParams.get('g');
+    try {
+      let out = null;
+      if (!c) out = await boards.hub();
+      else if (c === 'economy') {
+        // The US economy: FRED's official figures, not quotes (lib/economy).
+        const economy = require('../../lib/economy');
+        out = g ? await economy.board(g) : await economy.overview();
+      } else if (boards.CLASS_IDS.includes(c)) {
+        out = g
+          ? await boards.board(c, g, { view: url.searchParams.get('view'), session: url.searchParams.get('session') })
+          : await boards.overview(c);
+      }
+      if (!out) { sendJson(res, { error: 'unknown_board' }, 404); return true; }
+      sendJson(res, out, 200);
+    } catch (e) {
+      sendJson(res, { error: 'markets_unavailable', reason: e.message }, 503);
+    }
+    return true;
+  }
+
+  // GET /api/trading/markets/series?s=<symbol>&r=1D|5D|1M|6M|1Y|5Y — one chart line.
+  // GET /api/trading/markets/instrument?s=<symbol> — one board instrument, for its page.
+  // Both refuse a symbol that is not on a board (lib/market-boards LISTED), so neither can
+  // be used to make this host fetch whatever a caller names.
+  if ((url.pathname === '/api/trading/markets/series' || url.pathname === '/api/trading/markets/instrument')
+      && req.method === 'GET') {
+    const boards = require('../../lib/market-boards');
+    const s = String(url.searchParams.get('s') || '');
+    if (!boards.isListed(s)) { sendJson(res, { error: 'not_listed' }, 404); return true; }
+    try {
+      if (url.pathname.endsWith('/series')) {
+        const r = String(url.searchParams.get('r') || '1D').toUpperCase();
+        if (!boards.RANGES.includes(r)) { sendJson(res, { error: 'bad_range' }, 400); return true; }
+        const sr = (await boards.series(s, r)) || {};
+        sendJson(res, { symbol: s, range: r, points: sr.points || [], base: sr.base || null, last: sr.last || null }, 200);
+      } else {
+        sendJson(res, await boards.instrument(s), 200);
+      }
+    } catch (e) {
+      sendJson(res, { error: 'markets_unavailable', reason: e.message }, 503);
+    }
     return true;
   }
 

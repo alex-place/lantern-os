@@ -67,7 +67,14 @@ const sig = (over = {}) => ({
 });
 
 const ladderOf = (sym) => (JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')).zoneLadder || {})[sym];
-const scan = (signals, now) => runAutoTrade({ signals, spy_1d: 0 }, { bridge, userId: 't', now: now || Date.now() });
+// A FIXED Wednesday, 11:00 ET, mid-session. The default was Date.now(), which made
+// this file fail every weekend and pass every weekday: the engine has weekend
+// behaviour armed (TRADER_EOD_FLAT=weekend), so on a Saturday or Sunday the exit
+// path answers 'bearish, no long to exit' instead of 'zone ladder owns' and the
+// ownership assertion below cannot be true. Nothing about the ENGINE changes here;
+// the test simply stops asking a clock-dependent question with no clock.
+const WED = Date.parse('2026-10-07T15:00:00Z');
+const scan = (signals, now) => runAutoTrade({ signals, spy_1d: 0 }, { bridge, userId: 't', now: now || WED });
 
 test('blue sky arms at the PLAN targets — symbol outside the old allowlist, no zone needed', async () => {
   _resetCooldowns(); book = [];
@@ -88,7 +95,7 @@ test('an armed ladder OWNS the exit after min-hold — the SOXL scratch path is 
   const out = await scan([
     sig({ direction: 'BEARISH', convergence: { decision: 'ENTER', p_win: 0.85 } }),   // the live enter-short verdict the longs-only engine routes to the EXIT path
     { symbol: 'QQQ', direction: 'BULLISH', entry_price: 0, convergence: { decision: 'ENTER', p_win: 0.6, size_mult: 1 }, plan: {}, zones: [] },
-  ], Date.now() + 21 * 60 * 1000);
+  ], WED + 21 * 60 * 1000);
   const skip = (out.skipped || []).find((x) => x.symbol === 'SOXL');
   assert.ok(skip && /zone ladder owns/.test(skip.why), `signal_exit must be pre-empted, got: ${skip && skip.why}`);
 });

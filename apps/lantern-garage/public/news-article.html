@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="observe">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0e17">
+  <title>Story — Unisona</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/market.css">
+</head>
+<body>
+<header class="band">
+  <div class="band-inner wrap">
+    <a class="sym-back" href="/">&larr; Market news</a>
+    <div class="art-meta" id="aMeta"></div>
+    <h1 class="art-h" id="aHead">Loading…</h1>
+    <div class="art-syms" id="aSyms"></div>
+  </div>
+</header>
+
+<main>
+  <section class="sec wrap" aria-labelledby="sum-h">
+    <div class="sec-head">
+      <h2 id="sum-h">The short version</h2>
+      <span class="sub" id="sumSub"></span>
+    </div>
+    <div class="card art-card">
+      <p class="art-sum" id="aSum">Looking for a summary…</p>
+      <p class="disc" id="aDisc"></p>
+      <div class="art-orig" id="aOrig"></div>
+    </div>
+  </section>
+
+  <!-- What the feed itself recorded. Worth its own block because it is always
+       available, and on a story we cannot summarise it is the whole value. -->
+  <section class="sec wrap" aria-labelledby="read-h">
+    <div class="sec-head"><h2 id="read-h">How the feed tagged it</h2></div>
+    <div class="card art-card">
+      <div class="kstats" id="aRead"></div>
+      <p class="disc">Both figures come from keywords in the HEADLINE, scored when the story was
+        collected — not from reading the article. They are what the trading engine's news
+        filter sees, published here so it is visible rather than hidden.</p>
+    </div>
+  </section>
+</main>
+
+<script src="/js/site-chrome.js" defer></script>
+<script>
+/* ── One story, summarised ─────────────────────────────────────────────────────
+   The news rows used to jump straight to the publisher. They land here now, and the
+   original is one clearly-labelled link away (founder, 2026-10-11).
+
+   The summary is ours and is generated server-side from the publisher's page; this
+   file only renders it. Everything it renders goes through textContent, including the
+   summary — the text came out of a model that read an untrusted web page, and writing
+   that as markup would make the article's author the author of this page.
+*/
+(function () {
+  'use strict';
+  function byId(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function ago(iso) {
+    var t = Date.parse(iso);
+    if (!isFinite(t)) return '';
+    var m = Math.round((Date.now() - t) / 60000);
+    if (m < 60) return m + 'm ago';
+    var h = Math.round(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.round(h / 24) + 'd ago';
+  }
+  /* Only ever link out to a real http(s) URL from the record — never to whatever string
+     happened to be in the field. */
+  function safeHttp(u) {
+    try {
+      var p = new URL(String(u));
+      return (p.protocol === 'http:' || p.protocol === 'https:') ? p.href : null;
+    } catch (e) { return null; }
+  }
+
+  var id = (new URLSearchParams(location.search).get('id') || '').slice(0, 80);
+  if (!id) {
+    byId('aHead').textContent = 'No story chosen.';
+    byId('aSum').textContent = 'Open this page from a headline on the home page or a symbol page.';
+    return;
+  }
+
+  /* One place renders the summary, in every state it can be in. Never a blank panel,
+     and never something invented from the headline — a plausible invented summary of a
+     real story would be the worst thing this page could show. */
+  function renderSummary(s) {
+    var box = byId('aSum');
+    if (s && s.ok && s.summary) {
+      box.className = 'art-sum';
+      box.textContent = s.summary;
+      byId('sumSub').textContent = 'summarised by Unisona';
+      byId('aDisc').textContent =
+        'Written by a language model from the publisher’s page, not by a person, and not'
+        + ' checked line by line. It is a summary, not the article — read the original for'
+        + ' anything you intend to act on.' + (s.model ? ' Model: ' + s.model + '.' : '');
+      return;
+    }
+    box.className = 'art-sum muted';
+    box.textContent = ({
+      fetch_failed:    'The publisher does not allow us to open this article automatically, so we cannot summarise it.',
+      fetch_timeout:   'The publisher’s page did not answer our request, so we cannot summarise it.',
+      no_article_text: 'The publisher’s page had no readable article on it — often a paywall or a consent screen.',
+      no_provider:     'No summarisation model was available just now.',
+      empty_reply:     'The summariser returned nothing for this page.',
+      no_url:          'This story was recorded without a link, so there is nothing to summarise.',
+    })[s && s.reason] || 'No summary is available for this story.';
+    byId('sumSub').textContent = 'no summary';
+    byId('aDisc').textContent =
+      'We summarise from the publisher’s own page and never from the headline alone. The'
+      + ' headline, the tags and the link below are exactly as the feed recorded them.';
+  }
+
+  fetch('/api/trading/news/article?id=' + encodeURIComponent(id), { credentials: 'same-origin' })
+    .then(function (r) {
+      if (r.status === 404) throw new Error('That story is no longer in the recent feed.');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (d) {
+      var a = d.article || {}, s = d.summary || {};
+      document.title = (a.headline ? a.headline.slice(0, 70) : 'Story') + ' — Unisona';
+      byId('aHead').textContent = a.headline || '(untitled)';
+
+      var meta = byId('aMeta');
+      if (a.source) meta.appendChild(el('span', 'k', a.source));
+      if (a.published) meta.appendChild(el('span', null, ago(a.published)));
+      if (a.direction && a.direction !== 'neutral') {
+        meta.appendChild(el('span', 'chip ' + (a.direction === 'bullish' ? 'up' : 'down'), a.direction));
+      }
+
+      var syms = byId('aSyms');
+      (a.symbols || []).forEach(function (sym) {
+        var link = el('a', 'chip', sym);
+        link.href = '/symbol.html?t=' + encodeURIComponent(sym);
+        syms.appendChild(link);
+      });
+
+      // What the feed recorded — always available, and the whole value on a story we
+      // cannot summarise.
+      var read = byId('aRead');
+      function tag(k, v, cls) {
+        var w = el('div', 'kst');
+        w.appendChild(el('div', 'kk', k));
+        w.appendChild(el('div', 'kv' + (cls ? ' ' + cls : ''), v));
+        read.appendChild(w);
+      }
+      tag('Direction', a.direction || 'neutral',
+          a.direction === 'bullish' ? 'up' : a.direction === 'bearish' ? 'down' : null);
+      tag('Headline impact', a.impact == null ? '—' : a.impact + ' / 100');
+      tag('Source', a.source || '—');
+      tag('Symbols', (a.symbols || []).length ? a.symbols.join(', ') : '—');
+
+      // A cached summary shows at once; otherwise ask for one, which is the call that
+      // may go out to the publisher. The story above is already on screen either way.
+      if (s && !s.pending) { renderSummary(s); }
+      else {
+        fetch('/api/trading/news/article?summarize=1&id=' + encodeURIComponent(id), { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d2) { renderSummary(d2 && d2.summary); })
+          .catch(function () { renderSummary(null); });
+      }
+
+      // The original, always — whether or not the summary worked.
+      var href = safeHttp(a.url);
+      var orig = byId('aOrig');
+      if (href) {
+        var link = el('a', 'cta', 'Read the original at ' + (a.source || 'the publisher') + ' ↗');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        orig.appendChild(link);
+      } else {
+        orig.appendChild(el('span', 'state', 'This story was recorded without a usable link.'));
+      }
+    })
+    .catch(function (e) {
+      byId('aHead').textContent = 'That story could not be loaded.';
+      byId('aSum').textContent = e.message;
+      byId('sumSub').textContent = '';
+    });
+})();
+</script>
+</body>
+</html>

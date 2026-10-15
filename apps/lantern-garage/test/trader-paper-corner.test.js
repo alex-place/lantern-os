@@ -24,10 +24,12 @@ const strip = slice('<div class="range-strip"', '<!-- Footer -->');
 const header = slice('<div class="header" role="region"', '<div class="hgroup"');
 
 test('the badge left the header for the strip\'s left corner, ahead of the range buttons', () => {
-  assert.ok(!header.includes('badge-paper'), 'the badge is still in the header');
-  assert.strictEqual((PAGE.match(/class="badge badge-paper"/g) || []).length, 1);
+  assert.ok(!header.includes('acctBadge'), 'the badge is still in the header');
+  assert.strictEqual((PAGE.match(/id="acctBadge"/g) || []).length, 1);
   assert.ok(strip.indexOf('id="acctCorner"') !== -1 && strip.indexOf('id="acctCorner"') < strip.indexOf('id="rangeRow"'), 'the corner is not ahead of the range row');
-  assert.match(strip, /<button type="button" class="badge badge-paper" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel\(\)"/);
+  // Neutral until the account answers (2026-10-11): the badge is painted from the account's
+  // reported mode (test/trader-acct-badge.test.js), never "practice" before that is known.
+  assert.match(strip, /<button type="button" class="badge badge-none" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel\(\)"/);
   assert.match(strip, /<button type="button" class="acct-caret" id="acctMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" onclick="togglePickMenu\('acct', this\)"/);
   // The panel it controls is the footer, by id, exactly once.
   assert.strictEqual((PAGE.match(/id="tradePanel"/g) || []).length, 1);
@@ -76,9 +78,10 @@ test('clicking the badge collapses the panel, remembered per device, and the too
   store['trader.panelOpen'] = '0'; cls.clear();
   fns.initTradePanel();
   assert.ok(cls.has('panel-collapsed'));
-  // The description lives on the button (data-desc); nothing renames it any more (the demo
-  // showroom went with the Watch page, operator 2026-09-13).
-  assert.match(PAGE, /id="acctBadge"[^>]*data-desc="Paper trading — simulated money; orders are practice, not real\."/);
+  // The description lives on the button (data-desc). It starts neutral and is repainted
+  // from the account's mode (2026-10-11); the paper sentence is the paper account's.
+  assert.match(PAGE, /id="acctBadge"[^>]*data-desc="Your account — checking whether it is paper or live\."/);
+  assert.match(PAGE, /paper: +\{ text:'PAPER', +cls:'badge-paper'[^}]*desc:'Paper trading — simulated money; orders are practice, not real\.' \}/);
   assert.ok(!PAGE.includes("badge.dataset.desc='Demo account"), 'the demo relabel survives');
   assert.match(PAGE, /initFooterResize\(\); initTradePanel\(\);/);
 });

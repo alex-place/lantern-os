@@ -312,8 +312,10 @@ async function getEarningsSurprise(ticker) {
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Latest price + % change for each ticker.
- * Returns: [{ ticker, price, chg_pct, is_crypto }]
+ * Latest price + % change for each ticker, and the previous close the change is measured
+ * from -- so a reader can show the change in dollars exactly rather than rebuild it from a
+ * percent rounded to two places.
+ * Returns: [{ ticker, price, chg_pct, prev_close, session, is_crypto }]
  */
 async function getQuotes(tickers, opts = {}) {
   const list = Array.isArray(tickers) ? tickers : [];
@@ -340,7 +342,7 @@ async function getQuotes(tickers, opts = {}) {
       const { price, session } = latestPrint(result);
       const prev = Number(meta.chartPreviousClose || meta.previousClose) || 0;
       const chg = prev > 0 ? ((price - prev) / prev) * 100 : 0;
-      return { ticker, price: round(price, 4), chg_pct: round(chg, 2), session, is_crypto: isCrypto(ticker) };
+      return { ticker, price: round(price, 4), chg_pct: round(chg, 2), prev_close: prev > 0 ? round(prev, 4) : null, session, is_crypto: isCrypto(ticker) };
     } catch (e) {
       return { ticker, price: 0, chg_pct: 0, is_crypto: isCrypto(ticker) };
     }

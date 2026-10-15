@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: clicking a chart focuses it again, and ←/→ walk the deck. The handler was switched off whole on 2026-08-01 as "a diagnostic step" while a double-click fullscreen was hunted down (that lived elsewhere and was removed separately), and it was never switched back on — so in a multi-chart deck a click on the second chart pointed nothing at it, ←/→ did nothing, and B/S kept opening a ticket for whichever watchlist row was picked last. A click now points the details, the order ticket and the watchlist highlight at that chart (never a fullscreen), and the focused chart is marked when there is more than one on screen.

@@ -527,6 +527,22 @@
     body.leftdock-closed .dockL,body.rightdock-closed .dockR{display:none}
     .ticket-dock{height:auto}
   }
+  /* Tablet band (581–760px, 2026-10-11). The right dock is permanent — it holds the
+     watchlist, and a closed one once could not be reopened — and the rule above makes it a
+     bottom sheet here. Together that left a sheet OPEN over 62% of the screen with nothing
+     that could move it: at 671px it covered the lower 56% of the chart, where the latest
+     price is, and the whole account panel. Below 580px the phone shell shows one view at a
+     time, so only this band had it. The sheet now rests collapsed to its header — a strip
+     the layout keeps clear — and the header opens it; a dock tab opens it too, and picking
+     a symbol closes it again so the chart you chose is the one you see. */
+  @media (min-width:581px) and (max-width:760px){
+    .layout{padding-bottom:46px}
+    body:not(.rsheet-open) .dockR{height:46px;overflow:hidden}
+    body:not(.rsheet-open) .dockR .dock-body{display:none}
+    .dockR .dock-head{cursor:pointer;user-select:none}
+    .dockR .dock-head::after{content:'\25B4';margin-left:auto;padding-left:10px;color:var(--text2);font-size:12px}
+    body.rsheet-open .dockR .dock-head::after{content:'\25BE'}
+  }
 
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
      A thin ew-resize strip with a centred grip; min/max are enforced in
@@ -713,6 +729,8 @@
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
+  .badge-live{background:color-mix(in srgb, var(--tint-neg) 16%, transparent);color:var(--red);border:1px solid color-mix(in srgb, var(--tint-neg) 45%, transparent)}
+  .badge-none{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
@@ -1617,8 +1635,8 @@
        the panel below (positions, orders, order history); the chevron beside it opens the
        account menu (trading settings, broker settings) and turns up while it is open. -->
   <div class="acct-corner" id="acctCorner">
-    <button type="button" class="badge badge-paper" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel()"
-      data-desc="Paper trading — simulated money; orders are practice, not real." title="Paper trading — simulated money; orders are practice, not real. Click to hide the account panel.">PAPER</button>
+    <button type="button" class="badge badge-none" id="acctBadge" aria-expanded="true" aria-controls="tradePanel" onclick="toggleTradePanel()"
+      data-desc="Your account — checking whether it is paper or live." title="Your account — checking whether it is paper or live. Click to hide the account panel.">ACCOUNT</button>
     <button type="button" class="acct-caret" id="acctMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" onclick="togglePickMenu('acct', this)"
       title="Account menu — trading settings, broker settings"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
@@ -2242,7 +2260,12 @@ function marketRegime(ticker){
   let volSum = 0;
   for(let i=bars.length-1-volCount; i<bars.length-1; i++) volSum += bars[i].volume || 0;
   const avgVol = volCount > 0 ? volSum/volCount : 0;
-  const volumeRatio = avgVol > 0 ? recentVol/avgVol : 1;
+  // No average volume means no ratio — 0, the same "nothing to show" the short-history
+  // branch above returns. The fallback was 1, and Yahoo reports every extended-hours and
+  // weekend 5m bar with volume 0, so off-hours EVERY symbol read "RVOL 1.00×" in the
+  // symbol panel, the RVOL sort was a tie, and an order placed then was journaled with a
+  // relative volume nobody measured.
+  const volumeRatio = avgVol > 0 ? recentVol/avgVol : 0;
 
   // Trend strength — % of recent bars moving in the dominant direction
   const dirCount = Math.min(10, bars.length-1);
@@ -5038,12 +5061,15 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   } // end patternPrefs.levels (P&L / entry-stop-TP)
 
   // Scales › previous day close, on intraday charts: the level the day's change is
-  // measured from, derived the same way the watchlist derives its day %.
+  // measured from -- the feed's own previous close. It was rebuilt from the percent,
+  // which is rounded to two places, so the line and its label could sit cents off;
+  // the rebuild stays as the fallback for a row without one.
   if(_cs('scales.prevClose') === true && _INTRADAY.indexOf(chartTimeframe) !== -1){
     const wl = (wlPrices||[]).find(t=> t.ticker === ticker);
     const chg = wl ? Number(wl.chg_pct) : NaN;
-    if(wl && Number.isFinite(chg) && (1 + chg/100) !== 0){
-      const pc = Number(wl.price) / (1 + chg/100);
+    const sent = wl ? Number(wl.prev_close) : NaN;
+    if(wl && (sent > 0 || (Number.isFinite(chg) && (1 + chg/100) !== 0))){
+      const pc = sent > 0 ? sent : Number(wl.price) / (1 + chg/100);
       if(pc >= rMin && pc <= rMax){
         const col = _cs('scales.prevCloseColor') || 'var(--text2)';
         html += zlLine(pct(pc), col, 'Prev close ' + fmt(pc, _priceDec(pc>=100?2:4)), col);
@@ -5253,7 +5279,7 @@ function updateCardChg(t){
   if(!isFinite(chg)){ el.textContent=''; el.className='card-chg'; return; }
   const cls = chg>0?'up':chg<0?'dn':'flat';
   el.className = 'card-chg '+cls;
-  el.textContent = (chg>0?'▲ +':chg<0?'▼ ':'· ')+chg+'%';
+  el.textContent = (chg>0?'▲ +':chg<0?'▼ ':'· ')+_pct2(chg)+'%';
 }
 
 // ── Update an existing card's meta in place (no DOM rebuild) ────────────────
@@ -5371,6 +5397,10 @@ function setSlotCount(v){
   // (a bare `.value =` fires no 'change'). Every way in -- the chip itself, the 0-6 keys,
   // "Back to grid", the phone migration -- lands here, so the chip is told here.
   _setSelectValue('chartLayoutSelect', String(slotCount));
+  // Down to one chart, the chart kept is the focused one, as TradingView keeps the active
+  // chart. It kept slot 0 whatever was focused: from two charts with the right-hand one
+  // focused, one chart showed the left-hand symbol beside the other's details and ticket.
+  _chartInSlotZero(activeTicker);
   persistSlots();
   lastCardOrder = '';            // force a full rebuild
   applyGridCols();
@@ -5421,21 +5451,30 @@ function renderCards(){
   applyGridCols();
   grid.innerHTML = list.map(t => buildCard(t, zonesData[t]||{})).join('');
   list.forEach(t => renderZoneLadder(t, zonesData[t]||{}, getCurrentPrice(t)));
+  _markActiveCard();
 }
 
 // Per-slot symbol editor (#1628): click a chart's ticker to retype it. Validates +
 // resolves via the same Alpaca-backed watchlist endpoint (#1624), then swaps the slot.
 // Clicking a chart's ticker opens the symbol-search popup (#1692) to switch it.
 function editSlot(oldTicker){
-  openSymbolSearch((sym)=>commitSlotSymbol(oldTicker, sym), { title: 'Change chart symbol' });
+  // The chart whose symbol was just changed is the one being looked at, so the details, the
+  // ticket and the watchlist highlight follow it. They stayed on the old symbol -- in a
+  // one-chart deck no longer on screen at all.
+  openSymbolSearch(async (sym)=>{ await commitSlotSymbol(oldTicker, sym); if(visibleTickers().includes(sym)) focusTicker(sym); }, { title: 'Change chart symbol' });
 }
 async function commitSlotSymbol(oldTicker, sym){
   if(!sym || sym===oldTicker) return;
-  if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
   // The symbol is already Alpaca-validated by the search; charting it also adds it to
   // the watchlist so price/zone data flows (tracking only -- the AI trader's list is the
-  // row's own toggle).
-  try{ await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); await loadMyList(true); }catch(e){}
+  // row's own toggle). A slot off the list charts nothing, so the slot changes once the
+  // symbol is on it: signed out there is no list to put it on, and the server says so.
+  try{
+    const r = await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    if(r.status === 401){ _alertToast(SIGN_IN_FOR_LIST); return; }
+    await loadMyList(true);
+  }catch(e){}
+  if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
   lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
 
@@ -5782,7 +5821,7 @@ function renderOrderTicket(){
   const wl  = wlPrices.find(x=>x.ticker===otTicker);
   const chg = wl && wl.chg_pct!=null ? Number(wl.chg_pct) : null;
   document.getElementById('otHeadQuote').innerHTML = price
-    ? `$${fmt(price)}${chg==null?'':` <span style="color:${chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)'}">${chg>=0?'+':''}${chg}%</span>`}`
+    ? `$${fmt(price)}${chg==null?'':` <span style="color:${chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)'}">${chg>=0?'+':''}${_pct2(chg)}%</span>`}`
     : '—';
 
   document.getElementById('otSellBtn').classList.toggle('active', otSide === 'sell');
@@ -7775,6 +7814,10 @@ function adaptLogoBg(img){
 // names still need 4dp to say anything at all.
 const _wlPx = (p)=> p==null ? '—' : (p < 1 ? p.toFixed(4)
   : p.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+/* A day change in percent, always two places. The feed's number went out as it came, so
+   one column read "+0.6%" over "+0.51%" and "-1.7%" (TradingView: +0.60%). A function, not
+   a const: the card and ticket painters above it call it too. */
+function _pct2(v){ return Number(v).toFixed(2); }
 
 function renderWatchlist(){
   document.getElementById('wlList').innerHTML = _sortedWlPrices().map(t=>{
@@ -7790,8 +7833,8 @@ function renderWatchlist(){
       ${tickerLogoHtml(t.ticker)}
       <span class="wl-sym">${t.ticker}</span>
       <span class="wl-price">${_wlPx(t.price)}</span>
-      <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct)}</span>
-      <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
+      <span class="wl-abs ${cl}">${_wlAbs(t.price, t.chg_pct, t.prev_close)}</span>
+      <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${_pct2(t.chg_pct)}%</span>
       <button class="wl-ai${ai?' on':''}" aria-pressed="${ai}" aria-label="AI trader ${ai?'on':'off'} for ${t.ticker}" title="${ai ? 'The AI trader may trade '+t.ticker+'. Click to take it off the AI list.' : 'Let the AI trader trade '+t.ticker+'. Click to put it on the AI list.'}" onclick="toggleAiTicker('${t.ticker}',event)">AI</button>
       <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
@@ -7821,13 +7864,19 @@ function _syncWlScrollbar() {
 }
 window.addEventListener('resize', _syncWlScrollbar);
 
-function _wlAbs(price, pct) {
-  const p = Number(price), c = Number(pct);
-  if (!Number.isFinite(p) || !Number.isFinite(c)) return '—';
-  const prev = p / (1 + c / 100);
+/* The change in dollars, at the price column's decimals (_wlPx). It was rebuilt from the
+   percent, which the feed rounds to two places, so it was only ever approximate -- SPY's
+   could be off by four cents -- and under $100 it printed a third decimal of pure rounding
+   ("+0.093" beside 77.97). The feed now sends the previous close it measures from; the
+   rebuild is the fallback for a row without one (the demo book, an older server). */
+function _wlAbs(price, pct, prevClose) {
+  const num = (v) => (v == null ? NaN : Number(v));   // null is unknown, not zero
+  const p = num(price), c = num(pct), pc = num(prevClose);
+  if (!Number.isFinite(p)) return '—';
+  const prev = pc > 0 ? pc : (Number.isFinite(c) ? p / (1 + c / 100) : NaN);
   if (!Number.isFinite(prev) || prev <= 0) return '—';
   const d = p - prev;
-  return (d >= 0 ? '+' : '') + d.toFixed(Math.abs(p) >= 100 ? 2 : 3);
+  return (d >= 0 ? '+' : '') + d.toFixed(Math.abs(p) < 1 ? 4 : 2);
 }
 
 function renderSymbolInfo(ticker){
@@ -7851,7 +7900,7 @@ function renderSymbolInfo(ticker){
   el.innerHTML = `
     <div class="wi-sym">${ticker}</div>
     <div class="wi-name">${_symNames[ticker]||kind}</div>
-    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span>${rvol>0?`<span class="wi-rvol${rvol>=1.5?' hot':''}" title="Relative volume — recent bar volume vs its average">RVOL ${rvol.toFixed(2)}×</span>`:''}</div>
+    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${_pct2(chg)}%</span>${rvol>0?`<span class="wi-rvol${rvol>=1.5?' hot':''}" title="Relative volume — recent bar volume vs its average">RVOL ${rvol.toFixed(2)}×</span>`:''}</div>
     ${(st&&st.available)?`
     <div class="wi-sect">Technicals</div>
     <div class="wi-tech ${techCls}">${st.technical}</div>
@@ -7880,11 +7929,10 @@ function renderSymbolInfo(ticker){
     <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>
     <div class="wi-sect">Alerts</div>
     <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ Alert</button></div>`;
-  if(!_symNames[ticker] && kind==='Equity'){
-    fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
-      if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
-    }).catch(()=>{});
-  }
+  // Through _ensureSymName, which asks once per symbol: this panel re-renders several
+  // times while the answer is in flight (the stats landing, the watchlist redraw), and
+  // each render asked again — three identical symbol-info requests for SPY on every load.
+  if(!_symNames[ticker] && kind==='Equity') _ensureSymName(ticker);
   if(_symStats[ticker]===undefined){
     _symStats[ticker]=null;   // in-flight
     fetch('/api/trading/symbol-stats?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
@@ -7896,47 +7944,80 @@ function renderSymbolInfo(ticker){
 function focusTicker(t){
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}   // remember the selected symbol
+  // A ONE-chart deck shows the symbol you picked (2026-10-11). The row says "View X chart",
+  // and it did while a click opened a fullscreen chart; when that went (#3141) the click kept
+  // changing the highlight, the details and the ticket — everything but the chart, so with
+  // QQQ charted, picking DIA left QQQ on screen beside DIA's details. The phone shell already
+  // puts the pick in slot 0; this keeps the same promise on a wider screen. Only a symbol on
+  // the watchlist: slots are pruned to the list (#3514), so anything else would snap back.
+  // A multi-chart deck is the reader's own arrangement and is left alone (drag a row onto a
+  // chart to swap it); the swap below keeps that arrangement for when they go back to it.
+  if (_chartInSlotZero(t)) {
+    persistSlots();
+    lastCardOrder = '';
+    renderCards();
+  }
   renderWatchlist();
   renderSymbolInfo(t);
+  _markActiveCard();
   // Read-only guests can't trade, so skip the order panel entirely — otherwise
   // clicking a chart shoves the grid aside to make room for a panel they can't
   // use. They just get the fullscreen chart. #guest-no-order-panel
   if(!document.body.classList.contains('guest')){
-    setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
+    // #1695: the order panel follows the selected symbol -- but not onto the symbol it is
+    // already on. setOrderSymbol starts a fresh ticket (quantity 1, no take-profit, no
+    // stop), so picking the row or the chart of the symbol being entered wiped the
+    // quantity and the stop without a word, and the order could go in without them.
+    if(otTicker !== t) setOrderSymbol(t);
     // Desktop: keep the docked panel open unless the user dismissed it (Esc). Phone:
     // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
     // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
 }
+/* In a one-chart deck the chart IS the focused symbol: put t in slot 0, swapping it out of
+   another slot so a multi-chart arrangement survives for the way back. Only a symbol on
+   the list -- slots are pruned to it (#3514), so anything else would snap back. Says
+   whether the slots changed. Shared by a pick (focusTicker) and a switch to one chart. */
+function _chartInSlotZero(t){
+  if (slotCount !== 1 || !t || chartSlots[0] === t || !wlPrices.some((w) => w.ticker === t)) return false;
+  const i = chartSlots.indexOf(t);
+  if (i > 0) chartSlots[i] = chartSlots[0];
+  chartSlots[0] = t;
+  return true;
+}
 
-// Click a chart in the grid to FOCUS it (#focus-chart): mark that card selected
-// (a slightly darker grey) and point the rest of the screen — symbol details,
-// order panel, watchlist highlight — at it, WITHOUT going fullscreen (that's what
-// the watchlist click / expand control do). Desktop-oriented; harmless on mobile
-// (single chart, order panel stays closed via the isNarrowTrader guard).
+// Click a chart in the grid to FOCUS it (#focus-chart): point the rest of the screen —
+// symbol details, the order ticket, the watchlist highlight — at it, and mark the card
+// when there is more than one on screen. ←/→ walk the same focus through the deck
+// (#2438). It never opens a fullscreen chart; that went with #3141.
+// It was switched off whole on 2026-08-01 as "a diagnostic step" while a double-click
+// fullscreen was hunted down (it lived elsewhere and went in 74132fd5), and it was never
+// switched back on: for two months a click on the second chart of a deck pointed nothing
+// at it and ←/→ did nothing, while B and S kept opening a ticket for whichever row was
+// picked last.
 function selectChart(t, ev){
-  // DISABLED: All click-based fullscreen removed per #3141 - do nothing
-  return;
-  /*
   if(!t) return;
   // Clicks that land on a control inside the card (buy/sell, change-symbol, drag
-  // handle) do their own thing — never focus or fullscreen from those.
+  // handle) do their own thing.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
-  // Click → focus it in the grid (darker grey) + point the peripherals at it.
-  // (removed fullscreen behavior entirely per #3141)
+  if(activeTicker === t) return;
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}
-  document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
-  const card = document.getElementById('card-'+t);
-  if(card) card.classList.add('active');
-  renderWatchlist();                       // sidebar highlight follows the selection
+  renderWatchlist();                        // sidebar highlight follows the selection
   renderSymbolInfo(t);                      // detail panel follows the selection
-  if(!document.body.classList.contains('guest')){
-    setOrderSymbol(t);                       // order ticket follows the selection
-    // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
-  }
-  */
+  _markActiveCard();
+  // The ticket follows the selection, never onto the symbol it is already on (see
+  // focusTicker); opening it stays with the BUY/SELL affordances (operator UI pass
+  // 2026-07-28). A card's BUY opens a ticket without moving the focus, so a click on that
+  // same chart came here and cleared the stop just entered.
+  if(!document.body.classList.contains('guest') && otTicker !== t) setOrderSymbol(t);
+}
+/* The focused chart is marked only when there is more than one to tell it from: a lone
+   card lit up read as a stuck state (31f580e6). */
+function _markActiveCard(){
+  const cards = document.querySelectorAll('#cardsGrid .card');
+  cards.forEach(c => c.classList.toggle('active', cards.length > 1 && c.dataset.ticker === activeTicker));
 }
 
 // ── Zoom a ticker (#1629) ─────────────────────────────────────────────────────
@@ -7955,6 +8036,24 @@ document.addEventListener('keydown', e=>{
   // Fullscreen zoom removed per #3141
 });
 
+/* "/" jumps to ANY symbol, not only one on the list. A chart needs its symbol on the list --
+   slots are pruned to it (#3514), and the list is how a symbol's price and zones arrive --
+   so a symbol not on it yet goes on first, as the chart's own symbol search does
+   (commitSlotSymbol): tracking only, never the AI trader's list. Then it is focused like a
+   watchlist pick, which in a one-chart deck charts it (#3759). It went straight to
+   focusTicker: the details and the ticket moved to the new symbol, priced "$—", while the
+   chart stayed on the old one, so B/S opened a ticket for a symbol that was not on screen.
+   If it does not go on (refused, or the add failed) nothing moves. */
+async function jumpToSymbol(sym){
+  if(!sym) return;
+  const listed = () => !!(MY_LIST && MY_LIST.has(String(sym).toUpperCase()));
+  if(!listed()){
+    await addWatchlistSymbol(sym);
+    if(!listed()) return;
+  }
+  focusTicker(sym);
+}
+
 // ── Keyboard-first trading (#2438) ───────────────────────────────────────────
 // `/` jump-to-symbol · B/S buy/sell ticket for the focused symbol · ←/→ move
 // focus through the visible deck · 1-6 set the chart layout. Never fires while
@@ -7964,7 +8063,7 @@ document.addEventListener('keydown', e=>{
   if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
   if(e.ctrlKey || e.metaKey || e.altKey) return;
   const guest=document.body.classList.contains('guest');
-  if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>focusTicker(sym), {title:'Jump to symbol'}); return; }
+  if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>jumpToSymbol(sym), {title:'Jump to symbol'}); return; }
   // #2445: Shift+B/S in rapid mode = instant market order at the last-used qty.
   // Plain B/S (or rapid mode off) = open the ticket as before.
   if(e.key==='b'||e.key==='B'){ if(activeTicker && !guest){ e.preventDefault();
@@ -8429,6 +8528,9 @@ document.addEventListener('dblclick', function(e){
 // watchlist, and each row's AI toggle puts it on or takes it off the tradelist.
 // /api/trading/watchlist-prices returns the UNION across users so data exists for all.
 const LIST_API='/api/trading/watchlist'; const LIST_KEY='watchlist';
+// Signed out, the list on the page is the starter list every visitor shares, and the
+// server refuses changes to it (401): a list of your own comes with an account.
+const SIGN_IN_FOR_LIST = 'Sign in to keep your own watchlist.';
 const AI_LIST_API='/api/trading/tradelist'; const AI_LIST_KEY='tradelist';
 let MY_LIST=null, AI_LIST=new Set(), WL_LIST=new Set();
 async function loadMyList(force){
@@ -8436,7 +8538,10 @@ async function loadMyList(force){
   try{
     const [w, t] = await Promise.all([
       fetch(LIST_API).then(r=>r.json()).catch(()=>({})),
-      fetch(AI_LIST_API).then(r=>r.json()).catch(()=>({})),
+      // A guest has no AI list to read: the endpoint is trade-gated, so asking only put a
+      // 401 in the console on every page load. detectGuestMode() has settled window.GUEST
+      // before the dashboard's first list load.
+      (typeof window !== 'undefined' && window.GUEST) ? Promise.resolve({}) : fetch(AI_LIST_API).then(r=>r.json()).catch(()=>({})),
     ]);
     const up = (a)=> (Array.isArray(a) ? a : []).map(x=>String(x).toUpperCase());
     WL_LIST = new Set(up(w && w[LIST_KEY]));
@@ -8487,7 +8592,8 @@ async function addWatchlistTicker(){
 async function addWatchlistSymbol(sym){
   if(!sym) return;
   try{
-    await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    const r = await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    if(r.status === 401){ _alertToast(SIGN_IN_FOR_LIST); return; }
     await loadMyList(true);
     await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
@@ -8746,6 +8852,9 @@ function _feedStatus(ok){
 // Session clock: US equities phases in ET (pre 4:00–9:30 · open 9:30–16:00 ·
 // after 16:00–20:00 · closed). Countdown to the next phase edge. Weekends roll to
 // Monday. (Exchange holidays are out of scope — the label is a clock, not an oracle.)
+// After 20:00 the next edge is tomorrow's 04:00 pre-market, Monday to Thursday; only
+// Friday night rolls into the weekend. That branch left no countdown, so every weekday
+// evening read "Closed · wknd" (2026-10-11).
 function _updateMktClock(){
   const lab=document.getElementById('mktClockLabel'), val=document.getElementById('mktClock');
   if(!lab||!val) return;
@@ -8759,7 +8868,7 @@ function _updateMktClock(){
   else if(mins<570){ phase='Pre-mkt'; cls='pre'; left=570-mins; }
   else if(mins<960){ phase='Open'; cls='open'; left=960-mins; }
   else if(mins<1200){ phase='After-hrs'; cls='after'; left=1200-mins; }
-  else { phase='Closed'; cls=''; left=null; }
+  else { phase='Closed'; cls=''; left = day===5 ? null : (1440-mins)+240; }
   lab.textContent=phase; lab.className='l '+cls;
   const suffix = phase==='Open' ? ' to close' : phase==='Pre-mkt' ? ' to open' : phase==='After-hrs' ? ' left' : ' to pre';
   val.textContent = left!=null ? fmtC(left)+suffix : 'wknd';
@@ -9195,7 +9304,7 @@ function _pickMenuHtml(kind){
   } else if(kind === 'acct') {
     // TradingView's account menu: the trading settings (the dialog's Trading tab) and the
     // broker page (Settings › Connections, where accounts are added and traders switched).
-    h += '<div class="pat-menu-group">' + (document.body.classList.contains('demo') ? 'Demo account' : 'Paper trading') + '</div>';
+    h += '<div class="pat-menu-group">' + (ACCT_BADGE[_acctMode] || ACCT_BADGE.unknown).menu + '</div>';
     h += '<div class="pat-menu-item pick-row" role="menuitem" onclick="_closePickMenu(\'acct\');openChartSettings(\'trading\')">'
       + '<span class="pick-name"><span>Trading settings…<span class="pick-sub">P&amp;L display and order labels on the chart</span></span></span></div>';
     h += '<a class="pat-menu-item pick-row" role="menuitem" href="/settings.html#connections">'
@@ -9781,8 +9890,24 @@ function setRightWidget(name) {
   // Without this the bell is a one-way trip and the watchlist is unreachable.
   _rwPanel = (_rightOpen && _rwPanel === name && name !== 'watchlist') ? 'watchlist' : name;
   _rightOpen = true;
+  if (_isSheetBand()) document.body.classList.add('rsheet-open');   // a tab that opens a panel opens the sheet it lives in
   _saveDocks(); _applyDocks();
 }
+/* Tablet band (581–760px): the right dock is a bottom sheet that rests collapsed to its
+   header (see the CSS of the same name). The header opens and closes it; picking a symbol
+   closes it, so the chart that was just chosen is the one on screen. Header controls and
+   the row's own buttons (AI, remove) keep their jobs. CAPTURE phase: a row's own click
+   re-renders the watchlist, which detaches the clicked node before a bubbling listener
+   could ask where it was. */
+function _isSheetBand() {
+  try { return window.matchMedia('(min-width:581px) and (max-width:760px)').matches; } catch (_e) { return false; }
+}
+document.addEventListener('click', (e) => {
+  if (!_isSheetBand() || !e.target || !e.target.closest) return;
+  if (e.target.closest('#dockR button, #dockR a, #dockR select, #dockR input')) return;
+  if (e.target.closest('#dockR .dock-head')) { document.body.classList.toggle('rsheet-open'); return; }
+  if (e.target.closest('#dockR .wl-item')) document.body.classList.remove('rsheet-open');
+}, true);
 /* Kept as a deliberate no-op: the column cannot be closed, but leaving the function
    defined means any remaining caller fails harmlessly instead of throwing. */
 function closeRightWidget() { /* the right column is permanent -- see _rightOpen */ }
@@ -10360,6 +10485,20 @@ function _accountDegraded(kind, reason){
       : ' Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
   }
 }
+function _accountNoBroker(){
+  _paintAcctBadge('none');
+  const el = document.getElementById('tpSummary');
+  if (el) { el.style.opacity = ''; el.title = 'No broker connected'; }
+  const b = document.getElementById('staleBadge');
+  if (b && b.parentNode) b.parentNode.removeChild(b);
+  const pe = document.getElementById('hDayPnl');
+  if (pe) { pe.textContent = '—'; pe.className = 'v'; }
+  const pp = document.getElementById('tp-positions');
+  if (pp) {
+    pp.innerHTML = '<div class="tp-empty">No broker connected. '
+      + '<a href="/settings.html#connections">Connect one in Settings</a> to trade and to see your positions here.</div>';
+  }
+}
 function _accountFresh(){
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = ''; el.title = ''; }
@@ -10836,7 +10975,11 @@ function _ensureSymName(ticker){
   if(!ticker || typeof fetch !== 'function' || typeof _symNames === 'undefined' || _symNames[ticker] || _symNameInflight.has(ticker)) return;
   _symNameInflight.add(ticker);
   fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
-    if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(_lastPositions.length && !(typeof _armedBtn !== 'undefined' && _armedBtn)) renderPositionsTable(_lastPositions); }
+    if(j&&j.name){
+      _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):'');
+      if(_lastPositions.length && !(typeof _armedBtn !== 'undefined' && _armedBtn)) renderPositionsTable(_lastPositions);
+      if(activeTicker===ticker) renderSymbolInfo(ticker);   // the symbol panel asks through here too
+    }
   }).catch(()=>{}).finally(()=>_symNameInflight.delete(ticker));
 }
 function renderPositionsTable(positions){
@@ -10991,9 +11134,16 @@ async function loadPortfolio(){
     // the one it was given so callers could say "connect a broker" instead of reading an
     // empty {account:{}} as a real $0 book. The ticket gate reads it rather than asking
     // the broker endpoints again.
-    if (d && d.available === false) { _brokerOk = false; _refreshTradeGate(); _accountDegraded('backend', d.reason); return; }
+    if (d && d.available === false) {
+      _brokerOk = false; _refreshTradeGate();
+      // No broker at all is not an outage: no STALE badge, no "unreachable" toast — say
+      // what is true and where to fix it (#2725, lib/server-book).
+      if (d.no_broker) { _accountNoBroker(); return; }
+      _accountDegraded('backend', d.reason); return;
+    }
     _brokerOk = true; _refreshTradeGate();
     const a  = d.account||{};
+    _paintAcctBadge(a.mode);
     _accountFresh(a);
     // Day P&L: the SERVER figure is authoritative (2026-08-10). It is realized
     // (ET-dated ledger fills) + today's unrealized change with the correct basis
@@ -11117,6 +11267,32 @@ function _setTradePanel(open){
   b.setAttribute('aria-expanded', open ? 'true' : 'false');
   b.title = (b.dataset.desc || '') + (open ? ' Click to hide the account panel.' : ' Click to show the account panel.');
 }
+/* The badge says what the account IS (2026-10-11). It was static markup — "PAPER — simulated
+   money; orders are practice, not real" — whatever was connected, though both adapters report
+   the mode (Alpaca from its env, IBKR from the account id: DU… paper, U… live). On a live
+   account that sentence is the most dangerous one on the page. It starts neutral (or as the
+   last mode this device saw) and is painted from each account answer. */
+const ACCT_BADGE = {
+  paper:   { text:'PAPER',     cls:'badge-paper', menu:'Paper trading',       desc:'Paper trading — simulated money; orders are practice, not real.' },
+  live:    { text:'LIVE',      cls:'badge-live',  menu:'Live trading',        desc:'Live trading — a real-money account; orders execute with real funds.' },
+  none:    { text:'NO BROKER', cls:'badge-none',  menu:'No broker connected', desc:'No broker connected — connect one in Settings to trade.' },
+  unknown: { text:'ACCOUNT',   cls:'badge-none',  menu:'Account',             desc:'Your account — the broker did not say whether it is paper or live.' },
+};
+let _acctMode = null;
+// Remembered per USER, not per device: one person's LIVE must not open as someone else's badge.
+function _acctModeKey(){ return 'trader.acctMode:' + ((typeof window !== 'undefined' && window.SESSION_UID) || ''); }
+function _paintAcctBadge(mode){
+  const k = (mode === 'paper' || mode === 'live' || mode === 'none') ? mode : 'unknown';
+  _acctMode = k;
+  try{ if(mode === 'paper' || mode === 'live' || mode === 'none') localStorage.setItem(_acctModeKey(), k); }catch(_e){}
+  const b = document.getElementById('acctBadge'); if(!b) return;
+  const m = ACCT_BADGE[k];
+  b.textContent = m.text;
+  b.classList.remove('badge-paper', 'badge-live', 'badge-none');
+  b.classList.add(m.cls);
+  b.dataset.desc = m.desc;
+  _setTradePanel(!document.body.classList.contains('panel-collapsed'));   // re-title with the new description
+}
 function toggleTradePanel(){
   // A phone has no panel row to collapse: there the badge opens the Positions view, which
   // is where the account panel lives on a small screen.
@@ -11125,7 +11301,11 @@ function toggleTradePanel(){
   _setTradePanel(openIt);
   try{ localStorage.setItem('trader.panelOpen', openIt ? '1' : '0'); }catch(_e){}
 }
-function initTradePanel(){ _setTradePanel(_tradePanelOpen()); }
+function initTradePanel(){
+  _setTradePanel(_tradePanelOpen());
+  let last = null; try{ last = localStorage.getItem(_acctModeKey()); }catch(_e){}
+  if(last === 'paper' || last === 'live' || last === 'none') _paintAcctBadge(last);
+}
 function initFooterResize(){
   const handle = document.getElementById('footerResize');
   const layout = document.querySelector('.layout');
@@ -11280,7 +11460,8 @@ function initChartDrag(){
       if(_dragWlTk){
         // #1700: replace this slot with the dragged watchlist symbol
         const idx = chartSlots.indexOf(dropTk);
-        if(idx >= 0 && dropTk !== _dragWlTk){ chartSlots[idx] = _dragWlTk; persistSlots(); lastCardOrder=''; renderCards(); }
+        // ...and focus it: the symbol just put on screen is the one being looked at.
+        if(idx >= 0 && dropTk !== _dragWlTk){ chartSlots[idx] = _dragWlTk; persistSlots(); lastCardOrder=''; renderCards(); focusTicker(_dragWlTk); }
       } else if(dragTk){
         const i = chartSlots.indexOf(dragTk), j = chartSlots.indexOf(dropTk);
         if(dropTk && dropTk!==dragTk && i>=0 && j>=0){ chartSlots[i]=dropTk; chartSlots[j]=dragTk; persistSlots(); lastCardOrder=''; renderCards(); }
@@ -11315,12 +11496,18 @@ function startDashboard(){
     // Info-only: sets the active ticker + renders the panel, but does NOT open the
     // order panel or zoom a chart (so it works for read-only users too).
     if(wlPrices.length && !activeTicker){
-      // Prefer the symbol the user was last on (if still in the watchlist), else SPY.
+      // Prefer the symbol the user was last on (if still in the watchlist), else SPY --
+      // except in a one-chart deck, which focuses the symbol it charts. The two could
+      // disagree (an older page; a deck narrowed to one chart), and the page opened on one
+      // symbol's chart beside another's details and ticket.
       let saved=null; try{ saved=localStorage.getItem('trader.ticker'); }catch(e){}
-      activeTicker = (saved && wlPrices.some(w=>w.ticker===saved)) ? saved
-                   : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
+      const charted = (slotCount === 1 && chartSlots[0] && wlPrices.some(w=>w.ticker===chartSlots[0])) ? chartSlots[0] : null;
+      activeTicker = charted
+                   || ((saved && wlPrices.some(w=>w.ticker===saved)) ? saved
+                   : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker);
       renderSymbolInfo(activeTicker);
       renderWatchlist();
+      _markActiveCard();
     }
     if(!window.GUEST && wlPrices.length){
       setOrderSymbol(activeTicker || wlPrices[0].ticker);
@@ -11372,6 +11559,7 @@ async function detectGuestMode(){
     const s = await (await fetch('/api/auth/session',{cache:'no-store'})).json();
     const ent = (s && s.entitlements) || {};
     authed = !!(s && s.authenticated);
+    window.SESSION_UID = (s && s.user && s.user.id) || null;   // keys per-user device memory (the account badge)
     window.GUEST = !(s && (s.role === 'admin' || ent.trade === true));
   }catch(e){ window.GUEST = true; }
   // Signed-in-ness is its own fact, separate from the trade entitlement: a supporter is

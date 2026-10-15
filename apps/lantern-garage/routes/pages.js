@@ -47,6 +47,20 @@ const PUBLIC_PAGES = {
   // client-side; the trade-gated data endpoints stay blocked server-side by
   // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
   "/stock-trader.html":   "stock-trader.html",
+  // The per-symbol view the home page’s tickers lead to (2026-10-11). It must be
+  // public for the same reason pricing and the FAQ are: it is the destination of a
+  // link on a PUBLIC page, and gating it 302s the visitor to sign-in and drops the
+  // symbol they clicked — the exact bounce #2610 and #3161 were filed for. It reads
+  // prices, statistics and news; it offers no action a guest cannot take.
+  "/symbol.html":         "symbol.html",
+  // The markets hub the home page’s Markets heading leads to, and the page per asset
+  // class it leads to in turn — public for the same reason the symbol view is: each is
+  // the destination of a link on a public page.
+  "/markets.html":        "markets.html",
+  "/market.html":         "market.html",
+  // Our summary of one story. Public: it is where the public news feed now points,
+  // and it serves a headline, a few sentences and a link to the original.
+  "/news-article.html":   "news-article.html",
   "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
   "/journal.html":        "journal.html",   // the trading journal — its own page since it outgrew the panel
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status

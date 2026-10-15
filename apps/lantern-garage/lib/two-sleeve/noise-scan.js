@@ -183,7 +183,7 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
       if (logged.gate !== e.day) {
         logged.gate = e.day; changed = true;
         lateLog({ event: 'late_gate_shadow', proxy: pr.proxy, day: e.day, bar: hhmm(last.min + 5), state: prices.state, ...read,
-          up: { symbol: pr.up, px: prices.up }, dn: { symbol: pr.dn, px: prices.dn }, shadow: true });
+          up: { symbol: pr.up, px: prices.up }, dn: { symbol: pr.dn, px: prices.dn }, shadow: !late.armed, armed: !!late.armed });
       }
     }
     const today = (S.obs[pr.proxy] || []).find((o) => o.d === e.day);
@@ -223,16 +223,31 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
       const decision = !!(last && state && state !== 'in' && NOISE_DECISIONS.includes(last.min) && last.min < CLOSE_MIN
         && now - (last.t + BAR_MS) <= entryWindowMs);
       const prices = { state, up: null, dn: null };
+      // THE LATE-REVERSAL GATE AS A RULE (2026-10-08, ledger leg-early-sale-late-reversal-gate-engine-13-windows /
+      // -30-quarters, both CONFIRMED: +0.047 | +0.013%/wk, worst weeks unchanged, zero negative years). From the first
+      // read after the 15:30 bar, when the sessions before today say the last half hour has been giving the day back
+      // (the 60-session mean once 60 sessions exist, else the 40-session one), both wrappers read BEARISH / ENTER for the
+      // rest of the session: a held one is sold at the 15:30 price, no new entry at the 15:30 decision bar. Off, or the
+      // gate off, or too little history: the leg's own signals, as before. The shadow's rows and state are untouched.
+      let gateOn = false;
+      if (late && late.armed && last && last.min >= LATE_FROM_MIN) {
+        const g = lateRead(pr.proxy, e.day);
+        const on = g.n >= 60 && g.gate60 != null ? g.gate60 : g.gate40;
+        gateOn = on === true;
+      }
       for (const [sym, side] of [[pr.up, 'up'], [pr.dn, 'dn']]) {
         const w = await wrapperRead(sym, e.day, now);
         prices[side] = w.px;
         let direction = 'NEUTRAL', dec = 'SKIP';
-        if (state && state !== side) { direction = 'BEARISH'; dec = 'ENTER'; }              // back inside, or through: sell a held one
+        if (gateOn) { direction = 'BEARISH'; dec = 'ENTER'; }                                // the late-reversal gate: sell the leg at the 15:30 price
+        else if (state && state !== side) { direction = 'BEARISH'; dec = 'ENTER'; }         // back inside, or through: sell a held one
         else if (decision && state === side) { direction = 'BULLISH'; dec = 'ENTER'; }      // a decision bar outside the band on this side
+        const ctx = { ibs: w.ibs, spy_tape: 0, noise: state, noise_proxy: pr.proxy, noise_side: side,
+          noise_bar: last ? hhmm(last.min + 5) : null, noise_decision: decision };
+        if (late && late.armed) ctx.noise_late_gate = gateOn;
         signals.push({
           symbol: sym, direction, entry_price: w.px, price: w.px, noise_leg: true,
-          decision_context: { ibs: w.ibs, spy_tape: 0, noise: state, noise_proxy: pr.proxy, noise_side: side,
-            noise_bar: last ? hhmm(last.min + 5) : null, noise_decision: decision },
+          decision_context: ctx,
           convergence: { decision: dec, p_win: 0.6 },
         });
       }
@@ -244,7 +259,7 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
     return { signals, noise: { at: new Date(now).toISOString(), pairs: read } };
   }
 
-  return { pairs: P, scan, lateGate: late ? { read: lateRead, observations: lateObservations } : null };
+  return { pairs: P, scan, lateGate: late ? { read: lateRead, observations: lateObservations, armed: !!late.armed } : null };
 }
 
 module.exports = { createNoiseScan, ENTRY_WINDOW_MS, CLOSE_MIN, LATE_LOOKBACKS };

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="observe">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0e17">
+  <title>Markets — Unisona</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/market.css">
+</head>
+<body>
+<header class="band">
+  <div class="band-inner wrap">
+    <a class="sym-back" href="/">&larr; Home</a>
+    <h1 class="sym-t">Markets</h1>
+    <div class="sym-name">Indices, US stocks, crypto, futures and forex — priced live.</div>
+    <nav class="mk-nav" aria-label="Markets">
+      <a href="/markets.html" aria-current="page">Overview</a>
+      <a href="/market.html?c=indices">Indices</a>
+      <a href="/market.html?c=stocks">US stocks</a>
+      <a href="/market.html?c=crypto">Crypto</a>
+      <a href="/market.html?c=futures">Futures</a>
+      <a href="/market.html?c=forex">Forex</a>
+      <a href="/market.html?c=economy">Economy</a>
+    </nav>
+    <div class="pulse" id="pulse" aria-live="polite" style="margin-top:18px"></div>
+  </div>
+</header>
+
+<main>
+  <!-- ── Market summary ── -->
+  <section class="sec wrap" aria-labelledby="sum-h">
+    <div class="sec-head">
+      <h2 id="sum-h">Market summary</h2>
+      <span class="sub" id="sumSub">loading…</span>
+    </div>
+    <div class="mk-sum">
+      <div class="card" id="lead"></div>
+      <div class="card" id="majors" style="padding:8px"></div>
+    </div>
+  </section>
+
+  <!-- ── US stocks ── -->
+  <section class="sec wrap" aria-labelledby="st-h">
+    <div class="sec-head">
+      <a href="/market.html?c=stocks"><h2 id="st-h">US stocks</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub" id="stSub">loading…</span>
+    </div>
+    <div class="grid" id="movers"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=stocks">See all US stocks</a></div>
+  </section>
+
+  <!-- ── Crypto ── -->
+  <section class="sec wrap" aria-labelledby="cr-h">
+    <div class="sec-head">
+      <a href="/market.html?c=crypto"><h2 id="cr-h">Crypto</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">the largest coins by market cap</span>
+    </div>
+    <div class="tiles" id="crypto"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=crypto&amp;g=coins">See all coins</a></div>
+  </section>
+
+  <!-- ── Futures ── -->
+  <section class="sec wrap" aria-labelledby="fu-h">
+    <div class="sec-head">
+      <a href="/market.html?c=futures"><h2 id="fu-h">Futures</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">energy, metals and the S&amp;P — the front contract</span>
+    </div>
+    <div class="tiles" id="futures"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=futures">See all futures</a></div>
+  </section>
+
+  <!-- ── Forex ── -->
+  <section class="sec wrap" aria-labelledby="fx-h">
+    <div class="sec-head">
+      <a href="/market.html?c=forex"><h2 id="fx-h">Forex</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">the major pairs and the dollar index</span>
+    </div>
+    <div class="tiles" id="forex"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=forex&amp;g=majors">See all major pairs</a></div>
+  </section>
+
+  <!-- ── Economy ── -->
+  <section class="sec wrap" aria-labelledby="ec-h">
+    <div class="sec-head">
+      <a href="/market.html?c=economy"><h2 id="ec-h">US economy</h2>
+        <svg class="caret" viewBox="0 0 6 11" fill="currentColor" aria-hidden="true"><path d="M.7 10.6 0 9.9 4.4 5.5 0 1.1.7.4l5.1 5.1z"/></svg></a>
+      <span class="sub">official figures from FRED, each as of its own release</span>
+    </div>
+    <div class="tiles" id="economy"></div>
+    <div class="viewall"><a class="cta-line" href="/market.html?c=economy">See the US economy</a></div>
+  </section>
+
+  <section class="sec wrap">
+    <hr class="rule">
+    <p class="disc prose">
+      Prices are Yahoo Finance quotes, refreshed about every thirty seconds and delayed as the
+      exchange requires; economic figures are FRED’s, each as of its own release. Each board is a
+      curated list that its page names — not every index, coin, contract or pair, and not a
+      screener. Nothing here is investment advice.
+    </p>
+  </section>
+</main>
+
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/market-ui.js"></script>
+<script>
+/* ── Markets hub ─────────────────────────────────────────────────────────────────
+   TradingView's /markets, ours: a market summary, then one section per asset class.
+   Every heading and every "See all" leads to that class's own page (/market.html), and
+   every instrument to its own (/symbol.html) — none of them to the trader, which is
+   where every link on the old home page went (founder, 2026-10-11).
+
+   One call, /api/trading/markets, carries every section, priced in one batch so the
+   sections cannot disagree about a price. */
+(function () {
+  'use strict';
+  var U = window.MarketUI, el = U.el;
+  function byId(id) { return document.getElementById(id); }
+  function fail(box, what, e) {
+    box.innerHTML = '';
+    box.appendChild(el('div', 'state err', 'Could not load ' + what + ' (' + e.message + ').'));
+  }
+  function tiles(box, rows, what) {
+    box.innerHTML = '';
+    if (!rows || !rows.length) { box.appendChild(el('div', 'state', 'No ' + what + ' could be priced just now.')); return; }
+    rows.forEach(function (r) { box.appendChild(U.tile(r)); });
+  }
+  function moverCard(title, sub, rows) {
+    var c = el('div', 'card');
+    c.appendChild(el('h3', null, title));
+    c.appendChild(el('p', 'csub', sub));
+    if (!rows.length) { c.appendChild(el('div', 'state', 'Nothing to show.')); return c; }
+    rows.forEach(function (r) {
+      var a = el('a', 'row');
+      a.href = U.symHref(r.symbol);
+      a.appendChild(U.badge(r));
+      var g = el('div', 'grow'), l1 = el('div', 'l1');
+      l1.appendChild(el('span', 'sym', r.symbol));
+      // A leveraged fund's 9% day is not the same event as a stock's: labelled, not hidden.
+      if (r.kind === 'leveraged') l1.appendChild(el('span', 'chip', 'leveraged'));
+      else if (r.kind === 'etf') l1.appendChild(el('span', 'chip', 'ETF'));
+      g.appendChild(l1);
+      g.appendChild(el('div', 'l2', r.name || ''));
+      a.appendChild(g);
+      var n = el('div', 'num');
+      n.appendChild(el('div', 'px', U.price(r)));
+      n.appendChild(el('div', 'ch ' + U.dirCls(r.chg_pct), U.pct(r.chg_pct)));
+      a.appendChild(n);
+      c.appendChild(a);
+    });
+    return c;
+  }
+
+  U.get('/api/trading/markets')
+    .then(function (d) {
+      // Market summary: the S&P 500 drawn large, the major indices beside it.
+      U.leadChart(byId('lead'), d.lead || { symbol: '^GSPC', name: 'S&P 500' }, ['1D', '1M', '1Y'], '1D');
+      var mj = byId('majors');
+      mj.innerHTML = '';
+      var h = el('div', 'sec-head');
+      h.style.margin = '6px 6px 4px';
+      var ha = el('a');
+      ha.href = '/market.html?c=indices';
+      ha.appendChild(el('h3', null, 'Major indices'));
+      h.appendChild(ha);
+      mj.appendChild(h);
+      (d.indices || []).forEach(function (r) {
+        var a = el('a', 'row');
+        a.style.minHeight = '48px';
+        a.href = U.symHref(r.symbol);
+        var g = el('div', 'grow');
+        g.appendChild(el('div', 'sym', r.name));
+        g.appendChild(el('div', 'l2', r.short));
+        a.appendChild(g);
+        var n = el('div', 'num');
+        n.appendChild(el('div', 'px', U.price(r)));
+        n.appendChild(el('div', 'ch ' + U.dirCls(r.chg_pct), U.pct(r.chg_pct)));
+        a.appendChild(n);
+        mj.appendChild(a);
+      });
+      var all = el('a', 'inlink', 'See all indices');
+      all.href = '/market.html?c=indices';
+      all.style.margin = '8px 12px 6px';
+      mj.appendChild(all);
+      byId('sumSub').textContent = 'as of ' + new Date(d.asOf).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+      // US stocks: the day's biggest moves, over a universe the page names.
+      var st = d.stocks || {};
+      var mv = byId('movers');
+      mv.innerHTML = '';
+      mv.appendChild(moverCard('Gainers', 'biggest move up today', st.gainers || []));
+      mv.appendChild(moverCard('Losers', 'biggest move down today', st.losers || []));
+      byId('stSub').textContent = 'across the ' + (st.universe || 0) + ' US names and funds we track — '
+        + (st.priced || 0) + ' priced';
+
+      tiles(byId('crypto'), d.crypto, 'coins');
+      tiles(byId('futures'), d.futures, 'futures');
+      tiles(byId('forex'), d.forex, 'pairs');
+    })
+    .catch(function (e) {
+      ['lead', 'majors', 'movers', 'crypto', 'futures', 'forex'].forEach(function (id) { fail(byId(id), 'the markets', e); });
+      byId('sumSub').textContent = '';
+      byId('stSub').textContent = '';
+    });
+
+  // The economy is a second, separate call: FRED's figures, not quotes (lib/economy).
+  U.get('/api/trading/markets?c=economy')
+    .then(function (d) {
+      var box = byId('economy');
+      box.innerHTML = '';
+      var key = (d && d.available && d.key) || [];
+      if (!key.length) { box.appendChild(el('div', 'state', 'The economic figures are not available just now.')); return; }
+      key.slice(0, 6).forEach(function (ind) { box.appendChild(U.econTile(ind, '/market.html?c=economy&g=' + encodeURIComponent(ind.group))); });
+    })
+    .catch(function (e) { fail(byId('economy'), 'the economy', e); });
+
+  U.get('/api/trading/market-status')
+    .then(function (m) {
+      var box = byId('pulse');
+      function pill(parts) {
+        var s = el('span', 'pill');
+        parts.forEach(function (p) { s.appendChild(el('span', p.cls || null, p.text)); });
+        box.appendChild(s);
+      }
+      var open = !!m.market_open;
+      pill([{ cls: 'dot' + (open ? ' on' : '') }, { text: open ? 'US market open' : 'US market closed' }]);
+      if (m.vix != null) pill([{ cls: 'k', text: 'VIX' }, { text: U.fmt(m.vix, 2) + (m.vix_regime ? ' · ' + m.vix_regime : '') }]);
+      if (m.spy_1d != null) pill([{ cls: 'k', text: 'SPY 1D' }, { cls: U.dirCls(m.spy_1d), text: U.pct(m.spy_1d) }]);
+    })
+    .catch(function () { /* the pulse is context, not the point of the page */ });
+})();
+</script>
+</body>
+</html>
