@@ -931,6 +931,7 @@ function _signalIbs(s) {
   return Number.isFinite(ctx) ? ctx : null;
 }
 const _etDateStr = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const _etMinOf = (ms) => { const d = new Date(new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); };
 // Minutes elapsed in the REGULAR session (09:30-16:00 ET); null outside it.
 // The bounce exit reads a session range, so it needs the session to have one.
 function _sessionMinutes(now) {
@@ -1150,6 +1151,7 @@ const _stopOrders = new Map();
 // mirrors is a GTC and outlives the process; even if this map is lost, the
 // ratchet pass re-records a working stop it finds at/above entry.
 const _beStopAt = new Map();
+const _gapAuction = new Map();   // sym -> ET day its position was handed to the opening auction (gap_stop_to_open, 2026-10-15)
 function _registerStop(sym, r, px, qty) {
   if (r && r.order_id && !/error/i.test(String(r.status || ''))) {
     _stopOrders.set(sym, { id: String(r.order_id), px, qty, at: Date.now() });
@@ -1296,6 +1298,7 @@ function _saveState() {
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
       stopOrders: Object.fromEntries(_stopOrders),   // #3379: a GTC stop OUTLIVES the process by design
       beStopAt: Object.fromEntries(_beStopAt),       // #3413: the ratchet must not un-ratchet on restart
+      gapAuction: Object.fromEntries(_gapAuction),   // a market-on-open hand-off must survive a restart: no stop may be stacked on it
       limitShadow: Object.fromEntries(_limitShadow), // #3424: a restart mid-session must not lose the day's shadow
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
       cadenceDecided: { day: _cadenceDecided.day, boundary: _cadenceDecided.boundary },   // a spent entry bar survives restarts
@@ -1329,6 +1332,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
     for (const [k, v] of Object.entries(o.stopOrders || {})) _stopOrders.set(k, v);   // #3379: GTC stops outlive the process
     for (const [k, v] of Object.entries(o.beStopAt || {})) _beStopAt.set(k, v);       // #3413
+    for (const [k, v] of Object.entries(o.gapAuction || {})) _gapAuction.set(k, v);
     for (const [k, v] of Object.entries(o.limitShadow || {})) _limitShadow.set(k, v); // #3424
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
     if (o.cadenceDecided && o.cadenceDecided.day && Number.isFinite(Number(o.cadenceDecided.boundary)) && o.cadenceDecided.boundary !== null) {
@@ -2683,7 +2687,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // touch level and fills on the next downtick — effectively a take-profit.
     const _beLock = Math.max(0, Number(process.env.TRADER_BE_LOCK) || 0);
     const _stepPct = Math.max(0, Number(process.env.TRADER_STEP_FLOOR) || 0);   // 2026-08-24: stepped floor, % per step (0 = flat lock)
-    if ((_bePct > 0 || _stepPct > 0) && !_ordersUnknown) {
+    // REGULAR HOURS ONLY (2026-10-15 cost audit, operator: "do the fixes"). A raise read off a thin PRE-MARKET
+    // mark parks the stop over the opening print: GDX 10-15 stepped to entry+1% and +2% at 04:04 / 04:30 ET on
+    // pre-market marks, the stop then sold at the open (84.62) and GDX closed 87.02. Raises now wait for the
+    // regular session; TRADER_RATCHET_EXTENDED=1 restores the old behaviour.
+    const _ratchetNow = !extended || process.env.TRADER_RATCHET_EXTENDED === '1';
+    if ((_bePct > 0 || _stepPct > 0) && !_ordersUnknown && _ratchetNow) {
       let _beCancels = 0;
       for (const [sym, p] of Object.entries(heldPos)) {
         if (exclude.has(sym)) continue;
@@ -2743,9 +2752,59 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         if (Array.isArray(_fresh)) _openOrders = _fresh;
       }
     }
+    // ── GAPPED STOP -> THE OPENING AUCTION (2026-10-15 cost audit, operator: "do the fixes"). A stop the
+    //    pre-market already trades through fires on the opening print and fills as a market order in the
+    //    first seconds AFTER it, under the official open (GDX 10-15: 84.62 vs the 84.78 open; five stable stops
+    //    since 09-01 filled $1.0k under their opens). Inside the pre-open window the position goes to the
+    //    auction itself: cancel the stop, send a market-on-open sell (tif OPG). If the auction order is
+    //    refused, the stop goes straight back at its original level (the re-protect pass is the backstop).
+    //    TRADER_GAP_STOP_TO_OPEN=1 arms it (default off); window _FROM/_TO in ET minutes, margin _MIN_BP. ──
+    if (process.env.TRADER_GAP_STOP_TO_OPEN === '1' && extended && !_ordersUnknown) {
+      const _gNow = _etMinOf(now);
+      const _gFrom = Number(process.env.TRADER_GAP_STOP_TO_OPEN_FROM) || 560;   // 09:20 ET
+      const _gTo = Number(process.env.TRADER_GAP_STOP_TO_OPEN_TO) || 568;       // 09:28 ET: Alpaca stops taking OPG orders then
+      const _gMinBp = process.env.TRADER_GAP_STOP_TO_OPEN_MIN_BP != null && process.env.TRADER_GAP_STOP_TO_OPEN_MIN_BP !== '' && Number.isFinite(Number(process.env.TRADER_GAP_STOP_TO_OPEN_MIN_BP)) ? Number(process.env.TRADER_GAP_STOP_TO_OPEN_MIN_BP) : 10;
+      if (_gNow >= _gFrom && _gNow < _gTo) {
+        const _gDay = _etDateStr(now);
+        let _gHanded = 0;
+        for (const [sym, p] of Object.entries(heldPos)) {
+          if (exclude.has(sym)) continue;
+          const _gHeld = Math.floor(Math.abs(Number(p.qty) || 0));
+          if (_gHeld < 1 || _gapAuction.get(sym) === _gDay) continue;
+          const _gStops = (_openOrders || []).filter((o) => String(o.symbol || '').toUpperCase() === sym
+            && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') && STOP_WORKING.test(o.status || ''));
+          const _gTop = _gStops.reduce((a, o) => Math.max(a, Number(o.price) || Number(o.stopPrice) || 0), 0);
+          const _gMark = Number(p.current_price) || 0;
+          if (!(_gTop > 0) || !(_gMark > 0) || !(_gMark < _gTop * (1 - _gMinBp / 1e4))) continue;
+          await cancelRestingStops(bridge, userId, sym);
+          const _gR = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: _gHeld, type: 'market', timeInForce: 'opg', equity: account.equity, acceptWarnings: true })
+            .catch((e) => ({ status: 'error', reason: String((e && e.message) || e) }));
+          if (_gR && (_gR.status === 'placed' || _gR.status === 'submitted')) {
+            _gapAuction.set(sym, _gDay); _gHanded++;
+            workingSells.add(sym);
+            logTrade({ event: 'gap_stop_to_open', symbol: sym, qty: _gHeld, stop: _gTop, mark: _gMark, gap_bp: +((_gMark / _gTop - 1) * 1e4).toFixed(1), order_id: _gR.order_id || null,
+              why: `pre-market ${_gMark} is under the stop ${_gTop}: the stop would fill after the opening print, so the position sells IN the opening auction (market-on-open, 2026-10-15)` });
+          } else {
+            // the auction order was refused: put the stop back at its ORIGINAL level, so the old behaviour (a sale at
+            // the open) is what happens; if the broker refuses that too, the re-protect pass below re-attaches one.
+            const _gBack = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: _gHeld, type: 'stop', stopPrice: _gTop, timeInForce: 'gtc', equity: account.equity, acceptWarnings: true })
+              .catch((e) => ({ status: 'error', reason: String((e && e.message) || e) }));
+            if (_gBack && (_gBack.status === 'placed' || _gBack.status === 'submitted')) _registerStop(sym, _gBack, _gTop, _gHeld);
+            logTrade({ event: 'gap_stop_to_open_failed', symbol: sym, qty: _gHeld, stop: _gTop, mark: _gMark, reason: (_gR && (_gR.reason || _gR.error)) || 'no response',
+              restop: _gTop, restop_status: (_gBack && _gBack.status) || null, why: 'the opening-auction order was refused; the stop goes back at its original level' });
+          }
+        }
+        if (_gHanded) _saveState();
+        const _gFresh = await bridge.getIBKROpenOrders(userId).catch(() => null);
+        if (Array.isArray(_gFresh)) _openOrders = _gFresh;
+      }
+    }
     for (const [sym, p] of Object.entries(heldPos)) {
       if (_ordersUnknown) break;                  // orders fetch unreadable this scan — never re-protect blind
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
+      // A position handed to the opening auction has a working market-on-open sell: a stop on top of it
+      // would oversell. Hold off until 09:35 ET; a position still held then gets its stop back.
+      if (_gapAuction.get(sym) === _etDateStr(now) && _etMinOf(now) < 575) continue;
       const qty = Number(p.qty) || 0;
       if (qty > 0 && !hasStop(sym) && attemptsFor(sym) >= REPROTECT_MAX_ATTEMPTS) {
         (out.skipped = out.skipped || []).push({ symbol: sym, why: `re-protect capped: ${attemptsFor(sym)} prior stop order(s) exist but none is working (check for unconfirmed/Inactive orders)` });
@@ -3804,6 +3863,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
 module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

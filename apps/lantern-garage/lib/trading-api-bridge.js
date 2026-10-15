@@ -225,7 +225,7 @@ class TradingAPIBridge {
       // the caller sized from — without it a market buy's notional reads as zero and
       // the cap never binds on the engine's normal entry path.
       refPrice,
-      tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
+      tif: (() => { const v = String(timeInForce || defaultTif).toLowerCase(); return v === 'gtc' ? 'GTC' : v === 'opg' ? 'OPG' : 'DAY'; })(),   // OPG = market-on-open (gap_stop_to_open)
       equity: eq,
       outsideRth: !!outsideRth,   // pre/post-market fills (LMT + outsideRTH)
       // RISK-REDUCING sells clear IBKR's order warnings automatically (2026-07-27:

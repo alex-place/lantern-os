@@ -125,3 +125,16 @@ test('the lock is clamped below the market so the broker cannot reject it', asyn
     assert.ok(w >= 102.8, `but only just below (got ${w})`);
   } finally { delete process.env.TRADER_BE_RATCHET; delete process.env.TRADER_BE_LOCK; delete process.env.TRADER_STEP_FLOOR; }
 });
+
+test('EXTENDED HOURS (2026-10-15): no raise on a pre-market mark; TRADER_RATCHET_EXTENDED=1 restores it', async () => {
+  // GDX 10-15: the floor stepped to entry+1% and +2% at 04:04 / 04:30 ET on thin pre-market marks, the stop then sold
+  // at the open (84.62) and GDX closed 87.02. Raises now wait for the regular session.
+  process.env.TRADER_BE_RATCHET = '0.01'; process.env.TRADER_BE_LOCK = '0.01'; process.env.TRADER_STEP_FLOOR = '1';
+  try {
+    await at.runAutoTrade(scan, { bridge: world({ mark: 102.2 }), userId: 't', extended: true, protectiveOnly: true });
+    assert.strictEqual(resizes().length, 0, 'a pre-market +2.2% mark moves no stop');
+    process.env.TRADER_RATCHET_EXTENDED = '1';
+    await at.runAutoTrade(scan, { bridge: world({ mark: 102.2 }), userId: 't', extended: true, protectiveOnly: true });
+    assert.strictEqual(resizes()[0].stop_want, 102, 'the opt-out restores the old pre-market raise');
+  } finally { delete process.env.TRADER_BE_RATCHET; delete process.env.TRADER_BE_LOCK; delete process.env.TRADER_STEP_FLOOR; delete process.env.TRADER_RATCHET_EXTENDED; }
+});
