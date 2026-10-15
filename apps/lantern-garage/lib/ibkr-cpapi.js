@@ -701,7 +701,11 @@ class IbkrCpapi {
       orderType: o.orderType || o.order_type || '',
       price: firstNum(o.price, o.limit_price),
       avgPrice: firstNum(o.avgPrice, o.average_price),
-      time: firstNum(o.lastExecutionTime_r) || o.lastExecutionTime || o.orderTime || null,
+      // EXECUTION time only (2026-10-15). The old `|| o.orderTime` fallback stamped a GTC stop's FILL with the
+      // time the stop was PLACED: SMH placed 10-14 14:17 ET, filled at the 10-15 open, booked to 10-14 and missing
+      // from both days' P&L (SLV 10-14 the same). The placement time travels separately for the age guards.
+      time: firstNum(o.lastExecutionTime_r) || o.lastExecutionTime || null,
+      orderTime: o.orderTime || null,
     }));
   }
 

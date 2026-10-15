@@ -36,6 +36,16 @@ function isFilledSell(o) {
   return Number(o.filledQty) > 0;
 }
 
+/** When the order was PLACED (IBKR orderTime), epoch ms or null. Used ONLY by the age guards below, never as
+ *  the fill time: a GTC stop placed yesterday and filled at today's open was booked to yesterday (SMH 2026-10-15). */
+function placedTimeMs(o) {
+  const raw = (o && o.orderTime) ?? null;
+  if (raw == null) return null;
+  if (typeof raw === 'number') return raw < 1e12 ? raw * 1000 : raw;
+  const t = Date.parse(String(raw));
+  return Number.isFinite(t) ? t : null;
+}
+
 /** Broker order timestamp in epoch ms, or null when absent/unparseable. */
 function orderTimeMs(o) {
   const raw = (o && (o.time ?? o.lastExecutionTime ?? o.filledAt ?? o.updatedAt)) ?? null;
@@ -67,14 +77,15 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     // rows on top of the day's already-wrong ones and made the ledger unusable
     // for P&L. A fill older than this process only ever produces noise, so skip
     // it. The id is still REMEMBERED (see idsToRemember) so it cannot resurface.
-    const t = orderTimeMs(o);
+    const t = orderTimeMs(o);                 // the EXECUTION time (null when the broker gives none)
+    const tAge = t != null ? t : placedTimeMs(o);   // the age guards may fall back to when the order was placed
     const sym = String(o.symbol || o.ticker || '').toUpperCase();
     const info = (entryFor && entryFor(sym)) || {};
     // A fill that predates the position it would close is not that position's exit (live
     // 2026-09-25: a 10:00:35 stop fill on a carry the other sleeve owned was booked against
     // a position this brain opened at 11:17:57). Tracked position, older fill -> skip.
-    if (t != null && Number(info.openedAt) > 0 && t < Number(info.openedAt)) continue;
-    if (sinceMs > 0 && t != null && t < sinceMs) {
+    if (tAge != null && Number(info.openedAt) > 0 && tAge < Number(info.openedAt)) continue;
+    if (sinceMs > 0 && tAge != null && tAge < sinceMs) {
       // ...but a fill of a position this engine is TRACKING is not history: it is the exit it
       // has been waiting for. Race, SQQQ 2026-09-21: the GTC stop filled at the open while the
       // server was disarmed; the brain re-armed hours later, dropped its own exit as "older than
@@ -82,7 +93,7 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
       // fill AFTER the position's open time = ours. An unknown open time stays conservative: a
       // sell we cannot place after the entry could belong to an earlier round trip.
       const openedAt = Number(info.openedAt);
-      const tracked = Number(info.avg_entry_price) > 0 && openedAt > 0 && t >= openedAt;
+      const tracked = Number(info.avg_entry_price) > 0 && openedAt > 0 && tAge >= openedAt;
       if (!tracked) continue;
     }
 
@@ -177,4 +188,4 @@ function excursionFields(entryPx, peak, trough, stopDistPct) {
   return out;
 }
 
-module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs, excursionFields };
+module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs, placedTimeMs, excursionFields };

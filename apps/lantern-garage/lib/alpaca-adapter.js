@@ -275,7 +275,7 @@ async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPri
 
   const t = String(type || 'market').toLowerCase();
   const stopPx = stopPrice || (t === 'stop' ? limitPrice : null);
-  const tif = String(timeInForce || 'day').toLowerCase() === 'gtc' ? 'gtc' : 'day';
+  const tif = (() => { const v = String(timeInForce || 'day').toLowerCase(); return v === 'gtc' ? 'gtc' : v === 'opg' ? 'opg' : 'day'; })();   // opg = market-on-open, accepted until 09:28 ET
   const order = {
     symbol: ticker,
     qty: String(Math.abs(Number(qty) || 0)),
