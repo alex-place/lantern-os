@@ -103,6 +103,19 @@ let _extendedTrading = process.env.TRADER_EXTENDED_HOURS === '1';
 const _extendedExitsOnly = () => process.env.TRADER_EXTENDED_EXITS === '1';
 async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
+  // PRE-OPEN READ (v3, 2026-10-15): the AI layer's ~09:15 call on the size of the day's new
+  // entries (normal / half / stand aside). Journal-only like the other reads, so it sizes
+  // nothing. It sits ABOVE the market-hours gate: before the bell the loop scans only when an
+  // extended-hours flag is on, but it still TICKS (every AUTOSCAN_CLOSED_MS), and the module
+  // dedupes on its own journal, so a 09:10-09:29 window fires it exactly once.
+  try {
+    const _rs = require('../lib/regime-shadow');
+    if (_rs.enabled() && _rs.preopenEnabled()) {
+      const _et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const _m = _et.getHours() * 60 + _et.getMinutes();
+      if (_et.getDay() >= 1 && _et.getDay() <= 5 && _m >= 550 && _m < 570) _rs.run('preopen').catch(() => {});
+    }
+  } catch (_e) { /* the shadow must never touch the scan */ }
   const marketHours = _isUsMarketHours();
   const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
   // Protective-only window: run the loop, manage positions, take no entries.
