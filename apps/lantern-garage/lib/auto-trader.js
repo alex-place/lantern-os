@@ -2254,6 +2254,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       .map((o) => ({ id: o.orderId, side: o.side, type: o.orderType || o.type, qty: o.qty, status: o.status, price: o.price })).slice(0, 12) });
   }
   const _filledSyms = _reconcileFills(_ordersEarly);   // authoritative exits, priced at the fill
+  // SAME-SCAN FILL GUARD (2026-10-16). heldPos/heldQty are a START-of-scan snapshot, and IBKR's positions endpoint
+  // lags its orders feed: a sell this scan's orders read shows FILLED can still look held. Every pass below that sends
+  // a SELL for a held position (stop-size reconciliation, the ratchet, the gap auction, re-protect, held exits) skips
+  // those symbols for this scan. Live on stable: XLE's step-floor stop (2,628 @ 67.37) filled at 09:40:48; the 09:42:03
+  // scan booked that fill, still read 2,628 held, raised a NEW 2,628-share stop at the same level (stop_was null: a
+  // filled order is not a working one) and it filled at 09:42:06 — the account went SHORT 2,628 XLE. The next scan
+  // re-reads the book; a genuine remainder (a partial fill) gets its stop then, one scan later — the trade the
+  // empty-orders guard below already makes (one naked scan beats an oversell).
+  const _sellExclude = new Set([...exclude, ...(_filledSyms || [])]);
   // REGISTRY SEEDING (#3386). The #3379 registry only learns about stops the
   // engine places AFTER it shipped — QQQ, carried since 08-14 with a GTC stop
   // from a pre-registry process, stopped out on 2026-08-20 (-$1,718) and still
@@ -2648,7 +2657,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       .reduce((a, o) => a + (Number(o.qty) || 0), 0);
     if (!_ordersUnknown) {
       for (const [sym, p] of Object.entries(heldPos)) {
-        if (exclude.has(sym)) continue;
+        if (_sellExclude.has(sym)) continue;
         const _held = Math.abs(Number(p.qty) || 0);
         if (_held < 1) continue;                  // dust cannot carry a stop at all
         const _stopQty = _stopQtyFor(sym);
@@ -2695,7 +2704,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     if ((_bePct > 0 || _stepPct > 0) && !_ordersUnknown && _ratchetNow) {
       let _beCancels = 0;
       for (const [sym, p] of Object.entries(heldPos)) {
-        if (exclude.has(sym)) continue;
+        if (_sellExclude.has(sym)) continue;
         const qty = Number(p.qty) || 0;
         const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;  // genuine basis only — no mark fallback
         const mark = Number(p.current_price) || 0;
@@ -2768,7 +2777,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const _gDay = _etDateStr(now);
         let _gHanded = 0;
         for (const [sym, p] of Object.entries(heldPos)) {
-          if (exclude.has(sym)) continue;
+          if (_sellExclude.has(sym)) continue;
           const _gHeld = Math.floor(Math.abs(Number(p.qty) || 0));
           if (_gHeld < 1 || _gapAuction.get(sym) === _gDay) continue;
           const _gStops = (_openOrders || []).filter((o) => String(o.symbol || '').toUpperCase() === sym
@@ -2801,7 +2810,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     }
     for (const [sym, p] of Object.entries(heldPos)) {
       if (_ordersUnknown) break;                  // orders fetch unreadable this scan — never re-protect blind
-      if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
+      if (_sellExclude.has(sym)) continue;        // overnight-owned (its own engine protects/exits it) or filled this scan
       // A position handed to the opening auction has a working market-on-open sell: a stop on top of it
       // would oversell. Hold off until 09:35 ET; a position still held then gets its stop back.
       if (_gapAuction.get(sym) === _etDateStr(now) && _etMinOf(now) < 575) continue;
@@ -2866,7 +2875,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  if (_gate.allowed) try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude, protectiveOnly }); } catch (_e) { /* fail-soft */ }
+  if (_gate.allowed) try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude: _sellExclude, protectiveOnly }); } catch (_e) { /* fail-soft */ }
   // manageHeldExits updates every held position's peak; persist NOW so the common
   // early-return paths below (exits-only mode, no ENTER signals) don't drop it.
   _saveState();
