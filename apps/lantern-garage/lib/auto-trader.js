@@ -1546,6 +1546,59 @@ function trailTriggerPct(peakGainPct, base) {
   return base;                                            // small gain → base (room to develop)
 }
 
+// AN EXIT REFUSED FOR RESERVED SHARES IS RETRIED, NOT ABANDONED (2026-10-24, week-1 review).
+// cancelRestingStops settles (#3407) until the cancelled stop leaves the working book, yet
+// Alpaca can still refuse the sell that follows -- "insufficient qty available for order
+// (requested: N, available: 0)" -- because the shares are released a beat after the order
+// reads cancelled. Fifteen refusals 10-02..10-23, mostly in the 15:50-15:55 window where the
+// sale has to happen: on 10-22 the SOXS de-carry was refused and the 3x position rode the
+// night unintended; on 10-23 all three close-IBS max-hold sells were refused and left only at
+// 15:59 through the weekend flat. Two things made each refusal worse than a lost minute:
+//   - the caller treated it like a placed order: closeLong dropped the entry and hold clocks
+//     (the next scan re-adopted the max-hold clock at zero -> a close-IBS position would have
+//     been held a whole extra session) and stamped _exitAt, so exitReattemptMs (8 min)
+//     blocked the retry;
+//   - the same scan deleted heldQty, so the entry loop could have re-bought the symbol.
+// The refusal means the broker created NO order, so a retry cannot double-sell: wait, re-run
+// the cancel (idempotent), sell again -- bounded, so the close can never hang. Only this
+// explicit refusal is retried; a timeout or any other error keeps the old path, because an
+// order may exist behind it.
+const _QTY_RESERVED_RE = /insufficient (qty|quantity)|qty_available|held_for_orders/i;
+function _isQtyReservedReject(r) {
+  return !!(r && /error|reject/i.test(String(r.status || '')) && _QTY_RESERVED_RE.test(String(r.reason || r.error || r.message || '')));
+}
+const _exitKeptOpen = new Set();   // symbols whose exit was refused THIS scan: still held, never re-bought by the entry loop
+async function _sellAfterCancel(bridge, userId, sym, order) {
+  await cancelRestingStops(bridge, userId, sym);
+  let r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
+  const maxRetries = Math.max(0, Number(process.env.TRADER_EXIT_QTY_RETRIES ?? 3) || 0);
+  const waitMs = Math.max(0, Number(process.env.TRADER_EXIT_QTY_RETRY_MS ?? 1000) || 0);
+  let retries = 0;
+  while (_isQtyReservedReject(r) && retries < maxRetries) {
+    retries++;
+    await new Promise((res) => setTimeout(res, waitMs));
+    await cancelRestingStops(bridge, userId, sym);
+    r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
+  }
+  return { r, retries, reserved: _isQtyReservedReject(r) };
+}
+// Still refused after the retries: nothing rests at the broker and the position is still held.
+// Keep every per-position clock (entry, hold, peak, trough) so max-hold keeps counting from the
+// real entry; leave _exitAt unset so the next scan may retry at once. _exitStatus 'error' still
+// feeds the MAX_EXIT_FAILURES backoff, and the next pass re-protects the shares the cancel
+// left stopless (as before).
+function _keepOpenAfterReservedReject(sym, qty, hp, reason, r, retries, refPrice, out, now, extraExecuted = {}) {
+  _exitStatus.set(sym, r && r.status);
+  _lastOrderAt.set(sym, now);
+  _exitKeptOpen.add(sym);
+  logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status,
+    ref_px: Number(refPrice) > 0 ? Number(refPrice) : null,
+    error: (r && (r.reason || r.error)) || null, retries, kept_open: true,
+    why: 'the broker still held the shares for the cancelled stop -- no order exists; position and its clocks kept, the next scan retries' });
+  if (out) out.executed.push({ ...extraExecuted, symbol: sym, action: 'exit_long', qty, reason, result: r });
+  return { ...(r || {}), keptOpen: true };
+}
+
 /** Close a held long at market: cancel its resting stop, clear per-symbol state,
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
 async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
@@ -1600,8 +1653,8 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   // A real exit supersedes a decision deferred to the open; left in place, the open's
   // flush would sell the same shares a second time.
   if (_deferredExit.delete(sym)) _saveState();
-  await cancelRestingStops(bridge, userId, sym);
-  const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
+  const { r, retries, reserved } = await _sellAfterCancel(bridge, userId, sym, order);
+  if (reserved) return _keepOpenAfterReservedReject(sym, qty, hp, reason, r, retries, refPrice, out, now);
   // Freeze the excursion run BEFORE clearing per-symbol state — the fill row that
   // needs it is only written later, at broker reconcile (#3241).
   _excursion.set(sym, { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null,
@@ -1617,7 +1670,8 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
     // the quote the exit was decided on (2026-10-09): exit slippage = ref_px vs the fill, as quote_px vs fill_px on entries
     ref_px: Number(refPrice) > 0 ? Number(refPrice) : null,
     // #3407: keep the broker's words — status:'error' alone cost a diagnosis round trip on 08-21
-    error: (r && /error/i.test(String(r.status || '')) && (r.reason || r.error)) || null });
+    error: (r && /error/i.test(String(r.status || '')) && (r.reason || r.error)) || null,
+    ...(retries ? { retries } : {}) });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
   return r;
 }
@@ -2132,6 +2186,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // entries. Each engine manages only its own positions; the caller (trading.js)
   // supplies the live exclusion set.
   const exclude = new Set([...(excludeSymbols || [])].map((s) => String(s).toUpperCase()));
+  _exitKeptOpen.clear();   // per scan: this scan's positions snapshot is fresh broker truth
   const c = cfg();
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
   _warnExitAuthority(c);
@@ -3072,8 +3127,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         // (2026-09-18: four canceled TLT orders, an 8-minute retry loop, exit_frozen).
         // Between cancel and sell the position is stopless for ~a second; a failed sell
         // is re-protected by the next scan pass, exactly as before.
-        await cancelRestingStops(bridge, userId, sym);
-        const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
+        const { r, retries, reserved } = await _sellAfterCancel(bridge, userId, sym, exOrder);
+        if (reserved) {   // refused for reserved shares after the retries -- see _sellAfterCancel
+          _keepOpenAfterReservedReject(sym, held, heldPos[sym] || {}, 'signal_exit', r, retries, price, out, now, record);
+          console.warn('[Trading] signal_exit ' + sym + ' refused (shares still reserved) after ' + retries + ' retries -- position kept, next scan retries');
+          continue;
+        }
         _entryAt.delete(sym); _holdClockAt.delete(sym); _exitAt.set(sym, now);
         _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
         const hp = heldPos[sym] || {};
@@ -3083,7 +3142,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
           ref_px: Number(price) > 0 ? Number(price) : null,   // the signal's price the exit was decided on (2026-10-09)
           // #3660 B: the WHY is not optional -- this row used to say status:"error"
           // with no cause while the broker rejection text sat unread in r.reason.
-          error: (r && r.status === 'error' && (r.reason || r.error)) || undefined });
+          error: (r && r.status === 'error' && (r.reason || r.error)) || undefined,
+          ...(retries ? { retries } : {}) });
         if (r && r.status === 'error') console.warn('[Trading] signal_exit ' + sym + ' placement failed: ' + (r.reason || r.error || 'unknown'));
         out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
         _lastOrderAt.set(sym, now);
@@ -3105,6 +3165,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       || held * (Number(heldPos[sym] && heldPos[sym].current_price) || price || 0));
     const _isDustHolding = held > 0 && c.dustPct > 0 && _heldMv < account.equity * (c.dustPct / 100);
     if (_bookWait.wait) { out.skipped.push({ ...record, why: _bookWait.why }); continue; }
+    // An exit the broker refused THIS scan left the position held, but the exit path already
+    // dropped it from heldQty, so 'already long' below would read it as flat (2026-10-24).
+    if (_exitKeptOpen.has(sym)) { out.skipped.push({ ...record, why: 'exit refused this scan (shares still reserved) -- still held, not re-bought' }); continue; }
     if (held > 0 && !_isDustHolding) { out.skipped.push({ ...record, why: 'already long' }); continue; }
     // UNEXPLAINED FLAT = FEED DROPOUT, NOT AN OPPORTUNITY (#3282).
     //
@@ -3872,6 +3935,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
+function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
