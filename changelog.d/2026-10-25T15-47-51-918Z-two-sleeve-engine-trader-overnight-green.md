@@ -1,0 +1,3 @@
+### Added
+
+- Two-sleeve engine: TRADER_OVERNIGHT_GREEN_SHADOW=1 journals a 09:35 green-exit rule beside the armed overnight book, changing no order. The rule sells a held name at the 09:35 print when it is above its 15:55 entry, else at 09:40 as today; in the replay it lifts the overnight sleeve's win rate 3.5-4.3 points at an unchanged mean. Rows overnight_green_shadow (the 09:35 read) and overnight_green_shadow_close (both prices and both returns) go to the sleeve's own log, and the worker reports overnight armed+green-shadow. The entry comes from the 5-minute bars, so a runner restart overnight loses nothing.

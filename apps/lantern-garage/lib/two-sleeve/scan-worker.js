@@ -28,6 +28,8 @@
  * (lib/two-sleeve/overnight-scan.js) over the sleeve s universe (required); TRADER_OVERNIGHT_TREND_N (default 200).
  * TRADER_OVERNIGHT_SHADOW=1 offers nothing and journals the reads it would have traded (overnight_shadow /
  * overnight_shadow_exit rows in the worker's own log). The reply's `overnight` field carries the per-name reads.
+ * TRADER_OVERNIGHT_GREEN_SHADOW=1 keeps the book as it is and journals the 09:35 green-exit rule beside it
+ * (overnight_green_shadow / overnight_green_shadow_close rows; ready reports overnight 'armed+green-shadow').
  */
 const path = require('path');
 
@@ -109,13 +111,15 @@ async function drain() {
       const { createOvernightScan, TREND_N } = require(path.join(app, 'lib', 'two-sleeve', 'overnight-scan'));
       if (!Array.isArray(universe) || !universe.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=overnight needs the sleeve s universe (its index funds)');
       const shadow = process.env.TRADER_OVERNIGHT_SHADOW === '1';
+      // TRADER_OVERNIGHT_GREEN_SHADOW=1 (2026-10-25): journal-only rows for the 09:35 green-exit rule beside the armed book.
+      const greenShadow = process.env.TRADER_OVERNIGHT_GREEN_SHADOW === '1';
       const ownLog = process.env.TRADER_TRADES_LOG || null;
-      const fq = ownLog && shadow ? require(path.join(app, 'lib', 'file-queue')) : null;
+      const fq = ownLog && (shadow || greenShadow) ? require(path.join(app, 'lib', 'file-queue')) : null;
       const trendN = process.env.TRADER_OVERNIGHT_TREND_N ? Number(process.env.TRADER_OVERNIGHT_TREND_N) : TREND_N;
-      overnight = createOvernightScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), trendN, shadow,
+      overnight = createOvernightScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), trendN, shadow, greenShadow,
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'overnight', watchlist: overnight.symbols.length,
-        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : 'armed', trendN, ibsMax: null, pMin: null, shortEdge: null });
+        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : (greenShadow ? 'armed+green-shadow' : 'armed'), trendN, ibsMax: null, pMin: null, shortEdge: null });
       drain();
       return;
     }
