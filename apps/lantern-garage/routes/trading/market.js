@@ -137,7 +137,9 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             timestamp: scan.timestamp,
           })),
         ];
-        tradingMemory.recordNewSignals({ logs: logEntries }).catch((e) => {
+        // Once per scan, trading store only (recordScanLog): every /zones poll used to
+        // re-append this scan's rows and copy them into the CSF memory registry.
+        tradingMemory.recordScanLog(scan.timestamp, logEntries).catch((e) => {
           console.error('[Trading] /zones agent-log write failed:', e.message);
         });
       }

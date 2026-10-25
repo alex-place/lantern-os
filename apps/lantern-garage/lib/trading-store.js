@@ -15,7 +15,7 @@
 const path = require("path");
 
 const { appendJsonlQueued } = require("./file-queue");
-const { readJsonlCached } = require("./jsonl-cache");
+const { readJsonlCached, readJsonlTail } = require("./jsonl-cache");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
@@ -53,16 +53,21 @@ async function appendLogEntry(entry) {
   return entry;
 }
 
-/** Read all stored orders (oldest first), optionally limited to the most recent N. */
+/**
+ * Read all stored orders (oldest first), optionally limited to the most recent N.
+ * With a limit only the file's tail is parsed (readJsonlTail), never the whole file.
+ */
 function listOrders({ limit } = {}) {
-  const all = _readAll(ordersPath());
-  return limit ? all.slice(-limit) : all;
+  return limit ? readJsonlTail(ordersPath(), limit).slice() : _readAll(ordersPath());
 }
 
-/** Read all stored agent-log entries (oldest first), optionally limited to the most recent N. */
+/**
+ * Read all stored agent-log entries (oldest first), optionally limited to the most
+ * recent N. With a limit only the tail is parsed: the dashboard asks for 100 rows and
+ * this file reached 430 MB on the stable box (2026-10-25).
+ */
 function listLogEntries({ limit } = {}) {
-  const all = _readAll(agentLogPath());
-  return limit ? all.slice(-limit) : all;
+  return limit ? readJsonlTail(agentLogPath(), limit).slice() : _readAll(agentLogPath());
 }
 
 module.exports = {
