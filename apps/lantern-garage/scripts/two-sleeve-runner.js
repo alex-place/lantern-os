@@ -53,6 +53,8 @@
  *        TWO_SLEEVE_SCAN=per-sleeve|shared, TWO_SLEEVE_SCAN_TIMEOUT_MS (45000),
  *        TWO_SLEEVE_FAKE_NOW=<ISO> (dry runs only: pin the runner's clock for an after-hours smoke),
  *        TRADER_AUTOSCAN_MS (60000), TRADER_AUTOSCAN_CLOSED_MS (300000),
+ *        TWO_SLEEVE_BAR_ALIGN=0 (turns off the bar-aligned ticks: in session the next tick otherwise lands on the next
+ *        5-minute bar close + 22 s when that comes first; see lib/two-sleeve/tick-schedule.js),
  * A sleeve may carry "scan": "noise" (2026-10-02): its worker runs the noise-area leg (lib/two-sleeve/noise-scan.js) over
  * the sleeve env s TRADER_NOISE_LEG_PAIRS instead of the tree s trader-agent scan; see
  * scripts/two-sleeve.config.noise-leg.example.json for the measured leg s settings. Without such a sleeve nothing changes.
@@ -87,6 +89,11 @@ const args = new Set(process.argv.slice(2));
 const DRY = args.has('--dry');
 const ONCE = args.has('--once');
 const { envFromFile, envForMode, dryFacade, tickSummary, ScanWorker, loadSleeveBrain } = require(path.join(APP, 'lib', 'two-sleeve', 'runner-support'));
+// BAR-ALIGNED TICKS (2026-10-25, lib/two-sleeve/tick-schedule.js): in session the next tick lands on the next 5-minute
+// bar close + the scans' 20 s settle when that comes before the regular cadence, so a decision bar is acted on ~25 s
+// after its close instead of 20-85 s. TWO_SLEEVE_BAR_ALIGN=0 restores the flat cadence.
+const { nextTickDelay } = require(path.join(APP, 'lib', 'two-sleeve', 'tick-schedule'));
+const BAR_ALIGN = process.env.TWO_SLEEVE_BAR_ALIGN !== '0';
 const CFG_FILE = process.env.TWO_SLEEVE_CONFIG || path.join(REPO, 'data', 'lantern-garage', 'trading', 'two-sleeve', 'config.json');
 const cfg = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'));
 const DIR = path.dirname(CFG_FILE);
@@ -248,7 +255,9 @@ async function tick() {
     console.error('[two-sleeve] tick failed:', stats.lastError);
     journal({ event: 'tick_error', error: stats.lastError });
   }
-  heartbeat({ marketHours: mh, protectiveOnly, nextInMs: delay });
+  let aligned = false;
+  if ((mh || protectiveOnly) && BAR_ALIGN) { const n = nextTickDelay(nowMs(), now, delay); delay = n.delayMs; aligned = n.aligned; }
+  heartbeat({ marketHours: mh, protectiveOnly, nextInMs: delay, aligned });
   if (ONCE || stopping) { stopWorkers(); return; }
   setTimeout(tick, delay);
 }

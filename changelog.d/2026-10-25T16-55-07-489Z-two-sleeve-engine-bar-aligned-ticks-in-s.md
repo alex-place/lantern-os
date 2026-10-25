@@ -1,0 +1,3 @@
+### Changed
+
+- Two-sleeve engine: bar-aligned ticks. In session the runner's next tick lands on the next 5-minute bar close plus the scans' 20 s settle (+2 s) whenever that comes before the flat 60 s cadence, and it ticks again at once when a tick ran across such an instant. Before, ticks drifted through the minute, so a decision bar was acted on 20-85 s after its close; the live fills of 09-25..10-23 landed 55-80 s after the price the replay assumes, about 8-10 bp a round trip on the leg and the overnight book in a volatile month. TWO_SLEEVE_BAR_ALIGN=0 restores the flat cadence; the heartbeat reports aligned.
