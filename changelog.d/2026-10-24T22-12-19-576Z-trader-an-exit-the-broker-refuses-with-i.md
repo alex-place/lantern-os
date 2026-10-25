@@ -1,0 +1,3 @@
+### Fixed
+
+- Trader: an exit the broker refuses with "insufficient qty available" (the cancelled protective stop still reserving the shares) is retried up to 3 times about a second apart, and if it stays refused the position keeps its entry and hold clocks and the next scan retries at once (no 8-minute debounce); the same scan no longer re-buys the symbol. Before: on Alpaca 15 exits were refused 10-02..10-23, the 10-22 SOXS de-carry left a 3x position overnight, the 10-23 close-IBS max-hold sells only left at 15:59, and on a weekday the reset hold clock would have held a close-IBS position a whole extra session. Other errors keep the old path. Knobs: TRADER_EXIT_QTY_RETRIES (3), TRADER_EXIT_QTY_RETRY_MS (1000)
