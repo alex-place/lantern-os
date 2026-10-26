@@ -443,20 +443,12 @@ function round(n, d) {
   return Math.round(n * f) / f;
 }
 
-// Is the US equity session open right now? (Mon–Fri, 09:30–16:00 America/New_York.)
-// DST-correct via Intl; does NOT account for market holidays — good enough to
-// avoid the 7s Python/Alpaca clock call that used to hang the header (#1860).
+// Is the US equity session open right now? The exchange calendar (lib/market-calendar.js, 2026-10-26): 09:30-16:00
+// America/New_York on a trading day, 09:30-13:00 on an early close, closed on weekends and weekday holidays. Local
+// rules, no network: the 7s Python/Alpaca clock call used to hang the header (#1860).
 function isUsEquityMarketOpen() {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York', weekday: 'short', hour: '2-digit',
-      minute: '2-digit', hour12: false,
-    }).formatToParts(new Date());
-    const get = (t) => parts.find((p) => p.type === t)?.value;
-    const wd = get('weekday');
-    if (wd === 'Sat' || wd === 'Sun') return false;
-    const mins = parseInt(get('hour'), 10) * 60 + parseInt(get('minute'), 10);
-    return mins >= 570 && mins < 960; // 09:30 (570) .. 16:00 (960) ET
+    return require('./market-calendar').isRegularHours(Date.now());
   } catch (e) {
     return false;
   }

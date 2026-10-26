@@ -15,16 +15,13 @@
 // 09:30 auction, and the dust probe's "accepted" order went Inactive at the
 // broker instead of working. Same order, different fate, purely because a human
 // pressed the button.
-//   rth      weekday 09:30-16:00 — market orders are fine
-//   extended weekday 04:00-09:30 / 16:00-20:00 — LMT + outsideRth required
-//   closed   otherwise — nothing executes; the order queues to the next session
+//   rth      09:30-16:00 on a trading day (09:30-13:00 on an early close) — market orders are fine
+//   extended 04:00-09:30 / the close + 4 h on a trading day — LMT + outsideRth required
+//   closed   otherwise, weekday holidays included (lib/market-calendar.js) — nothing executes; the order queues
+const marketCalendar = require('../../lib/market-calendar');
 function _sessionState(now = Date.now()) {
-  const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const dow = d.getDay();
-  const min = d.getHours() * 60 + d.getMinutes();
-  if (dow < 1 || dow > 5) return 'closed';
-  if (min >= 570 && min < 960) return 'rth';
-  if (min >= 240 && min < 1200) return 'extended';
+  if (marketCalendar.isRegularHours(now)) return 'rth';
+  if (marketCalendar.isExtendedHours(now)) return 'extended';
   return 'closed';
 }
 

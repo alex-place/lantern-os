@@ -87,3 +87,16 @@ test('dust is untouchable here too — 0.8 shares cannot fill an order', async (
   const out = await scan(AT_1555);
   assert.ok(!exited(out, 'SOXS'));
 });
+
+// THE EXCHANGE CALENDAR (2026-10-26): on a 13:00 early close the window moves with the close (12:50-13:00 by default),
+// so a 3x position is flat before the bell, not "flattened" at 15:55 into a closed market and carried over the weekend.
+test('a 13:00 early close: the de-carry runs 12:50-13:00, never at 15:55 after the close', async () => {
+  const HALF = (h, m) => Date.parse('2026-11-27T00:00:00Z') + ((h + 5) * 60 + m) * 60000;   // the Friday after Thanksgiving, EST
+  await new Promise((r) => setTimeout(r, 2100));   // let the 2 s pin cache forget the PIN test's SOXL
+  _resetCooldowns(); book = [pos('SOXL', 200, 145)]; sells = [];
+  assert.ok(!exited(await scan(HALF(12, 30)), 'SOXL'), '12:30: before the moved window');
+  _resetCooldowns(); book = [pos('SOXL', 200, 145)]; sells = [];
+  assert.ok(exited(await scan(HALF(12, 55)), 'SOXL'), '12:55: flat into the 13:00 close');
+  _resetCooldowns(); book = [pos('SOXL', 200, 145)]; sells = [];
+  assert.ok(!exited(await scan(HALF(15, 55)), 'SOXL'), '15:55 is after the close: nothing is sent into a closed market');
+});

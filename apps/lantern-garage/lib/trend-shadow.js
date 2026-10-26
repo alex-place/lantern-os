@@ -28,6 +28,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { inRegularSession } = require('./market-calendar');
 
 const RULES = [
   { id: 'v0', checks: [625, 685, 775] },
@@ -58,7 +59,7 @@ function sessionBars(rawBars, day) {
     const c = Number(b.close != null ? b.close : b.c), h = Number(b.high != null ? b.high : b.h), l = Number(b.low != null ? b.low : b.l);
     if (!Number.isFinite(t) || !(c > 0) || !(h > 0) || !(l > 0)) continue;
     const e = etOf(t);
-    if (e.day !== day || e.min < 570 || e.min >= 960) continue;
+    if (e.day !== day || !inRegularSession(day, e.min)) continue;   // the exchange calendar: an early close ends at 13:00
     out.push({ t, min: e.min, h, l, c });
   }
   return out.sort((a, b) => a.t - b.t);
@@ -269,7 +270,7 @@ function sessionsOf(rawBars) {
     const c = Number(b.close != null ? b.close : b.c), h = Number(b.high != null ? b.high : b.h), l = Number(b.low != null ? b.low : b.l);
     if (!Number.isFinite(t) || !(c > 0) || !(h > 0) || !(l > 0)) continue;
     const e = etOf(t);
-    if (e.min < 570 || e.min >= 960) continue;
+    if (!inRegularSession(e.day, e.min)) continue;   // after-hours prints of a 13:00 close are not session bars
     if (!by.has(e.day)) by.set(e.day, []);
     by.get(e.day).push({ t, min: e.min, h, l, c });
   }
