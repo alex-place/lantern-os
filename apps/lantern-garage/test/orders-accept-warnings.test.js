@@ -158,3 +158,51 @@ test('a sub-share remnant is flat for a Flatten (dust has its own Clear-dust pat
   assert.strictEqual(c.orderReq, null);
   assert.match(c.response.reason, /already flat/);
 });
+
+// ── FLATTEN IS IDEMPOTENT (2026-10-26): four presses sent four XLE orders ──
+// Each test uses its own symbol: the route remembers the last Flatten per account and symbol.
+
+const placedReply = (o) => ({ status: 'placed', order_id: 'F1', ticker: o.ticker, side: o.side, qty: o.qty });
+
+test('pressing Flatten again while the broker still shows the old position sends NOTHING', async () => {
+  const book = { positions: [{ symbol: 'XLB', qty: 2628 }], reply: placedReply };
+  const first = await drive({ ticker: 'XLB', side: 'sell', qty: 2628, type: 'market', flatten: true }, book);
+  assert.strictEqual(first.orderReq.qty, 2628);
+  const again = await drive({ ticker: 'XLB', side: 'sell', qty: 2628, type: 'market', flatten: true }, book);   // IBKR has not reported the fill yet
+  assert.strictEqual(again.orderReq, null, 'the second press would have opened a short');
+  assert.match(again.response.reason, /a Flatten \(SELL 2628\) was sent \d+ s ago and the broker still shows LONG 2628, so nothing was placed again/);
+});
+
+test('two presses landing together place ONE order', async () => {
+  let placed = 0;
+  const book = { positions: [{ symbol: 'XLU', qty: -500 }], reply: (o) => { placed += 1; return placedReply(o); } };
+  const [a, b] = await Promise.all([
+    drive({ ticker: 'XLU', side: 'buy', qty: 500, type: 'market', flatten: true }, book),
+    drive({ ticker: 'XLU', side: 'buy', qty: 500, type: 'market', flatten: true }, book),
+  ]);
+  assert.strictEqual(placed, 1, 'exactly one order reached the broker');
+  assert.strictEqual([a, b].filter((c) => c.orderReq).length, 1);
+});
+
+test('once the broker shows the fill, the next press finds the position flat', async () => {
+  await drive({ ticker: 'XLP', side: 'sell', qty: 300, type: 'market', flatten: true }, { positions: [{ symbol: 'XLP', qty: 300 }], reply: placedReply });
+  const after = await drive({ ticker: 'XLP', side: 'sell', qty: 300, type: 'market', flatten: true }, { positions: [], reply: placedReply });
+  assert.strictEqual(after.orderReq, null);
+  assert.match(after.response.reason, /already flat at the broker/);
+});
+
+test('a Flatten the broker refused can be retried at once', async () => {
+  const refused = await drive({ ticker: 'XLV', side: 'sell', qty: 100, type: 'market', flatten: true },
+    { positions: [{ symbol: 'XLV', qty: 100 }], reply: () => ({ status: 'error', error: 'rejected by broker' }) });
+  assert.ok(refused.orderReq, 'the first attempt was sent');
+  const retry = await drive({ ticker: 'XLV', side: 'sell', qty: 100, type: 'market', flatten: true },
+    { positions: [{ symbol: 'XLV', qty: 100 }], reply: placedReply });
+  assert.strictEqual(retry.orderReq.qty, 100, 'a refused send is forgotten, so the retry goes out');
+});
+
+test('ticket orders are not deduplicated: an explicit repeat order is the user call', async () => {
+  const book = { positions: [{ symbol: 'XLI', qty: 100 }], reply: placedReply };
+  const a = await drive({ ticker: 'XLI', side: 'buy', qty: 100, type: 'market' }, book);
+  const b = await drive({ ticker: 'XLI', side: 'buy', qty: 100, type: 'market' }, book);
+  assert.ok(a.orderReq && b.orderReq);
+});

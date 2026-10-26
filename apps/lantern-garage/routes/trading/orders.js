@@ -36,6 +36,15 @@ function _sessionState(now = Date.now()) {
 // shared agent log is ~90MB and grows by megabytes a day, so a broker verdict
 // written there is unfindable within days without scanning the file. A dedicated
 // file holds a handful of rows forever, so the lookup is exact and costs nothing.
+// FLATTEN IS IDEMPOTENT (2026-10-26). Pressed four times in a row, Flatten sent four orders
+// (XLE: sell, sell, sell, buy between 10:53:55 and 10:54:2x), because each press read a book that
+// still showed the position: IBKR reports fills seconds after they happen. The last Flatten placed
+// per account and symbol is remembered with the position the broker showed when it was sent; while
+// the broker still shows that same position, a repeat sends nothing. Written at the moment the
+// order is decided, before any broker call, so two presses landing together cannot both pass; a
+// send the broker refuses is forgotten at once, so a real retry is never blocked.
+const _flattenSent = new Map();   // `${bookUid}|${SYMBOL}` -> { at, side, qty, before }
+const FLATTEN_SETTLE_MS = 120000;
 function _dustProbeLog(agentLogPath) {
   return require('path').join(require('path').dirname(agentLogPath), 'dust-probes.jsonl');
 }
@@ -513,7 +522,13 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         } catch (_e) { return { why: `${ticker}: the working orders could not be read, so nothing was placed. Try again.` }; }
         const n = held - Math.floor(resting);
         if (n < 1) return { why: `${ticker}: a closing order for ${held} is already working, so nothing was placed` };
-        return { qty: n };
+        const key = `${bookUid}|${String(ticker).toUpperCase()}`;
+        const prev = _flattenSent.get(key);
+        if (prev && Date.now() - prev.at < FLATTEN_SETTLE_MS && prev.before === signed) {
+          return { why: `${ticker}: a Flatten (${prev.side.toUpperCase()} ${prev.qty}) was sent ${Math.max(1, Math.round((Date.now() - prev.at) / 1000))} s ago and the broker still shows ${signed > 0 ? 'LONG' : 'SHORT'} ${held}, so nothing was placed again. The position updates once IBKR reports that fill.` };
+        }
+        _flattenSent.set(key, { at: Date.now(), side: _isSell ? 'sell' : 'buy', qty: n, before: signed });
+        return { qty: n, key };
       };
       if (stopLoss != null && Number(stopLoss) <= 0) {
         sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
@@ -527,6 +542,7 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // one-click Alpaca account (ADR-0027), then the legacy env agent. First match
       // that isn't null wins. Every path is HARD-GATED inside its own placeOrder.
       const uid = getEffectiveUserId(req);
+      let _flattenKey = null;
       if (payload.flatten === true) {
         const fq = await _freshFlattenQty(uid);
         if (fq.why) {
@@ -534,6 +550,7 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           return true;
         }
         qty = fq.qty;
+        _flattenKey = fq.key;
       }
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings, manual: true };
       // EXTENDED-HOURS CONVERSION (#3326). A MARKET order does not execute
@@ -681,6 +698,8 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           .map((w) => [].concat(w && w.message).filter(Boolean).join(' ')).filter(Boolean);
       }
       if (payload.flatten === true && result) result.flatten = true;
+      // A Flatten the broker did not take is forgotten, so pressing it again really retries.
+      if (_flattenKey && !(result && result.status === 'placed')) _flattenSent.delete(_flattenKey);
       // The session caveat rides on the response so the toast can tell the truth
       // about WHEN this order will act — "placed" and "will fill" are different
       // claims, and conflating them is what made a pre-market Flatten look done.
