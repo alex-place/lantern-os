@@ -195,3 +195,21 @@ test('the extended-hours marketable limit does not deny its own sized order', ()
   assert.strictEqual(ext.allowed, true, 'the 0.2% marketable uplift must not trip the cap');
 });
 
+
+// 2026-10-26: covering stable's accidental XLE short. A cover is a BUY, and outside RTH the
+// manual route sends it as a priced marketable limit, so the cap that judges buys would have
+// refused $182k of XLE against 12% x $963k. Only a buy its caller VERIFIED as a cover skips it.
+const XLE = { qty: 2628, price: 69.33, equity: 963000 };
+
+test('a VERIFIED short cover is not capped by the position-size limit', () => {
+  const g = armed({}, { ...XLE, side: 'buy', reducing: true });
+  assert.strictEqual(g.allowed, true, `a verified cover must close the short: ${g.reason}`);
+});
+
+test('the same buy WITHOUT the verification is still capped', () => {
+  const g = armed({}, { ...XLE, side: 'buy' });
+  assert.strictEqual(g.allowed, false);
+  assert.match(g.reason, /exceeds cap/);
+  const fake = armed({}, { ...XLE, side: 'buy', reducing: 'yes' });
+  assert.strictEqual(fake.allowed, false, 'only a boolean true counts');
+});

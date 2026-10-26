@@ -227,3 +227,66 @@ test('open-orders feed unreadable → cannot verify → no auto-accept (blind ru
   assert.strictEqual(captured.orderReq.acceptWarnings, false, 'an unreadable orders feed is the dropout shape — human check stays');
   void c;
 });
+
+// ── short covers (2026-10-26): stable's accidental XLE short could not be closed ──
+// Both the Flatten button and the order ticket dead-ended: a cover is a BUY, and no buy
+// ever cleared IBKR's warnings. A buy that only brings a short back toward flat gets the
+// same proof a risk-reducing sell gets. The proof now reads the position's SIGN.
+
+test('a BUY that covers a short auto-accepts and tells the guard it reduces risk', async () => {
+  const c = await drive(
+    { ticker: 'XLE', side: 'buy', qty: 2628, type: 'market' },
+    { positions: [{ symbol: 'XLE', qty: -2628 }] },     // the live 2026-10-26 shape
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true, 'qty <= |short| is a verified cover');
+  assert.strictEqual(c.orderReq.reducing, true, 'the size cap must not block the cover');
+  assert.strictEqual(c.response.auto_warnings, 'short_cover_buy');
+});
+
+test('a PARTIAL cover auto-accepts; a cover larger than the short does not (it would flip long)', async () => {
+  const part = await drive({ ticker: 'XLE', side: 'buy', qty: 1000, type: 'market' }, { positions: [{ symbol: 'XLE', qty: -2628 }] });
+  assert.strictEqual(part.orderReq.acceptWarnings, true);
+  const over = await drive({ ticker: 'XLE', side: 'buy', qty: 3000, type: 'market' }, { positions: [{ symbol: 'XLE', qty: -2628 }] });
+  assert.strictEqual(over.orderReq.acceptWarnings, false, 'buying 3000 against a 2628 short would open a 372-share long');
+  assert.strictEqual(over.orderReq.reducing, undefined, 'an unverified buy never carries the flag');
+});
+
+test('A RESTING COVER COUNTS: a second identical cover must NOT auto-accept', async () => {
+  const c = await drive(
+    { ticker: 'XLE', side: 'buy', qty: 2628, type: 'market' },
+    {
+      positions: [{ symbol: 'XLE', qty: -2628 }],
+      openOrders: [{ symbol: 'XLE', side: 'BUY', qty: 2628, orderType: 'Market', status: 'Submitted' }],
+    },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false, 'short 2628 minus a resting 2628 cover leaves nothing to cover');
+});
+
+test('THE SIGN: a SELL against a SHORT never auto-accepts (|qty| used to verify it and would double the short)', async () => {
+  const c = await drive(
+    { ticker: 'XLE', side: 'sell', qty: 2628, type: 'market' },
+    { positions: [{ symbol: 'XLE', qty: -2628 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false);
+  assert.strictEqual(c.response.auto_warnings, undefined);
+});
+
+test('a warned BUY that could not be verified says so, in IBKR\'s words, instead of "re-submit with acceptWarnings"', async () => {
+  const captured = { response: null };
+  const ctx = {
+    sendJson: (_res, body) => { captured.response = body; },
+    collectRequestBody: async () => JSON.stringify({ ticker: 'XLE', side: 'buy', qty: 100, type: 'market' }),
+    bridge: {
+      placeIBKROrder: async () => ({ status: 'needs_confirmation', reason: 'IBKR returned order warnings; re-submit with acceptWarnings:true to confirm each',
+        warnings: [{ id: 'w1', message: 'The order size exceeds the Size Limit' }] }),
+      getIBKRPositions: async () => [{ symbol: 'XLE', qty: 500 }],   // long: this buy adds to it (P0-8)
+      getIBKROpenOrders: async () => [],
+    },
+    traderAgent: null, tradingMemory: { recordNewOrders: async () => {} }, tradingStore: {},
+    getEffectiveUserId: () => 'test-user',
+  };
+  await ordersRoutes({ method: 'POST', headers: {}, socket: {} }, {}, new URL('http://127.0.0.1/api/trading/orders/place'), ctx);
+  assert.match(captured.response.reason, /IBKR raised warnings on this BUY \("The order size exceeds the Size Limit"\)/);
+  assert.match(captured.response.reason, /nothing was placed/);
+  assert.doesNotMatch(captured.response.reason, /acceptWarnings/);
+});

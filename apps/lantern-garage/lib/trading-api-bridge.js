@@ -164,7 +164,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice, reducing }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -233,6 +233,9 @@ class TradingAPIBridge {
       // sell that then ran to -18.9% and a take-profit that gave back its whole gain).
       // Entries still surface warnings for a human, which is what P0-8 was protecting.
       acceptWarnings: !!acceptWarnings,
+      // A buy the caller VERIFIED as covering a short (the manual order route, 2026-10-26)
+      // is risk-reducing, so the guard's position-size cap does not judge it. Never set by the engine.
+      reducing: reducing === true,
     });
     const reason = [r.note || r.error || (r.gate && r.gate.reason) || null, fracNote].filter(Boolean).join('; ') || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read
@@ -244,6 +247,8 @@ class TradingAPIBridge {
       reason,
       error: r.status === 'error' ? reason : undefined, // surfaced by the UI (result.error)
       mode: r.gate && r.gate.mode,
+      // IBKR's own words when it stopped at a warning (needs_confirmation), so a caller can show them.
+      warnings: Array.isArray(r.warnings) && r.warnings.length ? r.warnings : undefined,
       stop_loss: stopLoss || null,
       take_profit: takeProfit || null,
       source: 'ibkr-cpapi',
