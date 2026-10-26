@@ -76,7 +76,7 @@ function haltFile() {
 // given up to remove 25% of the drawdown. Win rate is unchanged at 64%: sizing does not
 // change WHICH trades are taken, only how big. The operator chose this knowing the
 // number; TRADER_MAX_POSITION_PCT is the single knob that reverses it.
-function orderGate({ mode = "unknown", qty, price, equity, side, refPrice } = {}) {
+function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, reducing: verifiedReducing = false } = {}) {
   const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
   // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
   // equity (default 5% → $50k on $1M; must MATCH auto-trader.js maxPositionPct or
@@ -163,8 +163,11 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice } = {}
   // A sell cannot increase a long position, so the position-size cap has no business
   // judging it. Every other gate still applies to sells — the halt file, TRADER_LIVE,
   // the account-mode opt-in, and the MAX_ORDER_QTY sanity ceiling — and the trader is
-  // longs-only, so this does not open a naked-short path. Buys are untouched.
-  const reducing = String(side || "").toLowerCase() === "sell";
+  // longs-only, so this does not open a naked-short path.
+  // A BUY is treated the same way only when its caller VERIFIED it covers a short in the
+  // book (2026-10-26: the manual order route, after stable's accidental XLE short could
+  // not be covered); every other buy — the engine's included — is capped as before.
+  const reducing = String(side || "").toLowerCase() === "sell" || verifiedReducing === true;
   if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? ceilingPct + "% of equity — the HARD ceiling (cap " + maxPositionPct + "% x stress " + stressCeilMult + "); the symbol tilt cannot raise it" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
   if (process.env.TRADER_LIVE !== "1") return deny("TRADER_LIVE=0 — dry run (no real order placed); set TRADER_LIVE=1 to arm");
   if (mode === "unknown") return deny("account mode unknown — refusing to place a real order");

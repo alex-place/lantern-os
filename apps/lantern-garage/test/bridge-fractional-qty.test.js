@@ -43,3 +43,27 @@ test('integer quantities pass through untouched', async () => {
   assert.strictEqual(r.status, 'placed');
   assert.strictEqual(r.reason, null);
 });
+
+// 2026-10-26 (short covers): the bridge forwards a verified cover's `reducing` to the client, never invents it,
+// and hands IBKR's warning text back up so the route can show it.
+test('reducing is forwarded only when the caller set it, and IBKR warnings come back to the caller', async () => {
+  const got = [];
+  const b = stubbedBridge(got);
+  await b.placeIBKROrder('u', { ticker: 'XLE', side: 'buy', qty: 2628, type: 'market', equity: 963000, reducing: true });
+  await b.placeIBKROrder('u', { ticker: 'XLE', side: 'buy', qty: 10, type: 'market', equity: 963000 });
+  assert.strictEqual(got[0].reducing, true); assert.strictEqual(got[1].reducing, false);
+  const w = new TradingAPIBridge();
+  w.ibkrForUser = () => ({
+    getStatus: async () => ({ connected: true, mode: 'paper', accountId: 'DUR0' }),
+    placeOrder: async () => ({ status: 'needs_confirmation', note: 'IBKR returned order warnings; re-submit with acceptWarnings:true to confirm each',
+      warnings: [{ id: 'w1', message: 'The order size exceeds the Size Limit' }], gate: { allowed: true } }),
+  });
+  const r = await w.placeIBKROrder('u', { ticker: 'XLE', side: 'buy', qty: 10, type: 'market', equity: 963000 });
+  assert.strictEqual(r.status, 'needs_confirmation');
+  assert.deepStrictEqual(r.warnings, [{ id: 'w1', message: 'The order size exceeds the Size Limit' }]);
+});
+
+test('the IBKR client hands the verified flag to the guard (source pin)', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'ibkr-cpapi.js'), 'utf8');
+  assert.match(src, /const gate = orderGate\(\{ mode, qty, price, symbol, side, equity: eq, refPrice, reducing: reducing === true \}\);/);
+});

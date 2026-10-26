@@ -577,7 +577,7 @@ class IbkrCpapi {
    * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
-  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false, acceptWarnings = false, refPrice } = {}) {
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false, acceptWarnings = false, refPrice, reducing = false } = {}) {
     const status = await this.getStatus();
     const mode = status.mode; // 'paper' | 'live' | 'unknown'
     // Prefer the caller-supplied equity; else read the account so the guard's
@@ -586,7 +586,7 @@ class IbkrCpapi {
     if (!eq) { try { const s = await this.getAccountSummary(status.accountId); eq = (s && s.equity) || 0; } catch (_e) { /* fall back to flat cap */ } }
     // refPrice prices a MARKET order for the per-position cap — a market buy has no
     // price of its own, and an uncapped one is how a position outgrows the guard.
-    const gate = orderGate({ mode, qty, price, symbol, side, equity: eq, refPrice });
+    const gate = orderGate({ mode, qty, price, symbol, side, equity: eq, refPrice, reducing: reducing === true });
     const order = {
       symbol: symbol || null,
       conid: conid != null ? Number(conid) : null,
