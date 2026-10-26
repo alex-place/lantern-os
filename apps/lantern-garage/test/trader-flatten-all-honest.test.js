@@ -93,7 +93,7 @@ test('the summary claims no mode — a live close is never called paper', async 
   const paper = closeAll([TWO[0]], PLACED);
   await paper.run();
   assert.match(paper.out.toasts[0], /\(paper\)/, 'the per-position toast lost its mode');
-  assert.match(live.out.toasts[0], /Flattened AAPL/);
+  assert.match(live.out.toasts[0], /Flatten: SELL 10 AAPL filled @ 199\.5/, 'the toast says what was sent, not "Flattened"');
   assert.doesNotMatch(live.out.toasts[0], /\(paper\)/);
 });
 
@@ -103,4 +103,33 @@ test('Close all still asks first, with the count and the money at stake', async 
   assert.strictEqual(t.out.confirms.length, 1, 'the hard confirm is what Rapid mode cannot skip');
   assert.match(t.out.confirms[0], /Close ALL 2 open positions/);
   assert.match(t.out.confirms[0], /3,800/, 'the total market value is what makes a misclick obvious');
+});
+
+// 2026-10-26: four presses of Flatten sent four XLE orders (sell, sell, sell, buy). A press while
+// one is being sent for the same symbol now does nothing, and the toast says what was SENT.
+test('a second press while a Flatten is being sent does nothing: ONE order', async () => {
+  const posted = [];
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const fetch = async (_url, opts) => { posted.push(JSON.parse(opts.body)); await gate; return { ok: true, statusText: 'OK', json: async () => ({ status: 'placed', qty: 2628, mode: 'paper' }) }; };
+  const toasts = [];
+  const scope = new Function('fetch', '_alertToast', 'window', 'journalLog', 'refreshAfterOrder', '_twoStep', '_lastPositions',
+    SRC + '\nreturn { flattenAll, flattenPosition };')(fetch, (m) => toasts.push(m), { confirm: () => true }, () => {}, () => {}, () => true, []);
+  const first = scope.flattenPosition('XLE', 'long', 2628, true);
+  const second = await scope.flattenPosition('XLE', 'long', 2628, true);   // pressed again while the first is in flight
+  assert.strictEqual(second, false, 'the repeat press is ignored');
+  release(); await first;
+  assert.strictEqual(posted.length, 1, 'exactly one order left the page');
+  assert.strictEqual(posted[0].flatten, true, 'the server is asked to size it from the fresh book');
+  assert.match(toasts[toasts.length - 1], /^Flatten: SELL 2628 XLE sent at market; the position updates when IBKR reports the fill \(paper\)$/);
+  const third = scope.flattenPosition('XLE', 'long', 2628, true);   // after it settled, a new press is sent (the server decides)
+  await third;
+  assert.strictEqual(posted.length, 2);
+});
+
+test('after an order the page re-reads the book fresh from the broker (source pin)', () => {
+  assert.match(PAGE, /Promise\.all\(\[loadOrders\(\), loadPortfolio\(\{ fresh: true \}\)\]\)/);
+  assert.match(PAGE, /fetch\('\/api\/trading\/positions' \+ \(opts && opts\.fresh \? '\?fresh=1' : ''\)\)/);
+  const market = fs.readFileSync(path.join(__dirname, '..', 'routes', 'trading', 'market.js'), 'utf8');
+  assert.match(market, /bridge\.getIBKRPositions\(uid, url\.searchParams\.get\('fresh'\) === '1' \? \{ fresh: true \} : undefined\)/);
 });

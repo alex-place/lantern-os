@@ -524,6 +524,18 @@ class IbkrCpapi {
    * looked like a flat (or smaller) book and the engine could buy on top of positions
    * it could not see (review H3, 2026-09-29). An EMPTY page is still the end.
    */
+  /**
+   * POST /portfolio/{acct}/positions/invalidate: drop IBKR's backend portfolio cache so the next
+   * positions read reflects recent fills (that read is cached and lags them). Best effort: true
+   * when IBKR accepted it.
+   */
+  async invalidatePositions(accountId) {
+    const id = accountId || (await this.resolveAccountId());
+    if (!id) return false;
+    const r = await this._request('POST', `/portfolio/${encodeURIComponent(id)}/positions/invalidate`);
+    return !!(r && r.ok);
+  }
+
   async getPositions(accountId, { maxPages = 5 } = {}) {
     const id = accountId || (await this.resolveAccountId());
     if (!id) return null;
@@ -577,7 +589,7 @@ class IbkrCpapi {
    * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
-  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false, acceptWarnings = false, refPrice, reducing = false } = {}) {
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false, acceptWarnings = false, refPrice, manual = false } = {}) {
     const status = await this.getStatus();
     const mode = status.mode; // 'paper' | 'live' | 'unknown'
     // Prefer the caller-supplied equity; else read the account so the guard's
@@ -586,7 +598,7 @@ class IbkrCpapi {
     if (!eq) { try { const s = await this.getAccountSummary(status.accountId); eq = (s && s.equity) || 0; } catch (_e) { /* fall back to flat cap */ } }
     // refPrice prices a MARKET order for the per-position cap — a market buy has no
     // price of its own, and an uncapped one is how a position outgrows the guard.
-    const gate = orderGate({ mode, qty, price, symbol, side, equity: eq, refPrice, reducing: reducing === true });
+    const gate = orderGate({ mode, qty, price, symbol, side, equity: eq, refPrice, manual: manual === true });
     const order = {
       symbol: symbol || null,
       conid: conid != null ? Number(conid) : null,

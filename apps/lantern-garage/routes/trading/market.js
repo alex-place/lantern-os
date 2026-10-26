@@ -336,7 +336,9 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       if (ibkrAccount) {
         // IBKR keeps just-closed names in the portfolio snapshot as qty:0 rows; they're
         // not positions anymore (a $0 "Long" line the user reads as clutter/loss). Drop them.
-        const ibkrPositions = (await bridge.getIBKRPositions(uid).catch(() => []))
+        // ?fresh=1 (the page's burst right after an order, 2026-10-26): ask IBKR for the book as it
+        // is now, not its cached copy, so a filled order shows within seconds (lib/trading-api-bridge.js).
+        const ibkrPositions = (await bridge.getIBKRPositions(uid, url.searchParams.get('fresh') === '1' ? { fresh: true } : undefined).catch(() => []))
           .filter((p) => Math.abs(Number(p && p.qty) || 0) > 0);
         // Reconcile the header's Unrealized P&L with the positions the user actually
         // sees. `ibkrAccount.unrealized` comes from IBKR's /pnl/partitioned `upl`, a
