@@ -41,6 +41,7 @@
  * Signals are untouched by it.
  */
 const { noiseBand, sessionBars, parseNoisePairs, NOISE_DECISIONS, etOf } = require('../trend-shadow');
+const { closeOffset, inRegularSession } = require('../market-calendar');
 const fs = require('fs');
 const path = require('path');
 
@@ -48,6 +49,7 @@ const BAR_MS = 5 * 60000;
 const SETTLE_MS = 20000;              // a bar is read 20 s after it closes (feed lag), as the shadow reads it
 const ENTRY_WINDOW_MS = 3 * 60000;    // an entry is offered only within 3 minutes of its decision bar's close
 const CLOSE_MIN = 950;                // 15:50 ET: the brain's de-carry sells the leg; no decision at or after it
+// (On a 13:00 early close it moves with the close, lib/market-calendar.js: no decision at or after the 12:50 bar.)
 // The live 5m feed holds ~14 sessions (lib/market-data-yahoo.js MAX_BARS incl. extended hours); the band needs 15.
 // A settled window 7 to 28 calendar days back is merged under it (#3720, the same fix as the shadow).
 const HISTORY_FROM_DAYS = 28;
@@ -119,7 +121,7 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
     for (const b of raw || []) {
       const t = tOf(b); const c = Number(b.close != null ? b.close : b.c);
       if (!Number.isFinite(t) || !(c > 0)) continue;
-      const e = etOf(t); if (e.min < 570 || e.min >= 960) continue;
+      const e = etOf(t); if (!inRegularSession(e.day, e.min)) continue;
       if (!by.has(e.day)) by.set(e.day, new Map());
       by.get(e.day).set(e.min, { t, c });
     }
@@ -220,7 +222,7 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
       const lim = last && band.at ? band.at(last.min) : null;
       if (!lim && !why) why = band.why || (last ? 'no band at this bar' : 'no completed bar today');
       const state = lim ? (last.c > lim.upper ? 'up' : last.c < lim.lower ? 'dn' : 'in') : null;
-      const decision = !!(last && state && state !== 'in' && NOISE_DECISIONS.includes(last.min) && last.min < CLOSE_MIN
+      const decision = !!(last && state && state !== 'in' && NOISE_DECISIONS.includes(last.min) && last.min < CLOSE_MIN - closeOffset(e.day)
         && now - (last.t + BAR_MS) <= entryWindowMs);
       const prices = { state, up: null, dn: null };
       // THE LATE-REVERSAL GATE AS A RULE (2026-10-08, ledger leg-early-sale-late-reversal-gate-engine-13-windows /

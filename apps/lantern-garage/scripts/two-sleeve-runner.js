@@ -108,11 +108,12 @@ const SCAN_TIMEOUT_MS = parseInt(process.env.TWO_SLEEVE_SCAN_TIMEOUT_MS || '4500
 const FAKE_NOW = DRY && process.env.TWO_SLEEVE_FAKE_NOW ? Date.parse(process.env.TWO_SLEEVE_FAKE_NOW) : NaN;
 const nowMs = () => (Number.isFinite(FAKE_NOW) ? FAKE_NOW : Date.now());
 
-const et = (ms = Date.now()) => new Date(new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-const etMin = (ms) => { const d = et(ms); return d.getHours() * 60 + d.getMinutes(); };
-const isWeekday = (ms) => { const w = et(ms).getDay(); return w >= 1 && w <= 5; };
-const marketHours = (ms) => isWeekday(ms) && etMin(ms) >= 570 && etMin(ms) < 960;
-const extendedHours = (ms) => isWeekday(ms) && ((etMin(ms) >= 240 && etMin(ms) < 570) || (etMin(ms) >= 960 && etMin(ms) < 1200));
+// THE EXCHANGE CALENDAR (2026-10-26, lib/market-calendar.js): a weekday holiday is closed all day and a 13:00 early
+// close ends the session at 13:00 (its after-hours session runs 13:00-17:00), so no scan or brain tick treats a closed
+// market as open. On a full day both read exactly as the old 09:30-16:00 / 04:00-09:30 + 16:00-20:00 rules.
+const cal = require(path.join(APP, 'lib', 'market-calendar'));
+const marketHours = (ms) => cal.isRegularHours(ms);
+const extendedHours = (ms) => cal.isExtendedHours(ms);
 
 const journalFile = path.join(DIR, 'engine.jsonl');
 const journal = (row) => { try { fs.appendFileSync(journalFile, JSON.stringify({ ts: new Date().toISOString(), ...row }) + '\n'); } catch (_e) { /* never break a tick */ } };

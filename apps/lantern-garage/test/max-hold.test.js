@@ -86,3 +86,30 @@ test('the manual sell route cancels resting stops first — source pin', () => {
   const sendAt = src.indexOf('const attempts = alpacaFirst');
   assert.ok(cancelAt > 0 && sendAt > cancelAt, 'and it must happen BEFORE the order is sent');
 });
+
+test('weekday holidays are not sessions, and a 13:00 close moves the window to 12:50 (exchange calendar)', async () => {
+  const EST_AT = (isoDay, h, m) => new Date(`${isoDay}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-05:00`).getTime();
+  const wed = EST_AT('2026-11-25', 15, 55);
+  assert.strictEqual(at._sessionsHeld(wed, EST_AT('2026-11-26', 15, 50)), 0, 'Thanksgiving is not a session');
+  assert.strictEqual(at._sessionsHeld(wed, EST_AT('2026-11-27', 12, 50)), 1, 'the Friday after is the next session');
+  assert.strictEqual(at._sessionsHeld(EST_AT('2026-12-23', 15, 55), EST_AT('2026-12-28', 15, 50)), 2, 'Christmas Friday skipped');
+  const placed = [];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => [{ symbol: 'LNG', qty: 100, avg_entry_price: 100, current_price: 99, market_value: 9900, unrealized_pl: -100 }],
+    getIBKROpenOrders: async () => [], getIBKRDayPnl: async () => 0, getIBKROrderStatus: async () => null,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (u, o) => { placed.push(o); return { status: 'placed', order_id: 'X' + placed.length }; },
+  };
+  const sold = () => placed.filter((o) => o.side === 'sell' && !/stop/i.test(o.type || '')).length;
+  const run = (nowMs) => { at._resetCooldowns(); at._entryAtSet('LNG', wed); return at.runAutoTrade({ signals: [] }, { bridge, userId: 't', now: nowMs }); };
+  const prev = process.env.TRADER_MAX_HOLD_SESSIONS;
+  process.env.TRADER_MAX_HOLD_SESSIONS = '1'; process.env.TRADER_MANAGE_EXITS = '1';
+  try {
+    await run(EST_AT('2026-11-26', 15, 55)); assert.strictEqual(sold(), 0, 'nothing on Thanksgiving: the position is 0 sessions old');
+    await run(EST_AT('2026-11-27', 12, 30)); assert.strictEqual(sold(), 0, 'before the moved window');
+    await run(EST_AT('2026-11-27', 12, 52)); assert.strictEqual(sold(), 1, 'the 1-session close is 12:50-13:00 on the early close');
+  } finally {
+    if (prev === undefined) delete process.env.TRADER_MAX_HOLD_SESSIONS; else process.env.TRADER_MAX_HOLD_SESSIONS = prev;
+  }
+});

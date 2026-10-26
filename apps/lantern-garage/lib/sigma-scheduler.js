@@ -28,13 +28,10 @@ let _stopped = false;
 let _lastRebalanceAt = 0;
 let _last = { at: null, action: 'not started', orders: 0, gross: null, note: null };
 
-/** US regular market hours (ET), Mon–Fri 09:30–16:00 — when orders fill immediately. */
+/** US regular market hours by the exchange calendar (lib/market-calendar.js): 09:30-16:00 ET on a trading day,
+ *  09:30-13:00 on an early close, never on a weekend or a weekday holiday — when orders fill immediately. */
 function _marketOpen(now = new Date()) {
-  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return mins >= 570 && mins < 960;
+  return require('./market-calendar').isRegularHours(now.getTime());
 }
 
 function enabled() { return process.env.SIGMA_SCHEDULE === '1'; }

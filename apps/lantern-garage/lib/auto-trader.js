@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const yahoo = require('./market-data-yahoo');
 const { macd, rsi, emaSeries } = require('./signal-engine/indicators');
+// The exchange calendar (2026-10-26): the closing-window rules below were written against a 16:00 close. On a 13:00
+// early close they move with the close (closeOffset = 180), and session counts skip weekday holidays.
+const marketCalendar = require('./market-calendar');
 
 // Per-trade outcome log (append-only JSONL) — the honest record that lets us
 // MEASURE the autopilot's realized edge (win-rate / P&L) against the backtest,
@@ -935,10 +938,9 @@ const _etMinOf = (ms) => { const d = new Date(new Date(ms).toLocaleString('en-US
 // Minutes elapsed in the REGULAR session (09:30-16:00 ET); null outside it.
 // The bounce exit reads a session range, so it needs the session to have one.
 function _sessionMinutes(now) {
-  const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const m = d.getHours() * 60 + d.getMinutes();
-  if (m < 570 || m >= 960) return null;    // outside regular hours: the extended-hours guard already owns this path
-  return m - 570;
+  const e = marketCalendar.etOf(now);
+  if (!marketCalendar.inRegularSession(e.day, e.min)) return null;    // outside regular hours: the extended-hours guard already owns this path
+  return e.min - 570;
 }
 function _entryCadenceBlocked(etMin, cadence, phase = 0, window = 3, decided) {
   const k = Math.floor(Number(cadence));
@@ -1383,7 +1385,7 @@ async function _spySessionMovePct(now) {
     for (const b of bars) {
       const t = Date.parse(b.timestamp || b.t || b.time); if (!Number.isFinite(t) || t > now) continue;
       const d = et(t); if (d.toDateString() !== today) continue;
-      const m = d.getHours() * 60 + d.getMinutes(); if (m < 570 || m >= 960) continue;
+      const x = marketCalendar.etOf(t); if (!marketCalendar.inRegularSession(x.day, x.min)) continue;
       reg.push(Number(b.close));
     }
     if (reg.length >= 2 && reg[0] > 0 && reg[reg.length - 1] > 0) v = (reg[reg.length - 1] / reg[0] - 1) * 100;
@@ -1446,21 +1448,12 @@ function isFallingKnife(closes) {
   return !!(r && r.fires);
 }
 
-// Trading sessions between two instants, ET, weekends skipped (holidays widen the
-// count by at most a day — conservative for a timeout). Entry day is session 0, so
-// Mon -> next Mon = 5, matching the lab's `si >= entrySi + timeoutS` semantics.
+// Trading sessions between two instants, ET: weekends AND weekday holidays skipped (the exchange calendar,
+// 2026-10-26 — before it a holiday counted as a session, so a Wednesday buy "aged" on Thanksgiving and its max_hold
+// sale went into a closed market). Entry day is session 0, so Mon -> next Mon = 5, matching the lab's
+// `si >= entrySi + timeoutS` semantics.
 function _sessionsHeld(entryMs, nowMs) {
-  const d0 = new Date(new Date(entryMs).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const d1 = new Date(new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  d0.setHours(12, 0, 0, 0); d1.setHours(12, 0, 0, 0);
-  let n = 0;
-  const cur = new Date(d0);
-  while (cur < d1 && n < 400) {
-    cur.setDate(cur.getDate() + 1);
-    const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) n++;
-  }
-  return n;
+  return marketCalendar.sessionsBetween(marketCalendar.etOf(entryMs).day, marketCalendar.etOf(nowMs).day);
 }
 
 // REVERSAL CONFIRMATION read (TRADER_ENTRY_CONFIRM). Pure: bars in (the
@@ -1480,7 +1473,7 @@ function _entryConfirmRead(bars, n, nowMs, shape = false) {
     const bd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (bd !== day) continue;
     const m = d.getHours() * 60 + d.getMinutes();
-    if (m < 570 || m > 960) continue;                  // regular session only
+    if (m < 570 || m > 960 - marketCalendar.closeOffset(bd)) continue;   // regular session only (to 13:00 on an early close)
     if (Number(b.close) > 0) sess.push(b);
   }
   const closes = sess.slice(-need).map((b) => +Number(b.close).toFixed(4));
@@ -1742,7 +1735,8 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     // gap). The operator's pin overrides: a pinned symbol is a deliberate carry.
     if (c.eodDecarry && c.decarrySyms.has(sym) && qty >= 1 && !extended) {
       const _dm = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
-      if (_dm >= c.decarryMin && _dm < 960) {
+      const _dOff = marketCalendar.closeOffset(marketCalendar.etOf(now).day);   // 180 on a 13:00 close: flat from 12:50/12:55
+      if (_dm >= c.decarryMin - _dOff && _dm < 960 - _dOff) {
         const _cdd = c.carryDownDayPct < 0 && c.carryDownDaySyms.has(sym) ? await _spySessionMovePct(now) : null;
         if (_cdd != null && _cdd <= c.carryDownDayPct) {
           out.skipped.push({ symbol: sym, price: cur, qty, why: `carry_downday — eod_decarry suppressed: SPY ${_cdd.toFixed(2)}% on the session (at or below ${c.carryDownDayPct}%); the inverse breakdown rides the gap (ledger tier0-inverse-carry-gated-by-entry-day)` });
@@ -1774,7 +1768,8 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
       }
       const _hEt = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
       const _hMin = _hEt.getHours() * 60 + _hEt.getMinutes();
-      if (_hEntryAt && _hMin >= c.eodFlatMin && _hMin < 960) {
+      const _hOff = marketCalendar.closeOffset(marketCalendar.etOf(now).day);
+      if (_hEntryAt && _hMin >= c.eodFlatMin - _hOff && _hMin < 960 - _hOff) {
         const _held = _sessionsHeld(_hEntryAt, now);
         if (_held >= c.maxHoldSessions) {
           if (_isPinned(sym)) {
@@ -1798,7 +1793,8 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
       const _fm = _et.getHours() * 60 + _et.getMinutes();
       const _dow = _et.getDay();                       // 5 = Friday, the last session before a weekend
       const _due = c.eodFlat === 'all' || _dow === 5;
-      if (_due && _fm >= c.eodFlatMin && _fm < 960) {
+      const _fOff = marketCalendar.closeOffset(marketCalendar.etOf(now).day);
+      if (_due && _fm >= c.eodFlatMin - _fOff && _fm < 960 - _fOff) {
         if (_isPinned(sym)) {
           out.skipped.push({ symbol: sym, why: 'pinned — eod_flat suppressed by operator (#3318); carrying deliberately' });
         } else {

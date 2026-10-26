@@ -25,6 +25,7 @@ const tesseract = require("./tesseract");
 const ev = require("./convergence-ev");
 const { targetR } = require("./profiles");
 const adaptiveDepth = require("./adaptive-depth");   // washout depth follows the trailing P&L (shadow-first, 2026-09-26)
+const { inRegularSession } = require("../market-calendar");   // the exchange calendar: an early close ends the session at 13:00
 const tradingNews = require("../trading-news"); // directional news sentiment (external anchor)
 
 // Derive a candidate trade direction from zone posture, falling back to RSI
@@ -92,7 +93,7 @@ function sessionIbs(bars) {
   for (const b of bars) {
     if (rthOnly) {
       const p = _etParts(b.timestamp);
-      if (!p || p.day !== day || p.min < 570 || p.min >= 960) continue;
+      if (!p || p.day !== day || !inRegularSession(day, p.min)) continue;
     } else if (String(b.timestamp || "").slice(0, 10) !== day) continue;
     const h = Number(b.high), l = Number(b.low);
     if (Number.isFinite(h)) hi = Math.max(hi, h);

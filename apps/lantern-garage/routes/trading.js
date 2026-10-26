@@ -53,22 +53,13 @@ const AUTOSCAN_MS = parseInt(process.env.TRADER_AUTOSCAN_MS || '60000');
 // engine still uses the authoritative Alpaca clock to decide what to trade; this
 // is cadence only. Kill-switch: set TRADER_AUTOSCAN_CLOSED_MS=60000 to disable.
 const AUTOSCAN_CLOSED_MS = parseInt(process.env.TRADER_AUTOSCAN_CLOSED_MS || '300000'); // 5 min
-function _isUsMarketHours() {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();                       // 0 Sun .. 6 Sat
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return mins >= 570 && mins < 960;              // 09:30 (570) .. 16:00 (960) ET
-}
-// Pre-market (04:00–09:30) and after-hours (16:00–20:00) ET, Mon–Fri — the extended
-// session where IBKR accepts LMT + outsideRTH orders.
-function _isUsExtendedHours() {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return (mins >= 240 && mins < 570) || (mins >= 960 && mins < 1200); // 04:00–09:30 | 16:00–20:00
-}
+// The regular session by the exchange calendar (lib/market-calendar.js, 2026-10-26): 09:30-16:00 ET on a full day,
+// 09:30-13:00 on an early close, never on a weekday holiday.
+const marketCalendar = require('../lib/market-calendar');
+function _isUsMarketHours() { return marketCalendar.isRegularHours(Date.now()); }
+// Pre-market (04:00–09:30) and after-hours (the close + 4 h: 16:00–20:00, or 13:00–17:00 on an early close) ET on a
+// trading day — the extended session where IBKR accepts LMT + outsideRTH orders.
+function _isUsExtendedHours() { return marketCalendar.isExtendedHours(Date.now()); }
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const { passWindow } = require('../lib/scan-window');
 const accountLock = require('../lib/account-lock');       // one account, one managing process

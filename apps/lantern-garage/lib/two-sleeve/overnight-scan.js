@@ -35,6 +35,7 @@
  * both returns). The entry price comes from the same 5m bars, so a runner restart overnight loses nothing.
  */
 const { sessionBars, etOf } = require('../trend-shadow');
+const { closeOffset, inRegularSession } = require('../market-calendar');
 
 const BAR_MS = 5 * 60000;
 const SETTLE_MS = 20000;                 // a bar is read 20 s after it closes (feed lag), as the other scans read it
@@ -42,6 +43,8 @@ const ENTRY_BAR = 950;                   // the 15:50 bar (closes 15:55)
 const SELL_BAR = 575;                    // the 09:35 bar (closes 09:40)
 const GREEN_BAR = 570;                   // the 09:30 bar (closes 09:35): the green-exit shadow's early read
 const CLOSE_MIN = 960;                   // no entry decision at or after 16:00 ET
+// On a 13:00 early close (lib/market-calendar.js) the entry bar and the cut-off move with the close (the 12:50 bar,
+// nothing at or after 13:00), and the next morning's exit reads the entry at that session's own entry bar.
 const TREND_N = 200;
 const TREND_MIN = 120;                   // sessions of history needed before the gate reads at all
 
@@ -65,7 +68,7 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
     let best = null;
     for (const b of raw || []) {
       const t = Date.parse(b.timestamp != null ? b.timestamp : b.t); if (!Number.isFinite(t)) continue;
-      const x = etOf(t); if (x.day < day && x.min >= 570 && x.min < CLOSE_MIN && (!best || x.day > best)) best = x.day;
+      const x = etOf(t); if (x.day < day && inRegularSession(x.day, x.min) && (!best || x.day > best)) best = x.day;
     }
     return best;
   }
@@ -73,13 +76,13 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
   /** Green-exit shadow: the 09:35 read and the first sell-window read journal what the rule would do (see the header). */
   async function greenRead(sym, raw, e, last) {
     const early = last.min === GREEN_BAR;
-    const sell = last.min >= sellBar && last.min < entryBar;
+    const sell = last.min >= sellBar && last.min < entryBar - closeOffset(e.day);
     if (!early && !sell) return;
     const G = loggedGreen[sym] = loggedGreen[sym] || {};
     if ((early && G.early === e.day) || (sell && G.close === e.day)) return;
     if (early) G.early = e.day; else G.close = e.day;
     const prevDay = priorSessionDay(raw, e.day); if (!prevDay) return;
-    const ent = sessionBars(raw, prevDay).find((b) => b.min === entryBar); if (!ent) return;
+    const ent = sessionBars(raw, prevDay).find((b) => b.min === entryBar - closeOffset(prevDay)); if (!ent) return;
     const today = sessionBars(raw, e.day);
     const b0935 = today.find((b) => b.min === GREEN_BAR) || null;
     const gate = await trendRead(sym, prevDay);   // what the entry window read the evening before (O held it only if above)
@@ -116,8 +119,9 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
       const done = raw ? sessionBars(raw, e.day).filter((b) => b.t + BAR_MS + SETTLE_MS <= now) : [];
       const last = done.length ? done[done.length - 1] : null;
       if (greenShadow && log && last) { try { await greenRead(sym, raw, e, last); } catch (_e) { /* journal only: never breaks the scan */ } }
-      const inEntry = !!(last && last.min === entryBar && e.min < CLOSE_MIN);
-      const inSell = !!(last && last.min >= sellBar && last.min < entryBar);
+      const off = closeOffset(e.day);
+      const inEntry = !!(last && last.min === entryBar - off && e.min < CLOSE_MIN - off);
+      const inSell = !!(last && last.min >= sellBar && last.min < entryBar - off);
       if (inEntry) window = 'entry'; else if (inSell && !window) window = 'sell';
       let gate = null, direction = 'NEUTRAL', dec = 'SKIP', why;
       if (!raw || !raw.length) why = 'no bars'; else if (!last) why = 'no completed bar today';

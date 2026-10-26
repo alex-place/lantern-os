@@ -51,8 +51,11 @@ test('NO ORDER AUTHORITY: the module cannot reach a bridge, broker, or the auto-
   assert.deepStrictEqual(requires, ['./app-paths', './trend-shadow', 'fs', 'http', 'https', 'path'],
     `only node built-ins allowed, got: ${requires}`);
   const ts = fs.readFileSync(path.join(__dirname, '..', 'lib', 'trend-shadow.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  assert.deepStrictEqual([...ts.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]).sort(), ['fs', 'path'],
-    'lib/trend-shadow.js must stay pure bar math (fs + path only)');
+  // ./market-calendar (2026-10-26) is the exchange calendar's date rules and requires nothing at all (pinned next).
+  assert.deepStrictEqual([...ts.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]).sort(), ['./market-calendar', 'fs', 'path'],
+    'lib/trend-shadow.js must stay pure bar math (fs + path + the calendar rules only)');
+  const mc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'market-calendar.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.deepStrictEqual([...mc.matchAll(/require\(['"]([^'"]+)['"]\)/g)].map((m) => m[1]), [], 'lib/market-calendar.js requires nothing');
 });
 
 test('DEFAULT OFF: without the flag, run() does nothing and calls nothing', async () => {

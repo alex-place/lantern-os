@@ -132,3 +132,15 @@ test('TRADER_EOD_FLAT_MIN moves the window; a pinned symbol is never flattened',
     assert.strictEqual(sells(b2).length, 1, 'after the moved window');
   } finally { delete process.env.TRADER_EOD_FLAT; delete process.env.TRADER_EOD_FLAT_MIN; }
 });
+
+test('EOD_FLAT=weekend on a 13:00 early close: flat from 12:50, nothing at 15:55 after the close (exchange calendar)', async () => {
+  process.env.TRADER_EOD_FLAT = 'weekend';
+  try {
+    const b1 = world();
+    await run(b1, new Date('2026-11-27T17:52:00Z'));   // 12:52 ET (EST) on the Friday after Thanksgiving
+    assert.strictEqual(sells(b1).length, 1, 'flat before the 13:00 bell');
+    const b2 = world();
+    await run(b2, new Date('2026-11-27T20:55:00Z'));   // 15:55 ET: the market closed at 13:00
+    assert.strictEqual(sells(b2).length, 0, 'no order into a closed market');
+  } finally { delete process.env.TRADER_EOD_FLAT; }
+});
