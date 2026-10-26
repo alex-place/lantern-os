@@ -10530,10 +10530,20 @@ function _dayPnlTip(a){
   if (a && a.pnl_today_source === 'broker_reset') {
     return 'BROKER figure, not the trading session: IBKR day P&L re-baselines at the ~17:15 ET daily reset, so in the evening this measures post-reset drift, not today. ' + (a.pnl_basis || '');
   }
-  const decomp = (a && a.realized_today != null && a.unrealized_today != null)
-    ? ` Today = Realized ${(a.realized_today>=0?'+':'-')}$${fmt(Math.abs(a.realized_today),2)} (closed trades) ${(a.unrealized_today>=0?'+ ':'- ')}$${fmt(Math.abs(a.unrealized_today),2)} move on open positions.`
+  // THE ACCOUNT'S DAY IS ITS EQUITY CHANGE (2026-10-26, lib/day-pnl reconcileDayPnl): the trade log
+  // explains realized + the open-position move, and `pnl_other` is whatever it cannot (commissions,
+  // holdings it never recorded, short positions). On 10-26 the log alone read -$899 on a +$1,627 day.
+  const eqBasis = !!(a && a.pnl_today_source === 'broker_equity');
+  const other = Number(a && a.pnl_other);
+  const otherTxt = (eqBasis && isFinite(other) && Math.abs(other) >= 0.01)
+    ? ` ${(other>=0?'+ ':'- ')}$${fmt(Math.abs(other),2)} other (commissions, holdings the trade log did not record, short positions)`
     : '';
-  const base = "How much the account made TODAY — today’s move only, across both closed and open positions." + decomp;
+  const decomp = (a && a.realized_today != null && a.unrealized_today != null)
+    ? ` Today = Realized ${(a.realized_today>=0?'+':'-')}$${fmt(Math.abs(a.realized_today),2)} (closed trades) ${(a.unrealized_today>=0?'+ ':'- ')}$${fmt(Math.abs(a.unrealized_today),2)} move on open positions${otherTxt}.`
+    : '';
+  const base = (eqBasis
+    ? "How much the account made TODAY: its equity change since the previous close."
+    : "How much the account made TODAY — today’s move only, across both closed and open positions.") + decomp;
   const adj = Number(a && a.pnl_carry_adjustment) || 0;
   if (!adj) return base;
   const amt = '$' + fmt(Math.abs(adj), 2);

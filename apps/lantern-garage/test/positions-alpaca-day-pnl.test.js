@@ -21,6 +21,9 @@ const ROUTE = require.resolve(path.join(__dirname, '..', 'routes', 'trading', 'm
 const ledger = path.join(os.tmpdir(), 'alpaca-day-pnl-ledger-' + process.pid + '.jsonl');
 fs.writeFileSync(ledger, '{"event":"noop"}\n');
 
+// The REAL reconcileDayPnl rides along in the stub below (taken before the stub replaces the module):
+// the route calls it after computeDayPnl (2026-10-26), and every export the route calls must be here.
+const { reconcileDayPnl } = require(path.join(LIB, 'day-pnl'));
 const stubbed = [];
 function stub(name, exportsObj) {
   const file = require.resolve(path.join(LIB, name));
@@ -30,8 +33,9 @@ function stub(name, exportsObj) {
 let dayPnlCalls = [];
 let dayPnlImpl = null;
 let extraLedgers = [];   // what TRADER_TRADES_LOG_EXTRA would name (2026-09-28)
+let lastEquity;          // the broker's previous close (Alpaca last_equity); undefined = not reported
 stub('alpaca-adapter', {
-  getAccount: async () => ({ account_id: 'PA-TEST', equity: 100000, cash: 50000, pnl_today: 321, realized_today: 0, source: 'alpaca' }),
+  getAccount: async () => ({ account_id: 'PA-TEST', equity: 100000, cash: 50000, pnl_today: 321, realized_today: 0, source: 'alpaca', ...(lastEquity ? { last_equity: lastEquity } : {}) }),
   getPositions: async () => ({ positions: [
     { symbol: 'SPY', qty: 20, side: 'long', avg_entry_price: 758.39, current_price: 765.36, market_value: 15307.2, unrealized_pl: 139.4, pnl_pct: 0.92 },
     { symbol: 'TLT', qty: 190, side: 'long', avg_entry_price: 81.04, current_price: 80.96, market_value: 15382.4, unrealized_pl: -15.2, pnl_pct: -0.1 },
@@ -42,6 +46,7 @@ stub('auth-middleware', { isAdmin: () => false });
 stub('market-data-yahoo', { getQuotes: async () => [] });
 stub('day-pnl', {
   computeDayPnl: async (o) => { dayPnlCalls.push(o); return dayPnlImpl(o); },
+  reconcileDayPnl,
   resolveTradesLog: () => ledger,
   // the route reads the MERGED ledger and names its sources: an account can have more
   // than one writer (the two-sleeve engine journals each sleeve to its own file)
@@ -107,4 +112,22 @@ test('an unreadable ledger keeps the broker figures: no crash, no invented day n
   assert.ok(r.body.positions.every((p) => p.day_pnl === undefined), 'no row gets a made-up day figure');
   assert.strictEqual(r.body.account.pnl_today, 321, "the broker's own day P&L stands");
   assert.strictEqual(r.body.account.pnl_basis, undefined);
+});
+
+test('with the broker previous close the tile is the equity change; the ledger split stays, other names the rest', async () => {
+  dayPnlImpl = () => ({ realized_today: 60, realized_booked: 60, unrealized_today: 128.4, pnl_today: 188.4, pnl_carry_adjustment: 0, pnl_basis: 'ledger', per_position: [] });
+  lastEquity = 99700;   // equity 100000: the account made +$300 today
+  try {
+    const r = await hit();
+    const a = r.body.account;
+    assert.strictEqual(a.pnl_today, 300, 'equity - last_equity');
+    assert.strictEqual(a.pnl_today_source, 'broker_equity');
+    assert.strictEqual(a.realized_today, 60);
+    assert.strictEqual(a.unrealized_today, 128.4);
+    assert.strictEqual(a.pnl_other, 111.6, 'what the ledger cannot explain');
+    assert.strictEqual(a.pnl_ledger, 188.4);
+    assert.strictEqual(a.pnl_prev_equity, 99700);
+    assert.match(a.pnl_basis, /^alpaca: equity change since the previous close \(Alpaca last_equity\): 100000\.00 - 99700\.00/);
+    assert.ok(Math.abs(a.pnl_pct - 0.3) < 1e-9);
+  } finally { lastEquity = undefined; }
 });

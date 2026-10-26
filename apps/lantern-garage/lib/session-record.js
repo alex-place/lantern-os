@@ -153,6 +153,9 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
     cash: round(account.cash),
     // ── P&L exactly as the panel reported it
     day_pnl: num(dayPnl.pnl_today),
+    // The ACCOUNT's day beside this book's (2026-10-26): equity change since the previous session's
+    // close. It differs from day_pnl by everything this trader's log does not hold (lib/day-pnl.js).
+    ...(dayPnl.account_day_pnl != null ? { account_day_pnl: num(dayPnl.account_day_pnl), prev_equity: num(dayPnl.prev_equity) } : {}),
     realized_today: num(dayPnl.realized_today),
     realized_booked: num(dayPnl.realized_booked),
     unrealized_today: num(dayPnl.unrealized_today),

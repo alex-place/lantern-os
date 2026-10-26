@@ -208,6 +208,7 @@ async function getAccount(userId) {
     unrealized: 0,                          // per-position; summed in getPositions
     realized_today: 0,
     pnl_today: day,
+    last_equity: lastEquity,                // the previous close: lib/day-pnl reconcileDayPnl measures the day from it
     pnl_pct: equity ? (day / equity) * 100 : 0,
     buying_power: Number(a.buying_power) || 0,
     mode: auth.env === 'live' ? 'live' : 'paper',

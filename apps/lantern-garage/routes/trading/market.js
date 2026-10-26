@@ -19,7 +19,7 @@ async function alpacaDayPnl(account, positions) {
     const fs = require('fs'), path = require('path');
     const dayPnlLib = require('../../lib/day-pnl');
     const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
-    const d = await dayPnlLib.computeDayPnl({
+    const d0 = await dayPnlLib.computeDayPnl({
       positions,
       // every ledger that trades this account (TRADER_TRADES_LOG_EXTRA): the two-sleeve
       // engine journals its sleeves to their own files, and a server that reads only its
@@ -29,11 +29,15 @@ async function alpacaDayPnl(account, positions) {
       getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
       getPrevClose: dayPnlLib.prevCloseFromBarsFactory(dayPnlLib.resolveBarsDir(dataDir)),
     });
+    // The day is the account's equity change since the previous close (lib/day-pnl reconcileDayPnl,
+    // 2026-10-26); the ledger keeps its realized / open-position split and `pnl_other` names the rest.
+    const d = dayPnlLib.reconcileDayPnl(d0, { equity: account.equity, prevEquity: account.last_equity, prevSource: 'Alpaca last_equity' });
     account.realized_today = d.realized_today;
     account.realized_booked = d.realized_booked;
     account.unrealized_today = d.unrealized_today;
     account.pnl_today = d.pnl_today;
     account.pnl_carry_adjustment = d.pnl_carry_adjustment;
+    if (d.pnl_today_source) Object.assign(account, { pnl_today_source: d.pnl_today_source, pnl_other: d.pnl_other, pnl_ledger: d.pnl_ledger, pnl_prev_equity: d.pnl_prev_equity });
     account.pnl_pct = account.equity ? (d.pnl_today / account.equity) * 100 : 0;
     const _src = dayPnlLib.tradesLedgerSources(dataDir);
     account.pnl_basis = 'alpaca: ' + d.pnl_basis + (_src.extras.length ? '; ledgers: primary + ' + _src.extras.length + ' extra' : '');
@@ -349,6 +353,11 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           const sumUpl = ibkrPositions.reduce(
             (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
           ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
+        }
+        // An EMPTY book still has a day (2026-10-26): trades closed today, commissions, the equity change
+        // since the previous close. This block used to run only with positions open, which left IBKR's own
+        // dpl (re-baselined at its ~17:15 ET reset) on screen whenever the book ended the day flat.
+        {
           // REALIZED TODAY + DAY P&L. IBKR reports $0 realized on the paper CPAPI
           // (both `rpl` and the portfolio summary), so both come from the autopilot
           // ledger via lib/day-pnl.js — which applies ONE basis rule to realized
@@ -373,9 +382,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             // numbers with the wrong meaning.
             const _dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
             const { computeDayPnl } = dayPnlLib;
-            const _d = await computeDayPnl({
+            const _ledgerText = dayPnlLib.readTradesLedger(_dataDir);   // primary + TRADER_TRADES_LOG_EXTRA (2026-09-28)
+            const _d0 = await computeDayPnl({
               positions: ibkrPositions,
-              ledgerText: dayPnlLib.readTradesLedger(_dataDir),   // primary + TRADER_TRADES_LOG_EXTRA (2026-09-28)
+              ledgerText: _ledgerText,
               now: Date.now(),
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
               // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
@@ -383,6 +393,11 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
               getPrevClose: dayPnlLib.prevCloseFromBarsFactory(dayPnlLib.resolveBarsDir(_dataDir)),
             });
+            // THE ACCOUNT'S DAY IS ITS EQUITY CHANGE (2026-10-26, lib/day-pnl reconcileDayPnl): measured from
+            // the previous session's close as the trader recorded it in its own session row. On 10-26 the
+            // ledger alone read -$899 (it booked short-opening XLE sells as long exits) on a +$1,627 day.
+            const _prev = dayPnlLib.prevSessionEquity(_ledgerText, Date.now());
+            const _d = dayPnlLib.reconcileDayPnl(_d0, { equity: ibkrAccount.equity, prevEquity: _prev && _prev.equity, prevSource: _prev ? `the trader's ${_prev.date} session close` : '' });
             ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
             ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
             ibkrAccount.unrealized_today = _d.unrealized_today;     // today's move on the open book
@@ -390,6 +405,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             ibkrAccount.pnl_carry_adjustment = _d.pnl_carry_adjustment;
             ibkrAccount.pnl_pct = ibkrAccount.equity ? (_d.pnl_today / ibkrAccount.equity) * 100 : 0;
             ibkrAccount.pnl_basis = _d.pnl_basis;
+            if (_d.pnl_today_source) Object.assign(ibkrAccount, { pnl_today_source: _d.pnl_today_source, pnl_other: _d.pnl_other, pnl_ledger: _d.pnl_ledger, pnl_prev_equity: _d.pnl_prev_equity });
             // Per-position day contribution, so the panel reconciles against the
             // table row by row — the check that caught the summary/table mismatch
             // before, now available for the "today" basis too.
@@ -437,9 +453,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             const fs = require('fs'), path = require('path');
             const logPath = require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
             const { computeDayPnl } = require('../../lib/day-pnl');
-            const _d = await computeDayPnl({
+            const _opLedger = fs.readFileSync(logPath, 'utf8');
+            const _d0 = await computeDayPnl({
               positions: opPositions,
-              ledgerText: fs.readFileSync(logPath, 'utf8'),
+              ledgerText: _opLedger,
               now: Date.now(),
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
               // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
@@ -447,6 +464,8 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
               getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'bars')),
             });
+            const _opPrev = require('../../lib/day-pnl').prevSessionEquity(_opLedger, Date.now());
+            const _d = require('../../lib/day-pnl').reconcileDayPnl(_d0, { equity: opAccount.equity, prevEquity: _opPrev && _opPrev.equity, prevSource: _opPrev ? `the trader's ${_opPrev.date} session close` : '' });
             opAccount.realized_today = _d.realized_today;
             opAccount.realized_booked = _d.realized_booked;
             opAccount.unrealized_today = _d.unrealized_today;
@@ -454,6 +473,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             opAccount.pnl_carry_adjustment = _d.pnl_carry_adjustment;
             opAccount.pnl_pct = opAccount.equity ? (_d.pnl_today / opAccount.equity) * 100 : 0;
             opAccount.pnl_basis = 'operator view: ' + _d.pnl_basis;
+            if (_d.pnl_today_source) Object.assign(opAccount, { pnl_today_source: _d.pnl_today_source, pnl_other: _d.pnl_other, pnl_ledger: _d.pnl_ledger, pnl_prev_equity: _d.pnl_prev_equity });
             const _opDay = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
             for (const p of opPositions) {
               const _x = _opDay.get(String(p.symbol).toUpperCase());
