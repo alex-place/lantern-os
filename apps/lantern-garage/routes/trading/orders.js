@@ -446,79 +446,75 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
     try {
       const body = await collectRequestBody(req);
       const payload = body ? JSON.parse(body) : {};
-      const { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit } = payload;
+      const { ticker, side, type, limitPrice, timeInForce, stopLoss, takeProfit } = payload;
+      let { qty } = payload;   // a Flatten re-sizes it from the broker's fresh book (below)
       if (!ticker || !['buy', 'sell'].includes(String(side || '').toLowerCase()) || !qty || Number(qty) <= 0) {
         sendJson(res, { status: 'error', error: 'ticker, side (buy/sell), and positive qty are required' }, 400);
         return true;
       }
-      // acceptWarnings (2026-08-14): IBKR raises disclosure/size warnings and the
-      // manual Flatten path dead-ended on them — the bridge supports the flag but
-      // this route never forwarded it, so the operator could not trim the 3x carry
-      // ("Couldn't flatten SOXS: re-submit with acceptWarnings:true").
-      // An EXPLICIT flag is honoured on SELLS only, always: a buy that draws warnings
-      // must keep surfacing them (P0-8), whether the engine or a person is driving.
-      // The one buy that clears them is one the server itself proves is a SHORT COVER.
+      // MANUAL ORDERS ARE THE USER'S DECISION (2026-10-26). Operator: "on manual orders there
+      // shouldnt be limitations on what the user can do like there are on the autonomous trader".
+      // Every caller of this route is a button on the trader page, and the page has the user
+      // confirm the order before it is sent: the ticket's armed "Confirm BUY 2628 XLE ->",
+      // Flatten's "Confirm ✕", Close-all's dialog (Rapid mode is the user's own opt-in to skip
+      // them). So IBKR's precautionary warnings ("size exceeds the Size Limit of 500. Are you
+      // sure?") are accepted on the user's behalf, buys and sells alike, and the reply lists what
+      // IBKR said (accepted_warnings). History: 2026-08-14 forwarded an explicit flag on sells
+      // only and auto-accepted sells verified against the book; #3785 added verified short covers.
+      // Both left a warned buy at a dead end ("re-submit with acceptWarnings:true", which no page
+      // could send for a buy), and both trusted a position read that lags fills (FLATTEN MEANS
+      // FLAT, below). P0-8 still governs the ENGINE: its orders go through lib/auto-trader.js,
+      // never through this route. The position-size cap is the engine's sizing policy too, so
+      // manual orders skip it (`manual`, lib/trading-guard.js). The arming switch, the real-money
+      // opt-in, the halt file and the share-count sanity ceiling still apply to every order.
       const _isSell = String(side).toLowerCase() === 'sell';
-      let acceptWarnings = payload.acceptWarnings === true && _isSell;
-      let _autoAccepted = null;
-      // VERIFIED RISK-REDUCING SELLS AUTO-ACCEPT (2026-08-14, second pass). The
-      // first fix bounced every warned sell to a confirm popup, and the popup was
-      // asking the human to approve "IBKR returned order warnings" — no content,
-      // pure friction (operator: "i dont like this popup"). The engine's own
-      // exits already auto-accept (2026-07-27, after 13 stalled exits, one run to
-      // -18.9% waiting for a click); what that decision actually requires is not
-      // a human, it is PROOF the sell reduces risk. The engine proves it by
-      // reconciling qty to the held position — so this route now does the same:
-      // verify against the live book that qty <= |held|, and only then accept.
-      // Oversell stays impossible to auto-clear: unverifiable (feed down, symbol
-      // not held, qty too big) falls back to the explicit human confirm.
-      // SHORT COVERS TOO, AND THE SIGN NOW MATTERS (2026-10-26). Stable carried an
-      // accidental XLE short (-2,628 from the 10-16 double stop) and both the Flatten
-      // button and the order ticket dead-ended on IBKR's warnings: a cover is a BUY,
-      // and no buy ever cleared them. A buy that only brings a SHORT back toward flat
-      // is the mirror of a sell that brings a long toward flat, so it gets the same
-      // proof and the same auto-accept. The proof now reads the position's SIGN: it
-      // used |qty|, so a sell against a short verified itself and would have
-      // auto-accepted DOUBLING the short. A sell must face a long, a buy a short.
-      const _riskReducing = async (uidX) => {
+      const acceptWarnings = true;
+      // FLATTEN MEANS FLAT (2026-10-26). The page sizes a Flatten from its own snapshot of the
+      // book, and IBKR's portfolio read lags fills. Live, 10:39 ET: the XLE short (-2,628) had
+      // already been covered, the next Flatten was sized from a book that still read -2,628, and
+      // it bought another 2,628: long about $181k. A Flatten now re-reads the position at the
+      // broker (IBKR's portfolio cache invalidated first) and closes exactly what is held, less
+      // any closing order already working. Already flat, on the other side of what the page
+      // showed, or unreadable: nothing is sent, and the reply says which.
+      const _freshFlattenQty = async (uidX) => {
+        const { brokerFacadeFor } = require('../../lib/broker-facade');
+        let bookUid = uidX;
+        let fac = await brokerFacadeFor(uidX, bridge).catch(() => null);
+        if (!fac) {   // an admin in the operator view acts on the operator book, as the send below does
+          try {
+            const { isAdmin } = require('../../lib/auth-middleware');
+            const OP = process.env.TRADER_OPERATOR_UID || 'local-owner';
+            if (isAdmin(req) && uidX !== OP) { bookUid = OP; fac = await brokerFacadeFor(OP, bridge).catch(() => null); }
+          } catch (_e) { /* auth module absent: no fallback */ }
+        }
+        const F = (fac && (fac.facade || fac)) || null;
+        if (!F || typeof F.getIBKRPositions !== 'function') return { why: `${ticker}: no broker book to read, so nothing was placed` };
+        let pos = null;
+        try { pos = await F.getIBKRPositions(bookUid, { fresh: true }); } catch (_e) { pos = null; }
+        if (!Array.isArray(pos)) return { why: `${ticker}: the position could not be read fresh at the broker, so nothing was placed (a Flatten never acts on a stale book). Try again, or use IBKR.` };
+        const p = pos.find((x) => String(x && x.symbol).toUpperCase() === String(ticker).toUpperCase());
+        const signed = Number(p && p.qty) || 0;
+        const held = Math.floor(Math.abs(signed));
+        if (held < 1) return { why: `${ticker}: already flat at the broker, so nothing was placed` };
+        if ((signed > 0) !== _isSell) {
+          return { why: `${ticker} is ${signed > 0 ? 'LONG' : 'SHORT'} ${held} at the broker, not ${_isSell ? 'long' : 'short'} as the page showed, so nothing was placed. Refresh and Flatten again.` };
+        }
+        let resting = 0;
         try {
-          const pos = await bridge.getIBKRPositions(uidX);
-          if (!Array.isArray(pos)) return false;
-          const p = pos.find((x) => String(x && x.symbol).toUpperCase() === String(ticker).toUpperCase());
-          const signed = Number(p && p.qty) || 0;
-          if (_isSell ? !(signed > 0) : !(signed < 0)) return false;   // toward flat only
-          const held = Math.abs(signed);
-          if (held < 1) return false;
-          // RESTING ORDERS ON THE SAME SIDE COUNT AGAINST THE POSITION (live 2026-08-14 04:34).
-          // The operator flattened SPXS, the position list did not update
-          // (pre-market market orders REST until the auction), so they clicked
-          // again — and this check re-verified against the unchanged position
-          // and auto-accepted a DUPLICATE 2,467-share sell: an oversell in two
-          // installments. The engine's own exit path has exactly this guard
-          // (its workingSells set); the manual path has it too, and a resting
-          // cover counts against a second cover the same way. Protective
-          // STOPS deliberately do not count: every position always carries one,
-          // and counting it would make every flatten unverifiable.
-          let resting = 0;
-          const open = await bridge.getIBKROpenOrders(uidX);
+          const open = typeof F.getIBKROpenOrders === 'function' ? await F.getIBKROpenOrders(bookUid) : [];
           const sameSide = _isSell ? /sell/i : /buy/i;
           for (const o of (Array.isArray(open) ? open : [])) {
             if (String(o && o.symbol).toUpperCase() !== String(ticker).toUpperCase()) continue;
             if (!sameSide.test(o.side || '')) continue;
-            if (/stp|stop/i.test(o.orderType || o.type || '')) continue;
+            if (/stp|stop/i.test(o.orderType || o.type || '')) continue;   // a protective stop is not a closing order
             if (!/submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || '')) continue;
             resting += Number(o.qty) || 0;
           }
-          const available = Math.floor(held) - resting;
-          // FLOOR THE REQUEST TOO (same morning): the UI sends the position's
-          // raw fractional qty (SOXS 3057.8); the bridge floors it before
-          // placing, so verification must judge the order that will actually be
-          // sent — floor(3057.8)=3057 against 3057 available is risk-reducing.
-          const wanted = Math.floor(Number(qty));
-          return wanted >= 1 && wanted <= available;
-        } catch (_e) { return false; }   // cannot verify -> cannot auto-accept
+        } catch (_e) { return { why: `${ticker}: the working orders could not be read, so nothing was placed. Try again.` }; }
+        const n = held - Math.floor(resting);
+        if (n < 1) return { why: `${ticker}: a closing order for ${held} is already working, so nothing was placed` };
+        return { qty: n };
       };
-      const _autoTag = _isSell ? 'risk_reducing_sell' : 'short_cover_buy';
       if (stopLoss != null && Number(stopLoss) <= 0) {
         sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
         return true;
@@ -531,16 +527,15 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // one-click Alpaca account (ADR-0027), then the legacy env agent. First match
       // that isn't null wins. Every path is HARD-GATED inside its own placeOrder.
       const uid = getEffectiveUserId(req);
-      if (!acceptWarnings && await _riskReducing(uid)) {
-        acceptWarnings = true;
-        _autoAccepted = _autoTag;
+      if (payload.flatten === true) {
+        const fq = await _freshFlattenQty(uid);
+        if (fq.why) {
+          sendJson(res, { status: 'error', ticker, side, qty, flatten: true, reason: fq.why, error: fq.why }, 200);
+          return true;
+        }
+        qty = fq.qty;
       }
-      // A VERIFIED cover tells the broker guard it reduces risk, so the position-size cap
-      // (which judges buys) cannot block it: outside RTH the cover goes out as a priced
-      // marketable limit, and $182k of XLE is over a 12% cap (lib/trading-guard.js).
-      // Unverified buys never carry the flag.
-      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings,
-        ...(_autoAccepted === 'short_cover_buy' ? { reducing: true } : {}) };
+      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings, manual: true };
       // EXTENDED-HOURS CONVERSION (#3326). A MARKET order does not execute
       // outside RTH, so a manual Flatten placed pre-market just sat there — the
       // operator saw "✓ Flattened" and a position that never left. The engine
@@ -649,15 +644,9 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           const { isAdmin } = require('../../lib/auth-middleware');
           const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
           if (isAdmin(req) && uid !== OPERATOR_UID) {
-            // The order is going to the OPERATOR book, so the risk-reducing
-            // verification must be re-run against that book, not the admin's own
-            // (empty) account — otherwise operator-view flattens keep the popup.
+            // The order is going to the OPERATOR book. It is the same manual order (warnings
+            // accepted on the user's confirmation, no engine size cap); only the account differs.
             const opReq = { ...orderReq };
-            if (!opReq.acceptWarnings && await _riskReducing(OPERATOR_UID)) {
-              opReq.acceptWarnings = true;
-              _autoAccepted = _autoTag;
-              if (!_isSell) opReq.reducing = true;
-            }
             // CANCEL THE OPERATOR BOOK'S STOPS FIRST (2026-08-27). The cancel-first
             // added for manual sells above runs against the REQUESTING uid — an admin
             // in the operator view has no linked broker, so that facade resolves null,
@@ -685,17 +674,13 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       }
       result = result
         || { status: 'error', ticker, side, qty, reason: 'No broker connected. Add your Alpaca API keys in Settings → Connections to trade.' };
-      // Transparency: when warnings were cleared by position-verification rather
-      // than a human, the response says so — the journal and any audit can tell
-      // the two apart.
-      if (_autoAccepted) result.auto_warnings = _autoAccepted;
-      // A WARNED BUY THAT COULD NOT BE VERIFIED (2026-10-26). The bridge's note says
-      // "re-submit with acceptWarnings:true", which no page can do for a buy (P0-8).
-      // Say what happened instead, in IBKR's own words when the bridge passed them.
-      if (!_isSell && result && result.status === 'needs_confirmation') {
-        const said = (Array.isArray(result.warnings) ? result.warnings : []).map((w) => w && w.message).filter(Boolean).join(' | ');
-        result.reason = `IBKR raised warnings on this BUY${said ? ` ("${said}")` : ''}. A buy clears them automatically only when the book shows a short it covers (qty no more than the short, less resting buys); this one could not be verified, so nothing was placed. Place it in IBKR if it is intended.`;
+      // What IBKR warned about, accepted on the user's confirmation, rides back on the reply so
+      // the page can show it (and the journal can tell an order IBKR flagged from one it did not).
+      if (result && Array.isArray(result.warnings) && result.warnings.length) {
+        result.accepted_warnings = result.warnings
+          .map((w) => [].concat(w && w.message).filter(Boolean).join(' ')).filter(Boolean);
       }
+      if (payload.flatten === true && result) result.flatten = true;
       // The session caveat rides on the response so the toast can tell the truth
       // about WHEN this order will act — "placed" and "will fill" are different
       // claims, and conflating them is what made a pre-market Flatten look done.

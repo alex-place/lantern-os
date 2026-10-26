@@ -196,20 +196,29 @@ test('the extended-hours marketable limit does not deny its own sized order', ()
 });
 
 
-// 2026-10-26: covering stable's accidental XLE short. A cover is a BUY, and outside RTH the
-// manual route sends it as a priced marketable limit, so the cap that judges buys would have
-// refused $182k of XLE against 12% x $963k. Only a buy its caller VERIFIED as a cover skips it.
+// 2026-10-26: manual orders are the user's decision (operator: "on manual orders there shouldnt be
+// limitations on what the user can do like there are on the autonomous trader"). The cap is the
+// engine's sizing policy; a person's order from the trader page carries manual:true and skips it.
+// Live case: covering stable's accidental XLE short is a BUY, and outside RTH the manual route
+// sends it as a priced marketable limit, so the cap would have refused $182k of XLE against
+// 12% x $963k.
 const XLE = { qty: 2628, price: 69.33, equity: 963000 };
 
-test('a VERIFIED short cover is not capped by the position-size limit', () => {
-  const g = armed({}, { ...XLE, side: 'buy', reducing: true });
-  assert.strictEqual(g.allowed, true, `a verified cover must close the short: ${g.reason}`);
+test('a MANUAL buy is not capped by the position-size limit', () => {
+  const g = armed({}, { ...XLE, side: 'buy', manual: true });
+  assert.strictEqual(g.allowed, true, `a manual order is the user's decision: ${g.reason}`);
 });
 
-test('the same buy WITHOUT the verification is still capped', () => {
+test('the same buy from the ENGINE (no manual flag) is still capped', () => {
   const g = armed({}, { ...XLE, side: 'buy' });
   assert.strictEqual(g.allowed, false);
   assert.match(g.reason, /exceeds cap/);
-  const fake = armed({}, { ...XLE, side: 'buy', reducing: 'yes' });
+  const fake = armed({}, { ...XLE, side: 'buy', manual: 'yes' });
   assert.strictEqual(fake.allowed, false, 'only a boolean true counts');
+});
+
+test('manual orders still need the account to be armed (TRADER_LIVE) like every order', () => {
+  const g = withEnv({ TRADER_LIVE: '0', TRADER_MAX_POSITION_PCT: '12' }, () => guard.orderGate({ mode: 'paper', ...XLE, side: 'buy', manual: true }));
+  assert.strictEqual(g.allowed, false);
+  assert.match(g.reason, /TRADER_LIVE=0/);
 });

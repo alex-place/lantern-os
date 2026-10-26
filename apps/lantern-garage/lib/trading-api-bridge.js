@@ -164,7 +164,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice, reducing }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice, manual }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -233,9 +233,10 @@ class TradingAPIBridge {
       // sell that then ran to -18.9% and a take-profit that gave back its whole gain).
       // Entries still surface warnings for a human, which is what P0-8 was protecting.
       acceptWarnings: !!acceptWarnings,
-      // A buy the caller VERIFIED as covering a short (the manual order route, 2026-10-26)
-      // is risk-reducing, so the guard's position-size cap does not judge it. Never set by the engine.
-      reducing: reducing === true,
+      // A MANUAL order (the trader page's ticket / Flatten, routes/trading/orders.js, 2026-10-26)
+      // is the user's decision: the guard's position-size cap, the engine's sizing policy, does not
+      // judge it. Never set by the engine.
+      manual: manual === true,
     });
     const reason = [r.note || r.error || (r.gate && r.gate.reason) || null, fracNote].filter(Boolean).join('; ') || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read
@@ -336,15 +337,19 @@ class TradingAPIBridge {
     }
   }
 
-  async getIBKRPositions(userId) {
+  // fresh: skip this cache AND ask IBKR to drop its portfolio cache first. IBKR's portfolio read
+  // lags fills; a Flatten sized from it doubled a cover on 2026-10-26 (routes/trading/orders.js).
+  async getIBKRPositions(userId, { fresh = false } = {}) {
+    if (fresh) { _RESP_CACHE.delete('pos:' + userId); return this._getIBKRPositionsRaw(userId, { fresh: true }); }
     return this._cached('pos:' + userId, 4000, () => this._getIBKRPositionsRaw(userId));
   }
-  async _getIBKRPositionsRaw(userId) {
+  async _getIBKRPositionsRaw(userId, { fresh = false } = {}) {
     const client = this._clientFor(userId);
     if (!client) return [];                   // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return [];
     this._assertPinnedAccount(status, 'a positions read');
+    if (fresh && typeof client.invalidatePositions === 'function') await client.invalidatePositions(status.accountId).catch(() => false);
     const positions = await client.getPositions(status.accountId);
     // A failed read is UNKNOWN, not a flat book (review H3). Throwing lets every caller
     // keep its own fallback: the engine's .catch(() => null) stands the scan down, and

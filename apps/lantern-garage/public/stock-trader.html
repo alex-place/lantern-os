@@ -7753,7 +7753,8 @@ async function submitOrderTicket(){
       const fill = result.fill_price ? ` @ $${result.fill_price}` : '';
       const sim = result.mode==='paper' ? ' (paper)' : '';
       const verb = result.fill_price ? 'filled' : 'placed';
-      _orderToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
+      const warned = Array.isArray(result.accepted_warnings) && result.accepted_warnings.length ? ` — IBKR warned: ${result.accepted_warnings.join(' | ')}` : '';
+      _orderToast(`${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}${warned}`);
       journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
       closeOrderTicket();
       refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
@@ -10890,35 +10891,28 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   if(!q) return false;
   if(!skipConfirm && !_twoStep(btn, 'Confirm ✕', ()=>flattenPosition(symbol, side, qty, true, btn))) return false;
   try{
-    let result = await _placeFlatten(symbol, exitSide, q, false);
-    // Normally warnings never reach this page: the server verifies a sell
-    // reduces the held position and auto-accepts IBKR's disclosure warnings
-    // (the engine's own exit policy since 2026-07-27). This confirm exists ONLY
-    // for the unverifiable case — the position feed is unreadable, or the qty
-    // does not match the book — where a human really is the last check.
-    if(!(result && result.status==='placed') && exitSide==='sell'
-       && /acceptWarnings/i.test(String(result&&(result.reason||result.error)||''))){
-      const warnText = String(result.reason||result.error).replace(/;?\s*re-submit with acceptWarnings:true[^;]*/i,'').trim();
-      if(window.confirm('IBKR raised warnings for SELL '+q+' '+symbol+' and the position could not be verified as covering this sell (feed unreadable or size mismatch):\n\n'+warnText
-        +'\n\nConfirm only if you are sure you hold at least '+q+' shares.')){
-        result = await _placeFlatten(symbol, exitSide, q, true);
-      }
-    }
-    if(!(result && result.status==='placed')){ _alertToast('Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
+    // FLATTEN MEANS FLAT (2026-10-26): this row can be stale (IBKR's position read lags fills),
+    // and a Flatten sized from a stale row doubled a cover. So the server re-reads the position
+    // fresh at the broker and closes exactly what is held, or says why it sent nothing (already
+    // flat, the other side of what this row showed). IBKR's precautionary warnings are accepted
+    // on this confirmation: a manual order is the user's decision.
+    const result = await _placeFlatten(symbol, exitSide, q);
+    if(!(result && result.status==='placed')){ _alertToast('Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); refreshAfterOrder(); return false; }
     const fill=result.fill_price?` @ ${result.fill_price}`:'';
+    const sent=Number(result.qty)||q;
+    const warned=Array.isArray(result.accepted_warnings)&&result.accepted_warnings.length?` — IBKR warned: ${result.accepted_warnings.join(' | ')}`:'';
     // 'Placed' is not 'filled' outside RTH — say which one happened (#3326).
-    _alertToast(`${result.session_note?'Order placed for':'Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
-    journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
+    _alertToast(`${result.session_note?'Order placed for':'Flattened'} ${symbol} (${exitSide} ${sent})${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}${warned}`);
+    journalLog({ symbol, side:exitSide, qty:sent, type:'market', source:'flatten' });   // #2446
     refreshAfterOrder();   // bookkeeping -- do not make the trader wait on it
     return true;
   }catch(e){ _alertToast('Couldn’t flatten '+symbol+': '+e.message); return false; }
 }
-// One flatten POST. acceptWarnings goes on the wire ONLY after the user has read
-// and confirmed IBKR's warning text above — never on the first attempt.
-async function _placeFlatten(symbol, exitSide, q, acceptWarnings){
+// One flatten POST. flatten:true has the server size it from the broker's fresh book.
+async function _placeFlatten(symbol, exitSide, q){
   const r = await fetch('/api/trading/orders/place', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market', ...(acceptWarnings?{acceptWarnings:true}:{}) })
+    body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market', flatten:true })
   });
   try{ return await r.json(); }catch(_e){ return { status:'error', error:r.statusText||'bad response' }; }
 }
