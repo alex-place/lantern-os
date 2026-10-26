@@ -406,6 +406,65 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
 }
 
 /**
+ * THE ACCOUNT'S DAY IS ITS EQUITY CHANGE (2026-10-26). computeDayPnl rebuilds the day from the trade
+ * log, and the log only knows the trades this trader wrote: longs it entered and exited. The account
+ * holds more than that, so the rebuilt figure drifted from the account's real day on most sessions.
+ * Stable's own session rows, 2026-08-14..10-26 (51 sessions): median $607 apart, p90 $3,443, worst
+ * $10,491. Three causes:
+ *   - holdings the log never recorded (stable carried about $32.6k of them on 10-26) move the
+ *     account but not the log;
+ *   - short positions: the log reads every sell as closing a long. On 10-26 it booked three XLE sells
+ *     as +$1,327 "realized" when two of them opened shorts, and the buys that covered them never
+ *     appear, so the page said -$899 on a day the account made +$1,627;
+ *   - commissions, which the log does not carry.
+ * The equity change since the previous close is exact by definition, so it is the Day P&L whenever
+ * the previous close is known. Realized (closed trades today) and the open-position move keep their
+ * ledger meaning, and `pnl_other` names the rest, so
+ *     Realized + open-position move + Other == Day P&L
+ * still holds. `pnl_ledger` keeps the log's own figure. Previous close unknown: the log's figure
+ * stands, unchanged.
+ */
+function reconcileDayPnl(d, { equity, prevEquity, prevSource } = {}) {
+  const eq = Number(equity), prev = Number(prevEquity);
+  if (!d || !(eq > 0) || !(prev > 0)) return d;
+  const round = (n) => Math.round(n * 100) / 100;
+  const day = round(eq - prev);
+  const realized = Number(d.realized_today) || 0, moved = Number(d.unrealized_today) || 0;
+  const other = round(day - realized - moved);
+  return {
+    ...d,
+    pnl_ledger: d.pnl_today,
+    pnl_today: day,
+    pnl_other: other,
+    pnl_prev_equity: round(prev),
+    pnl_today_source: 'broker_equity',
+    pnl_basis: `equity change since the previous close (${prevSource || 'broker'}): ${eq.toFixed(2)} - ${prev.toFixed(2)}`
+      + `; the trade log explains realized ${realized.toFixed(2)} + open-position move ${moved.toFixed(2)}`
+      + `, other ${other.toFixed(2)} (commissions, holdings and fills the log did not record, short positions)`,
+  };
+}
+
+/**
+ * The account's equity at the previous session's close, from the ledger's own `session` rows (the
+ * trader writes one at every close, account equity included). Only the row of the trading day right
+ * before `now` counts (lib/market-calendar.js): an older one would fold several days into "today".
+ * Returns { date, ts, equity } or null.
+ */
+function prevSessionEquity(ledgerText, now = Date.now()) {
+  const want = require('./market-calendar').prevTradingDay(etDay(now));
+  if (!want) return null;
+  let best = null;
+  for (const line of String(ledgerText || '').split(String.fromCharCode(10))) {
+    if (line.indexOf('"session"') < 0) continue;
+    let r; try { r = JSON.parse(line); } catch (_e) { continue; }
+    if (!r || r.event !== 'session' || !(Number(r.equity) > 0)) continue;
+    if ((r.date || etDay(r.ts)) !== want) continue;
+    if (!best || String(r.ts) > String(best.ts)) best = { date: want, ts: r.ts, equity: Number(r.equity) };
+  }
+  return best;
+}
+
+/**
  * Where the trade ledger and bar corpus actually live (#3380). The positions
  * route hardcoded repo-relative paths, which is correct exactly once: on the
  * tree the engine writes to. On the DEV server (:4178, a different checkout)
@@ -505,4 +564,4 @@ function readTradesLedger(repoRootDataDir) {
   return primary + (primary && !primary.endsWith(NL) ? NL : '') + added.join(NL) + NL;
 }
 
-module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir, extraTradesLogs, tradesLedgerSources, readTradesLedger };
+module.exports = { computeDayPnl, reconcileDayPnl, prevSessionEquity, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir, extraTradesLogs, tradesLedgerSources, readTradesLedger };

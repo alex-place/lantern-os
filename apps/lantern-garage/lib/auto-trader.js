@@ -3839,6 +3839,16 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         now,
         getQuotes: (syms) => require('./market-data-yahoo').getQuotes(syms),
       }).catch(() => ({}));
+      // The ACCOUNT's day beside this book's (2026-10-26): the equity change since the previous
+      // session's close, from this ledger's own session rows (lib/day-pnl prevSessionEquity). Recorded
+      // next to day_pnl, never mixed into it: a sleeve's book is not the whole account.
+      try {
+        const _prevEq = require('./day-pnl').prevSessionEquity(_ledger, now);
+        if (_prevEq && Number(account && account.equity) > 0) {
+          _dp.account_day_pnl = Math.round((Number(account.equity) - _prevEq.equity) * 100) / 100;
+          _dp.prev_equity = _prevEq.equity;
+        }
+      } catch (_e) { /* the book's own figures stand */ }
       logTrade(_sr.buildSessionRecord({
         ledgerText: _ledger, now, account, positions: _mine, dayPnl: _dp,
       }));
