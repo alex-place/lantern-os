@@ -150,7 +150,9 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
       if (why) log({ event: 'reconcile_skipped', why });
       else {
         const { released, adopted } = ownership.reconcile(Array.isArray(raw) ? raw : (raw.positions || []));
-        if (adopted.length) log({ event: 'ownership_adopted', symbols: adopted, owner: defaultOwner });
+        // `owner` stays the default sleeve for readers of this row; `owners` names each symbol's adopter (a reserved
+        // symbol goes to its reserved owner, lib/two-sleeve/reserve.js).
+        if (adopted.length) log({ event: 'ownership_adopted', symbols: adopted, owner: defaultOwner, owners: Object.fromEntries(adopted.map((s) => [s, ownership.ownerOf(s)])) });
         if (released.length) log({ event: 'ownership_released', symbols: released });
       }
     } catch (e) { log({ event: 'reconcile_error', error: String(e && e.message || e) }); }

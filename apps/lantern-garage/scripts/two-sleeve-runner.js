@@ -64,6 +64,9 @@
  * its index funds held from the 15:55 print to the 09:40 print when above their 200-session mean, weekends held;
  * TRADER_OVERNIGHT_SHADOW=1 = journal-only. See scripts/two-sleeve.config.overnight.example.json.
  *        TRADER_EXTENDED_EXITS=1 (protective-only ticks pre/post market, as the server does).
+ * A top-level "reserve" block (2026-10-27, lib/two-sleeve/reserve.js) parks a share of equity in one cash-like fund owned by
+ * the pseudo-owner RESERVE, which no sleeve sees or sells: { "symbol": "BOXX", "pct": 30, "bandPct": 10, "minCashPct": 5,
+ * "window": "12:00-12:30" }. It decides once a session inside the window, after the engine tick. Without the block nothing changes.
  */
 const fs = require('fs');
 const path = require('path');
@@ -158,7 +161,12 @@ const { brokerFacadeFor } = require(path.join(APP, 'lib', 'broker-facade'));
 const accountLock = require(path.join(APP, 'lib', 'account-lock'));
 const { createEngine } = require(path.join(APP, 'lib', 'two-sleeve', 'engine'));
 const { createOwnership } = require(path.join(APP, 'lib', 'two-sleeve', 'ownership'));
+const { createReserve, reserveConfig, OWNER: RESERVE_OWNER } = require(path.join(APP, 'lib', 'two-sleeve', 'reserve'));
 const { passWindow } = require(path.join(APP, 'lib', 'scan-window'));
+// THE CASH RESERVE (2026-10-27): its fund is reserved to RESERVE in the registry (never adopted by the default sleeve) and
+// excluded from every brain, so the sleeves trade exactly as before around it.
+const RESERVE_CFG = reserveConfig(cfg.reserve);
+const RESERVE_EXCLUDE = RESERVE_CFG ? [RESERVE_CFG.symbol] : [];
 
 const ibkrBridge = new TradingAPIBridge();
 // The shared in-process scan survives only as a smoke mode (TWO_SLEEVE_SCAN=shared).
@@ -169,11 +177,13 @@ const sharedAgent = SCAN_MODE === 'shared'
 // registry) and inherits untagged resting orders. Default = the first sleeve in tick order;
 // set it to "R" when the engine takes over an account the race sleeve was already trading.
 const DEFAULT_OWNER = cfg.defaultOwner || (cfg.order || ['S'])[0];
-const ownership = createOwnership({ file: path.join(DIR, 'ownership.json'), defaultOwner: DEFAULT_OWNER, onEvent: (ev) => journal(ev) });
+const ownership = createOwnership({ file: path.join(DIR, 'ownership.json'), defaultOwner: DEFAULT_OWNER,
+  reserved: RESERVE_CFG ? { [RESERVE_CFG.symbol]: RESERVE_OWNER } : {}, onEvent: (ev) => journal(ev) });
 
 let resolved = null;      // { broker, accountId, facade }
 let facade = null;        // the engine's broker: the real facade, or the dry wall around it
 let engine = null;
+let reserve = null;       // the cash reserve, when the config has one (its orders go through the same facade)
 let lockNoticed = false;
 const stats = { ticks: 0, scans: 0, lastTick: null, lastSignals: {}, lastError: null, started: new Date().toISOString(), pid: process.pid,
   dry: DRY, scan: SCAN_MODE, mode: MODE, fakeNow: Number.isFinite(FAKE_NOW) ? new Date(FAKE_NOW).toISOString() : null };
@@ -187,6 +197,14 @@ async function ensureEngine() {
   journal({ event: 'engine_start', broker: resolved.broker, accountId: resolved.accountId, order: engine.order, dry: DRY, scan: SCAN_MODE, mode: MODE, fakeNow: stats.fakeNow,
     sleeves: sleeves.map((s) => ({ id: s.id, app: s.app, envFile: s.envFile, universe: s.universe ? s.universe.length : 'all', scan: s.scan || undefined, env: s.env })) });
   console.info(`[two-sleeve] ${resolved.broker} ${resolved.accountId} — sleeves ${engine.order.join(' then ')}${DRY ? ' (DRY: no orders)' : ''} — scans ${SCAN_MODE}`);
+  if (RESERVE_CFG) {
+    const yahoo = require(path.join(APP, 'lib', 'market-data-yahoo'));
+    reserve = createReserve({ cfg: cfg.reserve, facade, ownership, journal, userId: USER, stateFile: path.join(DIR, 'reserve.state.json'), now: nowMs,
+      quote: async (sym) => { const q = await yahoo.getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
+    const { win: _w, ...shown } = reserve.cfg;
+    journal({ event: 'reserve_ready', ...shown, owner: RESERVE_OWNER, lastDay: reserve.state().lastDay });
+    console.info(`[two-sleeve] cash reserve ${shown.symbol} at ${shown.pct}% of equity, decided ${shown.window} ET`);
+  }
   return true;
 }
 
@@ -195,6 +213,7 @@ function heartbeat(extra) {
     fs.writeFileSync(path.join(DIR, 'heartbeat.json'), JSON.stringify({ ...stats, ...extra, accountId: resolved && resolved.accountId,
       ownership: ownership.snapshot().symbols, engine: engine ? engine.stats : null,
       intents: DRY && facade ? facade.intents : undefined,
+      reserve: reserve ? { symbol: reserve.cfg.symbol, pct: reserve.cfg.pct, lastDay: reserve.state().lastDay } : undefined,
       workers: Object.fromEntries(Object.entries(workers).map(([id, w]) => [id, w.status()])),
       at: new Date().toISOString() }));
   } catch (_e) { /* diagnostic only */ }
@@ -244,10 +263,14 @@ async function tick() {
           // seconds. A tick that crossed the bell runs protective-only: no entry decided at 15:59 lands after the close.
           const win = passWindow({ startedInSession: mh, inSessionNow: marketHours(nowMs()), extManageNow: protectiveOnly });
           if (win.afterBell) journal({ event: 'after_bell_pass', startedAt: new Date(now).toISOString() });
-          const res = await engine.tick((sl) => scans[sl.id] || { signals: [] }, { now, extended: win.extended, protectiveOnly: win.protectiveOnly, userId: USER });
+          const res = await engine.tick((sl) => scans[sl.id] || { signals: [] }, { now, extended: win.extended, protectiveOnly: win.protectiveOnly, excludeSymbols: RESERVE_EXCLUDE, userId: USER });
           stats.ticks++; stats.lastTick = new Date().toISOString();
           journal({ event: 'tick', protectiveOnly, sleeves: tickSummary(res, scans), collisions: engine.stats.collisions,
             intents: DRY && facade ? Object.keys(facade.intents).length : undefined });
+          // The reserve acts in the regular session only, after the sleeves, never on a tick that crossed the bell.
+          if (reserve && mh && !win.protectiveOnly && !win.afterBell) {
+            try { await reserve.maybeRun(nowMs()); } catch (e) { journal({ event: 'reserve_error', error: String((e && e.message) || e) }); }
+          }
         }
       }
     }

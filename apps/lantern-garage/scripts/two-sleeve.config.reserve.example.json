@@ -1,0 +1,10 @@
+{
+  "_comment": "The engine's cash reserve (2026-10-27, lib/two-sleeve/reserve.js): add the \"reserve\" block at the TOP LEVEL of any two-sleeve engine config (beside \"order\" and \"sleeves\"). It parks pct of equity in one cash-like fund owned by the pseudo-owner RESERVE: no sleeve sees, adopts, protects or sells it, and every brain gets the symbol in excludeSymbols. It decides at most once a session, at the first regular-session tick inside window (ET), only when the holding is off target by more than bandPct of the target; a buy never takes cash below minCashPct of equity, and cash below that floor sells enough of the fund to restore it. BOXX (Alpha Architect 1-3 Month Box ETF) accrues its T-bill yield in its PRICE, so a paper account that credits no dividends still earns it. Measured need (replay of the live design, live size, 2016-2026): the overnight book held a median 17 %, p99 41 %, at most 58 % of equity, so 30 % parked never forces a margin debit. To unwind: set pct 0 for one session (it sells the holding), then remove the block. Without the block nothing changes.",
+  "reserve": {
+    "symbol": "BOXX",
+    "pct": 30,
+    "bandPct": 10,
+    "minCashPct": 5,
+    "window": "12:00-12:30"
+  }
+}
