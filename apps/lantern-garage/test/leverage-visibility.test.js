@@ -115,3 +115,45 @@ test('a reason-matched stop is not double counted', () => {
   assert.strictEqual(rec.stops_by_price, 0, 'already counted by reason — not counted twice');
   assert.strictEqual(rec.stops_total, 1);
 });
+
+// ── EXPOSURE GROUPS (2026-10-27) ─────────────────────────────────────────────
+// Stable bought UCO, XLE, XOP and USO at 12 % each: one oil bet that the record
+// reported as four 12 % families. The OIL group pools them — for the RECORD only.
+const OIL_BOOK_2026_10_27 = [
+  { symbol: 'UCO', qty: 1795, market_value: 116208.3, unrealized_pl: 476.67 },
+  { symbol: 'USO', qty: 708, market_value: 115651.8, unrealized_pl: -58.62 },
+  { symbol: 'XLE', qty: 1691, market_value: 115360.02, unrealized_pl: -295.93 },
+  { symbol: 'XOP', qty: 580, market_value: 115826, unrealized_pl: -101.5 },
+  { symbol: 'SOXS', qty: 0.8, market_value: 34.05, unrealized_pl: -1.47 },
+];
+
+test('the 2026-10-27 oil book: four funds, ONE group, UCO at its stated 2x', () => {
+  const beta = dl.familyBetaNotional(OIL_BOOK_2026_10_27);
+  assert.deepStrictEqual(Object.keys(beta), ['OIL'], 'no per-fund families left, and the SOXS dust stays out');
+  assert.ok(Math.abs(beta.OIL - (115651.8 + 115360.02 + 115826 + 2 * 116208.3)) < 0.01, `got ${beta.OIL}`);
+});
+
+test('the session record reports the oil bet, not "max 12 %"', () => {
+  const rec = buildSessionRecord({
+    ledgerText: '', now: Date.parse('2026-10-27T20:01:00Z'),
+    account: { equity: 966121.06, cash: 314796.13 },
+    positions: OIL_BOOK_2026_10_27,
+    dayPnl: {},
+  });
+  const fx = rec.family_beta_exposure;
+  assert.ok(Math.abs(fx.pct_of_equity.OIL - 60.0) < 0.1, `OIL ${fx.pct_of_equity.OIL}`);
+  assert.ok(Math.abs(fx.max_pct - 60.0) < 0.1, 'max_pct is the one number to alert on');
+});
+
+test('MEASUREMENT ONLY: every trading read of the oil funds is unchanged', () => {
+  // The direction lock, mirrors, signal proxies, bucket cap and entry judge read these.
+  for (const s of ['USO', 'UCO', 'SCO', 'XLE', 'XOP']) {
+    assert.deepStrictEqual(dl.instrumentSign(s), { family: s, sign: 1 }, `${s} keeps its own trading family`);
+    assert.strictEqual(dl.leverageOf(s), 1, `${s}: the trading LEVERAGE table is untouched`);
+    assert.strictEqual(dl.mirrorOf(s), null, `${s}: no mirror is invented`);
+    assert.strictEqual(dl.underlyingProxy(s), null, `${s}: signals still read its own bars`);
+  }
+  assert.strictEqual(dl.riskBucket('XLE'), 'equity_long', 'the bucket cap still files XLE with equity longs');
+  for (const s of ['USO', 'UCO', 'XOP']) assert.strictEqual(dl.riskBucket(s), s);
+  assert.strictEqual(dl.conflicts('UCO', [{ symbol: 'USO', qty: -100 }]).conflict, false, 'a stray USO short still never blocks a UCO entry');
+});

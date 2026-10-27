@@ -74,9 +74,31 @@ function leverageOf(sym) {
   return LEVERAGE[String(sym || '').toUpperCase()] || 1;
 }
 
+// ── EXPOSURE GROUPS (2026-10-27) — MEASUREMENT ONLY ─────────────────────────
+// FAMILY is a TRADING table: the direction lock, the mirrors, the signal
+// proxies, the bucket cap and the entry judge all read it, so a fund it does not
+// list stays its own family there (correlation we cannot assert, we do not).
+// That left the session record blind to one bet bought four ways: on 2026-10-27
+// stable bought UCO, XLE, XOP and USO at 12 % each — 48 % of equity, all oil —
+// and family_beta_exposure reported "max 12 %". The correlation IS asserted
+// here, measured: daily returns 2024-10..2026-10 (Alpaca sip), UCO~USO r 0.93,
+// XOP~USO 0.65, XLE~USO 0.60, XLE~XOP 0.93 — against XLE~SPY 0.31 and
+// USO~SPY -0.06. These two maps are read ONLY by familyBetaNotional: they change
+// what the record reports, never a trade.
+const EXPOSURE_GROUP = {
+  USO: 'OIL', UCO: 'OIL', SCO: 'OIL',       // crude oil futures funds
+  XLE: 'OIL', XOP: 'OIL',                   // oil & gas producers
+};
+// UCO/SCO are 2x the Bloomberg Commodity Balanced WTI index (ProShares). That
+// index spreads across the curve, so UCO's measured daily beta to USO is 1.25,
+// not 2 — counted at the stated 2x anyway, as every wrapper in LEVERAGE is.
+const EXPOSURE_LEVERAGE = { UCO: 2, SCO: 2 };
+
 /**
  * Beta-adjusted exposure per family, in absolute currency: |market value| x
  * leverage. This is the number the notional-based gross cap cannot see.
+ * Funds in EXPOSURE_GROUP are pooled under their group (OIL), at
+ * EXPOSURE_LEVERAGE where LEVERAGE does not list them.
  * Dust (<1 share) is excluded, matching familyExposure().
  */
 function familyBetaNotional(positions) {
@@ -86,8 +108,9 @@ function familyBetaNotional(positions) {
     if (Math.abs(qty) < 1) continue;
     const mv = Math.abs(Number(p.market_value) || (qty * (Number(p.current_price) || 0)));
     if (!(mv > 0)) continue;
-    const { family } = instrumentSign(p.symbol);
-    out[family] = (out[family] || 0) + mv * leverageOf(p.symbol);
+    const sym = String(p.symbol || '').toUpperCase();
+    const group = EXPOSURE_GROUP[sym] || instrumentSign(sym).family;
+    out[group] = (out[group] || 0) + mv * (EXPOSURE_LEVERAGE[sym] || leverageOf(sym));
   }
   for (const k of Object.keys(out)) out[k] = Math.round(out[k] * 100) / 100;
   return out;
@@ -219,4 +242,4 @@ function conflicts(sym, positions) {
   return { conflict: true, family, entrySign: sign, existingSign: existing, against };
 }
 
-module.exports = { FAMILY, LEVERAGE, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, mirrorOf, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };
+module.exports = { FAMILY, LEVERAGE, EXPOSURE_GROUP, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, mirrorOf, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };

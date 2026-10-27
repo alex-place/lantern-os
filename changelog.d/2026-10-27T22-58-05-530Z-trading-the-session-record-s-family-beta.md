@@ -1,0 +1,3 @@
+### Changed
+
+- trading: the session record's family_beta_exposure pools the oil funds into ONE group (OIL: USO, UCO, SCO, XLE, XOP) and counts UCO/SCO at their stated 2x. On 2026-10-27 stable bought UCO, XLE, XOP and USO at 12 % each, 48 % of equity in one bet, and the record said max 12 %; it now says OIL 60 %. Measured 2024-10..2026-10 daily returns: UCO~USO r 0.93, XOP~USO 0.65, XLE~USO 0.60, XLE~XOP 0.93, against XLE~SPY 0.31. Measurement only: the grouping lives in its own two maps (EXPOSURE_GROUP, EXPOSURE_LEVERAGE) read by familyBetaNotional alone, so the direction lock, mirrors, signal proxies, bucket cap and entry judge, which read FAMILY and LEVERAGE, are unchanged (pinned by a test).
