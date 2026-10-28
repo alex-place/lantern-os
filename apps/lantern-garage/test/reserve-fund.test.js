@@ -6,8 +6,8 @@
  * (stable: gross 60, so at least 40 % cash) is parked in one T-bill fund. These tests pin the knobs (a blank knob
  * is absent, never the pct-0 unwind), the once-a-session decision for the operator's armed book only, the order
  * guard's reserve ceiling (a T-bill fund at up to 90 % of equity, every other symbol refused), the flag's path
- * through the bridge and the IBKR client, and the partition: the day-trader never sells the fund and never counts
- * it as a slot, a bucket or gross exposure.
+ * through the bridge and the IBKR client, the two cash readings, and the partition: the day-trader never sells the
+ * fund, never counts it as a slot, a bucket or gross exposure, and its snapshot tells never read it as a foreign row.
  *
  * Run: node --test test/reserve-fund.test.js
  */
@@ -34,7 +34,7 @@ function withEnv(env, fn) {
   try { const r = fn(); if (r && typeof r.then === 'function') return r.finally(done); done(); return r; } catch (e) { done(); throw e; }
 }
 
-// The stable book at the 10-27 close: four oil funds, 48 % of $966k, the rest cash.
+// A simplified stable account: equity $966k, a cash field of $502k, one oil fund (UCO) held; tests override the book.
 function stableFacade({ cash = 502000, pos = {}, answer = null } = {}) {
   const st = { equity: 966000, cash, pos: { UCO: { qty: 1795, price: 36.2 }, ...pos }, placed: [] };
   return {
