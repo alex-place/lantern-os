@@ -2378,11 +2378,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // second.
   const _knownSym = (k) => _lastPos.has(k) || _entryAt.has(k) || _zoneLadder.has(k)
     || _exitStatus.has(k) || _stopDistPct.has(k);
-  const _foreignRows = snapshotForeignRows(positions, _knownSym);
+  // The reserve fund (lib/reserve-fund.js) is an expected row, never evidence about the book: these tells read the
+  // trader's rows without it, so a parked fund neither counts as an unrecognised row nor pads the book size.
+  const _bookRows = positions.filter(_notFund);
+  const _foreignRows = snapshotForeignRows(_bookRows, _knownSym);
   const _snapshotForeign = _vanished.length >= 2 && _foreignRows >= 2;
   const _snapshotSuspect = !_positionsOk
-    || (positions.length === 0 && _lastPos.size > 0)
-    || (_vanished.length >= 3 && _vanished.length > positions.length)
+    || (_bookRows.length === 0 && _lastPos.size > 0)
+    || (_vanished.length >= 3 && _vanished.length > _bookRows.length)
     || _snapshotForeign;
   if (_snapshotForeign) {
     // The FOREIGN shape is the only suspect flavor where NOTHING in the snapshot

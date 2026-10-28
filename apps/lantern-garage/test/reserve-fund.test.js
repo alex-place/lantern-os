@@ -273,3 +273,28 @@ test('the trader never sells the fund: the scan pass and the fast-exit tick both
     assert.equal(b.sells.length, 0, 'nor does the fast-exit loop');
   });
 });
+
+test('snapshot tells: the fund is an expected row, never an unrecognised one', async () => {
+  // Two tracked names absent and two rows the engine has no state for is the foreign-book tell (#3378). With the
+  // fund parked, BOXX must not be one of the two: SPY and QQQ gone (say, stops the orders feed has not shown yet)
+  // plus one new GLD row is an ordinary book, not another account's.
+  const scanWith = (env) => withEnv(env, async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fund-tell-'));
+    const STATE = path.join(dir, 'state.json');
+    fs.writeFileSync(STATE, JSON.stringify({ lastPos: {
+      SPY: { qty: 50, entry: 680, mark: 682, ts: Date.now() }, QQQ: { qty: 40, entry: 600, mark: 601, ts: Date.now() } } }));
+    Object.assign(process.env, { TRADER_TRADES_LOG: path.join(dir, 'trades.jsonl'), TRADER_STATE_FILE: STATE, TRADER_MANAGE_EXITS: '1' });
+    delete process.env.TRADER_AUTO_EXECUTE;
+    delete require.cache[require.resolve('../lib/auto-trader')];
+    try {
+      const at2 = require('../lib/auto-trader');
+      at2._loadState();
+      const b = traderBridge([pos('BOXX', 338070, 114.6), pos('GLD', 38000, 380)]);
+      return await at2.runAutoTrade({ signals: [] }, { bridge: b, userId: 'u-tell', accountId: 'ACC-u-tell' });
+    } finally { delete require.cache[require.resolve('../lib/auto-trader')]; }
+  });
+  const counted = await scanWith({});
+  assert.match(String(counted.reason || ''), /another account/, 'control: unconfigured, BOXX is a second unknown row and the tell fires');
+  const parked = await scanWith({ TRADER_RESERVE_FUND_PCT: '35' });
+  assert.doesNotMatch(String(parked.reason || ''), /another account/, `with the fund parked the scan reads the book: ${parked.reason}`);
+});
