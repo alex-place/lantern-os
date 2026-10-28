@@ -115,3 +115,85 @@ test('a reason-matched stop is not double counted', () => {
   assert.strictEqual(rec.stops_by_price, 0, 'already counted by reason — not counted twice');
   assert.strictEqual(rec.stops_total, 1);
 });
+
+// ── EXPOSURE GROUPS (2026-10-27) ─────────────────────────────────────────────
+// Stable bought UCO, XLE, XOP and USO at 12 % each: one oil bet that the record
+// reported as four 12 % families. The OIL group pools them — for the RECORD only.
+const OIL_BOOK_2026_10_27 = [
+  { symbol: 'UCO', qty: 1795, market_value: 116208.3, unrealized_pl: 476.67 },
+  { symbol: 'USO', qty: 708, market_value: 115651.8, unrealized_pl: -58.62 },
+  { symbol: 'XLE', qty: 1691, market_value: 115360.02, unrealized_pl: -295.93 },
+  { symbol: 'XOP', qty: 580, market_value: 115826, unrealized_pl: -101.5 },
+  { symbol: 'SOXS', qty: 0.8, market_value: 34.05, unrealized_pl: -1.47 },
+];
+
+test('the 2026-10-27 oil book: four funds, ONE group, UCO at its stated 2x', () => {
+  const beta = dl.familyBetaNotional(OIL_BOOK_2026_10_27);
+  assert.deepStrictEqual(Object.keys(beta), ['OIL'], 'no per-fund families left, and the SOXS dust stays out');
+  assert.ok(Math.abs(beta.OIL - (115651.8 + 115360.02 + 115826 + 2 * 116208.3)) < 0.01, `got ${beta.OIL}`);
+});
+
+test('the session record reports the oil bet, not "max 12 %"', () => {
+  const rec = buildSessionRecord({
+    ledgerText: '', now: Date.parse('2026-10-27T20:01:00Z'),
+    account: { equity: 966121.06, cash: 314796.13 },
+    positions: OIL_BOOK_2026_10_27,
+    dayPnl: {},
+  });
+  const fx = rec.family_beta_exposure;
+  assert.ok(Math.abs(fx.pct_of_equity.OIL - 60.0) < 0.1, `OIL ${fx.pct_of_equity.OIL}`);
+  assert.ok(Math.abs(fx.max_pct - 60.0) < 0.1, 'max_pct is the one number to alert on');
+});
+
+test('MEASUREMENT ONLY: every trading read of the oil funds is unchanged', () => {
+  // The direction lock, mirrors, signal proxies, bucket cap and entry judge read these.
+  for (const s of ['USO', 'UCO', 'SCO', 'XLE', 'XOP']) {
+    assert.deepStrictEqual(dl.instrumentSign(s), { family: s, sign: 1 }, `${s} keeps its own trading family`);
+    assert.strictEqual(dl.leverageOf(s), 1, `${s}: the trading LEVERAGE table is untouched`);
+    assert.strictEqual(dl.mirrorOf(s), null, `${s}: no mirror is invented`);
+    assert.strictEqual(dl.underlyingProxy(s), null, `${s}: signals still read its own bars`);
+  }
+  assert.strictEqual(dl.riskBucket('XLE'), 'equity_long', 'the bucket cap still files XLE with equity longs');
+  for (const s of ['USO', 'UCO', 'XOP']) assert.strictEqual(dl.riskBucket(s), s);
+  assert.strictEqual(dl.conflicts('UCO', [{ symbol: 'USO', qty: -100 }]).conflict, false, 'a stray USO short still never blocks a UCO entry');
+});
+
+// Metals, the same blind spot: stable's 2026-09-30 close held GDX, GLD, NUGT and
+// SLV at 9-18 % each, recorded as four families with "max 18.1 %". One bet, gold
+// and its miners; equity fell -0.65 % the next session.
+const METALS_BOOK_2026_09_30 = [
+  { symbol: 'DIA', qty: 235, market_value: 119699.6, unrealized_pl: -831.46 },
+  { symbol: 'GDX', qty: 2018, market_value: 177442.74, unrealized_pl: -776.94 },
+  { symbol: 'GLD', qty: 232, market_value: 88359.52, unrealized_pl: -133.14 },
+  { symbol: 'NUGT', qty: 1197, market_value: 177167.25, unrealized_pl: -1199.71 },
+  { symbol: 'SLV', qty: 3265, market_value: 177909.86, unrealized_pl: 244.87 },
+  { symbol: 'SOXS', qty: 0.8, market_value: 26.41, unrealized_pl: 0.54 },
+  { symbol: 'TLT', qty: 1145, market_value: 89023.75, unrealized_pl: -40.08 },
+];
+
+test('the 2026-09-30 metals book: four funds, ONE group, NUGT at its stated 2x', () => {
+  const rec = buildSessionRecord({
+    ledgerText: '', now: Date.parse('2026-09-30T20:01:00Z'),
+    account: { equity: 985180.13 },
+    positions: METALS_BOOK_2026_09_30,
+    dayPnl: {},
+  });
+  const fx = rec.family_beta_exposure;
+  assert.ok(Math.abs(fx.abs.METALS - (177442.74 + 88359.52 + 177909.86 + 2 * 177167.25)) < 0.01, `got ${fx.abs.METALS}`);
+  assert.ok(Math.abs(fx.max_pct - 80.9) < 0.1, `the record said "max 18.1 %"; got ${fx.max_pct}`);
+  assert.strictEqual(fx.pct_of_equity.TLT, 9, 'a family outside the groups keeps its own key');
+  assert.strictEqual(fx.pct_of_equity.DIA, 12.2);
+});
+
+test('MEASUREMENT ONLY: every trading read of the metals funds is unchanged', () => {
+  for (const s of ['SLV', 'GDX', 'NUGT', 'JNUG']) {
+    assert.deepStrictEqual(dl.instrumentSign(s), { family: s, sign: 1 }, `${s} keeps its own trading family`);
+    assert.strictEqual(dl.leverageOf(s), 1, `${s}: the trading LEVERAGE table is untouched`);
+    assert.strictEqual(dl.mirrorOf(s), null, `${s}: no mirror is invented`);
+    assert.strictEqual(dl.underlyingProxy(s), null, `${s}: signals still read its own bars`);
+  }
+  assert.deepStrictEqual(dl.instrumentSign('GLD'), { family: 'GLD', sign: 1 }, 'gold keeps its trading family');
+  assert.strictEqual(dl.underlyingProxy('GLD'), 'GLD');
+  for (const s of ['GLD', 'SLV', 'GDX']) assert.strictEqual(dl.riskBucket(s), 'metals', `${s}: the bucket cap groups metals as before`);
+  for (const s of ['NUGT', 'JNUG']) assert.strictEqual(dl.riskBucket(s), s, `${s}: still its own bucket for the cap`);
+});
