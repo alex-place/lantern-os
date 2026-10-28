@@ -116,6 +116,39 @@ test('a cash balance that reads 0 is unreadable: skip and retry inside the windo
   assert.equal(later.plan.action, 'hold');
 });
 
+// Cash two ways: IBKR's cash field reads LOW after a day's buys (equity - cash - positions ran $0-351k on stable's
+// trading days), and equity minus the marked positions reads HIGH when the positions feed drops rows.
+const CASH_BOOK = { BOXX: { qty: 2950, price: 114.6 }, XLE: { qty: 7999, price: 70 } };   // $338,070 fund + $559,930 trader; true cash $68,000
+test('cash field reading low after the day\'s buys: no sale of the fund for a floor the account is not under', async () => {
+  rf._reset();
+  const rows = [], f = stableFacade({ cash: 68000 - 188000, pos: CASH_BOOK });
+  delete f.st.pos.UCO;
+  const r = await rf.maybeRun({ facade: f, userId: 'local-owner', at: AT('12:05'), journal: (x) => rows.push(x), quote, stateFile: path.join(DIR, 'low.state.json'), env: ARMED });
+  assert.equal(r.plan.action, 'hold', `the cash field alone would sell ~1,470 shares: ${JSON.stringify(r.plan)}`);
+  assert.equal(f.st.placed.length, 0);
+  const plan = rows.find((x) => x.event === 'reserve_plan');
+  assert.equal(plan.broker_cash, -120000); assert.equal(plan.derived_cash, 68000);
+});
+
+test('a positions dropout: buys are sized from the lower reading, never into margin', async () => {
+  rf._reset();
+  const f = stableFacade({ cash: 68000, pos: {} });
+  delete f.st.pos.UCO;   // the feed shows nothing, the fund and the trader's $560k included
+  const r = await rf.maybeRun({ facade: f, userId: 'local-owner', at: AT('12:05'), quote, stateFile: path.join(DIR, 'drop.state.json'), env: ARMED });
+  assert.equal(r.plan.action, 'buy');
+  assert.ok(f.st.placed[0].qty * 114.5 <= 68000 - 48300, `bounded by the broker's cash above the floor, got ${f.st.placed[0].qty} shares`);
+});
+
+test('a real shortfall, both readings under the floor: sell the smaller shortfall', async () => {
+  rf._reset();
+  const f = stableFacade({ cash: -12000, pos: { BOXX: { qty: 2950, price: 114.6 }, XLE: { qty: 9143, price: 70 } } });
+  delete f.st.pos.UCO;
+  const r = await rf.maybeRun({ facade: f, userId: 'local-owner', at: AT('12:05'), quote, stateFile: path.join(DIR, 'short.state.json'), env: ARMED });
+  assert.equal(r.plan.action, 'sell');
+  // floor 48,300; broker -12,000, derived 966,000 - 338,070 - 640,010 = -12,080: hi = -12,000 -> ceil(60,300 / 114.6) = 527
+  assert.equal(f.st.placed[0].qty, 527);
+});
+
 test('an IBKR order warning is not a fill: the order row says ok false and carries the warning', async () => {
   rf._reset();
   const rows = [], stateFile = path.join(DIR, 'warn.state.json');

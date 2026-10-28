@@ -15,7 +15,9 @@
  *     gross cap keeps, parked.
  *   - Size: with the gross cap at 60 the trader holds at most 60 % of equity, so a fund at 35 % with the 5 % cash
  *     floor leaves 5 % or more in cash at the cap. The cap is measured at entry and marks move; when cash is under
- *     the floor at the next decision, the reserve sells enough of the fund to restore it.
+ *     the floor at the next decision, the reserve sells enough of the fund to restore it. Cash is read two ways
+ *     (IBKR's cash field, and equity minus the marked positions) and the plan takes the cautious one of each
+ *     (see `view` below): the field reads low after a day's buys, the difference reads high on a feed dropout.
  *   - Orders go out flagged reserve: true, which the IBKR order guard (lib/trading-guard.js) caps at the reserve's
  *     ceiling (a T-bill fund, at most 90 % of equity) instead of the trader's per-position cap.
  *   - Only the operator's own book (local-owner), and only from an instance armed for entries
@@ -66,17 +68,31 @@ function _reserveFor(userId, c, stateFile) {
   let e = _live.get(userId);
   if (e && e.key === key) return e;
   try { fs.mkdirSync(path.dirname(stateFile), { recursive: true }); } catch (_e) { /* fail-soft: the memory guard still holds */ }
-  const ref = { facade: null, journal: () => {}, quote: null };
-  // The bridge reports an unreadable cash balance as 0, and a cash of 0 reads as "under the floor": the reserve
-  // would sell the fund to restore cash the account actually has. An exact 0 is read as unreadable (the reserve
-  // skips and retries at the next scan inside the window); the gross cap keeps real cash positive.
+  const ref = { facade: null, journal: () => {}, quote: null, cash: null };
+  // THE CASH THE RESERVE PLANS WITH. IBKR's cash field is not trustworthy on its own: on stable's trading days
+  // equity - cash - positions ran $0-351k (08-26..10-27), near 0 on idle days, so it reads LOW after the day's
+  // buys; and the bridge reports an unreadable balance as 0. Equity minus the marked positions is the other
+  // reading, but a positions dropout makes it read HIGH. The plan therefore sizes buys from the LOWER reading and
+  // sells to restore the cash floor only when BOTH readings are under it (then by the smaller shortfall); when they
+  // straddle the floor it holds. An exact 0 is unreadable: skip and retry at the next scan inside the window.
   const view = {
-    getIBKRAccount: async (u) => { const a = await ref.facade.getIBKRAccount(u); return a && Number(a.cash) === 0 ? null : a; },
+    getIBKRAccount: async (u) => {
+      const a = await ref.facade.getIBKRAccount(u);
+      if (!a || !(Number(a.equity) > 0) || Number(a.cash) === 0 || !Number.isFinite(Number(a.cash))) return null;
+      const rows = await ref.facade.getIBKRPositions(u);
+      if (!Array.isArray(rows)) return null;
+      const invested = rows.reduce((s, p) => s + (Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
+      const equity = Number(a.equity), broker = Number(a.cash), derived = equity - invested;
+      const floor = (c.minCashPct / 100) * equity, lo = Math.min(broker, derived), hi = Math.max(broker, derived);
+      ref.cash = { broker_cash: Math.round(broker), derived_cash: Math.round(derived) };
+      return { ...a, cash: hi < floor ? hi : Math.max(lo, floor) };
+    },
     getIBKRPositions: (u) => ref.facade.getIBKRPositions(u),
     placeIBKROrder: (u, o) => ref.facade.placeIBKROrder(u, o),
   };
   const reserve = createReserve({ cfg: c, facade: view, userId, stateFile,
-    journal: (row) => ref.journal(row), quote: (sym) => (ref.quote ? ref.quote(sym) : 0) });
+    journal: (row) => ref.journal(row.event === 'reserve_plan' && ref.cash ? { ...row, ...ref.cash } : row),
+    quote: (sym) => (ref.quote ? ref.quote(sym) : 0) });
   e = { key, reserve, ref };
   _live.set(userId, e);
   return e;
