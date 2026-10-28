@@ -283,6 +283,14 @@ async function _autoscanTick() {
             await require('../lib/reserve-fund').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
               quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
           } catch (e) { _logRow({ event: 'reserve_error', error: String((e && e.message) || e) }); }
+          // THE OVERNIGHT BOOK (lib/overnight-book.js, 2026-10-28): the engine's sleeve O on this account. Buys SPY/QQQ/SMH
+          // above their 200-session mean at the 15:55 print, sells them at the 09:40 print; a no-op (no market-data read)
+          // outside those windows. The day-trader leaves the names it holds alone on its own (auto-trader's partition).
+          try {
+            await require('../lib/overnight-book').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
+              getBars: (sym, tf) => require('../lib/market-data-yahoo').getBars(sym, tf),
+              quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
+          } catch (e) { _logRow({ event: 'overnight_book_error', error: String((e && e.message) || e) }); }
         }
       }
       // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
@@ -302,6 +310,8 @@ if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   try {
     const _rf = require('../lib/reserve-fund').config();
     if (_rf) console.info(`[Trading] reserve fund ${_rf.symbol} at ${_rf.pct}% of equity (band ${_rf.bandPct}%, cash floor ${_rf.minCashPct}%), decided ${_rf.window} ET — local-owner, armed entries only`);
+    const _ob = require('../lib/overnight-book').config();
+    if (_ob) console.info(`[Trading] overnight book ${_ob.symbols.join('/')} at ${_ob.pct}% of equity each, bought at the 15:55 print above the 200-session mean, sold at the 09:40 print — local-owner, armed entries only`);
   } catch (_e) { /* fail-soft */ }
 
   // ── STALL WATCHDOG (#3525) ──────────────────────────────────────────────────

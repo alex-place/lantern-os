@@ -1974,6 +1974,10 @@ async function _onePassPerAccount(opts, fn, { skipIfBusy = false } = {}) {
 function _reserveFund() {
   try { return require('./reserve-fund').symbols(); } catch (_e) { return []; }
 }
+/** What the overnight book (lib/overnight-book.js) owns on this account now: { symbols, since, sells }. Fail-soft. */
+function _overnightBook(userId) {
+  try { return require('./overnight-book').partition(userId); } catch (_e) { return { symbols: [], since: {}, sells: [] }; }
+}
 /**
  * PRICE-ONLY exit tick (#3165 "fast exit loop") — runs BETWEEN full scans so the
  * ladder / trailing / max-loss exits react in seconds, not the 60s scan cadence
@@ -2005,7 +2009,7 @@ async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended =
   const workingSells = new Set((openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
-  const exclude = new Set([...(excludeSymbols || []), ..._reserveFund()].map((x) => String(x).toUpperCase()));
+  const exclude = new Set([...(excludeSymbols || []), ..._reserveFund(), ..._overnightBook(userId).symbols].map((x) => String(x).toUpperCase()));
   // The fast path must honor the unclosable freeze and in-flight exits exactly like
   // the scan loop's reconcile does — without this it re-attempted the frozen SOXS
   // dust every debounce window (observed live 2026-08-04 09:31/09:39 ET).
@@ -2188,7 +2192,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // THE RESERVE FUND (lib/reserve-fund.js, 2026-10-28) is excluded on every pass, whoever the caller, and is
   // not open risk either: it is the cash the gross cap keeps, parked in a T-bill fund. `_fund` leaves it out of
   // the concurrency cap, the correlated-risk buckets, the gross cap, slot_util and the re-protect guard.
-  const _fund = new Set(_reserveFund());
+  // THE OVERNIGHT BOOK (lib/overnight-book.js, 2026-10-28) owns its names from its 15:55 buy until its morning sale
+  // has left the book. They join the partition too, with one difference: their notional DOES count toward the gross
+  // cap (the book buys only into the room the cap leaves, so the two together keep the operator's cash floor).
+  const _fundOnly = new Set(_reserveFund().map((s) => String(s).toUpperCase()));
+  const _ovn = _overnightBook(userId);
+  const _fund = new Set([..._fundOnly, ...(_ovn.symbols || []).map((s) => String(s).toUpperCase())]);
   const exclude = new Set([...(excludeSymbols || []), ..._fund].map((s) => String(s).toUpperCase()));
   const _notFund = (p) => !_fund.has(String((p && p.symbol) || '').toUpperCase());
   _exitKeptOpen.clear();   // per scan: this scan's positions snapshot is fresh broker truth
@@ -2240,7 +2249,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // Every symbol the broker CONFIRMS we hold refreshes its timestamp (#3282). If
   // one later vanishes with no exit row to explain it, this is what tells the
   // entry gate the flat reading is a feed dropout rather than an opportunity.
-  for (const [k, q] of Object.entries(heldQty)) if (Math.abs(q) > 0) _lastConfirmedHold.set(k, now);
+  // Partition rows (the reserve fund, the overnight book) are not the trader's holdings: their sale is no dropout.
+  for (const [k, q] of Object.entries(heldQty)) if (Math.abs(q) > 0 && !_fund.has(k)) _lastConfirmedHold.set(k, now);
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
   // OWNERSHIP FILTER (2026-08-13). heldPos is EVERY position in the account,
@@ -2258,6 +2268,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   for (const [k, p] of Object.entries(heldPos)) {
     if (!(Number(heldQty[k]) > 0)) continue;
     if (_ourSyms.size && !_ourSyms.has(k)) continue;   // another engine's position
+    // Partition rows are never tracked as this book: the overnight book's morning sale of three names must not read as
+    // three positions vanishing (the external-close sweep, the mass-vanish tell), and the fund's rebalances as drift.
+    if (_fund.has(k)) { _lastPos.delete(k); _seenStreak.delete(k); continue; }
     // ADOPTION DWELL (#3378). Being in the watchlist is not proof a position is
     // ours: a foreign snapshot put GLD/TLT rows — another book's lots, other
     // cost bases — into heldPos and they were adopted on sight. A symbol with no
@@ -2313,7 +2326,20 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     logTrade({ ..._dr, feed_orders: (_ordersEarly || []).filter((o) => String(o.symbol || '').toUpperCase() === _dr.symbol)
       .map((o) => ({ id: o.orderId, side: o.side, type: o.orderType || o.type, qty: o.qty, status: o.status, price: o.price })).slice(0, 12) });
   }
-  const _filledSyms = _reconcileFills(_ordersEarly);   // authoritative exits, priced at the fill
+  // Partition sales are not this trader's exits: the reserve fund's, a sale of a name the overnight book holds (filled
+  // at or after its buy), or one of the book's own sell orders. Their ids are remembered so no later pass books them.
+  const _ordersMine = (_ordersEarly || []).filter((o) => {
+    if (!fillLedger.isFilledSell(o)) return true;
+    const s = String((o && (o.symbol || o.ticker)) || '').toUpperCase();
+    const id = String((o && (o.orderId ?? o.order_id)) ?? '');
+    const t = fillLedger.orderTimeMs(o);
+    const theirs = _fundOnly.has(s)
+      || ((_ovn.symbols || []).includes(s) && !(t != null && t < Number((_ovn.since || {})[s] || 0)))
+      || (_ovn.sells || []).some((x) => (id && String(x.orderId) === id) || (!x.orderId && x.symbol === s && Number(o.filledQty) === Number(x.qty)));
+    if (theirs && id) _loggedFills.add(id);
+    return !theirs;
+  });
+  const _filledSyms = _reconcileFills(_ordersMine);   // authoritative exits, priced at the fill
   // SAME-SCAN FILL GUARD (2026-10-16). heldPos/heldQty are a START-of-scan snapshot, and IBKR's positions endpoint
   // lags its orders feed: a sell this scan's orders read shows FILLED can still look held. Every pass below that sends
   // a SELL for a held position (stop-size reconciliation, the ratchet, the gap auction, re-protect, held exits) skips
@@ -3572,7 +3598,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       }
     }
     if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
-      const _gross = _grossThisScan + Object.values(heldPos).filter(_notFund).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
+      // The overnight book's names count here (its notional is exposure); the reserve fund does not (it is the cash kept).
+      const _gross = _grossThisScan + Object.values(heldPos).filter((p) => !_fundOnly.has(String((p && p.symbol) || '').toUpperCase())).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
       if (_gross + qty * price > _budget) {
         out.skipped.push({ ...record, why: `cash reserve: gross $${Math.round(_gross).toLocaleString()} + $${Math.round(qty * price).toLocaleString()} would exceed ${c.maxGrossPct}% of equity ($${Math.round(_budget).toLocaleString()})` });
