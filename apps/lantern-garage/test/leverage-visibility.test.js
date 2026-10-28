@@ -145,16 +145,15 @@ test('the session record reports the oil bet, not "max 12 %"', () => {
   assert.ok(Math.abs(fx.max_pct - 60.0) < 0.1, 'max_pct is the one number to alert on');
 });
 
-test('MEASUREMENT ONLY: every trading read of the oil funds is unchanged', () => {
-  // The direction lock, mirrors, signal proxies, bucket cap and entry judge read these.
+test('MEASUREMENT ONLY: the oil group changes no FAMILY-based trading read', () => {
+  // The direction lock, mirrors, signal proxies and entry judge read FAMILY / LEVERAGE. The bucket cap reads the
+  // groups since 2026-10-28 (correlated-risk-cap.test.js).
   for (const s of ['USO', 'UCO', 'SCO', 'XLE', 'XOP']) {
     assert.deepStrictEqual(dl.instrumentSign(s), { family: s, sign: 1 }, `${s} keeps its own trading family`);
     assert.strictEqual(dl.leverageOf(s), 1, `${s}: the trading LEVERAGE table is untouched`);
     assert.strictEqual(dl.mirrorOf(s), null, `${s}: no mirror is invented`);
     assert.strictEqual(dl.underlyingProxy(s), null, `${s}: signals still read its own bars`);
   }
-  assert.strictEqual(dl.riskBucket('XLE'), 'equity_long', 'the bucket cap still files XLE with equity longs');
-  for (const s of ['USO', 'UCO', 'XOP']) assert.strictEqual(dl.riskBucket(s), s);
   assert.strictEqual(dl.conflicts('UCO', [{ symbol: 'USO', qty: -100 }]).conflict, false, 'a stray USO short still never blocks a UCO entry');
 });
 
@@ -185,7 +184,7 @@ test('the 2026-09-30 metals book: four funds, ONE group, NUGT at its stated 2x',
   assert.strictEqual(fx.pct_of_equity.DIA, 12.2);
 });
 
-test('MEASUREMENT ONLY: every trading read of the metals funds is unchanged', () => {
+test('MEASUREMENT ONLY: the metals group changes no FAMILY-based trading read', () => {
   for (const s of ['SLV', 'GDX', 'NUGT', 'JNUG']) {
     assert.deepStrictEqual(dl.instrumentSign(s), { family: s, sign: 1 }, `${s} keeps its own trading family`);
     assert.strictEqual(dl.leverageOf(s), 1, `${s}: the trading LEVERAGE table is untouched`);
@@ -194,6 +193,4 @@ test('MEASUREMENT ONLY: every trading read of the metals funds is unchanged', ()
   }
   assert.deepStrictEqual(dl.instrumentSign('GLD'), { family: 'GLD', sign: 1 }, 'gold keeps its trading family');
   assert.strictEqual(dl.underlyingProxy('GLD'), 'GLD');
-  for (const s of ['GLD', 'SLV', 'GDX']) assert.strictEqual(dl.riskBucket(s), 'metals', `${s}: the bucket cap groups metals as before`);
-  for (const s of ['NUGT', 'JNUG']) assert.strictEqual(dl.riskBucket(s), s, `${s}: still its own bucket for the cap`);
 });
