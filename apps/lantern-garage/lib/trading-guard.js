@@ -17,6 +17,8 @@
  *      four-figure share counts on cheap names. A MARKET buy has no price of its own,
  *      so it is measured against the caller's `refPrice` (the quote it sized from) and
  *      REFUSED if it has neither — an unpriceable buy cannot be capped.
+ *      A cash-reserve buy (reserve: true, a T-bill fund only) is capped at 90% of equity
+ *      instead — see THE CASH RESERVE in orderGate.
  *   4. Account mode is 'paper', OR mode 'live' AND TRADER_ALLOW_LIVE_ACCOUNT=1
  *      — placing real-money orders on a LIVE account needs a second opt-in.
  */
@@ -29,6 +31,11 @@ const path = require("path");
 const KALSHI_DIR = path.resolve(__dirname, "..", "..", "..", "data", "kalshi");
 const KILL_SWITCH = path.join(KALSHI_DIR, "LIVE-KILL-SWITCH");
 const TRADING_PAUSED = path.join(KALSHI_DIR, "TRADING-PAUSED");
+
+// The cash reserve's funds and ceiling (see orderGate): T-bill funds only, never above
+// lib/two-sleeve/reserve.js MAX_PCT of equity.
+const RESERVE_FUNDS = new Set(["BOXX", "SGOV", "BIL", "SHV", "USFR", "TFLO", "TBIL"]);
+const RESERVE_MAX_PCT = require("./two-sleeve/reserve").MAX_PCT;
 
 function envInt(name, dflt) {
   const v = parseInt(process.env[name], 10);
@@ -76,7 +83,7 @@ function haltFile() {
 // given up to remove 25% of the drawdown. Win rate is unchanged at 64%: sizing does not
 // change WHICH trades are taken, only how big. The operator chose this knowing the
 // number; TRADER_MAX_POSITION_PCT is the single knob that reverses it.
-function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, manual = false } = {}) {
+function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, manual = false, symbol, reserve = false } = {}) {
   const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
   // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
   // equity (default 5% → $50k on $1M; must MATCH auto-trader.js maxPositionPct or
@@ -169,7 +176,20 @@ function orderGate({ mode = "unknown", qty, price, equity, side, refPrice, manua
   // is the engine's sizing policy; a person's order from the trader page carries manual:true
   // (routes/trading/orders.js) and is not judged by it. Every order the engine sends is.
   const reducing = String(side || "").toLowerCase() === "sell" || manual === true;
-  if (!reducing && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? ceilingPct + "% of equity — the HARD ceiling (cap " + maxPositionPct + "% x stress " + stressCeilMult + "); the symbol tilt cannot raise it" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
+  // THE CASH RESERVE (2026-10-28; lib/two-sleeve/reserve.js, on the stable server lib/reserve-fund.js). The cap
+  // above is the trader's sizing policy for RISK. The reserve parks the cash the gross cap keeps in ONE T-bill fund,
+  // and its first buy is a third of the book (stable: 35 % of equity), which the cap would refuse as a 12 % position.
+  // A buy flagged reserve:true is capped at the reserve's own ceiling instead, 90 % of equity, and only for a fund
+  // on RESERVE_FUNDS: the flag on any other symbol is refused outright, so the exemption cannot carry risk past the
+  // cap. Every other gate below applies unchanged.
+  const isReserve = reserve === true && !reducing;
+  if (isReserve && !RESERVE_FUNDS.has(String(symbol || "").toUpperCase())) {
+    return deny(`reserve order for ${symbol || "(no symbol)"} refused — only a T-bill fund (${[...RESERVE_FUNDS].join(" ")}) may be a reserve`);
+  }
+  if (isReserve && px > 0 && notional > (eq > 0 ? eq * (RESERVE_MAX_PCT / 100) : flatNotional)) {
+    return deny(`reserve notional $${notional.toFixed(0)} exceeds ${eq > 0 ? RESERVE_MAX_PCT + "% of equity" : "flat MAX_ORDER_NOTIONAL — equity unknown"}`);
+  }
+  if (!reducing && !isReserve && px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? ceilingPct + "% of equity — the HARD ceiling (cap " + maxPositionPct + "% x stress " + stressCeilMult + "); the symbol tilt cannot raise it" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
   if (process.env.TRADER_LIVE !== "1") return deny("TRADER_LIVE=0 — dry run (no real order placed); set TRADER_LIVE=1 to arm");
   if (mode === "unknown") return deny("account mode unknown — refusing to place a real order");
   if (mode === "live" && process.env.TRADER_ALLOW_LIVE_ACCOUNT !== "1") {

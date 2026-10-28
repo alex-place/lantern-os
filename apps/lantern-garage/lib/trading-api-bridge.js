@@ -164,7 +164,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice, manual }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional, refPrice, manual, reserve }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -237,6 +237,8 @@ class TradingAPIBridge {
       // is the user's decision: the guard's position-size cap, the engine's sizing policy, does not
       // judge it. Never set by the engine.
       manual: manual === true,
+      // A CASH-RESERVE order (lib/two-sleeve/reserve.js) is capped by the guard as a reserve, not as a position.
+      reserve: reserve === true,
     });
     const reason = [r.note || r.error || (r.gate && r.gate.reason) || null, fracNote].filter(Boolean).join('; ') || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read

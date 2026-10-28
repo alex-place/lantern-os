@@ -274,6 +274,16 @@ async function _autoscanTick() {
         const _win = passWindow({ startedInSession: marketHours, inSessionNow: _isUsMarketHours(), extNow, extManageNow });
         if (_win.afterBell) console.info(`[Trading] autoscan — the pass for ${uid} reached the brain after the bell: protective only, no entries`);
         await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, accountId: resolved.accountId, extended: _win.extended, excludeSymbols: _ovnHeld, protectiveOnly: _win.protectiveOnly });
+        // THE RESERVE FUND (lib/reserve-fund.js, 2026-10-28): parks the cash the gross cap keeps in one T-bill fund.
+        // One decision per session inside its window, after the day-trader acted, regular-session passes only, the
+        // operator's book only. The day-trader leaves the fund alone on its own (auto-trader excludes it every pass).
+        if (!_win.extended && !_win.protectiveOnly) {
+          const _logRow = (row) => require('../lib/auto-trader').logTrade({ user: uid, ...row });
+          try {
+            await require('../lib/reserve-fund').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
+              quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
+          } catch (e) { _logRow({ event: 'reserve_error', error: String((e && e.message) || e) }); }
+        }
       }
       // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
       // the only point that means a scan CYCLE COMPLETED. A wedged broker session leaves
@@ -289,6 +299,10 @@ async function _autoscanTick() {
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
+  try {
+    const _rf = require('../lib/reserve-fund').config();
+    if (_rf) console.info(`[Trading] reserve fund ${_rf.symbol} at ${_rf.pct}% of equity (band ${_rf.bandPct}%, cash floor ${_rf.minCashPct}%), decided ${_rf.window} ET — local-owner, armed entries only`);
+  } catch (_e) { /* fail-soft */ }
 
   // ── STALL WATCHDOG (#3525) ──────────────────────────────────────────────────
   // Off unless TRADER_HEARTBEAT is set, because it can end the process and the armed

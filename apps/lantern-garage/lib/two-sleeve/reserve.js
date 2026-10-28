@@ -21,12 +21,16 @@
  *     floor (the sleeves are holding more than usual) it SELLS enough of the fund to restore it, inside
  *     the band or not. pct 0 sells the whole holding: to unwind, set pct 0 for one session, then remove
  *     the block (a removed block leaves the holding owned by RESERVE and unmanaged).
- *   - Orders: whole shares, market, day; priced at the broker's mark when held, else a fresh quote.
+ *   - Orders: whole shares, market, day; priced at the broker's mark when held, else a fresh quote. Each
+ *     order carries that price (refPrice), the equity it was sized from and reserve: true, so the IBKR
+ *     order guard (lib/trading-guard.js) caps it as a reserve order, not as a trader's position, and
+ *     acceptWarnings: true, as the day-trader's own entries do (IBKR's size notices).
  *
  * Config (two-sleeve config.json, top level; absent, or pct not a number in 0..90 = no reserve):
  *   "reserve": { "symbol": "BOXX", "pct": 30, "bandPct": 10, "minCashPct": 5, "window": "12:00-12:30" }
  * Journal rows (engine.jsonl): reserve_ready (at engine start), reserve_plan (every decision, holds
  * included), reserve_order (the broker's answer), reserve_skip (account or positions unreadable).
+ * The stable server's day-trader runs the same reserve from env knobs: lib/reserve-fund.js.
  */
 const fs = require('fs');
 
@@ -96,9 +100,10 @@ function planReserve(cfg, { equity, cash, qty = 0, price }) {
 /**
  * The runner's reserve. maybeRun(at) is called after each regular-session engine tick and decides at most
  * once per ET day, at the first call inside the window. `quote(symbol)` -> price is used only when the fund
- * is not held. Returns null when the config has no reserve.
+ * is not held. Returns null when the config has no reserve. `ownership` is optional: without one (the stable
+ * server, whose day-trader is told to leave the fund alone through excludeSymbols) nothing is claimed.
  */
-function createReserve({ cfg, facade, ownership, journal = () => {}, quote = null, userId, stateFile = null, now = () => Date.now() } = {}) {
+function createReserve({ cfg, facade, ownership = null, journal = () => {}, quote = null, userId, stateFile = null, now = () => Date.now() } = {}) {
   const c = reserveConfig(cfg);
   if (!c) return null;
   let state = { lastDay: null };
@@ -123,15 +128,19 @@ function createReserve({ cfg, facade, ownership, journal = () => {}, quote = nul
     state.lastDay = e.day; save();   // one decision a day, whatever the broker answers
     journal({ event: 'reserve_plan', symbol: c.symbol, pct: c.pct, equity: Number(acct.equity), cash: Number(acct.cash), held: qty, price, ...plan });
     if (plan.action === 'hold') return { ran: true, plan };
-    const res = await Promise.resolve(facade.placeIBKROrder(userId, { ticker: c.symbol, side: plan.action, qty: plan.qty, type: 'market', timeInForce: 'day', _owner: OWNER }))
+    // acceptWarnings: IBKR stops a ~3,000-share buy at its precautionary "Size Limit" notice, as it does the
+    // trader's entries, which accept it by design (auto-trader, 2026-08-10). Alpaca ignores the field.
+    const order = { ticker: c.symbol, side: plan.action, qty: plan.qty, type: 'market', timeInForce: 'day', refPrice: price, equity: Number(acct.equity), reserve: true, acceptWarnings: true, _owner: OWNER };
+    const res = await Promise.resolve(facade.placeIBKROrder(userId, order))
       .catch((err) => ({ status: 'error', reason: String((err && err.message) || err) }));
-    const ok = !!res && res.status !== 'error' && !res.error && !res.dry;
+    // needs_confirmation = IBKR stopped at an order warning: nothing was placed.
+    const ok = !!res && res.status !== 'error' && res.status !== 'needs_confirmation' && !res.error && !res.dry;
     const orderId = res ? (res.order_id ?? res.orderId ?? res.id ?? null) : null;
-    if (ok) {
+    if (ok && ownership) {
       if (plan.action === 'buy') ownership.claim(c.symbol, OWNER);
       if (orderId != null) ownership.tagOrder(orderId, c.symbol, OWNER);
     }
-    journal({ event: 'reserve_order', symbol: c.symbol, side: plan.action, qty: plan.qty, ok, status: res && res.status, orderId, reason: res && res.reason });
+    journal({ event: 'reserve_order', symbol: c.symbol, side: plan.action, qty: plan.qty, ok, status: res && res.status, orderId, reason: res && res.reason, warnings: (res && res.warnings) || undefined });
     return { ran: true, plan, res, ok };
   }
   return { cfg: c, owner: OWNER, maybeRun, state: () => ({ ...state }) };

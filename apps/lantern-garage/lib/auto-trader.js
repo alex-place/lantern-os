@@ -1970,6 +1970,10 @@ async function _onePassPerAccount(opts, fn, { skipIfBusy = false } = {}) {
   _passInFlight.set(key, run);
   try { return await run; } finally { if (_passInFlight.get(key) === run) _passInFlight.delete(key); }
 }
+/** The reserve fund's symbols (lib/reserve-fund.js): [] when none is configured. Fail-soft. */
+function _reserveFund() {
+  try { return require('./reserve-fund').symbols(); } catch (_e) { return []; }
+}
 /**
  * PRICE-ONLY exit tick (#3165 "fast exit loop") — runs BETWEEN full scans so the
  * ladder / trailing / max-loss exits react in seconds, not the 60s scan cadence
@@ -2001,7 +2005,7 @@ async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended =
   const workingSells = new Set((openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
-  const exclude = new Set([...(excludeSymbols || [])].map((x) => String(x).toUpperCase()));
+  const exclude = new Set([...(excludeSymbols || []), ..._reserveFund()].map((x) => String(x).toUpperCase()));
   // The fast path must honor the unclosable freeze and in-flight exits exactly like
   // the scan loop's reconcile does — without this it re-attempted the frozen SOXS
   // dust every debounce window (observed live 2026-08-04 09:31/09:39 ET).
@@ -2181,7 +2185,12 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // are completely off-limits — no exits, no re-protect stops, no signal-sells, no
   // entries. Each engine manages only its own positions; the caller (trading.js)
   // supplies the live exclusion set.
-  const exclude = new Set([...(excludeSymbols || [])].map((s) => String(s).toUpperCase()));
+  // THE RESERVE FUND (lib/reserve-fund.js, 2026-10-28) is excluded on every pass, whoever the caller, and is
+  // not open risk either: it is the cash the gross cap keeps, parked in a T-bill fund. `_fund` leaves it out of
+  // the concurrency cap, the correlated-risk buckets, the gross cap, slot_util and the re-protect guard.
+  const _fund = new Set(_reserveFund());
+  const exclude = new Set([...(excludeSymbols || []), ..._fund].map((s) => String(s).toUpperCase()));
+  const _notFund = (p) => !_fund.has(String((p && p.symbol) || '').toUpperCase());
   _exitKeptOpen.clear();   // per scan: this scan's positions snapshot is fresh broker truth
   const c = cfg();
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
@@ -2651,7 +2660,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // the fetch has recovered. A genuinely naked position stays naked one extra
     // scan; a duplicate stop is an oversell that can flip the account short.
     // A truly empty book (no positions) is unambiguous and still passes through.
-    const _heldCount = Object.values(heldPos).filter((p) => (Number(p.qty) || 0) > 0).length;
+    // The reserve fund carries no stop by design, so it is not a position that should have orders.
+    const _heldCount = Object.values(heldPos).filter((p) => (Number(p.qty) || 0) > 0 && _notFund(p)).length;
     const _ordersUnknown = _heldCount > 0 && (!Array.isArray(_openOrders) || _openOrders.length === 0);
     if (_ordersUnknown) {
       (out.skipped = out.skipped || []).push({ symbol: '*', why: `re-protect deferred: broker returned 0 orders while holding ${_heldCount} position(s) — treating as UNKNOWN, not unprotected` });
@@ -3506,6 +3516,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       const _openN = _openedThisScan + Object.values(heldPos).filter((p) => {
         const q = Math.abs(Number(p.qty) || 0);
         if (!(q > 0)) return false;
+        if (!_notFund(p)) return false;                                         // the reserve fund is cash, not a slot
         if (_unclosable.has(String(p.symbol).toUpperCase())) return false;   // cannot be exited -> not a slot
         const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
         return mv >= _dustFloor;
@@ -3550,7 +3561,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     if (c.maxPerBucket > 0) {
       const { riskBucket, bucketCounts } = require('./direction-lock');
       const _bucket = riskBucket(sym);
-      const _counts = bucketCounts(Object.values(heldPos));
+      const _counts = bucketCounts(Object.values(heldPos).filter(_notFund));
       const _inBucket = (_counts[_bucket] || 0) + (_bucketOpenedThisScan[_bucket] || 0);
       if (_inBucket >= c.maxPerBucket) {
         out.skipped.push({ ...record, why: `correlated-risk cap: ${_inBucket} position(s) already in '${_bucket}' (max ${c.maxPerBucket})` });
@@ -3558,7 +3569,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       }
     }
     if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
-      const _gross = _grossThisScan + Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
+      const _gross = _grossThisScan + Object.values(heldPos).filter(_notFund).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
       if (_gross + qty * price > _budget) {
         out.skipped.push({ ...record, why: `cash reserve: gross $${Math.round(_gross).toLocaleString()} + $${Math.round(qty * price).toLocaleString()} would exceed ${c.maxGrossPct}% of equity ($${Math.round(_budget).toLocaleString()})` });
@@ -3794,6 +3805,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const _slotSyms = Object.values(heldPos).filter((p) => {
       const q = Math.abs(Number(p.qty) || 0);
       if (!(q > 0)) return false;
+      if (!_notFund(p)) return false;   // same slot definition as the cap: the reserve fund is not a slot
       if (_unclosable.has(String(p.symbol).toUpperCase())) return false;
       const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
       return mv >= _dustFloorU;
@@ -3943,4 +3955,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE, logTrade };
