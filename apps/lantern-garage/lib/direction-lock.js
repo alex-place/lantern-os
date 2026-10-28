@@ -83,21 +83,26 @@ function leverageOf(sym) {
 // and family_beta_exposure reported "max 12 %". The correlation IS asserted
 // here, measured: daily returns 2024-10..2026-10 (Alpaca sip), UCO~USO r 0.93,
 // XOP~USO 0.65, XLE~USO 0.60, XLE~XOP 0.93 — against XLE~SPY 0.31 and
-// USO~SPY -0.06. These two maps are read ONLY by familyBetaNotional: they change
-// what the record reports, never a trade.
+// USO~SPY -0.06. Metals the same way: GDX~GLD 0.85, SLV~GLD 0.79, NUGT~GDX
+// 1.00, JNUG~GDX 0.98 — against GLD~SPY 0.18. These two maps are read ONLY by
+// familyBetaNotional: they change what the record reports, never a trade.
 const EXPOSURE_GROUP = {
   USO: 'OIL', UCO: 'OIL', SCO: 'OIL',       // crude oil futures funds
   XLE: 'OIL', XOP: 'OIL',                   // oil & gas producers
+  GLD: 'METALS', IAU: 'METALS', GLL: 'METALS', SLV: 'METALS',   // gold, silver
+  GDX: 'METALS', NUGT: 'METALS', JNUG: 'METALS',                // gold miners
 };
 // UCO/SCO are 2x the Bloomberg Commodity Balanced WTI index (ProShares). That
 // index spreads across the curve, so UCO's measured daily beta to USO is 1.25,
 // not 2 — counted at the stated 2x anyway, as every wrapper in LEVERAGE is.
-const EXPOSURE_LEVERAGE = { UCO: 2, SCO: 2 };
+// NUGT and JNUG are 2x their miners indexes (Direxion; 3x before 2020-03-31):
+// measured beta to GDX 1.98 and 2.16.
+const EXPOSURE_LEVERAGE = { UCO: 2, SCO: 2, NUGT: 2, JNUG: 2 };
 
 /**
  * Beta-adjusted exposure per family, in absolute currency: |market value| x
  * leverage. This is the number the notional-based gross cap cannot see.
- * Funds in EXPOSURE_GROUP are pooled under their group (OIL), at
+ * Funds in EXPOSURE_GROUP are pooled under their group (OIL, METALS), at
  * EXPOSURE_LEVERAGE where LEVERAGE does not list them.
  * Dust (<1 share) is excluded, matching familyExposure().
  */
