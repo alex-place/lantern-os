@@ -62,9 +62,9 @@ test('manual is forwarded only when the caller set it, and IBKR warnings come ba
   assert.deepStrictEqual(r.warnings, [{ id: 'w1', message: 'The order size exceeds the Size Limit' }]);
 });
 
-test('the IBKR client hands the manual flag to the guard (source pin)', () => {
+test('the IBKR client hands the manual and reserve flags to the guard (source pin)', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'ibkr-cpapi.js'), 'utf8');
-  assert.match(src, /const gate = orderGate\(\{ mode, qty, price, symbol, side, equity: eq, refPrice, manual: manual === true \}\);/);
+  assert.match(src, /const gate = orderGate\(\{ mode, qty, price, symbol, side, equity: eq, refPrice, manual: manual === true, reserve: reserve === true \}\);/);
 });
 
 test('a FRESH positions read invalidates the IBKR portfolio cache and skips the bridge cache', async () => {
