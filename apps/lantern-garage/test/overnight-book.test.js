@@ -5,7 +5,8 @@
  * The engine's sleeve O on the server's day-trader: SPY/QQQ/SMH bought at the 15:55 print when above their 200-session
  * mean, sold at the 09:40 print. These tests pin the knobs, the two windows (and no market-data read outside them), the
  * one-owner rule (no buy of a name the account holds), the room under the gross cap, the once-a-session buy and sale,
- * the release of a sold name only after two reads show it gone, and the day-trader's side of the partition: it never
+ * the release of a sold name only after two reads show it gone (and its sale as the broker priced it: the fill and
+ * the P&L on the gone row, a bounded wait for the price), and the day-trader's side of the partition: it never
  * sells the book's names, never counts them as a slot, does count them as gross exposure, does not read the morning
  * sale as a dropout, does not book the book's sale as its own exit, and keeps the book out of its session record.
  * Each partition test has a control.
@@ -158,6 +159,54 @@ test('09:40 the next session: the held names are sold once; a refused sale is re
   const quiet = market();
   const r = await run(acct, AT(D2, '11:00'), { stateFile: sf, rows, getBars: quiet.getBars });
   assert.equal(r.ran, false); assert.equal(quiet.calls.length, 0, 'nothing held, outside the entry window: no market-data read');
+});
+
+// IBKR's shape: positions carry the broker's average price, and the per-order status answers for the sale's own id.
+const priced = (acct, avg, status) => ({ ...acct,
+  getIBKRPositions: async () => (await acct.getIBKRPositions()).map((p) => ({ ...p, avg_entry_price: avg[p.symbol] || 0 })),
+  getIBKROrderStatus: async (u, id) => status[id] || null });
+
+test('the sale as the broker priced it: the gone row carries the fill, what the book paid and the P&L; a sale not priced yet keeps the name a read longer', async () => {
+  ob._reset();
+  const status = {};   // order id -> the broker's status of that order
+  const ibkr = priced(account(), { SPY: 690.12, QQQ: 610.4 }, status); const sf = stateFile(); const rows = [];
+  await run(ibkr, AT(D1, '15:56'), { stateFile: sf, rows });
+  await run(ibkr, AT(D2, '09:40', 25), { stateFile: sf, rows });
+  const sale = (s) => rows.find((r) => r.event === 'overnight_book_sell' && r.symbol === s);
+  assert.equal(sale('SPY').cost_px, 690.12, 'the sell row carries what the book paid, as the broker reports it');
+  status[sale('SPY').orderId] = { status: 'Filled', avgPrice: 692.5, filledQty: 77 };
+  status[sale('QQQ').orderId] = { status: 'PreSubmitted' };
+  await run(ibkr, AT(D2, '09:41'), { stateFile: sf, rows });
+  await run(ibkr, AT(D2, '09:42'), { stateFile: sf, rows });
+  const gone = (s) => rows.find((r) => r.event === 'overnight_book_gone' && r.symbol === s);
+  assert.deepEqual(gone('SPY'), { event: 'overnight_book_gone', symbol: 'SPY', qty: 77, bought_day: D1, sold: true, why: 'sold',
+    order_id: sale('SPY').orderId, cost_px: 690.12, cost_from: 'position', fill_px: 692.5, filled_qty: 77, ret_pct: 0.3449, pnl: 183.26 });
+  assert.equal(gone('QQQ'), undefined, 'two reads show QQQ gone, but the broker has not priced its sale yet');
+  assert.deepEqual(ob.partition(USER, { env: ARMED }).symbols, ['QQQ'], 'so it is still the book\'s');
+  status[sale('QQQ').orderId] = { status: 'Filled', avgPrice: 612, filledQty: 87 };
+  await run(ibkr, AT(D2, '09:43'), { stateFile: sf, rows });
+  assert.deepEqual([gone('QQQ').fill_px, gone('QQQ').ret_pct, gone('QQQ').pnl], [612, 0.2621, 139.2]);
+  assert.deepEqual(ob.partition(USER, { env: ARMED }).symbols, []);
+});
+
+test('a sale the broker never prices goes without a price three reads later; a broker with no order status releases at once; no average price = the buy quote', async () => {
+  ob._reset();
+  const silent = priced(account(), { SPY: 690.12, QQQ: 610.4 }, {}); const sf = stateFile(); const rows = [];
+  await run(silent, AT(D1, '15:56'), { stateFile: sf, rows });
+  for (const t of ['09:40', '09:41', '09:42', '09:43', '09:44']) await run(silent, AT(D2, t, 25), { stateFile: sf, rows });
+  assert.deepEqual(ob.partition(USER, { env: ARMED }).symbols.sort(), ['QQQ', 'SPY'], 'four reads show them gone; still waiting for the price');
+  await run(silent, AT(D2, '09:45', 25), { stateFile: sf, rows });
+  assert.deepEqual(ob.partition(USER, { env: ARMED }).symbols, [], 'released three reads after an unpriced name would have been');
+  const g = rows.find((r) => r.event === 'overnight_book_gone' && r.symbol === 'SPY');
+  assert.deepEqual([g.sold, g.fill_px, g.fill_why, g.cost_px, g.pnl], [true, null, 'order status unreadable', 690.12, undefined]);
+  // The control: no per-order status at this broker, so nothing to wait for — released at the second read, as before.
+  ob._reset();
+  const sf2 = stateFile(); const r2 = []; const plain = account();
+  await run(plain, AT(D1, '15:56'), { stateFile: sf2, rows: r2 });
+  for (const t of ['09:40', '09:41', '09:42']) await run(plain, AT(D2, t, 25), { stateFile: sf2, rows: r2 });
+  assert.deepEqual(ob.partition(USER, { env: ARMED }).symbols, []);
+  const g2 = r2.find((r) => r.event === 'overnight_book_gone' && r.symbol === 'SPY');
+  assert.deepEqual([g2.fill_px, g2.fill_why, g2.cost_px, g2.cost_from], [null, 'no order status on this broker', 690, 'buy quote']);
 });
 
 test('only the operator\'s armed book; pct 0 buys nothing but still sells what the book holds', async () => {
