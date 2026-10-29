@@ -12,16 +12,22 @@
  * The same trap sits under the session record: unfiltered, another book's
  * positions land in carried_out, inflate open_risk, and are marked into this
  * book's Day P&L. These pin the filter the call site applies.
+ *
+ * The partition (2026-10-28) comes out first: the reserve fund and the overnight
+ * book's names are excluded even when this scan reads them (the book's SPY/QQQ/SMH
+ * are on the tradelist), and the row lists them apart as partition_out.
  */
 
 const test = require('node:test');
 const assert = require('node:assert');
 const { buildSessionRecord } = require('../lib/session-record');
 
-// Mirrors the production expression at the call site in auto-trader.js.
-const mine = (heldPos, ourSyms) => Object.values(heldPos).filter((p) => {
+// Mirrors the production expression at the call site in auto-trader.js; `fund` is its
+// `_fund` set (the reserve fund + the overnight book's names).
+const mine = (heldPos, ourSyms, fund = new Set()) => Object.values(heldPos).filter((p) => {
   const k = String(p && p.symbol || '').toUpperCase();
   if (!(Math.abs(Number(p && p.qty) || 0) > 0)) return false;
+  if (fund.has(k)) return false;
   return !ourSyms.size || ourSyms.has(k);
 });
 
@@ -64,4 +70,36 @@ test('an EMPTY ownership set keeps everything — never silently drop the whole 
 test('ownership is case-insensitive on the symbol', () => {
   const lower = { soxs: { symbol: 'soxs', qty: 10, current_price: 39, unrealized_pl: 1 } };
   assert.strictEqual(mine(lower, OURS).length, 1);
+});
+
+// Stable 2026-10-28 at the close: the trader's TLT, the overnight book's 15:55 SPY and SMH (both scanned, both on the
+// tradelist), and the reserve fund's BOXX (not scanned).
+const STABLE = {
+  TLT: { symbol: 'TLT', qty: 719, current_price: 80.92, unrealized_pl: -255.25 },
+  SPY: { symbol: 'SPY', qty: 69, current_price: 771.92, unrealized_pl: -2.79 },
+  SMH: { symbol: 'SMH', qty: 94, current_price: 567.15, unrealized_pl: -4 },
+  BOXX: { symbol: 'BOXX', qty: 2285, current_price: 118.8, unrealized_pl: 68.55 },
+};
+const SCANNED = new Set(['TLT', 'SPY', 'SMH', 'QQQ', 'GLD']);
+const FUND = new Set(['BOXX', 'SPY', 'SMH']);
+
+test('the partition never enters carried_out or open_risk, even when the scan reads its names', () => {
+  const r = buildSessionRecord({ ledgerText: LEDGER, now: NOW, account: { equity: 1 }, positions: mine(STABLE, SCANNED, FUND), dayPnl: {} });
+  assert.deepStrictEqual(r.carried_out.map((p) => p.symbol), ['TLT'], 'SPY and SMH are the overnight book\'s');
+  assert.strictEqual(r.open_risk, -255.25);
+  const leak = buildSessionRecord({ ledgerText: LEDGER, now: NOW, account: { equity: 1 }, positions: mine(STABLE, SCANNED), dayPnl: {} });
+  assert.deepStrictEqual(leak.carried_out.map((p) => p.symbol), ['SMH', 'SPY', 'TLT'], 'control: the scan alone lets the book through');
+});
+
+test('the partition stays out with an EMPTY ownership set too', () => {
+  assert.deepStrictEqual(mine(STABLE, new Set(), FUND).map((p) => p.symbol), ['TLT']);
+});
+
+test('partition_out lists the other books apart; no partition, no field', () => {
+  const theirs = Object.values(STABLE).filter((p) => FUND.has(p.symbol));
+  const r = buildSessionRecord({ ledgerText: LEDGER, now: NOW, account: { equity: 1 }, positions: mine(STABLE, SCANNED, FUND), dayPnl: {}, partition: theirs });
+  assert.deepStrictEqual(r.partition_out.map((p) => [p.symbol, p.qty]), [['BOXX', 2285], ['SMH', 94], ['SPY', 69]]);
+  assert.strictEqual(r.partition_out[0].unrealized, 68.55);
+  const none = buildSessionRecord({ ledgerText: LEDGER, now: NOW, account: { equity: 1 }, positions: mine(STABLE, SCANNED), dayPnl: {} });
+  assert.ok(!('partition_out' in none));
 });

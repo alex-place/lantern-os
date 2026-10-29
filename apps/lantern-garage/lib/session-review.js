@@ -83,18 +83,20 @@ function buildChecks(ledgerText, day, { shadowText = '', reviewText = '' } = {})
   const checks = [];
   const session = rows.filter((x) => x.event === 'session' && x.date === day).pop() || null;
 
-  // 1. the book is long-only: a negative position is always an oversell
-  for (const p of (session && Array.isArray(session.carried_out) ? session.carried_out : [])) {
+  // 1. the book is long-only: a negative position is always an oversell. The account's other books at the close
+  // (partition_out, 2026-10-28: the reserve fund, the overnight book) are long-only too, so they are checked the same way.
+  const held = (k) => (session && Array.isArray(session[k]) ? session[k].map((p) => ({ p, k })) : []);
+  for (const { p, k } of [...held('carried_out'), ...held('partition_out')]) {
     const q = Number(p && p.qty);
     if (q < 0) {
       checks.push({ severity: 'high', category: 'negative_position',
         claim: `${p.symbol} is held SHORT (${q} shares) in a long-only book`,
-        evidence: `session carried_out ${p.symbol} qty ${q}, mark ${r2(p.mark)}, unrealized ${r2(p.unrealized)}`,
+        evidence: `session ${k} ${p.symbol} qty ${q}, mark ${r2(p.mark)}, unrealized ${r2(p.unrealized)}`,
         check: `cover ${p.symbol} at the broker, then find the sell that exceeded the position` });
     } else if (q > 0 && q < 1) {
       checks.push({ severity: 'low', category: 'dust_position',
         claim: `${p.symbol} holds a fractional ${q} share left over from an exit`,
-        evidence: `session carried_out ${p.symbol} qty ${q}, mark ${r2(p.mark)}`,
+        evidence: `session ${k} ${p.symbol} qty ${q}, mark ${r2(p.mark)}`,
         check: `close the ${p.symbol} remainder at the broker` });
     }
   }

@@ -3870,9 +3870,17 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       // book's carried_out, open_risk and Day P&L. That is exactly the leak
       // that made the 2026-08-13 sweep reconstruct SPMO/XMMO exits as ours
       // (#3277). Same `_ourSyms` set that fix introduced.
-      const _mine = Object.values(heldPos).filter((p) => {
+      // THE PARTITION comes out first (2026-10-28): `_ourSyms` holds every name
+      // this scan read, and the overnight book's SPY/QQQ/SMH are on the
+      // tradelist, so its 15:55 buys passed as this book's. Stable's first
+      // night valued SPY and SMH from the prior close as the trader's carries:
+      // about +$1,020 of day_pnl the trader never made. The reserve fund and
+      // the book go to their own field, partition_out, so the row still shows
+      // everything the account takes into the gap.
+      const _held = Object.values(heldPos).filter((p) => Math.abs(Number(p && p.qty) || 0) > 0);
+      const _mine = _held.filter((p) => {
         const k = String(p && p.symbol || '').toUpperCase();
-        if (!(Math.abs(Number(p && p.qty) || 0) > 0)) return false;
+        if (!_notFund(p)) return false;
         return !_ourSyms.size || _ourSyms.has(k);
       });
       const _dp = await require('./day-pnl').computeDayPnl({
@@ -3893,6 +3901,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       } catch (_e) { /* the book's own figures stand */ }
       logTrade(_sr.buildSessionRecord({
         ledgerText: _ledger, now, account, positions: _mine, dayPnl: _dp,
+        partition: _held.filter((p) => !_notFund(p)),
       }));
       // POST-CLOSE REVIEW (#3359). Fire-and-forget, AFTER the session row is
       // written — and read back FRESH, because `_ledger` is a string snapshot

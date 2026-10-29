@@ -7,7 +7,8 @@
  * one-owner rule (no buy of a name the account holds), the room under the gross cap, the once-a-session buy and sale,
  * the release of a sold name only after two reads show it gone, and the day-trader's side of the partition: it never
  * sells the book's names, never counts them as a slot, does count them as gross exposure, does not read the morning
- * sale as a dropout, and does not book the book's sale as its own exit. Each partition test has a control.
+ * sale as a dropout, does not book the book's sale as its own exit, and keeps the book out of its session record.
+ * Each partition test has a control.
  *
  * Run: node --test test/overnight-book.test.js
  */
@@ -286,4 +287,43 @@ test('the book\'s sale is not the trader\'s exit: its filled sell order is never
   const ctl = fs.readFileSync(process.env.TRADER_TRADES_LOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
     .filter((r) => r.event === 'exit' && r.symbol === 'SPY' && String(r.order_id) === 'B79').length;
   assert.equal(ctl, 1, 'control: without the book, a filled sell in the feed is booked as an exit');
+});
+
+test('the session record is the trader\'s book: the book and the fund are listed apart, not carried, not day P&L', async () => {
+  // Stable 2026-10-28: the book's SPY is on the scan list and the ledger's last SPY entry is an old one, so the book's
+  // 15:55 buy was valued from the prior close as the trader's carry. Here 10 SPY, prior close 690, mark 700 = +$100.
+  // Past dates, so no row this file stamps with the real clock lands on them.
+  const DAYS = ['2026-10-21', '2026-10-22'];
+  const md = require('../lib/market-data-yahoo');
+  const savedQuotes = md.getQuotes;
+  md.getQuotes = async (syms) => syms.map((s) => ({ ticker: s, price: s === 'SPY' ? 700 : 380, chg_pct: s === 'SPY' ? (700 / 690 - 1) * 100 : 0 }));
+  const book = () => [
+    { symbol: 'GLD', qty: 50, avg_entry_price: 375, current_price: 380, market_value: 19000, unrealized_pl: 250 },
+    { symbol: 'SPY', qty: 10, avg_entry_price: 699.5, current_price: 700, market_value: 7000, unrealized_pl: 5 },
+    { symbol: 'BOXX', qty: 300, avg_entry_price: 118.7, current_price: 118.8, market_value: 35640, unrealized_pl: 30 },
+  ];
+  const watch = (sym) => ({ symbol: sym, direction: 'NEUTRAL', convergence: { decision: 'WAIT' } });
+  const seed = (r) => fs.appendFileSync(process.env.TRADER_TRADES_LOG, JSON.stringify(r) + '\n');
+  const sessionOf = (day) => fs.readFileSync(process.env.TRADER_TRADES_LOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+    .filter((r) => r.event === 'session' && r.date === day).pop();
+  const FUND = { TRADER_RESERVE_FUND_PCT: '35', TRADER_RESERVE_FUND_SYMBOL: 'BOXX' };
+  try {
+    for (const [day, env] of [[DAYS[0], {}], [DAYS[1], { ...ARMED, ...FUND }]]) {
+      seed({ ts: new Date(AT('2026-10-13', '10:00')).toISOString(), event: 'entry', symbol: 'SPY', qty: 10, entry: 690 });
+      seed({ ts: new Date(AT(day, '10:00')).toISOString(), event: 'entry', symbol: 'GLD', qty: 50, entry: 375 });
+      bookHolds(['SPY']);
+      at._resetCooldowns();
+      await pass(traderBridge(book()), [enter('GLD'), watch('SPY'), watch('BOXX')], env, AT(day, '16:00', 30));   // the row is written past the entries
+    }
+  } finally { md.getQuotes = savedQuotes; }
+  const ctl = sessionOf(DAYS[0]);
+  assert.ok(ctl, 'control: a session row was written');
+  assert.deepStrictEqual(ctl.carried_out.map((p) => p.symbol), ['BOXX', 'GLD', 'SPY'], 'control: without the knobs all three are the trader\'s');
+  assert.equal(ctl.day_pnl, 380, 'control: GLD +250 since entry, SPY +100 from the prior close, BOXX +30');
+  const r = sessionOf(DAYS[1]);
+  assert.ok(r, 'a session row was written');
+  assert.deepStrictEqual(r.carried_out.map((p) => p.symbol), ['GLD'], 'the book\'s SPY and the fund\'s BOXX are not the trader\'s carries');
+  assert.equal(r.open_risk, 250);
+  assert.equal(r.day_pnl, 250, 'the trader\'s day is its GLD; the book\'s +$100 is not');
+  assert.deepStrictEqual(r.partition_out.map((p) => [p.symbol, p.qty]), [['BOXX', 300], ['SPY', 10]]);
 });

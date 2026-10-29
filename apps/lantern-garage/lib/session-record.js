@@ -88,7 +88,7 @@ function shouldWriteSession(ledgerText, now) {
  * SAME ones the panel showed; a later post-mortem never has to guess which
  * basis was in effect.
  */
-function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, positions = [], dayPnl = {} } = {}) {
+function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, positions = [], dayPnl = {}, partition = [] } = {}) {
   const { date, entries, exits, skips, slotRows } = scanDay(ledgerText, now);
 
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
@@ -143,6 +143,16 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
   };
   const stops = exits.filter(isStop);
   const stopsByPrice = exits.filter(atStopPrice);
+  const held = (list) => list
+    .filter((p) => Math.abs(Number(p.qty) || 0) > 0)
+    .map((p) => ({
+      symbol: String(p.symbol).toUpperCase(),
+      qty: Number(p.qty),
+      mark: num(p.current_price),
+      unrealized: round(p.unrealized_pl),
+      day_pnl: round(p.day_pnl),
+    }))
+    .sort((a, b) => (a.symbol < b.symbol ? -1 : 1));
 
   return {
     ts: new Date(now).toISOString(),
@@ -175,16 +185,11 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
     max_slots_used: slotsUsed.length ? Math.max(...slotsUsed) : null,
     slot_cap: slotRows.length ? (Number(slotRows[slotRows.length - 1].cap) || null) : null,
     // ── the book carried into tonight: what tomorrow's gap acts on
-    carried_out: positions
-      .filter((p) => Math.abs(Number(p.qty) || 0) > 0)
-      .map((p) => ({
-        symbol: String(p.symbol).toUpperCase(),
-        qty: Number(p.qty),
-        mark: num(p.current_price),
-        unrealized: round(p.unrealized_pl),
-        day_pnl: round(p.day_pnl),
-      }))
-      .sort((a, b) => (a.symbol < b.symbol ? -1 : 1)),
+    carried_out: held(positions),
+    // ── the account's other books at the close (the reserve fund, the overnight book, 2026-10-28): held in the
+    // account but not this trader's, so they are out of carried_out, open_risk, family exposure and day_pnl. Listed
+    // here so the row still shows everything the account carries, and the gap to account_day_pnl is explained.
+    ...(partition.length ? { partition_out: held(partition) } : {}),
     open_risk: round(positions.reduce((t, p) => t + (Number(p.unrealized_pl) || 0), 0)),
     // BETA-ADJUSTED FAMILY EXPOSURE (#3354). The gross cap counts NOTIONAL, so a
     // 3x wrapper at 6% of equity reads as 6% while carrying 18% of market risk.
