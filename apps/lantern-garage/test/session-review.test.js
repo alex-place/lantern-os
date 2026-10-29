@@ -246,6 +246,20 @@ test('machine checks: a short in a long-only book is HIGH, a fractional leftover
   assert.ok(!sr.buildChecks(OCT14, '2026-10-14').some((x) => /GDX/.test(x.claim)), 'a normal long is not a finding');
 });
 
+test('machine checks: the other books at the close (partition_out) are long-only too', () => {
+  const text = [
+    row({ ts: '2026-10-29T15:00:00Z', event: 'entry', symbol: 'TLT', qty: 719, entry: 81.2, notional: 58383, tier: 'A' }),
+    row({ ts: '2026-10-29T20:00:09Z', event: 'session', date: '2026-10-29', equity: 978000, entries: 1, exits: 0,
+      carried_out: [{ symbol: 'TLT', qty: 719, mark: 80.9, unrealized: -215.7 }],
+      partition_out: [{ symbol: 'BOXX', qty: 2285, mark: 118.76, unrealized: -22.85 }, { symbol: 'SMH', qty: -94, mark: 567.2, unrealized: 1.3 }] }),
+  ].join('\n');
+  const c = byCat(sr.buildChecks(text, '2026-10-29'));
+  assert.strictEqual(c.negative_position.severity, 'high');
+  assert.match(c.negative_position.claim, /SMH is held SHORT \(-94 shares\)/);
+  assert.match(c.negative_position.evidence, /^session partition_out SMH qty -94/);
+  assert.ok(!sr.buildChecks(text, '2026-10-29').some((x) => /BOXX|TLT/.test(x.claim)), 'the fund and the trader\'s long are not findings');
+});
+
 test('machine checks: an exit found today but booked to an earlier day is HIGH, on the day it was found only', () => {
   const c = byCat(sr.buildChecks(OCT14, '2026-10-14'));
   assert.strictEqual(c.backdated_fill.severity, 'high');
