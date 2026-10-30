@@ -2179,6 +2179,40 @@ function _noiseShadowKick(now) {
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (_e) { /* journal only: a shadow never breaks a pass */ }
 }
+// AFTER-THE-RISE SHADOW (2026-10-30). The one open hint of the 10-29 pullback research: the stable design's entries
+// made the session after their name rose big (prior close-to-close >= 1.5 trailing sds) lost money on the recent
+// windows and not on the older quarters. lib/rise-shadow.js tags every live entry with that reading, plus one check
+// row a session, so the live record can say whether it is real. Enabled by TRADER_RISE_SHADOW=1. Same contract as the
+// other shadows: journal only, never awaited, rows under the user 'rise-shadow'.
+let _riseShadow = null;
+function _riseShadowOf() {
+  if (!['1', 'true', 'on'].includes(String(process.env.TRADER_RISE_SHADOW || '').trim().toLowerCase())) return null;
+  if (!_riseShadow) {
+    _riseShadow = require('./rise-shadow').createRiseShadow({
+      log: (rec) => logTrade({ user: 'rise-shadow', ...rec }),
+      stateFile: path.join(path.dirname(TRADES_LOG), 'rise-shadow-state.json'),
+      getDaily: (s, from, to) => yahoo.getBarsWindow(s, '1d', from, to),
+    });
+  }
+  return _riseShadow;
+}
+function _riseShadowKick(now, scan) {
+  try {
+    const rs = _riseShadowOf();
+    if (!rs) return;
+    const syms = ((scan && Array.isArray(scan.signals)) ? scan.signals : []).map((s) => s && (s.symbol || s.ticker)).filter(Boolean);
+    const p = rs.check(now, syms);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a shadow never breaks a pass */ }
+}
+function _riseShadowTag(entry) {
+  try {
+    const rs = _riseShadowOf();
+    if (!rs) return;
+    const p = rs.tag(entry);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a shadow never touches an entry */ }
+}
 
 async function runAutoTrade(scan, opts = {}) {
   return _onePassPerAccount(opts,
@@ -2206,6 +2240,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   _warnExitAuthority(c);
   _trendShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js)
   _noiseShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js createNoiseShadow)
+  _riseShadowKick(now, scan);   // journal only, never awaited (lib/rise-shadow.js)
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
   if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
@@ -3760,6 +3795,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
             ...(s.decision_context || {}) }).catch(() => {});
         }
       } catch (_e) { /* the judge must never touch an entry */ }
+      _riseShadowTag({ symbol: sym, account: userId, qty, price, now });   // journal only, never awaited (lib/rise-shadow.js)
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
