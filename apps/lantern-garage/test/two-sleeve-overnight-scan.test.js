@@ -100,6 +100,37 @@ test('a name with no bars is neutral with the reason said', async () => {
   assert.equal(sig(r, 'AAA').direction, 'BULLISH');
 });
 
+test('the missed night: a late feed never opens the entry window, so one row after the close names the names; a normal night, a scan that never read the window and a weekend say nothing', async () => {
+  // A late feed (10-30): on D1 the newest bar any read gets is the 15:45 bar (it ends 15:50), so the 15:50 bar never settles.
+  const lateMarket = () => { const m = market(); const g = m.getBars; m.getBars = async (sym, tf) => { const r = await g(sym, tf); return tf === '1d' ? r : { bars: r.bars.filter((b) => Date.parse(b.timestamp) < at(D1, 15, 50)) }; }; return m; };
+  const m = lateMarket(); const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA', 'BBB'], getBars: m.getBars, log: (r) => rows.push(r) });
+  for (const [hh, mm, ss] of [[15, 56, 0], [15, 59, 30], [16, 0, 30], [16, 5, 0]]) {
+    m.now = at(D1, hh, mm, ss); const r = await s.scan(m.now);
+    if (hh === 15) assert.equal(r.overnight.window, 'sell', 'the 15:45 bar is the newest: still the sell window, nothing is bought');
+  }
+  const miss = rows.filter((x) => x.event === 'overnight_entry_missed');
+  assert.equal(miss.length, 1, 'one row, after the close, once');
+  assert.equal(miss[0].day, D1); assert.deepEqual(miss[0].symbols, ['AAA', 'BBB']); assert.equal(miss[0].reads, 2);
+  assert.deepEqual(miss[0].newest_bar_end, { AAA: '15:50', BBB: '15:50' }); assert.equal(miss[0].last_read, new Date(at(D1, 15, 59, 30)).toISOString());
+  assert.match(miss[0].why, /15:50 bar never settled/);
+  // control: the same night on the normal feed opens the window (for the name below its trend too): no row
+  const n = market(); const nrows = [];
+  const ns = createOvernightScan({ symbols: ['AAA', 'BBB'], getBars: n.getBars, log: (r) => nrows.push(r) });
+  for (const [hh, mm, ss] of [[15, 56, 0], [16, 0, 30]]) { n.now = at(D1, hh, mm, ss); await ns.scan(n.now); }
+  assert.equal(nrows.filter((x) => x.event === 'overnight_entry_missed').length, 0);
+  // a scan that never read the window (a worker started after 16:00) cannot tell and says nothing
+  const l = lateMarket(); const lrows = [];
+  const ls = createOvernightScan({ symbols: ['AAA'], getBars: l.getBars, log: (r) => lrows.push(r) });
+  l.now = at(D1, 16, 1); await ls.scan(l.now);
+  assert.equal(lrows.length, 0);
+  // a Saturday is not a session: no row
+  const w = market(); const wrows = [];
+  const ws = createOvernightScan({ symbols: ['AAA'], getBars: w.getBars, log: (r) => wrows.push(r) });
+  for (const [hh, mm] of [[15, 56], [16, 1]]) { w.now = at('2026-09-26', hh, mm); await ws.scan(w.now); }
+  assert.equal(wrows.length, 0);
+});
+
 test('the worker runs it under TWO_SLEEVE_WORKER_SCAN=overnight, as a shadow or armed', async () => {
   const app = fs.mkdtempSync(path.join(os.tmpdir(), 'overnight-app-'));
   fs.mkdirSync(path.join(app, 'lib', 'two-sleeve'), { recursive: true });

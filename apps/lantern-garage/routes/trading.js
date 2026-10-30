@@ -60,7 +60,7 @@ function _isUsMarketHours() { return marketCalendar.isRegularHours(Date.now()); 
 // Pre-market (04:00–09:30) and after-hours (the close + 4 h: 16:00–20:00, or 13:00–17:00 on an early close) ET on a
 // trading day — the extended session where IBKR accepts LMT + outsideRTH orders.
 function _isUsExtendedHours() { return marketCalendar.isExtendedHours(Date.now()); }
-const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const { passWindow } = require('../lib/scan-window');
 const accountLock = require('../lib/account-lock');       // one account, one managing process
 const processRole = require('../lib/process-role');     // which half of the app this process runs (#3523)
@@ -292,6 +292,11 @@ async function _autoscanTick() {
               quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
           } catch (e) { _logRow({ event: 'overnight_book_error', error: String((e && e.message) || e) }); }
         }
+        // THE MISSED NIGHT (2026-10-30): after the close, one row when the book's entry window passed without deciding a
+        // name (a late 5m feed, or no pass inside 15:55-16:00). Every pass, extended ones included; journal only.
+        try {
+          require('../lib/overnight-book').auditMissed({ userId: uid, journal: (row) => require('../lib/auto-trader').logTrade({ user: uid, ...row }) });
+        } catch (_e) { /* journal only: never breaks the pass */ }
       }
       // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
       // the only point that means a scan CYCLE COMPLETED. A wedged broker session leaves

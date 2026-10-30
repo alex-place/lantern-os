@@ -33,6 +33,13 @@
  * +3.5..+4.3 points at an unchanged mean). One `overnight_green_shadow` row per name at the 09:35 read (the 09:30 bar
  * read 20 s after it closes) and one `overnight_green_shadow_close` row at the first sell-window read (both prices and
  * both returns). The entry price comes from the same 5m bars, so a runner restart overnight loses nothing.
+ *
+ * THE MISSED NIGHT (2026-10-30, armed or shadow): on 10-30 the 5m feed ran 20-60 minutes late from midday, the 15:50 bar
+ * never settled inside 15:55-16:00, and the sleeve bought nothing for the weekend with no row saying so (the brain read
+ * the sell window to the end: "bearish, no long to exit"). A scan that read the entry window on a session day without the
+ * window ever opening for a name journals one `overnight_entry_missed` row after the close: the names, the window's
+ * reads, and the end time of each name's newest settled bar at the last read. A scan that never read the window (a worker
+ * started after 16:00) cannot tell and says nothing.
  */
 const { sessionBars, etOf } = require('../trend-shadow');
 const { closeOffset, inRegularSession } = require('../market-calendar');
@@ -60,6 +67,7 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
   const logged = {};           // sym -> { entry: day, exit: day }
   const lastEntry = {};        // sym -> { day, px } (shadow: the 15:55 price the exit row is scored against)
   const loggedGreen = {};      // sym -> { early: day, close: day } (green-exit shadow)
+  const windowSeen = {};       // day -> { reads, open: { sym: true }, bars, last, logged } (the missed-night row)
 
   async function rawOf(sym, tf) { try { const r = await getBars(sym, tf); return (r && r.bars) || null; } catch (_e) { return null; } }
 
@@ -149,7 +157,27 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
       });
       reads.push({ symbol: sym, bar: last ? hhmm(last.min + 5) : null, gate: gate ? { above: gate.above, prior: round(gate.prior), mean: round(gate.mean), n: gate.n } : null, why });
     }
+    missedNight(e, now, signals, reads);
     return { signals, overnight: { at: new Date(now).toISOString(), window, shadow: !!shadow, trendN, reads } };
+  }
+
+  /** The missed-night row (see the header): count the entry window's reads, journal once after the close if it never opened. */
+  function missedNight(e, now, signals, reads) {
+    const off = closeOffset(e.day);
+    if (!inRegularSession(e.day, entryBar - off)) return;                 // not a session day
+    for (const d of Object.keys(windowSeen)) if (d !== e.day) delete windowSeen[d];
+    const W = windowSeen[e.day] = windowSeen[e.day] || { reads: 0, open: {}, bars: null, last: null, logged: false };
+    if (e.min >= entryBar + 5 - off && e.min < CLOSE_MIN - off) {
+      W.reads += 1; W.last = now; W.bars = Object.fromEntries(reads.map((x) => [x.symbol, x.bar]));
+      for (const x of signals) if (x.decision_context.overnight_window === 'entry') W.open[x.symbol] = true;
+    }
+    if (e.min < CLOSE_MIN - off || W.logged || !W.reads || !log) return;
+    W.logged = true;
+    const missed = S.filter((s) => !W.open[s]);
+    if (!missed.length) return;
+    log({ event: 'overnight_entry_missed', day: e.day, symbols: missed, reads: W.reads, last_read: new Date(W.last).toISOString(),
+      newest_bar_end: W.bars, shadow: !!shadow,
+      why: `the ${hhmm(entryBar - off)} bar never settled on any of the entry window's ${W.reads} read(s): a late 5m feed, nothing bought tonight` });
   }
 
   return { symbols: S, scan, trendRead, shadow: !!shadow, greenShadow: !!greenShadow };

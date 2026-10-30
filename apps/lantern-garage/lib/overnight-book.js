@@ -37,12 +37,15 @@
  * filled_qty from the sale's own order status, cost_px = the position's average price at the sale (the book's own buy
  * fills, one owner per name; the buy quote when the broker reported none, see cost_from), ret_pct and pnl against it.
  * A sale the broker never priced goes with fill_px null and fill_why.
+ * overnight_book_missed (2026-10-30): one row after the close of a session day whose entry window never decided a name
+ * (no buy, no skip): on 10-30 the 5m feed ran late, the 15:50 bar never settled inside 15:55-16:00, and the book held
+ * nothing over the weekend with no row saying so. auditMissed() writes it; the autoscan calls it on every pass.
  */
 const fs = require('fs');
 const path = require('path');
 const { createOvernightScan, ENTRY_BAR, SELL_BAR } = require('./two-sleeve/overnight-scan');
 const { etOf } = require('./trend-shadow');
-const { closeOffset } = require('./market-calendar');
+const { closeOffset, inRegularSession } = require('./market-calendar');
 
 const USER = 'local-owner';
 const OWNER = 'OVERNIGHT_BOOK';
@@ -154,6 +157,7 @@ async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, g
   const holding = Object.keys(b.state.held).length > 0;
   const sellHours = holding && e.min >= SELL_BAR + 5 && e.min < CLOSE_MIN - off;
   if (!nearEntry && !sellHours) return { ran: false, why: 'outside the windows' };
+  const w = nearEntry ? _windowPass(b, e.day, at) : null;   // the entry window's passes, for auditMissed
 
   const raw = await Promise.resolve(facade.getIBKRPositions(userId)).catch(() => null);
   if (!raw || raw.unreadable) { journal({ event: 'overnight_book_skip', symbol: '*', why: 'positions unreadable' }); return { ran: false, why: 'unreadable' }; }
@@ -193,6 +197,7 @@ async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, g
   const window = res && res.overnight ? res.overnight.window : null;
   const sig = {}; for (const x of (res && res.signals) || []) sig[x.symbol] = x;
   const read = {}; for (const x of (res && res.overnight && res.overnight.reads) || []) read[x.symbol] = x;
+  if (w) { for (const s of c.symbols) w.bars[s] = read[s] ? read[s].bar : null; _save(b); }
   const out = { ran: true, window, bought: [], sold: [] };
 
   if (window === 'sell') {
@@ -231,7 +236,7 @@ async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, g
       for (const s of todo) {
         const x = sig[s], rd = read[s] || {};
         const gate = rd.gate ? { above: rd.gate.above, prior: rd.gate.prior, mean: rd.gate.mean, n: rd.gate.n } : null;
-        const skip = (why) => { b.state.tried.syms.push(s); journal({ event: 'overnight_book_skip', symbol: s, why, gate, bar: rd.bar || null }); };
+        const skip = (why) => { b.state.tried.syms.push(s); _save(b); journal({ event: 'overnight_book_skip', symbol: s, why, gate, bar: rd.bar || null }); };
         // A name whose own 15:50 bar is not read yet (feed lag) is decided by the next pass inside the window.
         if (!x || !x.decision_context || x.decision_context.overnight_window !== 'entry') continue;
         if (x.direction !== 'BULLISH') { skip(rd.why || 'below the trend'); continue; }
@@ -256,4 +261,43 @@ async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, g
   return out;
 }
 
-module.exports = { USER, OWNER, MAX_PCT, config, grossCapPct, partition, maybeRun, _reset: () => _books.clear() };
+/** Count one pass inside the entry window: state.window = { day, passes, last, bars: { SYM: end time of its newest settled bar } }. */
+function _windowPass(b, day, at) {
+  const w = b.state.window && b.state.window.day === day ? b.state.window : { day, passes: 0, last: null, bars: {} };
+  w.passes += 1; w.last = at;
+  b.state.window = w;
+  return w;
+}
+
+/**
+ * The missed-night row (2026-10-30). Called on every autoscan pass, extended ones included; journal only (no order, no
+ * market-data read). After the close of a session day it journals overnight_book_missed once, naming each name the entry
+ * window never decided (no buy, no skip row) and why: the window's passes never had the 15:50 bar settled (a late 5m
+ * feed), or no pass reached the book inside the window at all (the server was down or the scan loop stalled).
+ * Returns null when there is nothing to audit (book off or unwinding, not the armed operator's book, not after a
+ * session's close, already audited), else { day, missed }.
+ */
+function auditMissed({ userId, at = Date.now(), journal = () => {}, env = process.env, stateFile = null } = {}) {
+  const c = config(env);
+  if (!c || !(c.pct > 0) || userId !== USER || env.TRADER_AUTO_EXECUTE !== '1') return null;
+  const e = etOf(at);
+  const off = closeOffset(e.day);
+  if (!inRegularSession(e.day, ENTRY_BAR - off) || e.min < CLOSE_MIN - off) return null;
+  const b = _book(userId, stateFile);
+  if (b.state.missed === e.day) return null;
+  const decided = new Set(b.state.tried && b.state.tried.day === e.day && Array.isArray(b.state.tried.syms) ? b.state.tried.syms : []);
+  for (const [s, h] of Object.entries(b.state.held)) if (h.day === e.day) decided.add(s);
+  const missed = c.symbols.filter((s) => !decided.has(s));
+  b.state.missed = e.day; _save(b);
+  if (!missed.length) return { day: e.day, missed };
+  const w = b.state.window && b.state.window.day === e.day && b.state.window.passes > 0 ? b.state.window : null;
+  const bar = `${String(Math.floor((ENTRY_BAR - off) / 60)).padStart(2, '0')}:${String((ENTRY_BAR - off) % 60).padStart(2, '0')}`;
+  const lastEt = w ? new Date(w.last).toLocaleTimeString('en-GB', { timeZone: 'America/New_York' }) : null;
+  journal({ event: 'overnight_book_missed', symbol: '*', day: e.day, symbols: missed, window_passes: w ? w.passes : 0,
+    last_read: w ? new Date(w.last).toISOString() : null, newest_bar_end: w ? w.bars : null,
+    why: w ? `the ${bar} bar was not settled on any of the entry window's ${w.passes} pass(es), the last at ${lastEt} ET: a late 5m feed, nothing bought tonight`
+      : 'no pass reached the book inside the entry window (the server was down or the scan loop stalled): nothing bought tonight' });
+  return { day: e.day, missed };
+}
+
+module.exports = { USER, OWNER, MAX_PCT, config, grossCapPct, partition, maybeRun, auditMissed, _reset: () => _books.clear() };
