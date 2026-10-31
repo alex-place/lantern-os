@@ -570,6 +570,7 @@ const _exitNoOrder = new Map();   // sym -> consecutive scans an IN-FLIGHT exit 
                                   //   the broker (freeze-expiry needs two misses so a fill racing
                                   //   the positions snapshot can't unfreeze into a double-sell)
 const _loggedFills = new Set();   // broker order ids already written to the ledger
+const _ordersSeenWorking = new Map();   // broker order id -> the last scan that saw it WORKING (the fill-time guard, fill-ledger.js)
 // Fills older than this process are not reconciled: after a restart the entry
 // price is not in memory, so back-filling only produces pnl:null noise (observed
 // 2026-08-07). Their ids are still remembered, so they can never resurface.
@@ -1211,7 +1212,7 @@ function _reconcileFills(orders) {
       // openedAt rides along for the ledger's process-start guard: a pre-boot fill of a
       // position we are tracking (entry known, filled after it opened) is our exit, not history.
       return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), openedAt: _entryAt.get(sym) ?? (lp && lp.openedAt) ?? null, ...ex };
-    }, _PROCESS_START);
+    }, _PROCESS_START, { seenWorkingAt: (id) => _ordersSeenWorking.get(String(id)) ?? null });
     for (const row of rows) {
       // Case-insensitive (#3407): IBKR reports 'Stop', Alpaca reports 'stop'.
       // The exact-case compare cost a cooldown on 2026-08-21 — a real Alpaca
@@ -1295,6 +1296,7 @@ function _saveState() {
       unclosable: [..._unclosable],
       unclosableAt: Object.fromEntries(_unclosableAt),
       loggedFills: [..._loggedFills].slice(-500),   // bounded: ids only matter within a session
+      ordersSeenWorking: Object.fromEntries([..._ordersSeenWorking].slice(-1000)),   // a GTC stop's fill can come after a restart
       zoneLadder: Object.fromEntries(_zoneLadder),
       stopDistPct: Object.fromEntries(_stopDistPct),
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
@@ -1329,6 +1331,7 @@ function _loadState() {
     for (const s of (o.unclosable || [])) _unclosable.add(s);
     for (const [k, v] of Object.entries(o.unclosableAt || {})) _unclosableAt.set(k, v);
     for (const id of (o.loggedFills || [])) _loggedFills.add(String(id));
+    for (const [k, v] of Object.entries(o.ordersSeenWorking || {})) { const t = Number(v); if (Number.isFinite(t)) _ordersSeenWorking.set(k, t); }
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
@@ -2357,6 +2360,13 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // the reconstruct loop below must yield to it rather than logging a second,
   // mark-priced row for the same exit.
   const _ordersEarly = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  // FILL-TIME GUARD (2026-10-30): when each order was last seen working, so a fill whose reported execution time is
+  // no later than that (IBKR: a GTC stop's submission time) is stamped at its discovery instead (fill-ledger.js).
+  for (const o of (_ordersEarly || [])) {
+    const id = String((o && (o.orderId ?? o.order_id)) ?? ''); const st = String((o && o.status) || '');
+    if (id && STOP_WORKING.test(st) && !STOP_TERMINAL.test(st)) { _ordersSeenWorking.delete(id); _ordersSeenWorking.set(id, now); }
+  }
+  while (_ordersSeenWorking.size > 1000) _ordersSeenWorking.delete(_ordersSeenWorking.keys().next().value);
   for (const _dr of _driftPending) {   // #3432: journaled with the broker orders the feed shows for the symbol
     logTrade({ ..._dr, feed_orders: (_ordersEarly || []).filter((o) => String(o.symbol || '').toUpperCase() === _dr.symbol)
       .map((o) => ({ id: o.orderId, side: o.side, type: o.orderType || o.type, qty: o.qty, status: o.status, price: o.price })).slice(0, 12) });
@@ -4028,6 +4038,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
+function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _ordersSeenWorking.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
 module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE, logTrade };
