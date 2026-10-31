@@ -30,6 +30,7 @@
  * overnight_shadow_exit rows in the worker's own log). The reply's `overnight` field carries the per-name reads.
  * TRADER_OVERNIGHT_GREEN_SHADOW=1 keeps the book as it is and journals the 09:35 green-exit rule beside it
  * (overnight_green_shadow / overnight_green_shadow_close rows; ready reports overnight 'armed+green-shadow').
+ * Armed or shadow, a night the entry window never opened gets an overnight_entry_missed row after the close (2026-10-30).
  */
 const path = require('path');
 
@@ -114,7 +115,7 @@ async function drain() {
       // TRADER_OVERNIGHT_GREEN_SHADOW=1 (2026-10-25): journal-only rows for the 09:35 green-exit rule beside the armed book.
       const greenShadow = process.env.TRADER_OVERNIGHT_GREEN_SHADOW === '1';
       const ownLog = process.env.TRADER_TRADES_LOG || null;
-      const fq = ownLog && (shadow || greenShadow) ? require(path.join(app, 'lib', 'file-queue')) : null;
+      const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;   // armed too: the missed-night row
       const trendN = process.env.TRADER_OVERNIGHT_TREND_N ? Number(process.env.TRADER_OVERNIGHT_TREND_N) : TREND_N;
       overnight = createOvernightScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), trendN, shadow, greenShadow,
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });

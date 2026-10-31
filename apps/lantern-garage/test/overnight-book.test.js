@@ -222,6 +222,44 @@ test('only the operator\'s armed book; pct 0 buys nothing but still sells what t
   assert.equal(acct.st.placed.filter((o) => o.side === 'sell').length, 2, 'and sells what is held');
 });
 
+test('the missed night: a late feed leaves the entry window undecided, so one overnight_book_missed row after the close names the names; a decided night writes none', async () => {
+  ob._reset();
+  // A late feed (10-30): the newest bar any read gets on D1 is the 15:45 bar, so the 15:50 bar never settles.
+  const { getBars } = market();
+  const lateBars = async (sym, tf) => { const r = await getBars(sym, tf); return tf === '1d' ? r : { bars: r.bars.filter((x) => Date.parse(x.timestamp) < AT(D1, '15:50')) }; };
+  const acct = account(); const sf = stateFile(); const rows = [];
+  await run(acct, AT(D1, '15:56'), { stateFile: sf, rows, getBars: lateBars });
+  await run(acct, AT(D1, '15:59', 10), { stateFile: sf, rows, getBars: lateBars });
+  assert.equal(acct.st.placed.length, 0, 'nothing bought'); assert.equal(rows.length, 0, 'and, before this row, nothing journaled');
+  const audit = (when, sfile = sf, env = {}, out = rows) => withEnv({ ...ARMED, ...env }, () =>
+    ob.auditMissed({ userId: USER, at: when, journal: (r) => out.push(r), stateFile: sfile, env: process.env }));
+  assert.equal(audit(AT(D1, '15:59', 40)), null, 'nothing before the close');
+  assert.deepEqual(audit(AT(D1, '16:00', 20)).missed, ['SPY', 'QQQ', 'SMH']);
+  assert.equal(audit(AT(D1, '16:05')), null, 'once a session');
+  ob._reset(); assert.equal(audit(AT(D1, '16:10')), null, 'a restart after the close reads it from the state file');
+  const miss = rows.filter((r) => r.event === 'overnight_book_missed');
+  assert.equal(miss.length, 1); assert.equal(miss[0].day, D1); assert.equal(miss[0].window_passes, 2);
+  assert.deepEqual(miss[0].newest_bar_end, { SPY: '15:50', QQQ: '15:50', SMH: '15:50' });
+  assert.match(miss[0].why, /15:50 bar was not settled .* 15:59:10 ET: a late 5m feed/);
+  // control: a decided night (two buys and the below-trend skip) writes none, across a restart
+  ob._reset(); const sf2 = stateFile(); const r2 = [];
+  await run(account(), AT(D1, '15:56'), { stateFile: sf2, rows: r2 });
+  ob._reset();
+  assert.deepEqual(audit(AT(D1, '16:01'), sf2, {}, r2).missed, [], 'the buys and the skip are on file');
+  assert.equal(r2.filter((r) => r.event === 'overnight_book_missed').length, 0);
+  // no pass inside the window at all (the server was down): the row says so
+  ob._reset(); const r3 = [];
+  assert.deepEqual(audit(AT(D1, '16:02'), stateFile(), {}, r3).missed, ['SPY', 'QQQ', 'SMH']);
+  assert.equal(r3[0].window_passes, 0); assert.match(r3[0].why, /no pass reached the book/);
+  // nothing to audit: a Saturday, the unwind, another user, a disarmed box, the book off
+  ob._reset();
+  assert.equal(audit(AT('2026-10-31', '16:01'), stateFile()), null);
+  assert.equal(audit(AT(D1, '16:01'), stateFile(), { TRADER_OVERNIGHT_BOOK_PCT: '0' }), null);
+  assert.equal(withEnv(ARMED, () => ob.auditMissed({ userId: 'u-other', at: AT(D1, '16:01'), stateFile: stateFile(), env: process.env })), null);
+  assert.equal(audit(AT(D1, '16:01'), stateFile(), { TRADER_AUTO_EXECUTE: '0' }), null);
+  assert.equal(audit(AT(D1, '16:01'), stateFile(), { TRADER_OVERNIGHT_BOOK_PCT: '' }), null);
+});
+
 // ── the day-trader's side of the partition ──────────────────────────────────────
 const enter = (sym) => ({
   symbol: sym, direction: 'BULLISH', entry_price: 100, atr: 1,
