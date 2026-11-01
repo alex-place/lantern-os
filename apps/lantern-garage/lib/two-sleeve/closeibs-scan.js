@@ -21,11 +21,14 @@
  * (sleeve C: clock 945-950 on the default clock = the 15:50 and 15:55 prices, the same two decision bars as here).
  */
 const { sessionBars, etOf } = require('../trend-shadow');
+const { closeOffset } = require('../market-calendar');
 
 const BAR_MS = 5 * 60000;
 const SETTLE_MS = 20000;                 // a bar is read 20 s after it closes (feed lag), as the noise leg reads it
 const DECISION_BARS = [945, 950];        // bar starts: the 15:45 bar (closes 15:50) and the 15:50 bar (closes 15:55)
 const CLOSE_MIN = 960;                   // no entry decision at or after 16:00 ET
+// On a 13:00 early close (lib/market-calendar.js) the decision bars and the cut-off move with the close: the 12:45 and
+// 12:50 bars, nothing at or after 13:00. The after-hours prints that follow are not session bars (sessionBars).
 
 const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 const round = (x, d = 4) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d);
@@ -54,7 +57,8 @@ function createCloseIbsScan({ symbols, getBars, ibsMax = 0.15, exitIbs = 0.6, de
       const hi = done.length ? Math.max(...done.map((b) => b.h)) : null;
       const lo = done.length ? Math.min(...done.map((b) => b.l)) : null;
       const ibs = last && hi > lo ? (last.c - lo) / (hi - lo) : null;
-      const inWindow = !!(last && dow >= 1 && dow <= 4 && decisionBars.includes(last.min) && e.min < CLOSE_MIN);
+      const off = closeOffset(e.day);
+      const inWindow = !!(last && dow >= 1 && dow <= 4 && decisionBars.some((m) => m - off === last.min) && e.min < CLOSE_MIN - off);
       if (inWindow) window = true;
       let direction = 'NEUTRAL', dec = 'SKIP';
       if (ibs != null && inWindow && ibs <= ibsMax) { direction = 'BULLISH'; dec = 'ENTER'; }

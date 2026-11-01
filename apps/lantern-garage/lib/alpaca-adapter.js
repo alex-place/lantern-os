@@ -208,6 +208,7 @@ async function getAccount(userId) {
     unrealized: 0,                          // per-position; summed in getPositions
     realized_today: 0,
     pnl_today: day,
+    last_equity: lastEquity,                // the previous close: lib/day-pnl reconcileDayPnl measures the day from it
     pnl_pct: equity ? (day / equity) * 100 : 0,
     buying_power: Number(a.buying_power) || 0,
     mode: auth.env === 'live' ? 'live' : 'paper',
@@ -275,7 +276,7 @@ async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPri
 
   const t = String(type || 'market').toLowerCase();
   const stopPx = stopPrice || (t === 'stop' ? limitPrice : null);
-  const tif = String(timeInForce || 'day').toLowerCase() === 'gtc' ? 'gtc' : 'day';
+  const tif = (() => { const v = String(timeInForce || 'day').toLowerCase(); return v === 'gtc' ? 'gtc' : v === 'opg' ? 'opg' : 'day'; })();   // opg = market-on-open, accepted until 09:28 ET
   const order = {
     symbol: ticker,
     qty: String(Math.abs(Number(qty) || 0)),

@@ -36,6 +36,16 @@ function isFilledSell(o) {
   return Number(o.filledQty) > 0;
 }
 
+/** When the order was PLACED (IBKR orderTime), epoch ms or null. Used ONLY by the age guards below, never as
+ *  the fill time: a GTC stop placed yesterday and filled at today's open was booked to yesterday (SMH 2026-10-15). */
+function placedTimeMs(o) {
+  const raw = (o && o.orderTime) ?? null;
+  if (raw == null) return null;
+  if (typeof raw === 'number') return raw < 1e12 ? raw * 1000 : raw;
+  const t = Date.parse(String(raw));
+  return Number.isFinite(t) ? t : null;
+}
+
 /** Broker order timestamp in epoch ms, or null when absent/unparseable. */
 function orderTimeMs(o) {
   const raw = (o && (o.time ?? o.lastExecutionTime ?? o.filledAt ?? o.updatedAt)) ?? null;
@@ -52,9 +62,10 @@ function orderTimeMs(o) {
  * @param loggedIds   Set of order ids already written
  * @param entryFor    (symbol) -> { avg_entry_price, reason } best-known entry
  * @param sinceMs     ignore fills older than this (default 0 = no cutoff)
+ * @param opts.seenWorkingAt (orderId) -> the last time a scan saw the order WORKING (ms), or null
  * @returns array of ledger rows (event:'exit', source:'fill')
  */
-function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
+function newExitRows(orders, loggedIds, entryFor, sinceMs = 0, { seenWorkingAt = null } = {}) {
   const out = [];
   for (const o of orders || []) {
     if (!isFilledSell(o)) continue;
@@ -67,14 +78,15 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     // rows on top of the day's already-wrong ones and made the ledger unusable
     // for P&L. A fill older than this process only ever produces noise, so skip
     // it. The id is still REMEMBERED (see idsToRemember) so it cannot resurface.
-    const t = orderTimeMs(o);
+    const t = orderTimeMs(o);                 // the EXECUTION time (null when the broker gives none)
+    const tAge = t != null ? t : placedTimeMs(o);   // the age guards may fall back to when the order was placed
     const sym = String(o.symbol || o.ticker || '').toUpperCase();
     const info = (entryFor && entryFor(sym)) || {};
     // A fill that predates the position it would close is not that position's exit (live
     // 2026-09-25: a 10:00:35 stop fill on a carry the other sleeve owned was booked against
     // a position this brain opened at 11:17:57). Tracked position, older fill -> skip.
-    if (t != null && Number(info.openedAt) > 0 && t < Number(info.openedAt)) continue;
-    if (sinceMs > 0 && t != null && t < sinceMs) {
+    if (tAge != null && Number(info.openedAt) > 0 && tAge < Number(info.openedAt)) continue;
+    if (sinceMs > 0 && tAge != null && tAge < sinceMs) {
       // ...but a fill of a position this engine is TRACKING is not history: it is the exit it
       // has been waiting for. Race, SQQQ 2026-09-21: the GTC stop filled at the open while the
       // server was disarmed; the brain re-armed hours later, dropped its own exit as "older than
@@ -82,7 +94,7 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
       // fill AFTER the position's open time = ours. An unknown open time stays conservative: a
       // sell we cannot place after the entry could belong to an earlier round trip.
       const openedAt = Number(info.openedAt);
-      const tracked = Number(info.avg_entry_price) > 0 && openedAt > 0 && t >= openedAt;
+      const tracked = Number(info.avg_entry_price) > 0 && openedAt > 0 && tAge >= openedAt;
       if (!tracked) continue;
     }
 
@@ -93,13 +105,23 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
     const entryPx = Number(info.avg_entry_price);
     const havePnl = entryPx > 0;
 
+    // A reported execution time no later than a moment a scan saw the order still WORKING is not the fill's time.
+    // IBKR 2026-10-30: lastExecutionTime_r on a GTC stop is its submission (or last modify), so GDX (stop placed
+    // 10-22 12:08 ET, filled 10-23 ~10:17) and GLD (placed with its 10-29 11:26 entry, filled 10-30 ~10:25) were
+    // booked to the day before and left that day's stop count. Such a row is stamped at its discovery, a scan or so
+    // after the fill; the broker's value stays on the row as broker_time.
+    const seen = typeof seenWorkingAt === 'function' ? Number(seenWorkingAt(id)) : NaN;
+    const staleTime = t != null && Number.isFinite(seen) && seen > 0 && t <= seen;
+    const nowIso = new Date().toISOString();
+
     out.push({
       // The BROKER's execution time is the trade's close time — logTrade lets a
       // provided ts win over its own now(). Without this every row was stamped at
       // reconciliation time, so a fill the process missed (downtime, feed gap) was
       // journaled days late and every date-derived stat drifted (#3660 C).
       // discovered_at keeps the booking moment; absent broker time → now(), as before.
-      ...(t != null ? { ts: new Date(t).toISOString(), discovered_at: new Date().toISOString() } : {}),
+      ...(t != null && !staleTime ? { ts: new Date(t).toISOString(), discovered_at: nowIso } : {}),
+      ...(staleTime ? { ts: nowIso, discovered_at: nowIso, broker_time: new Date(t).toISOString(), ts_from: 'discovered' } : {}),
       event: 'exit',
       symbol: sym,
       qty,
@@ -177,4 +199,4 @@ function excursionFields(entryPx, peak, trough, stopDistPct) {
   return out;
 }
 
-module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs, excursionFields };
+module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs, placedTimeMs, excursionFields };

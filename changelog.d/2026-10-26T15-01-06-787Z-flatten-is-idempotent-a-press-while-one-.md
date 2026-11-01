@@ -1,0 +1,3 @@
+### Fixed
+
+- Flatten is idempotent. A press while one is being sent for the same symbol does nothing on the page. On the server, a Flatten is refused while the broker still shows the same position it showed when the last Flatten for that symbol was sent, so pressing it repeatedly can no longer stack orders into a new position (2026-10-26: four presses sent sell, sell, sell, buy on XLE). A send the broker refuses is forgotten, so a real retry still goes out. After any order the page re-reads positions fresh from the broker, and the Flatten toast says what was sent ('SELL 2628 XLE sent at market; the position updates when IBKR reports the fill') instead of 'Flattened'.

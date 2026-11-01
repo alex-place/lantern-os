@@ -74,9 +74,37 @@ function leverageOf(sym) {
   return LEVERAGE[String(sym || '').toUpperCase()] || 1;
 }
 
+// ── EXPOSURE GROUPS (2026-10-27) ────────────────────────────────────────────
+// FAMILY is a TRADING table: the direction lock, the mirrors, the signal
+// proxies and the entry judge all read it, so a fund it does not list stays its
+// own family there (correlation we cannot assert, we do not).
+// That left the session record blind to one bet bought four ways: on 2026-10-27
+// stable bought UCO, XLE, XOP and USO at 12 % each — 48 % of equity, all oil —
+// and family_beta_exposure reported "max 12 %". The correlation IS asserted
+// here, measured: daily returns 2024-10..2026-10 (Alpaca sip), UCO~USO r 0.93,
+// XOP~USO 0.65, XLE~USO 0.60, XLE~XOP 0.93 — against XLE~SPY 0.31 and
+// USO~SPY -0.06. Metals the same way: GDX~GLD 0.85, SLV~GLD 0.79, NUGT~GDX
+// 1.00, JNUG~GDX 0.98 — against GLD~SPY 0.18. familyBetaNotional reads both
+// maps; riskBucket reads EXPOSURE_GROUP too (2026-10-28), so the correlated-risk
+// cap counts each group as one bet. FAMILY stays untouched either way.
+const EXPOSURE_GROUP = {
+  USO: 'OIL', UCO: 'OIL', SCO: 'OIL',       // crude oil futures funds
+  XLE: 'OIL', XOP: 'OIL',                   // oil & gas producers
+  GLD: 'METALS', IAU: 'METALS', GLL: 'METALS', SLV: 'METALS',   // gold, silver
+  GDX: 'METALS', NUGT: 'METALS', JNUG: 'METALS',                // gold miners
+};
+// UCO/SCO are 2x the Bloomberg Commodity Balanced WTI index (ProShares). That
+// index spreads across the curve, so UCO's measured daily beta to USO is 1.25,
+// not 2 — counted at the stated 2x anyway, as every wrapper in LEVERAGE is.
+// NUGT and JNUG are 2x their miners indexes (Direxion; 3x before 2020-03-31):
+// measured beta to GDX 1.98 and 2.16.
+const EXPOSURE_LEVERAGE = { UCO: 2, SCO: 2, NUGT: 2, JNUG: 2 };
+
 /**
  * Beta-adjusted exposure per family, in absolute currency: |market value| x
  * leverage. This is the number the notional-based gross cap cannot see.
+ * Funds in EXPOSURE_GROUP are pooled under their group (OIL, METALS), at
+ * EXPOSURE_LEVERAGE where LEVERAGE does not list them.
  * Dust (<1 share) is excluded, matching familyExposure().
  */
 function familyBetaNotional(positions) {
@@ -86,8 +114,9 @@ function familyBetaNotional(positions) {
     if (Math.abs(qty) < 1) continue;
     const mv = Math.abs(Number(p.market_value) || (qty * (Number(p.current_price) || 0)));
     if (!(mv > 0)) continue;
-    const { family } = instrumentSign(p.symbol);
-    out[family] = (out[family] || 0) + mv * leverageOf(p.symbol);
+    const sym = String(p.symbol || '').toUpperCase();
+    const group = EXPOSURE_GROUP[sym] || instrumentSign(sym).family;
+    out[group] = (out[group] || 0) + mv * (EXPOSURE_LEVERAGE[sym] || leverageOf(sym));
   }
   for (const k of Object.keys(out)) out[k] = Math.round(out[k] * 100) / 100;
   return out;
@@ -109,6 +138,13 @@ function familyBetaNotional(positions) {
 // Equity-correlated families collapse to equity_long / equity_short. Precious
 // metals move together and get their own bucket. Everything else (bonds, an
 // unknown symbol) is its own bucket — correlation we cannot assert, we do not.
+//
+// Oil and metals funds collapse to 'oil' / 'metals' by EXPOSURE_GROUP's measured
+// grouping (2026-10-28). On 2026-10-27 stable held UCO, XLE, XOP and USO — four
+// buckets to the cap, one bet to the market — and the operator set a one-bet
+// limit (TRADER_MAX_PER_BUCKET=2 on stable). XLE files under oil, not
+// equity_long: it moves with crude (r 0.60) more than with SPY (0.31). The 2x
+// miners (NUGT, JNUG) join the metals bucket they used to escape.
 const EQUITY_FAMILIES = new Set([
   'SPY', 'QQQ', 'IWM', 'SOX', 'DIA',                                  // broad + semis
   'XLK', 'XLF', 'XLE', 'XLV', 'XLI', 'XLU', 'XLY', 'XLP',             // sectors
@@ -118,6 +154,9 @@ const METALS = new Set(['GLD', 'SLV', 'GDX']);
 
 /** Which correlated risk bucket an instrument belongs to. */
 function riskBucket(sym) {
+  const group = EXPOSURE_GROUP[String(sym || '').toUpperCase()];
+  if (group === 'OIL') return 'oil';
+  if (group === 'METALS') return 'metals';
   const { family, sign } = instrumentSign(sym);
   if (METALS.has(family)) return 'metals';
   if (EQUITY_FAMILIES.has(family)) return sign < 0 ? 'equity_short' : 'equity_long';
@@ -219,4 +258,4 @@ function conflicts(sym, positions) {
   return { conflict: true, family, entrySign: sign, existingSign: existing, against };
 }
 
-module.exports = { FAMILY, LEVERAGE, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, mirrorOf, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };
+module.exports = { FAMILY, LEVERAGE, EXPOSURE_GROUP, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, mirrorOf, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };

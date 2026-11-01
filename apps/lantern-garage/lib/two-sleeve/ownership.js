@@ -12,7 +12,10 @@
  *   - a symbol whose position has left the book is released on the next reconcile;
  *   - a position nobody claimed (pre-existing, manual, or a lost registry) is
  *     ADOPTED by the default sleeve — the one whose exits are safer (S: intraday,
- *     decarry, weekend-flat) — and journaled, never silently ignored.
+ *     decarry, weekend-flat) — and journaled, never silently ignored;
+ *   - a RESERVED symbol (`reserved: { BOXX: 'RESERVE' }`, the engine's cash reserve,
+ *     lib/two-sleeve/reserve.js) is adopted by its reserved owner instead: the default
+ *     sleeve's exits would otherwise sell the reserve the first tick it is unclaimed.
  *
  * The file is written synchronously on every change; it is a few hundred bytes.
  * Everything here is pure bookkeeping — no broker calls, no clock of its own.
@@ -20,7 +23,8 @@
 const fs = require('fs');
 const path = require('path');
 
-function createOwnership({ file, defaultOwner = 'S', now = () => Date.now(), onEvent = null } = {}) {
+function createOwnership({ file, defaultOwner = 'S', reserved = {}, now = () => Date.now(), onEvent = null } = {}) {
+  const RESERVED = Object.fromEntries(Object.entries(reserved || {}).map(([s, o]) => [String(s).toUpperCase(), o]));
   let state = { symbols: {}, orders: {}, savedAt: 0 };
   if (file) {
     try {
@@ -93,7 +97,7 @@ function createOwnership({ file, defaultOwner = 'S', now = () => Date.now(), onE
         if (!r.seen && (now() - Number(r.since || 0)) < graceMs) continue;
         released.push(k); api.release(k, 'position left the book');
       }
-      for (const k of held) if (!state.symbols[k]) { state.symbols[k] = { owner: defaultOwner, since: now(), adopted: true, seen: true }; adopted.push(k); emit({ event: 'ownership_adopt', symbol: k, owner: defaultOwner }); }
+      for (const k of held) if (!state.symbols[k]) { const owner = RESERVED[k] || defaultOwner; state.symbols[k] = { owner, since: now(), adopted: true, seen: true }; adopted.push(k); emit({ event: 'ownership_adopt', symbol: k, owner }); }
       if (adopted.length || dirty) save();
       return { released, adopted };
     },

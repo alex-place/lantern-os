@@ -154,3 +154,26 @@ test('a fill this process never saw opened has NO hold, rather than a zero one (
   const rows = newExitRows(orders, new Set(), entryFor({ QQQ: { avg_entry_price: 48 } }));
   assert.strictEqual(rows[0].opened_at, null);
 });
+
+test('SMH 2026-10-15: a stop fill with no execution time is NOT stamped with the time the stop was PLACED', () => {
+  // IBKR's order list gave the orderTime (the GTC stop was placed 10-14 14:17 ET) but no execution time for the fill
+  // at the 10-15 open; the row was stamped 10-14 and its -$6,490 left BOTH days' P&L. Now: no execution time = the
+  // row is stamped when it is discovered; the placement time only feeds the age guards.
+  const orders = [{ orderId: '1991306810', symbol: 'SMH', side: 'SELL', orderType: 'Stop', filledQty: 310, avgPrice: 545.900323, status: 'Filled', time: null, orderTime: Date.parse('2026-10-14T18:17:49Z') }];
+  const rows = newExitRows(orders, new Set(), entryFor({ SMH: { avg_entry_price: 566.8342287, openedAt: Date.parse('2026-10-14T18:17:41Z') } }), Date.parse('2026-10-15T08:00:00Z'));
+  assert.strictEqual(rows.length, 1, 'the tracked position still books its exit');
+  assert.strictEqual(rows[0].ts, undefined, 'no execution time -> stamped at discovery, never at placement');
+});
+
+test('an execution time still wins as the row timestamp', () => {
+  const exec = Date.parse('2026-10-15T13:30:01Z');
+  const orders = [{ orderId: '2', symbol: 'SMH', side: 'SELL', orderType: 'Stop', filledQty: 10, avgPrice: 545.9, status: 'Filled', time: exec, orderTime: Date.parse('2026-10-14T18:17:49Z') }];
+  const rows = newExitRows(orders, new Set(), entryFor({ SMH: { avg_entry_price: 566.83, openedAt: Date.parse('2026-10-14T18:17:41Z') } }));
+  assert.strictEqual(rows[0].ts, new Date(exec).toISOString());
+});
+
+test('the age guard still uses the placement time when there is no execution time', () => {
+  // an untracked old fill (placed long before this process started) stays out of the ledger
+  const orders = [{ orderId: '3', symbol: 'XLE', side: 'SELL', orderType: 'Stop', filledQty: 10, avgPrice: 60, status: 'Filled', time: null, orderTime: Date.parse('2026-10-01T15:00:00Z') }];
+  assert.strictEqual(newExitRows(orders, new Set(), entryFor({}), Date.parse('2026-10-15T08:00:00Z')).length, 0);
+});

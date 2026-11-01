@@ -67,7 +67,7 @@ function fetchJson(url) {
   for (let i = 0; i < rr.timestamp.length; i++) {
     const q = rr.indicators.quote[0];
     if (q.close[i] == null) continue;
-    days.push({ d: new Date(rr.timestamp[i] * 1000).toISOString().slice(0, 10), o: q.open[i], c: q.close[i] });
+    days.push({ d: new Date(rr.timestamp[i] * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
   }
   const idx = new Map(days.map((x, i) => [x.d, i]));
 
@@ -113,9 +113,85 @@ function fetchJson(url) {
     }
   }
   await scoreV2(usable, fetchJson, days);
+  scorePreopen(rows, days);
   console.log("\nDECISION BAR: nothing is wired to the engine unless a provider beats always-long");
   console.log("AND shows |rho| that survives n≥20 — the same bar the per-signal analyst failed.");
 })();
+
+/** Spearman with tied ranks averaged (a stance has three values, so ties are the norm). */
+function spearman(x, y) {
+  const ranks = (v) => {
+    const o = v.map((val, i) => [val, i]).sort((a, b) => a[0] - b[0]);
+    const r = new Array(v.length);
+    for (let i = 0; i < o.length;) {
+      let j = i; while (j + 1 < o.length && o[j + 1][0] === o[i][0]) j++;
+      for (let k = i; k <= j; k++) r[o[k][1]] = (i + j) / 2 + 1;
+      i = j + 1;
+    }
+    return r;
+  };
+  const a = ranks(x), b = ranks(y), n = a.length;
+  const ma = a.reduce((s, v) => s + v, 0) / n, mb = b.reduce((s, v) => s + v, 0) / n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+  return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : null;
+}
+
+/**
+ * v3 (2026-10-15): the PRE-OPEN stance (normal / half / stand_aside) against the ACCOUNT's
+ * day, read from the trade ledger's session rows (TRADER_TRADES_LOG or the default data path).
+ * Sized = Σ weight·day with normal 1, half 0.5, stand_aside 0; against always-normal and the
+ * VIX rule (half when the VIX shown to the read was >= 20). The range call is graded against
+ * SPY's (high-low)/open over its prior 20 sessions' median: quiet < 0.75x, wide > 1.25x.
+ */
+function scorePreopen(rows, spyDays) {
+  const pre = rows.filter((r) => r.read === "preopen" && !r.degraded && r.stance);
+  if (!pre.length) { console.log("\nv3 pre-open stance: no rows yet"); return; }
+  const ledger = process.env.TRADER_TRADES_LOG || path.join(__dirname, "..", "data", "lantern-garage", "trading", "autopilot-trades.jsonl");
+  const acct = new Map();
+  try {
+    for (const line of fs.readFileSync(ledger, "utf8").split("\n")) {
+      if (!line.includes('"event":"session"')) continue;
+      let r; try { r = JSON.parse(line); } catch (_e) { continue; }
+      const pnl = Number(r.day_pnl), eq = Number(r.equity);
+      if (r.date && Number.isFinite(pnl) && eq - pnl > 0) acct.set(r.date, pnl / (eq - pnl));
+    }
+  } catch (_e) { console.log("\nv3 pre-open stance: no trade ledger at " + ledger); }
+  const idx = new Map(spyDays.map((x, i) => [x.d, i]));
+  const rangeClass = (i) => {
+    if (i == null || i < 20) return null;
+    const prior = []; for (let k = i - 20; k < i; k++) prior.push((spyDays[k].h - spyDays[k].l) / spyDays[k].o);
+    prior.sort((p, q) => p - q);
+    const med = (prior[9] + prior[10]) / 2, today = (spyDays[i].h - spyDays[i].l) / spyDays[i].o;
+    return today < 0.75 * med ? "quiet" : today > 1.25 * med ? "wide" : "normal";
+  };
+  const W = { normal: 1, half: 0.5, stand_aside: 0 };
+  const pct = (x) => (x == null || !Number.isFinite(x) ? "  -" : (100 * x).toFixed(2) + "%");
+  console.log("\nv3 — the pre-open stance against the account's day (sessions from the trade ledger)");
+  console.log("provider  reads  scored  normal/half/aside   mean day: normal | half | aside   sized total   always-normal   VIX rule   rho(stance, day)   range hit");
+  for (const provider of ["claude", "local"]) {
+    const all = pre.filter((r) => r.provider === provider);
+    if (!all.length) { console.log(provider.padEnd(9) + "    —"); continue; }
+    const s = all.map((r) => ({ ...r, a: acct.get(r.date) })).filter((x) => x.a != null);
+    const by = (st) => s.filter((x) => x.stance === st);
+    const mean = (a) => (a.length ? a.reduce((t, x) => t + x.a, 0) / a.length : null);
+    const sized = s.reduce((t, x) => t + W[x.stance] * x.a, 0);
+    const base = s.reduce((t, x) => t + x.a, 0);
+    const vixRule = s.reduce((t, x) => t + (x.vix >= 20 ? 0.5 : 1) * x.a, 0);
+    const rho = s.length >= 5 ? spearman(s.map((x) => W[x.stance]), s.map((x) => x.a)) : null;
+    const ranged = all.map((r) => ({ call: r.range, real: rangeClass(idx.get(r.date)) })).filter((x) => x.call && x.real);
+    const rangeHit = ranged.length ? ranged.filter((x) => x.call === x.real).length / ranged.length : null;
+    console.log(provider.padEnd(9) + String(all.length).padStart(6) + String(s.length).padStart(8) + "   "
+      + `${by("normal").length}/${by("half").length}/${by("stand_aside").length}`.padStart(15) + "   "
+      + `${pct(mean(by("normal")))} | ${pct(mean(by("half")))} | ${pct(mean(by("stand_aside")))}`.padStart(30)
+      + pct(sized).padStart(14) + pct(base).padStart(16) + pct(vixRule).padStart(11)
+      + (rho == null ? (s.length >= 5 ? "    no variation" : "            n<5") : rho.toFixed(3).padStart(16))
+      + (rangeHit == null ? "        -" : ((100 * rangeHit).toFixed(0) + "% (" + ranged.length + ")").padStart(12)));
+  }
+  console.log("(THE BAR, the 2026-10-01 day-reader bar applied to size and registered before the first v3 read: the stance");
+  console.log(" sizes anything only if, over at least 20 scored sessions, rho(stance, account day) >= +0.4 AND the sized");
+  console.log(" total beats always-normal AND the VIX rule.)");
+}
 
 /** v2: day types and picks (prompt_v 2 rows only). */
 async function scoreV2(usable, fetchJson, spyDays) {

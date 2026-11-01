@@ -1,0 +1,3 @@
+### Fixed
+
+- Server memory: the trader's scan feed is written once per scan and only to the trading store's agent-log.jsonl, and the last-N readers (dashboard agent-log/orders, the CSF trading records) parse only the file's tail. Before: every /zones poll re-appended the same scan's rows (about 3 copies of each) and copied them into the CSF memory registry, which each chat turn reads; on the stable box agent-log.jsonl reached 430 MB and data/csf_memory/raw.jsonl 470 MB (97.5 % per-scan signal traces), each parsed whole after every append, and the server died at 15:38 ET on 10-19 (heap out-of-memory suspected). POSTed agent-log entries still reach CSF memory.

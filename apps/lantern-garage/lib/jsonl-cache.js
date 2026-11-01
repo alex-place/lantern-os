@@ -76,7 +76,63 @@ function readJsonCached(filePath, fallback = {}) {
   return value;
 }
 
-/** Drop a cached entry (e.g. after a synchronous rewrite). */
-function invalidate(filePath) { _cache.delete(filePath); }
+/**
+ * Parse only the TAIL of an append-only JSONL file: its last `maxLines` records,
+ * oldest first, memoised until the file's mtime/size changes. Reads backwards in
+ * growing chunks (256 KiB, doubling, at most `maxBytes`), so the cost follows what
+ * the caller asked for, not how large the file has grown. readJsonlCached parses
+ * the WHOLE file again after every append: on the stable box (2026-10-25) that was
+ * a 430 MB agent-log.jsonl parsed to answer "the last 100 rows" and a 470 MB CSF
+ * registry parsed to answer "the last 50 trading records". When the file holds more
+ * than `maxBytes`, the records inside that window are all that is returned.
+ * Same read-only contract as readJsonlCached: copy before mutating.
+ * @param {string} filePath absolute path
+ * @param {number} maxLines how many records (from the end) the caller needs
+ * @param {{maxBytes?: number}} [opts]
+ * @returns {object[]}
+ */
+function readJsonlTail(filePath, maxLines, { maxBytes = 32 * 1024 * 1024 } = {}) {
+  const n = Math.max(0, Math.floor(Number(maxLines) || 0));
+  if (!n) return [];
+  let st;
+  try { st = fs.statSync(filePath); } catch { return []; }
+  const cacheKey = `tail:${n}:${maxBytes}:${filePath}`;
+  const key = `${st.mtimeMs}:${st.size}`;
+  const hit = _cache.get(cacheKey);
+  if (hit && hit.key === key) return hit.value;
 
-module.exports = { readJsonlCached, readJsonCached, invalidate };
+  let value = [];
+  let fd;
+  try {
+    fd = fs.openSync(filePath, "r");
+    let want = Math.min(st.size, 256 * 1024, maxBytes);
+    for (;;) {
+      const buf = Buffer.alloc(want);
+      fs.readSync(fd, buf, 0, want, st.size - want);
+      const lines = buf.toString("utf8").split(/\r?\n/);
+      if (want < st.size) lines.shift(); // the window's first line may start mid-record
+      const parsed = [];
+      for (const l of lines) {
+        if (!l) continue;
+        try { parsed.push(JSON.parse(l)); } catch { /* bad line: skipped, as readJsonlCached does */ }
+      }
+      value = parsed.slice(-n);
+      if (parsed.length >= n || want >= st.size || want >= maxBytes) break;
+      want = Math.min(st.size, maxBytes, want * 2);
+    }
+  } catch {
+    value = [];
+  } finally {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* already closed */ } }
+  }
+  _cache.set(cacheKey, { key, value });
+  return value;
+}
+
+/** Drop a cached entry (e.g. after a synchronous rewrite). */
+function invalidate(filePath) {
+  _cache.delete(filePath);
+  for (const k of [..._cache.keys()]) if (k.startsWith("tail:") && k.endsWith(`:${filePath}`)) _cache.delete(k);
+}
+
+module.exports = { readJsonlCached, readJsonCached, readJsonlTail, invalidate };

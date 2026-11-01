@@ -15,6 +15,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const marketCalendar = require('../lib/market-calendar');
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ibsexit-'));
 const LOG = path.join(DIR, 'trades.jsonl');
@@ -130,7 +131,11 @@ const ET_AT = (hh, mm) => {
   // hh:mm America/New_York on TOMORROW's date: the time-of-day is what the guard
   // reads, and a forward instant keeps it after any wall-clock timestamp the
   // fixtures stamp (entryAt / exitAt), so suite order cannot change the result.
-  const etDate = new Date(Date.now() + 26 * 3600e3).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  // TOMORROW'S SESSION, not tomorrow: since the exchange calendar (#3784) a weekend or
+  // holiday time is outside the session and the guard reads nothing, so the suite
+  // failed whenever tomorrow was not a trading day (2026-10-30, a Friday).
+  let etDate = new Date(Date.now() + 26 * 3600e3).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  if (!marketCalendar.isTradingDay(etDate)) etDate = marketCalendar.nextTradingDay(etDate);
   const probeUtcHour = Number(new Date(etDate + 'T12:00:00Z').toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour12: false }).slice(0, 2));
   const offsetH = 12 - probeUtcHour;                       // 4 in EDT, 5 in EST
   return Date.parse(`${etDate}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`) + offsetH * 3600e3;

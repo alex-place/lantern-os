@@ -18,6 +18,7 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert');
+const { isTradingDay } = require('../lib/market-calendar');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -30,7 +31,7 @@ const SIGMA = 0.003;
 /** The 15 weekdays before DAY, oldest first. */
 function priorDays() {
   const out = []; let t = Date.parse(`${DAY}T12:00:00Z`);
-  while (out.length < 15) { t -= 86400000; const d = new Date(t); if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) out.unshift(d.toISOString().slice(0, 10)); }
+  while (out.length < 15) { t -= 86400000; const d = new Date(t); if (isTradingDay(d.toISOString().slice(0, 10))) out.unshift(d.toISOString().slice(0, 10)); }   // real sessions: no bars on Labor Day
   return out;
 }
 const PRIOR = priorDays();

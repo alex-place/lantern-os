@@ -50,6 +50,17 @@
  * of the picks and of the whole universe, so experiments/regime_shadow_score.js scores the
  * picks against the universe's average over the same window. The CLOSE read is v1,
  * unchanged. Still journal-only: nothing reads a pick.
+ *
+ * v3 (2026-10-15, the operator: "add the missing brain: news, earnings, the judgment a human
+ * uses"). A PRE-OPEN read at ~09:15 sets the SIZE for the day's new entries: normal, half or
+ * stand aside, with the range it expects and the scheduled events it saw. It gets what a
+ * trader has before the bell and the rule engine does not: SPY / QQQ / IWM in the pre-market,
+ * ES and NQ futures since the last settlement, every headline since the last close (the
+ * feed is where CPI, Fed and earnings days show up), and its own earlier pre-open calls with
+ * how SPY and the ACCOUNT then did. Every rule and model that called direction measured at
+ * chance here, so it is asked for size, not direction. Still journal-only: the stance sizes
+ * nothing until experiments/regime_shadow_score.js shows it beats always-normal and the VIX
+ * rule over 20+ sessions (the 2026-10-01 bar). TRADER_REGIME_PREOPEN=0 turns this read off.
  */
 const fs = require('fs');
 const path = require('path');
@@ -60,11 +71,15 @@ const noise = require('./trend-shadow');   // noiseBand / sessionBars: pure math
 const CLAUDE_MODEL = () => process.env.TRADER_REGIME_MODEL || 'claude-opus-5-5';
 const FALLBACK_MODEL = 'claude-opus-5';           // used once if the configured model is refused (400 / 404)
 const PROMPT_V = 2;                               // the open and mid reads; the close read stays v1
+const PREOPEN_V = 3;                              // the 09:15 pre-open read (size, not direction)
 const INTRADAY_READS = new Set(['open', 'mid']);
+const STANCES = ['normal', 'half', 'stand_aside'];
+const RANGES = ['quiet', 'normal', 'wide'];
 const LOCAL_URL = () => process.env.TRADER_REGIME_LOCAL_URL || 'http://127.0.0.1:11434';
 const LOCAL_MODEL = () => process.env.TRADER_REGIME_LOCAL_MODEL || process.env.OURO_MODEL || 'ouro:latest';
 
 function enabled() { return process.env.TRADER_REGIME_SHADOW === '1'; }
+function preopenEnabled() { return process.env.TRADER_REGIME_PREOPEN !== '0'; }   // rides on the shadow flag; =0 opts out
 function timeoutMs() { return Number(process.env.TRADER_REGIME_TIMEOUT_MS) || 45000; }
 const tradingDataFile = (name) => require('./app-paths').dataPath('lantern-garage', 'trading', name);
 function logFile() {
@@ -264,11 +279,95 @@ async function trackOf(read, now, getJson = fetchJson, n = 10) {
   return out;
 }
 
+// ── v3: before the bell ──────────────────────────────────────────────────────
+/** Epoch ms of an ET wall-clock minute on an ET date (EDT tried first, then EST). */
+function etWallMs(day, mins) {
+  for (const offH of [4, 5]) {
+    const t = Date.parse(`${day}T00:00:00Z`) + (mins + offH * 60) * 60000;
+    if (etDay(t) === day && etMin(t) === mins) return t;
+  }
+  return null;
+}
+
+/** SPY / QQQ / IWM in the pre-market: the last COMPLETED 5-minute bar before 09:30 against yesterday's close. */
+async function premarketOf(now, priorCloses, getJson = fetchJson) {
+  const day = etDay(now);
+  const out = [];
+  for (const sym of ['SPY', 'QQQ', 'IWM']) {
+    let raw = [];
+    try { raw = chartBars(await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=5m&range=1d&includePrePost=true`)); } catch (_e) { raw = []; }
+    const pre = raw.filter((b) => { const t = Date.parse(b.timestamp); return etDay(t) === day && etMin(t) < 570 && t + 300000 <= now; });
+    const last = pre[pre.length - 1];
+    const prev = priorCloses && priorCloses[sym];
+    out.push(last && prev > 0
+      ? { sym, px: +last.close.toFixed(2), chgPct: +((last.close / prev - 1) * 100).toFixed(2), asOf: hhmm(etMin(Date.parse(last.timestamp)) + 5) }
+      : { sym, unavailable: true });
+  }
+  return out;
+}
+
+/** ES and NQ futures since their last settlement (the chart meta: last price against the previous close). */
+async function futuresOf(getJson = fetchJson) {
+  const out = [];
+  for (const [sym, name] of [['ES=F', 'S&P 500 (ES)'], ['NQ=F', 'Nasdaq 100 (NQ)']]) {
+    try {
+      const j = await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=5m&range=1d`);
+      const m = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
+      const px = Number(m && m.regularMarketPrice), prev = Number(m && (m.chartPreviousClose || m.previousClose));
+      out.push(px > 0 && prev > 0 ? { sym, name, chgPct: +((px / prev - 1) * 100).toFixed(2) } : { sym, name, unavailable: true });
+    } catch (_e) { out.push({ sym, name, unavailable: true }); }
+  }
+  return out;
+}
+
+/** The account's own closed sessions from the trade ledger's tail ('session' rows): date → day P&L, $ and % of the day's starting equity. */
+function accountDaysOf({ bytes = 4000000 } = {}) {
+  const file = process.env.TRADER_REGIME_LEDGER || process.env.TRADER_TRADES_LOG || tradingDataFile('autopilot-trades.jsonl');
+  const out = new Map();
+  let text = '';
+  try {
+    const st = fs.statSync(file);
+    const len = Math.min(st.size, bytes);                   // ~60 sessions of a busy ledger; only 'session' rows are read
+    const fd = fs.openSync(file, 'r');
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, st.size - len); fs.closeSync(fd);
+    text = buf.toString('utf8');
+  } catch (_e) { return out; }
+  for (const line of text.split('\n')) {
+    if (!line.includes('"event":"session"')) continue;
+    let r; try { r = JSON.parse(line); } catch (_e) { continue; }
+    const pnl = Number(r.day_pnl), eq = Number(r.equity);
+    if (r.date && Number.isFinite(pnl) && eq - pnl > 0) out.set(r.date, { pnl: +pnl.toFixed(2), pct: +((pnl / (eq - pnl)) * 100).toFixed(2) });
+  }
+  return out;
+}
+
+/** The pre-open read's own earlier calls, with SPY's day and the ACCOUNT's day that followed (learning in context). */
+async function preopenTrackOf(now, getJson = fetchJson, n = 10) {
+  let rows = [];
+  try {
+    rows = fs.readFileSync(logFile(), 'utf8').split(/\r?\n/).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (_e) { return null; } })
+      .filter((r) => r && r.read === 'preopen' && r.provider === 'claude' && r.prompt_v === PREOPEN_V && !r.degraded && r.stance && r.date < etDay(now));
+  } catch (_e) { return []; }
+  rows = rows.slice(-n);
+  if (!rows.length) return [];
+  const spy = await daily('SPY', 40, getJson).catch(() => []);
+  const acct = accountDaysOf();
+  return rows.map((r) => {
+    const b = spy.find((x) => x.d === r.date);
+    const a = acct.get(r.date);
+    return { date: r.date, stance: r.stance, range: r.range || null, conviction: r.conviction,
+      spyOcPct: b ? +((b.c / b.o - 1) * 100).toFixed(2) : null,
+      spyRangePct: b ? +(((b.h - b.l) / b.o) * 100).toFixed(2) : null,
+      acctPct: a ? a.pct : null };
+  });
+}
+
 /** Everything the prompt gets. Exposed for tests and for the scorer. */
 async function buildContext(read, { getJson = fetchJson, now = Date.now(), scan = null } = {}) {
   const [spy, qqq, iwm, vix, open] = await Promise.all([
     daily('SPY', 11, getJson), daily('QQQ', 11, getJson), daily('IWM', 11, getJson), daily('^VIX', 2, getJson),
-    todayOpen('SPY', now, getJson).catch(() => null),
+    read === 'preopen' ? null : todayOpen('SPY', now, getJson).catch(() => null),   // no 09:30 bar exists before the bell
   ]);
   if (spy.length < 5) throw new Error('insufficient SPY history');
   // For the OPEN read, today's partial bar (if Yahoo already lists it) must be
@@ -298,6 +397,20 @@ async function buildContext(read, { getJson = fetchJson, now = Date.now(), scan 
     ctx.universe = universeOf(scan);
     ctx.headlines = headlinesOf(now);
     ctx.track = await trackOf(read, now, getJson).catch(() => []);
+  }
+  if (read === 'preopen') {
+    // v3: what a trader has before the bell. Nothing here is a regular-session print of today.
+    ctx.v = PREOPEN_V;
+    ctx.asOf = hhmm(etMin(now));
+    const lastBefore = (a) => { const h = a.filter((b) => b.d < today); return h.length ? h[h.length - 1].c : null; };
+    ctx.premarket = await premarketOf(now, { SPY: lastBefore(spy), QQQ: lastBefore(qqq), IWM: lastBefore(iwm) }, getJson).catch(() => []);
+    ctx.futures = await futuresOf(getJson).catch(() => []);
+    // every headline since the last session's 16:00 close (a Monday reads the weekend), 12..72 hours
+    const since = hist.length ? etWallMs(hist[hist.length - 1].d, 960) : null;
+    const hours = since ? Math.min(72, Math.max(12, (now - since) / 3600000)) : 18;
+    ctx.newsHours = Math.round(hours);
+    ctx.headlines = headlinesOf(now, { limit: 30, hours });
+    ctx.track = await preopenTrackOf(now, getJson).catch(() => []);
   }
   return ctx;
 }
@@ -353,7 +466,52 @@ function buildPromptV2(ctx) {
   ].join('\n');
 }
 
+/** The v3 prompt (the pre-open read): what a trader has before the bell, then the size of the day. Names no failure mode (#3370). */
+function buildPromptPreopen(ctx) {
+  const rows = ctx.spy.map((b) =>
+    `  ${b.d}  O ${b.o.toFixed(2)}  H ${b.h.toFixed(2)}  L ${b.l.toFixed(2)}  C ${b.c.toFixed(2)}  dayIBS ${b.ibs}`).join('\n');
+  const chg = (a) => (a.length >= 2 ? (((a[a.length - 1].c / a[0].c) - 1) * 100).toFixed(2) + '%' : 'n/a');
+  const pct = (x) => (x == null ? 'n/a' : signed(x) + '%');
+  const pre = (ctx.premarket || []).map((p) => (p.unavailable ? `  ${p.sym}: no pre-market print`
+    : `  ${p.sym}  ${p.px.toFixed(2)}  ${signed(p.chgPct)}% vs yesterday’s close (as of ${p.asOf})`)).join('\n');
+  const fut = (ctx.futures || []).map((f) => `${f.name} ${f.unavailable ? 'n/a' : signed(f.chgPct) + '%'}`).join('   ');
+  const news = (ctx.headlines || []).map((h) => `  [${new Date(h.t).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).slice(5)} ${timeEt(h.t)}] ${h.source ? h.source + ': ' : ''}${h.headline}`).join('\n');
+  const track = (ctx.track || []).map((r) => `  ${r.date}: stance ${r.stance}, range ${r.range || 'n/a'} (conviction ${r.conviction}); `
+    + `SPY then ${pct(r.spyOcPct)} open to close on a ${r.spyRangePct == null ? 'n/a' : r.spyRangePct + '%'} range; the account ${pct(r.acctPct)} on the day`).join('\n');
+  return [
+    'You are the pre-open risk desk for an automated intraday account. It buys short-term weakness in US index ETFs',
+    '(SPY, QQQ, IWM, DIA, sector funds and their 3x versions) during the regular session, holds each position for minutes',
+    'to hours behind a stop, opens nothing after 15:30 and is flat by 15:50.',
+    `It is ${ctx.asOf} ET on ${ctx.date}. The regular session opens at 09:30; before it does, you set the size of today’s new entries.`,
+    '',
+    'SPY, last 10 sessions (dayIBS: 1 = closed at the high, 0 = closed at the low):',
+    rows,
+    `QQQ 5-day change: ${chg(ctx.qqq5)}   IWM 5-day change: ${chg(ctx.iwm5)}   VIX: ${ctx.vix == null ? 'n/a' : ctx.vix.toFixed(1)}`,
+    '',
+    'Pre-market now:',
+    pre || '  (no pre-market prints)',
+    `Index futures since their last settlement: ${fut || 'n/a'}`,
+    '',
+    `Headlines since the last close (${ctx.newsHours != null ? ctx.newsHours : 18} hours; scheduled releases, central-bank decisions and earnings show up here):`,
+    news || '  (none)',
+    '',
+    'Your own recent pre-open calls, and what followed:',
+    track || '  (none yet: this is your first)',
+    '',
+    'Decide: (1) stance, the size for today’s new entries: "normal", "half", or "stand_aside" (no new entries today);',
+    '(2) range, how wide SPY’s session will be against its recent sessions: "quiet", "normal" or "wide";',
+    '(3) regime, how SPY most likely resolves from the open to the close; (4) the scheduled events today that matter,',
+    'with their ET time when the headlines give it.',
+    '',
+    'Reply with strict JSON, no prose:',
+    '{"stance":"normal"|"half"|"stand_aside","range":"quiet"|"normal"|"wide","regime":"trend_up"|"trend_down"|"chop",',
+    ' "conviction":<integer 0-100>,"events":["<event, ET time>"],"reason":"<max 30 words>"}',
+    'conviction is how sure you are of the stance; 50 = no view.',
+  ].join('\n');
+}
+
 function buildPrompt(ctx) {
+  if (ctx.v === PREOPEN_V) return buildPromptPreopen(ctx);
   if (ctx.v === PROMPT_V) return buildPromptV2(ctx);
   const rows = ctx.spy.map((b) =>
     `  ${b.d}  O ${b.o.toFixed(2)}  H ${b.h.toFixed(2)}  L ${b.l.toFixed(2)}  C ${b.c.toFixed(2)}  dayIBS ${b.ibs}`).join('\n');
@@ -409,8 +567,27 @@ function parseReply(text, { universe = null } = {}) {
   } catch (_e) { return { degraded: true, reason: 'parse error', raw }; }
 }
 
+/** v3 reply: stance + conviction required; range / regime / events optional and bounded. */
+function parsePreopen(text) {
+  const raw = String(text || '').slice(0, 180);
+  try {
+    const m = String(text || '').match(/\{[\s\S]*\}/);
+    if (!m) return { degraded: true, reason: 'unparseable', raw };
+    const j = JSON.parse(m[0]);
+    const stance = STANCES.includes(j.stance) ? j.stance : null;
+    const conviction = Number.isFinite(Number(j.conviction))
+      ? Math.max(0, Math.min(100, Math.round(Number(j.conviction)))) : null;
+    if (!stance || conviction == null) return { degraded: true, reason: 'missing fields', raw };
+    return { stance, conviction,
+      range: RANGES.includes(j.range) ? j.range : null,
+      regime: ['trend_up', 'trend_down', 'chop'].includes(j.regime) ? j.regime : null,
+      events: (Array.isArray(j.events) ? j.events : []).map((e) => String(e || '').trim().slice(0, 80)).filter(Boolean).slice(0, 6),
+      why: String(j.reason || '').slice(0, 200), degraded: false };
+  } catch (_e) { return { degraded: true, reason: 'parse error', raw }; }
+}
+
 // ── providers ────────────────────────────────────────────────────────────────
-async function askClaude(prompt, fetchImpl, { universe = null } = {}) {
+async function askClaude(prompt, fetchImpl, { universe = null, parse = null } = {}) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return { degraded: true, reason: 'no api key' };
   const doFetch = fetchImpl || globalThis.fetch;
@@ -430,13 +607,15 @@ async function askClaude(prompt, fetchImpl, { universe = null } = {}) {
     if (!res || !res.ok) return { degraded: true, reason: 'http ' + (res && res.status), model_used: model };
     const j = await res.json();
     const text = (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
-    return { ...parseReply(text, { universe }), model_used: model };
+    // usage on the row: what each read costs is measured, not guessed
+    const usage = j.usage ? { in: j.usage.input_tokens, out: j.usage.output_tokens } : undefined;
+    return { ...(parse ? parse(text) : parseReply(text, { universe })), model_used: model, ...(usage ? { usage } : {}) };
   } catch (e) {
     return { degraded: true, reason: ac.signal.aborted ? 'timeout' : String(e && e.message).slice(0, 60) };
   } finally { clearTimeout(timer); }
 }
 
-async function askLocal(prompt, fetchImpl, { universe = null } = {}) {
+async function askLocal(prompt, fetchImpl, { universe = null, parse = null } = {}) {
   const doFetch = fetchImpl || globalThis.fetch;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs());
@@ -450,14 +629,14 @@ async function askLocal(prompt, fetchImpl, { universe = null } = {}) {
     if (!res || !res.ok) return { degraded: true, reason: 'http ' + (res && res.status) };
     const j = await res.json();
     const text = (j.message && j.message.content) || j.response || '';
-    return parseReply(text, { universe });
+    return parse ? parse(text) : parseReply(text, { universe });
   } catch (e) {
     return { degraded: true, reason: ac.signal.aborted ? 'timeout' : String(e && e.message).slice(0, 60) };
   } finally { clearTimeout(timer); }
 }
 
 /**
- * Fire one read ('open' | 'mid' | 'close') for both providers, once per day each.
+ * Fire one read ('preopen' | 'open' | 'mid' | 'close') for both providers, once per day each.
  * `scan` = the scan the caller just ran (the universe the v2 reads show and pick from).
  * Fire-and-forget from the caller; never throws; journal-only.
  */
@@ -482,10 +661,11 @@ async function run(read, { fetchImpl, now = Date.now(), ctx: injectedCtx, scan =
   const universe = ctx.universe || [];
   const pxOf = (sym) => { const u = universe.find((x) => x.sym === sym); return u && u.px > 0 ? u.px : null; };
   const spyTape = (ctx.tape || []).find((t) => t.sym === 'SPY' && !t.unavailable);
+  const parse = ctx.v === PREOPEN_V ? parsePreopen : null;
   const out = [];
   for (const [name, ask] of providers) {
     const t0 = Date.now();
-    const { model_used: modelUsed, picks, ...r } = await ask(prompt, fetchImpl, { universe });
+    const { model_used: modelUsed, picks, ...r } = await ask(prompt, fetchImpl, { universe, parse });
     const row = { ts: new Date(now).toISOString(), date, read, provider: name,
       model: modelUsed || (name === 'claude' ? CLAUDE_MODEL() : LOCAL_MODEL()),
       prompt_v: ctx.v || 1,
@@ -503,11 +683,17 @@ async function run(read, { fetchImpl, now = Date.now(), ctx: injectedCtx, scan =
       row.rule_bullish = universe.filter((u) => u.read === 'BULLISH' && u.px > 0).map((u) => u.sym);
       row.inputs = { tape: (ctx.tape || []).length, universe: universe.length, headlines: (ctx.headlines || []).length, track: (ctx.track || []).length };
     }
+    if (ctx.v === PREOPEN_V) {
+      // the pre-market and futures moves it was shown, so the scorer can condition on them
+      row.premarket = Object.fromEntries((ctx.premarket || []).filter((p) => !p.unavailable).map((p) => [p.sym, p.chgPct]));
+      row.futures = Object.fromEntries((ctx.futures || []).filter((f) => !f.unavailable).map((f) => [f.sym, f.chgPct]));
+      row.inputs = { headlines: (ctx.headlines || []).length, news_hours: ctx.newsHours, track: (ctx.track || []).length };
+    }
     journal(row);
     out.push(row);
   }
   return { logged: out.length };
 }
 
-module.exports = { run, enabled, buildContext, buildPrompt, parseReply, alreadyLogged, logFile, todayOpen,
-  tapeOf, universeOf, headlinesOf, trackOf, PROMPT_V };
+module.exports = { run, enabled, preopenEnabled, buildContext, buildPrompt, parseReply, parsePreopen, alreadyLogged, logFile, todayOpen,
+  tapeOf, universeOf, headlinesOf, trackOf, premarketOf, futuresOf, accountDaysOf, preopenTrackOf, etWallMs, PROMPT_V, PREOPEN_V };

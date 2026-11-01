@@ -66,7 +66,9 @@ test('view-only: no account panel, no demo portfolio, the range strip stays', ()
   // Three rows for a view-only layout: header, charts, the range strip -- never a zero-height strip.
   assert.match(PAGE, /body\.guest \.layout\{ grid-template-rows:52px minmax\(0,1fr\) auto; \}/);
   assert.doesNotMatch(PAGE, /body\.guest:not\(\.demo\)/);
-  assert.match(PAGE, /async function loadPortfolio\(\)\{[\s\S]*?if\(window\.GUEST\) return;\s*try\{\s*const r  = await fetch\('\/api\/trading\/positions'\);/);
+  // loadPortfolio(opts) since 2026-10-26: the post-order refresh asks for the book fresh (?fresh=1); the
+  // guest early return still comes before any positions fetch.
+  assert.match(PAGE, /async function loadPortfolio\(opts\)\{[\s\S]*?if\(window\.GUEST\) return;\s*try\{\s*const r  = await fetch\('\/api\/trading\/positions' \+ \(opts && opts\.fresh \? '\?fresh=1' : ''\)\);/);
 });
 
 test('the page list is the watchlist with the AI list marked on it', () => {

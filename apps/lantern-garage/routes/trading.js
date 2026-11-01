@@ -53,23 +53,14 @@ const AUTOSCAN_MS = parseInt(process.env.TRADER_AUTOSCAN_MS || '60000');
 // engine still uses the authoritative Alpaca clock to decide what to trade; this
 // is cadence only. Kill-switch: set TRADER_AUTOSCAN_CLOSED_MS=60000 to disable.
 const AUTOSCAN_CLOSED_MS = parseInt(process.env.TRADER_AUTOSCAN_CLOSED_MS || '300000'); // 5 min
-function _isUsMarketHours() {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();                       // 0 Sun .. 6 Sat
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return mins >= 570 && mins < 960;              // 09:30 (570) .. 16:00 (960) ET
-}
-// Pre-market (04:00–09:30) and after-hours (16:00–20:00) ET, Mon–Fri — the extended
-// session where IBKR accepts LMT + outsideRTH orders.
-function _isUsExtendedHours() {
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return (mins >= 240 && mins < 570) || (mins >= 960 && mins < 1200); // 04:00–09:30 | 16:00–20:00
-}
-const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+// The regular session by the exchange calendar (lib/market-calendar.js, 2026-10-26): 09:30-16:00 ET on a full day,
+// 09:30-13:00 on an early close, never on a weekday holiday.
+const marketCalendar = require('../lib/market-calendar');
+function _isUsMarketHours() { return marketCalendar.isRegularHours(Date.now()); }
+// Pre-market (04:00–09:30) and after-hours (the close + 4 h: 16:00–20:00, or 13:00–17:00 on an early close) ET on a
+// trading day — the extended session where IBKR accepts LMT + outsideRTH orders.
+function _isUsExtendedHours() { return marketCalendar.isExtendedHours(Date.now()); }
+const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const { passWindow } = require('../lib/scan-window');
 const accountLock = require('../lib/account-lock');       // one account, one managing process
 const processRole = require('../lib/process-role');     // which half of the app this process runs (#3523)
@@ -103,6 +94,19 @@ let _extendedTrading = process.env.TRADER_EXTENDED_HOURS === '1';
 const _extendedExitsOnly = () => process.env.TRADER_EXTENDED_EXITS === '1';
 async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
+  // PRE-OPEN READ (v3, 2026-10-15): the AI layer's ~09:15 call on the size of the day's new
+  // entries (normal / half / stand aside). Journal-only like the other reads, so it sizes
+  // nothing. It sits ABOVE the market-hours gate: before the bell the loop scans only when an
+  // extended-hours flag is on, but it still TICKS (every AUTOSCAN_CLOSED_MS), and the module
+  // dedupes on its own journal, so a 09:10-09:29 window fires it exactly once.
+  try {
+    const _rs = require('../lib/regime-shadow');
+    if (_rs.enabled() && _rs.preopenEnabled()) {
+      const _et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const _m = _et.getHours() * 60 + _et.getMinutes();
+      if (_et.getDay() >= 1 && _et.getDay() <= 5 && _m >= 550 && _m < 570) _rs.run('preopen').catch(() => {});
+    }
+  } catch (_e) { /* the shadow must never touch the scan */ }
   const marketHours = _isUsMarketHours();
   const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
   // Protective-only window: run the loop, manage positions, take no entries.
@@ -270,6 +274,29 @@ async function _autoscanTick() {
         const _win = passWindow({ startedInSession: marketHours, inSessionNow: _isUsMarketHours(), extNow, extManageNow });
         if (_win.afterBell) console.info(`[Trading] autoscan — the pass for ${uid} reached the brain after the bell: protective only, no entries`);
         await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, accountId: resolved.accountId, extended: _win.extended, excludeSymbols: _ovnHeld, protectiveOnly: _win.protectiveOnly });
+        // THE RESERVE FUND (lib/reserve-fund.js, 2026-10-28): parks the cash the gross cap keeps in one T-bill fund.
+        // One decision per session inside its window, after the day-trader acted, regular-session passes only, the
+        // operator's book only. The day-trader leaves the fund alone on its own (auto-trader excludes it every pass).
+        if (!_win.extended && !_win.protectiveOnly) {
+          const _logRow = (row) => require('../lib/auto-trader').logTrade({ user: uid, ...row });
+          try {
+            await require('../lib/reserve-fund').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
+              quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
+          } catch (e) { _logRow({ event: 'reserve_error', error: String((e && e.message) || e) }); }
+          // THE OVERNIGHT BOOK (lib/overnight-book.js, 2026-10-28): the engine's sleeve O on this account. Buys SPY/QQQ/SMH
+          // above their 200-session mean at the 15:55 print, sells them at the 09:40 print; a no-op (no market-data read)
+          // outside those windows. The day-trader leaves the names it holds alone on its own (auto-trader's partition).
+          try {
+            await require('../lib/overnight-book').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
+              getBars: (sym, tf) => require('../lib/market-data-yahoo').getBars(sym, tf),
+              quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
+          } catch (e) { _logRow({ event: 'overnight_book_error', error: String((e && e.message) || e) }); }
+        }
+        // THE MISSED NIGHT (2026-10-30): after the close, one row when the book's entry window passed without deciding a
+        // name (a late 5m feed, or no pass inside 15:55-16:00). Every pass, extended ones included; journal only.
+        try {
+          require('../lib/overnight-book').auditMissed({ userId: uid, journal: (row) => require('../lib/auto-trader').logTrade({ user: uid, ...row }) });
+        } catch (_e) { /* journal only: never breaks the pass */ }
       }
       // HEARTBEAT (#3525). Deliberately here and not at the bottom of the tick: this is
       // the only point that means a scan CYCLE COMPLETED. A wedged broker session leaves
@@ -285,6 +312,12 @@ async function _autoscanTick() {
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
+  try {
+    const _rf = require('../lib/reserve-fund').config();
+    if (_rf) console.info(`[Trading] reserve fund ${_rf.symbol} at ${_rf.pct}% of equity (band ${_rf.bandPct}%, cash floor ${_rf.minCashPct}%), decided ${_rf.window} ET — local-owner, armed entries only`);
+    const _ob = require('../lib/overnight-book').config();
+    if (_ob) console.info(`[Trading] overnight book ${_ob.symbols.join('/')} at ${_ob.pct}% of equity each, bought at the 15:55 print above the 200-session mean, sold at the 09:40 print — local-owner, armed entries only`);
+  } catch (_e) { /* fail-soft */ }
 
   // ── STALL WATCHDOG (#3525) ──────────────────────────────────────────────────
   // Off unless TRADER_HEARTBEAT is set, because it can end the process and the armed

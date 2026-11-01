@@ -86,3 +86,25 @@ test('same-scan entries count — the snapshot blind spot that broke the concurr
   assert.strictEqual(blocked(one, 'SPXS', 2, { equity_short: 1 }), true,
     'a second entry in the SAME scan must see the slot it just took');
 });
+
+// ── ONE-BET LIMIT FOR COMMODITIES (2026-10-28) ───────────────────────────────
+// On 2026-10-27 stable bought UCO, XLE, XOP and USO at 12 % each: 48 % of the
+// book in oil, counted by the cap as four unrelated buckets. The operator set a
+// one-bet limit (TRADER_MAX_PER_BUCKET=2 on stable), so the oil and metals funds
+// now share a bucket each, by the same measured grouping as the exposure record.
+test('every oil fund shares ONE bucket, and XLE files with oil, not equity longs', () => {
+  for (const s of ['USO', 'UCO', 'SCO', 'XLE', 'XOP']) assert.strictEqual(riskBucket(s), 'oil', `${s} is the oil bet`);
+});
+
+test('every metals fund shares the metals bucket, the 2x miners included', () => {
+  for (const s of ['GLD', 'IAU', 'GLL', 'SLV', 'GDX', 'NUGT', 'JNUG']) assert.strictEqual(riskBucket(s), 'metals', `${s} is the metals bet`);
+});
+
+test('the 2026-10-27 stable book counts as FOUR in one bucket; cap 2 refuses the third', () => {
+  const book = [{ symbol: 'UCO', qty: 1795 }, { symbol: 'XLE', qty: 1691 }, { symbol: 'XOP', qty: 580 }, { symbol: 'USO', qty: 708 }, { symbol: 'SOXS', qty: 0.8 }];
+  assert.deepStrictEqual(bucketCounts(book), { oil: 4 }, 'one bet, four slots; the SOXS dust is not a slot');
+  const two = book.slice(0, 2);
+  assert.strictEqual(blocked(two, 'XOP', 2), true, 'the third oil fund is refused');
+  assert.strictEqual(blocked(two, 'GLD', 2), false, 'metals are a different bet');
+  assert.strictEqual(blocked(two, 'SPY', 2), false, 'equity longs are a different bet');
+});

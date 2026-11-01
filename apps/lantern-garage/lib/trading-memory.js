@@ -13,7 +13,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const { appendJsonlQueued } = require("./file-queue");
-const { readJsonlCached } = require("./jsonl-cache");
+const { readJsonlTail } = require("./jsonl-cache");
 const tradingStore = require("./trading-store");
 const csfWriter = require("./csf-memory-writer");
 
@@ -220,17 +220,37 @@ async function recordNewOrders(payload) {
  * or a single entry — all normalised via `_toArray` so alternate wrapper
  * keys don't silently write 0 records (the PR #338 payload-shape contract).
  * @param {object[]|{logs?:object[],agentLog?:object[],agent_log?:object[]}|object} payload
+ * @param {{toCsf?: boolean}} [opts] toCsf false = the trading store only, no CSF memory record
  * @returns {Promise<object[]>} entries that were written
  */
-async function recordNewSignals(payload) {
+async function recordNewSignals(payload, { toCsf = true } = {}) {
   const logs = _toArray(payload, ["logs", "agentLog", "agent_log"]);
   const written = [];
   for (const entry of logs) {
     const stored = await tradingStore.appendLogEntry(entry);
-    await recordSignal(entry).catch(() => {});
+    if (toCsf) await recordSignal(entry).catch(() => {});
     written.push(stored);
   }
   return written;
+}
+
+let _lastScanLogged = null;
+/**
+ * The scanner's per-scan feed rows (GET /api/trading/zones builds them from each
+ * cached scan): written ONCE per scan, and only to the trading store's agent-log.jsonl.
+ * Until 2026-10-25 every /zones poll re-appended the same scan's rows (the stable
+ * box's agent-log.jsonl held ~3 copies of each row, 430 MB), and every row also went
+ * into the CSF memory registry, which became 97.5 % per-scan signal traces (470 MB)
+ * that each chat turn's memory recall read whole. Rows without a scan timestamp are
+ * written every time (nothing to dedupe on).
+ * @param {string|number|null} scanTs the scan's timestamp
+ * @param {object[]} logEntries
+ * @returns {Promise<object[]>} rows written ([] when this scan was already logged)
+ */
+async function recordScanLog(scanTs, logEntries) {
+  if (scanTs != null && scanTs === _lastScanLogged) return [];
+  _lastScanLogged = scanTs != null ? scanTs : null;
+  return recordNewSignals({ logs: logEntries }, { toCsf: false });
 }
 
 /**
@@ -249,10 +269,11 @@ async function queryRecent({ limit = 50, kind } = {}) {
  * @returns {object[]}
  */
 function queryRecentTradingRecords(limit = 50, kind) {
-  // mtime-cached parse of the append-only CSF registry — previously this read +
-  // JSON.parsed the entire raw.jsonl (potentially 100k+ lines) just to return
-  // the last ~20 records, on every GET /api/trading/csf-records (#1889).
-  return readJsonlCached(_registryPath())
+  // Tail read of the append-only CSF registry (2026-10-25). The #1889 mtime cache
+  // still re-parsed the WHOLE raw.jsonl after every append (470 MB on the stable box)
+  // to return the last ~20 records; now only a window of the newest records is parsed.
+  const window = Math.max(2000, (Number(limit) || 0) * 50);
+  return readJsonlTail(_registryPath(), window)
     .filter((r) => {
       if (!r || !Array.isArray(r.tags) || !r.tags.includes("trading")) return false;
       if (kind === "order") return r.tags.includes("order");
@@ -298,6 +319,7 @@ module.exports = {
   recordSignal,
   recordNewOrders,
   recordNewSignals,
+  recordScanLog,
   queryRecent,
   queryRecentTradingRecords,
   ingestTradingData,

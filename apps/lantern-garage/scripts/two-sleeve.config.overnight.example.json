@@ -75,6 +75,7 @@
         "TRADER_DECARRY_SYMBOLS": "TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA,UPRO",
         "TRADER_TREND_SHADOW": "",
         "TRADER_NOISE_SHADOW": "",
+        "TRADER_RISE_SHADOW": "",
         "TRADER_ENTRY_REQUOTE": "refuse",
         "TRADER_ENTRY_REQUOTE_CAP_BPS": "5",
         "TRADER_NO_FRIDAY_ENTRIES": "0",
@@ -133,6 +134,7 @@
         "TRADER_EOD_DECARRY": "0",
         "TRADER_TREND_SHADOW": "",
         "TRADER_NOISE_SHADOW": "",
+        "TRADER_RISE_SHADOW": "",
         "TRADER_ENTRY_REQUOTE": "refuse",
         "TRADER_ENTRY_REQUOTE_CAP_BPS": "5",
         "TRADER_NO_FRIDAY_ENTRIES": "0"
@@ -202,6 +204,7 @@
         "TRADER_LOG_SKIPS": "0",
         "TRADER_TREND_SHADOW": "",
         "TRADER_NOISE_SHADOW": "",
+        "TRADER_RISE_SHADOW": "",
         "TRADER_ADAPTIVE_IBS_MODE": "",
         "TRADER_ADAPTIVE_IBS_PNL": "",
         "TRADER_ENTRY_REQUOTE": "shadow",
