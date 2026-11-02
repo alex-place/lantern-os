@@ -13,8 +13,9 @@
  * quote's own time and the measured lag, a quote from another day refused, the chart's previous close when the daily
  * read fails (labelled); one quote per scan with entries; the CSV once a day; a pass off the real clock writes nothing;
  * every failure is null with its reason; and in the brain: off without TRADER_ENTRY_TAGS, and on, the entry places
- * exactly as before while one entry_tags row lands under the user 'entry-tags'. The overnight book's hook is pinned in
- * overnight-book.test.js.
+ * exactly as before while one entry_tags row lands under the user 'entry-tags'; a box that merely holds the Alpaca keys
+ * never calls the news API, only the fetch role (TRADER_ENTRY_TAGS_NEWS_FETCH=1) does. The overnight book's hook is
+ * pinned in overnight-book.test.js.
  */
 const { test } = require('node:test');
 const assert = require('node:assert');
@@ -306,10 +307,11 @@ test('the brain: off without TRADER_ENTRY_TAGS; on, the entry places as before a
     getQuotes: async (tickers) => tickers.map((t) => ({ ticker: t, price: 500, chg_pct: 0 })),
     getBars: async () => ({ bars: [] }), getBarsMulti: async () => ({ bars: {} }), getSessionBars15m: async () => ({ bars: [] }),
     getBarsWindow: async () => ({ bars: [] }), getMarketStatus: async () => ({}), isUsEquityMarketOpen: () => true } };
-  const fetched = [];
+  const fetched = [], newsCalls = [];
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, opts) => {
     fetched.push(String(url));
+    if (String(url).startsWith(et.NEWS_URL)) { newsCalls.push({ url, key: opts && opts.headers && opts.headers['APCA-API-KEY-ID'] }); return resp(200, { news: [], next_page_token: null }); }
     if (url === et.GEX_URL) return resp(200, gexCsv('2026-09-21', 300, (i) => (300 - i) * 1e6));   // the prior session is the year s lowest
     if (url === et.VIX_URL) return resp(200, vixChart(16.2, NOW - 20000, 16.9));
     if (/chart\/%5EVIX\?interval=1d/.test(url)) {                                                  // the brain s _vixPriorClose
@@ -337,7 +339,8 @@ test('the brain: off without TRADER_ENTRY_TAGS; on, the entry places as before a
     assert.deepStrictEqual(fetched, [], 'off by default: no fetch');
 
     brain._resetCooldowns(); fs.unlinkSync(log);
-    Object.assign(process.env, { TRADER_ENTRY_TAGS: '1', TRADER_ENTRY_TAGS_DIR: tags });
+    // the box holds the Alpaca server keys (stable's env carries the engine's), but has no fetch role
+    Object.assign(process.env, { TRADER_ENTRY_TAGS: '1', TRADER_ENTRY_TAGS_DIR: tags, ALPACA_API_KEY: 'kid', ALPACA_SECRET_KEY: 'sec' });
     const on = bridge();
     await brain.runAutoTrade({ signals: [signal] }, { bridge: on, userId: 'local-owner', now: NOW });
     const onBuys = on.placed.filter((o) => o.side === 'buy' && o.ticker === 'QQQ');
@@ -355,8 +358,20 @@ test('the brain: off without TRADER_ENTRY_TAGS; on, the entry places as before a
     assert.strictEqual(fetched.filter((u) => u === et.GEX_URL).length, 1, 'the CSV once (the pass s kick and the tag share it)');
     assert.strictEqual(fetched.filter((u) => u === et.VIX_URL).length, 1);
     assert.ok(fs.existsSync(path.join(tags, 'gex.json')));
+    assert.deepStrictEqual(newsCalls, [], 'holding the keys is not the fetch role: no news call');
+    // the fetch role (the engine): the same keys and TRADER_ENTRY_TAGS_NEWS_FETCH=1 refresh the counts; at 15:50 C s count is due
+    process.env.TRADER_ENTRY_TAGS_NEWS_FETCH = '1';
+    const LATE = et.etMs(BDAY, 15 * 60 + 50) + 25000;
+    et._reset({ clock: () => LATE + 1000 });
+    brain.tagEntry({ symbol: 'QQQ', account: 'local-owner', qty: 1, price: 500, now: LATE, source: 'trader' });
+    for (let i = 0; i < 80 && rows().filter((r) => r.event === 'entry_tags').length < 2; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.strictEqual(newsCalls.length, 1, 'one refresh');
+    assert.strictEqual(newsCalls[0].key, 'kid', 'with the server keys');
+    assert.match(newsCalls[0].url, /end=2026-09-22T19:50:00Z/, 'C s count ends at 15:50');
+    const late = rows().filter((r) => r.event === 'entry_tags')[1];
+    assert.deepStrictEqual([late.news.session.n, late.news.session.to], [0, '2026-09-22T19:50:00.000Z'], 'the row reads the refreshed count');
   } finally {
     globalThis.fetch = realFetch;
-    delete process.env.TRADER_ENTRY_TAGS; delete process.env.TRADER_ENTRY_TAGS_DIR;
+    for (const k of ['TRADER_ENTRY_TAGS', 'TRADER_ENTRY_TAGS_DIR', 'TRADER_ENTRY_TAGS_NEWS_FETCH', 'ALPACA_API_KEY', 'ALPACA_SECRET_KEY']) delete process.env[k];
   }
 });

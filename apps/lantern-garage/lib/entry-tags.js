@@ -23,12 +23,13 @@
  *   news   OVERNIGHT = headlines per hour from 16:00 ET of the prior session to 09:30 ET; SESSION = headlines per hour
  *          from 09:30 ET to the entry (the history's sessions run 09:30-15:50, C's decision time); each ranked against
  *          the 120 sessions before the entry day (the share strictly lower) -> terciles. A session window under 30
- *          minutes gets no rank. The Alpaca News API needs keys: only a process holding the Alpaca server keys (the
- *          engine) refreshes the counts — the first pass at or after 09:30 (up to 10 missed past sessions are backfilled
+ *          minutes gets no rank. The Alpaca News API needs keys: only the process given the fetch role
+ *          (TRADER_ENTRY_TAGS_NEWS_FETCH=1 with the Alpaca server keys: the engine; holding keys alone is not enough)
+ *          refreshes the counts — the first pass at or after 09:30 (up to 10 missed past sessions are backfilled
  *          in the same call), hourly (the overnight window is counted again until a refresh 15 minutes past the open has
  *          counted it: a headline can reach the API a little after its created_at), the first pass at or after 15:50
  *          (C's count) and the first at or after 16:05 (the settled 09:30-15:50 count, which joins the history): about
- *          ten calls a session. A process without keys (stable) reads the same file.
+ *          ten calls a session. Every other process (stable) reads the same file and never calls.
  *          The history is seeded from the research's own archive by scripts/entry-tags-news-seed.js, counted by this
  *          module's sessionRow(), the function the live counts use.
  *   vix    prior = the prior session's close (the brain's own _vixPriorClose, Yahoo ^VIX daily; when that read fails, the
@@ -46,6 +47,8 @@
  *
  * Enable: TRADER_ENTRY_TAGS=1 (unset or 0 = off). TRADER_ENTRY_TAGS_DIR = the directory of gex.json and news.json,
  * shared by every process that tags (both boxes point at one directory); default <journal dir>/entry-tags.
+ * TRADER_ENTRY_TAGS_NEWS_FETCH=1 = this process refreshes news.json (the brain then passes the server keys as `headers`);
+ * set it on ONE process (the engine), whose key it spends.
  */
 const fs = require('fs');
 const path = require('path');
@@ -279,9 +282,9 @@ async function refreshNews(s, now, headers, fetchFn) {
   } catch (e) { s.failedAt = now; s.err = msg(e); }
 }
 function newsEnsure(c, now) {
-  if (!c.headers) return null;   // no keys: this process only reads the shared file
+  if (!c.headers) return null;   // not the fetch role: this process only reads the shared file
   const s = newsSlot(c.dir);
-  if (!s.st) loadNewsFile(s);
+  loadNewsFile(s);               // a cheap stat: another refresher's write (or a re-seed) is seen before deciding
   if (!s.p && newsDue(s, now)) s.p = refreshNews(s, now, c.headers, c.fetchFn || globalThis.fetch).finally(() => { s.p = null; });
   return s.p;
 }

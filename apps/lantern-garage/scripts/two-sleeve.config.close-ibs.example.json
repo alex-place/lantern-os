@@ -107,7 +107,8 @@
         "TRADER_NOISE_SHADOW": "",
         "TRADER_RISE_SHADOW": "",
         "TRADER_ENTRY_TAGS": "",
-        "TRADER_ENTRY_TAGS_DIR": ""
+        "TRADER_ENTRY_TAGS_DIR": "",
+        "TRADER_ENTRY_TAGS_NEWS_FETCH": ""
       },
       "universe": [
         "UPRO",
@@ -161,7 +162,8 @@
         "TRADER_NOISE_SHADOW": "",
         "TRADER_RISE_SHADOW": "",
         "TRADER_ENTRY_TAGS": "",
-        "TRADER_ENTRY_TAGS_DIR": ""
+        "TRADER_ENTRY_TAGS_DIR": "",
+        "TRADER_ENTRY_TAGS_NEWS_FETCH": ""
       },
       "universe": [
         "SPY",

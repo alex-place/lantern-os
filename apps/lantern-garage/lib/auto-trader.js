@@ -2220,14 +2220,18 @@ function _riseShadowTag(entry) {
 // session's dealer gamma (SqueezeMetrics GEX tercile), the news intensity (Benzinga overnight and session rates,
 // terciles) and the VIX change at the entry (QUIET / MILD / FEAR), measured as the 11-01 research measured them, so the
 // live record can score them (ledger live-both-gamma-news-vix-tags-2026-11). Enabled by TRADER_ENTRY_TAGS=1; both boxes
-// point TRADER_ENTRY_TAGS_DIR at one directory, and only a process holding the Alpaca server keys refreshes the news
-// counts. Same contract as the shadows: journal only, never awaited, rows under the user 'entry-tags'. The knobs and
-// the keys are read here, synchronously, while this sleeve's env is the process env (the engine swaps env per sleeve).
+// point TRADER_ENTRY_TAGS_DIR at one directory, and only the process with TRADER_ENTRY_TAGS_NEWS_FETCH=1 (the engine)
+// refreshes the news counts with the Alpaca server keys — a box that merely HOLDS keys never calls (stable's env carries
+// the engine's own keys). Same contract as the shadows: journal only, never awaited, rows under the user 'entry-tags'.
+// The knobs and the keys are read here, synchronously, while this sleeve's env is the process env (the engine swaps env
+// per sleeve).
+const _knobOn = (k) => ['1', 'true', 'on'].includes(String(process.env[k] || '').trim().toLowerCase());
 function _entryTagsCfg() {
-  if (!['1', 'true', 'on'].includes(String(process.env.TRADER_ENTRY_TAGS || '').trim().toLowerCase())) return null;
+  if (!_knobOn('TRADER_ENTRY_TAGS')) return null;
   const et = require('./entry-tags');
   const dir = String(process.env.TRADER_ENTRY_TAGS_DIR || '').trim();
-  return { dir: dir ? path.resolve(dir) : path.join(path.dirname(TRADES_LOG), 'entry-tags'), headers: et.serverNewsHeaders() };
+  return { dir: dir ? path.resolve(dir) : path.join(path.dirname(TRADES_LOG), 'entry-tags'),
+    headers: _knobOn('TRADER_ENTRY_TAGS_NEWS_FETCH') ? et.serverNewsHeaders() : null };
 }
 function _entryTagsKick(now) {
   try {
