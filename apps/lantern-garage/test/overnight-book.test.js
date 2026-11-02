@@ -120,6 +120,19 @@ test('one owner per name: a name the account already holds at 15:55 is the day-t
   assert.equal(rows.find((r) => r.symbol === 'SPY').why, 'held by the day-trader');
 });
 
+test('a placed buy calls the onBuy hook (the market-context tags, lib/entry-tags.js) after its order; a refused buy does not; a throwing hook changes nothing', async () => {
+  ob._reset();
+  const acct = account({ answer: (o) => (o.ticker === 'QQQ' ? { status: 'error', reason: 'refused in a test' } : null) });
+  const seen = [], rows = [];
+  const when = AT(D1, '15:56');
+  await withEnv(ARMED, () => ob.maybeRun({ facade: acct, userId: USER, at: when, getBars: market().getBars, journal: (r) => rows.push(r),
+    stateFile: stateFile(), env: process.env,
+    onBuy: (b) => { seen.push({ ...b, ordersBefore: acct.st.placed.length }); throw new Error('a hook that throws'); } }));
+  assert.deepStrictEqual(acct.st.placed.map((o) => o.ticker), ['SPY', 'QQQ'], 'both orders went in as without the hook');
+  assert.deepStrictEqual(seen, [{ symbol: 'SPY', account: USER, qty: 77, price: 690, now: when, order_id: 'O1', ordersBefore: 1 }]);
+  assert.deepStrictEqual(rows.filter((r) => r.event === 'overnight_book_buy').map((r) => [r.symbol, r.ok]), [['SPY', true], ['QQQ', false]]);
+});
+
 test('the gross cap: the book buys only into the room the cap leaves; the reserve fund is not exposure', async () => {
   ob._reset();
   // UCO $65k + XLE $435k = $500k of the trader's exposure (51.8 %) + BOXX $338k: under a 60 % cap, $79.6k of room.
