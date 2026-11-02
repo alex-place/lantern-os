@@ -105,7 +105,9 @@
         "TRADER_DECARRY_SYMBOLS": "TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA,UPRO",
         "TRADER_TREND_SHADOW": "",
         "TRADER_NOISE_SHADOW": "",
-        "TRADER_RISE_SHADOW": ""
+        "TRADER_RISE_SHADOW": "",
+        "TRADER_ENTRY_TAGS": "",
+        "TRADER_ENTRY_TAGS_DIR": ""
       },
       "universe": [
         "UPRO",
@@ -157,7 +159,9 @@
         "TRADER_EOD_DECARRY": "0",
         "TRADER_TREND_SHADOW": "",
         "TRADER_NOISE_SHADOW": "",
-        "TRADER_RISE_SHADOW": ""
+        "TRADER_RISE_SHADOW": "",
+        "TRADER_ENTRY_TAGS": "",
+        "TRADER_ENTRY_TAGS_DIR": ""
       },
       "universe": [
         "SPY",
