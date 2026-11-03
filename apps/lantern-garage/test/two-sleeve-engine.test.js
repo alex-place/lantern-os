@@ -205,3 +205,81 @@ test("a brain that throws does not stop the other sleeve, and the env is still r
   assert.equal(process.env.TRADER_IBS_MAX, "0.42");
   delete process.env.TRADER_IBS_MAX;
 });
+
+// ---- the account-wide cap on trades (2026-11-03) ----
+function capFacade(pos = {}, equity = 100000) {
+  const st = { pos: { ...pos }, placed: [], seq: 0, broken: false };
+  return {
+    st,
+    getIBKRAccount: async () => (st.broken ? null : { equity }),
+    getIBKRPositions: async () => (st.broken ? { unreadable: true, positions: [] } : Object.entries(st.pos).map(([symbol, market_value]) => ({ symbol, qty: 1, market_value }))),
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: "cancelled" }),
+    placeIBKROrder: async (u, o) => { st.placed.push(o); return { status: "placed", order_id: "o" + (++st.seq) }; },
+  };
+}
+const buy = (ticker, dollars) => ({ ticker, side: "buy", qty: dollars, type: "market", refPrice: 1 });
+const capEngine = (S, R, facade, extra = {}) => {
+  const rows = [];
+  const ownership = createOwnership({ file: tmpFile(), defaultOwner: "S", reserved: { BOXX: "RESERVE" } });
+  const eng = createEngine({ sleeves: [{ id: "S", brain: S, env: {}, userId: "u" }, { id: "R", brain: R, env: {}, userId: "u" }], order: ["S", "R"], facade, ownership, defaultOwner: "S", journal: (r) => rows.push(r), maxTradesPct: 60, capExemptOwner: "RESERVE", ...extra });
+  return { eng, rows, ownership };
+};
+
+test("the cap counts the whole book across sleeves: the buy past it is refused, the one inside it places", async () => {
+  const f = capFacade({ AAA: 40000 });
+  const S = stubBrain(() => [buy("BBB", 15000)]);   // 40k + 15k = 55k: inside 60 %
+  const R = stubBrain(() => [buy("CCC", 10000), buy("DDD", 5000)]);   // 55k + 10k is past it; 55k + 5k = exactly 60k is not
+  const { eng, rows } = capEngine(S, R, f);
+  const res = await eng.tick({ signals: [] }, { userId: "u" });
+  assert.deepEqual(f.st.placed.map((o) => o.ticker), ["BBB", "DDD"]);
+  assert.equal(res.R.placed[0].status, "error"); assert.match(res.R.placed[0].reason, /account cap: .*past 60 % of equity/);
+  const row = rows.find((r) => r.event === "trades_cap_refused");
+  assert.equal(row.symbol, "CCC"); assert.equal(row.owner, "R"); assert.equal(row.capPct, 60);
+});
+
+test("the reserve fund does not count as a trade", async () => {
+  const f = capFacade({ BOXX: 30000, AAA: 40000 });
+  const { eng } = capEngine(stubBrain(() => [buy("BBB", 15000)]), stubBrain(() => []), f);
+  await eng.tick({ signals: [] }, { userId: "u" });
+  assert.deepEqual(f.st.placed.map((o) => o.ticker), ["BBB"], "70k with the fund, 40k in trades: room for 20k");
+});
+
+test("sells and stops are never refused, even past the cap", async () => {
+  const f = capFacade({ AAA: 90000 });
+  const S = stubBrain(() => [{ ticker: "AAA", side: "sell", qty: 1, type: "market" }, { ticker: "AAA", side: "sell", qty: 1, type: "stop", stopPrice: 1 }, buy("BBB", 1)]);
+  const { eng } = capEngine(S, stubBrain(() => []), f);
+  const res = await eng.tick({ signals: [] }, { userId: "u" });
+  assert.equal(f.st.placed.filter((o) => o.side === "sell").length, 2);
+  assert.equal(res.S.placed[2].status, "error", "and the buy is refused");
+});
+
+test("with no readable snapshot a buy is refused and a sell still goes: the cap fails closed", async () => {
+  const f = capFacade({ AAA: 1000 }); f.st.broken = true;
+  const S = stubBrain(() => [buy("BBB", 1), { ticker: "AAA", side: "sell", qty: 1, type: "market" }]);
+  const { eng } = capEngine(S, stubBrain(() => []), f);
+  const res = await eng.tick({ signals: [] }, { userId: "u" });
+  assert.match(res.S.placed[0].reason, /account cap: the broker snapshot is unreadable/);
+  assert.deepEqual(f.st.placed.map((o) => o.ticker), ["AAA"]);
+});
+
+test("a buy with no price is refused under the cap; each tick starts from a fresh read", async () => {
+  const f = capFacade({});
+  let n = 0;
+  const S = stubBrain(() => (n++ === 0 ? [{ ticker: "BBB", side: "buy", qty: 5, type: "market" }, buy("CCC", 60000)] : [buy("DDD", 60000)]));
+  const { eng } = capEngine(S, stubBrain(() => []), f);
+  const res = await eng.tick({ signals: [] }, { userId: "u" });
+  assert.match(res.S.placed[0].reason, /no price/);
+  assert.deepEqual(f.st.placed.map((o) => o.ticker), ["CCC"]);
+  await eng.tick({ signals: [] }, { userId: "u" });   // the stub's book still reads empty: yesterday's count is gone
+  assert.deepEqual(f.st.placed.map((o) => o.ticker), ["CCC", "DDD"]);
+});
+
+test("no maxTradesPct: no cap, whatever the book holds; a bad value is refused at construction", async () => {
+  const f = capFacade({ AAA: 500000 });
+  const { eng, rows } = capEngine(stubBrain(() => [{ ticker: "BBB", side: "buy", qty: 5, type: "market" }]), stubBrain(() => []), f, { maxTradesPct: undefined });
+  await eng.tick({ signals: [] }, { userId: "u" });
+  assert.deepEqual(f.st.placed.map((o) => o.ticker), ["BBB"]); assert.equal(rows.filter((r) => r.event === "trades_cap_refused").length, 0);
+  for (const bad of [130, -1, "lots"]) assert.throws(() => capEngine(stubBrain(() => []), stubBrain(() => []), capFacade(), { maxTradesPct: bad }), /maxTradesPct/);
+});

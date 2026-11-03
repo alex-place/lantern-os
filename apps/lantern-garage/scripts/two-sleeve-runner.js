@@ -67,6 +67,8 @@
  * A top-level "reserve" block (2026-10-27, lib/two-sleeve/reserve.js) parks a share of equity in one cash-like fund owned by
  * the pseudo-owner RESERVE, which no sleeve sees or sells: { "symbol": "BOXX", "pct": 30, "bandPct": 10, "minCashPct": 5,
  * "window": "12:00-12:30" }. It decides once a session inside the window, after the engine tick. Without the block nothing changes.
+ * A top-level "maxTradesPct" (2026-11-03, lib/two-sleeve/engine.js) caps the whole book's trades as a share of equity: a buy past
+ * it is refused (trades_cap_refused in engine.jsonl), the reserve fund does not count, sells and stops are never refused. Absent = no cap.
  */
 const fs = require('fs');
 const path = require('path');
@@ -193,8 +195,8 @@ async function ensureEngine() {
   resolved = await brokerFacadeFor(USER, ibkrBridge).catch(() => null);
   if (!resolved || !resolved.accountId) { stats.lastError = 'no broker resolved'; return false; }
   facade = DRY ? dryFacade(resolved.facade, journal) : resolved.facade;
-  engine = createEngine({ sleeves, order: cfg.order || sleeves.map((s) => s.id), facade, ownership, defaultOwner: DEFAULT_OWNER, journal });
-  journal({ event: 'engine_start', broker: resolved.broker, accountId: resolved.accountId, order: engine.order, dry: DRY, scan: SCAN_MODE, mode: MODE, fakeNow: stats.fakeNow,
+  engine = createEngine({ sleeves, order: cfg.order || sleeves.map((s) => s.id), facade, ownership, defaultOwner: DEFAULT_OWNER, journal, maxTradesPct: cfg.maxTradesPct, capExemptOwner: RESERVE_OWNER });
+  journal({ event: 'engine_start', broker: resolved.broker, accountId: resolved.accountId, order: engine.order, dry: DRY, scan: SCAN_MODE, mode: MODE, fakeNow: stats.fakeNow, maxTradesPct: cfg.maxTradesPct ?? null,
     sleeves: sleeves.map((s) => ({ id: s.id, app: s.app, envFile: s.envFile, universe: s.universe ? s.universe.length : 'all', scan: s.scan || undefined, env: s.env })) });
   console.info(`[two-sleeve] ${resolved.broker} ${resolved.accountId} — sleeves ${engine.order.join(' then ')}${DRY ? ' (DRY: no orders)' : ''} — scans ${SCAN_MODE}`);
   if (RESERVE_CFG) {
