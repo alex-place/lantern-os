@@ -187,9 +187,19 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       var gate = null;
       try {
         var evmod = require('../../lib/signal-engine/convergence-ev');
-        gate = { ev_min: evmod.EV_MIN, p_min: evmod.P_MIN };
+        // The WEIGHTS go out with the gate (2026-11-03). The landing page states that
+        // the model's weights are published; serving them from the module that owns the
+        // decision is what makes that true, and keeps the page from carrying a
+        // transcribed copy that silently drifts the next time someone retunes a signal.
+        gate = { ev_min: evmod.EV_MIN, p_min: evmod.P_MIN, weights: evmod.WEIGHTS };
       } catch (e) { /* engine module unavailable — omit rather than guess */ }
-      sendJson(res, gate ? { zones: reshaped, gate: gate } : { zones: reshaped }, 200);
+      // as_of is the scan this response was BUILT from, not the moment of the request:
+      // a cached scan can be minutes old, and a reader looking at a book of verdicts
+      // cannot otherwise tell this morning's pass from last Tuesday's.
+      sendJson(res, Object.assign(
+        { zones: reshaped, as_of: new Date(cacheEntry.time).toISOString(), stale: !scanFresh },
+        gate ? { gate: gate } : {}
+      ), 200);
     } catch (error) {
       console.error('[Trading] /zones error:', error.message);
       sendJson(res, { zones: {}, error: error.message }, 500);

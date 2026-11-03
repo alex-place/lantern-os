@@ -100,9 +100,9 @@
             <circle cx="24" cy="24" r="15"/><path d="M24 14v10l7 4"/>
           </svg>
           <h3>A fixed calculation</h3>
-          <p>The evidence goes through a linear model with published weights. Same
-             arithmetic for every symbol, every pass — no discretion, nothing learned
-             between runs.</p>
+          <p>The evidence goes through a linear model whose weights are printed below,
+             straight from the scoring module. Same arithmetic for every symbol, every
+             pass — no discretion, nothing learned between runs.</p>
         </div>
         <svg class="arrow" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M0 6h20m0 0-5-5m5 5-5 5"/></svg>
         <div class="step">
@@ -115,6 +115,18 @@
              rule that fired.</p>
         </div>
       </div>
+      <div class="weights" id="weights" hidden>
+        <div class="weights-head">
+          <h3>The weights, exactly as the engine holds them</h3>
+          <p>Read live from the scoring module on every page load — not transcribed, so it
+             cannot drift from the code. Each signal is normalised to 0–1 where 0.5 is
+             neutral; the weight is how far a fully-confirming signal moves the win
+             probability.</p>
+        </div>
+        <ul class="wlist" id="wlist"></ul>
+        <p class="wfoot" id="wfoot"></p>
+      </div>
+
       <p class="note">
         Two things worth being plain about. The scoring is deterministic technical analysis
         with a hand-weighted linear model — arithmetic, not a language model, and not
@@ -220,6 +232,8 @@
       <div class="close">
         <h2 id="close-h">We would rather you checked than trusted us.</h2>
 
+      <div class="close-grid">
+        <div class="close-main">
         <p>
           We are the Unisona team. The engine that wrote every verdict above is in a public
           repository you can read line by line —
@@ -235,19 +249,36 @@
           the trader. That is the whole loop, and for most people it never becomes more than that.
         </p>
 
-        <p class="close-price">
-          <b>What it costs.</b> Reading everything above is free and needs no account. Connect
-          your own broker and you can trade your own account from the trader on the free tier
-          too — the keys stay yours and we never hold your funds. <b>Pro, $20/month</b>, adds the
-          terminal tools. <b>Pilot, $200/month</b>, is the only tier where the engine can place a
-          trade without you — and even there it stays switched off until it is deliberately
-          turned on. <a href="/pricing.html">See the plans →</a>
-        </p>
-
         <div class="cta-row close-cta">
           <a class="cta" href="/auth.html?returnTo=%2Fstock-trader.html">Create a free account</a>
           <a class="cta-link" href="/stock-trader.html">Or open the trader — free, read-only →</a>
         </div>
+      </div>
+
+      <aside class="close-side">
+        <div class="card price-card">
+          <h3>What it costs</h3>
+          <ul class="plans">
+            <li>
+              <b>Free <span class="chip">no account</span></b>
+              <span>Every verdict and every refusal on this page, and the trader behind it.
+                Connect your own broker and you can trade your own account from here — the
+                keys stay yours and we never hold your funds.</span>
+            </li>
+            <li>
+              <b>Pro · $20<i>/month</i></b>
+              <span>Adds the terminal tools on top of everything in Free.</span>
+            </li>
+            <li>
+              <b>Pilot · $200<i>/month</i></b>
+              <span>The only tier where the engine can place a trade without you — and even
+                there it stays switched off until it is deliberately turned on.</span>
+            </li>
+          </ul>
+          <a class="inlink" href="/pricing.html">See the plans →</a>
+        </div>
+      </aside>
+      </div>
       </div>
     </section>
 
@@ -378,7 +409,59 @@
   }
 
   var GATE = null;
+  var SCAN_AT = null;      // ISO time of the scan the book was built from
+  var SCAN_STALE = false;  // that scan is past its TTL; a refresh is already running
   var BARS = {};   // ticker -> promise, so a symbol is fetched once per page load
+
+  /* The weights the engine scores with, drawn from the gate the API publishes. The page
+     states that the model's weights are published; this is that publication, and it is
+     rendered from the response rather than written into the markup so it cannot say one
+     thing while convergence-ev.js says another. */
+  var WLABEL = {
+    structure: 'One-minute structure shift',
+    zone: 'At a real support / resistance zone',
+    pattern: 'Candle pattern grade',
+    earnings: 'Last EPS surprise agrees',
+    momentum: 'MACD + price vs moving average',
+    trend: 'Higher-timeframe trend agrees',
+    news: 'Ticker news sentiment agrees',
+    sector: 'Sector ETF trend agrees',
+    grok: 'Grok analyst conviction',
+    claude: 'Claude analyst conviction',
+    volume: 'Volume spike confirms',
+    backtest: 'Backtest win rate'
+  };
+
+  function renderWeights() {
+    var wrap = byId('weights'), list = byId('wlist');
+    var W = GATE && GATE.weights;
+    if (!wrap || !list || !W) return;   // nothing published → leave the block hidden
+    var rows = Object.keys(W)
+      .map(function (k) { return [k, Number(W[k]) || 0]; })
+      .filter(function (r) { return r[1] > 0; })          // 0 means the signal is folded in elsewhere
+      .sort(function (a, b) { return b[1] - a[1]; });
+    if (!rows.length) return;
+    var max = rows[0][1];
+    list.innerHTML = '';
+    rows.forEach(function (r) {
+      var li = el('li');
+      li.appendChild(el('span', 'wk', WLABEL[r[0]] || r[0]));
+      var track = el('span', 'wbar');
+      var fill = el('i');
+      fill.style.width = Math.round((r[1] / max) * 100) + '%';
+      track.appendChild(fill);
+      li.appendChild(track);
+      li.appendChild(el('span', 'wv', '+' + r[1].toFixed(2)));
+      list.appendChild(li);
+    });
+    var foot = byId('wfoot');
+    if (foot && GATE.ev_min != null && GATE.p_min != null) {
+      foot.textContent = 'Start from the backtested win rate, add those, and enter only if the '
+        + 'expected value clears ' + GATE.ev_min.toFixed(2) + ' R and the win probability clears '
+        + Math.round(GATE.p_min * 100) + '%. Anything below either bar is turned down.';
+    }
+    wrap.hidden = false;
+  }
 
   function bars(ticker, tf, limit) {
     var key = ticker + ':' + tf + ':' + limit;
@@ -554,9 +637,20 @@
     }
     picks.forEach(function (p) { box.appendChild(verdictPanel(p[0], p[1])); });
 
+    /* A book of verdicts with no time on it could be this morning or last Tuesday.
+       The scan is cached, so the honest stamp is the scan's own time, not now. */
+    var when = '';
+    if (SCAN_AT) {
+      var t = new Date(SCAN_AT);
+      if (!isNaN(t)) {
+        when = ' \u00b7 scored ' + t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+             + (SCAN_STALE ? ', refreshing' : '');
+      }
+    }
     byId('book-sub').textContent =
       'showing ' + picks.length + ' of ' + (entered.length + skipped.length) + ' scored \u00b7 ' +
-      entered.length + ' accepted \u00b7 ' + skipped.length + ' turned down \u00b7 ' + unscored + ' not scored';
+      entered.length + ' accepted \u00b7 ' + skipped.length + ' turned down \u00b7 ' + unscored +
+      ' not scored' + when;
   }
 
   function renderPulse(m) {
@@ -626,7 +720,7 @@
   }
 
   /* ── News ───────────────────────────────────────────────────────────────────── */
-  function renderNews(records) {
+  function renderNews(records, scanned) {
     var box = byId('news');
     box.innerHTML = '';
     if (!records.length) { box.appendChild(el('div', 'state', 'No market news has been collected yet.')); return; }
@@ -649,12 +743,20 @@
       a.appendChild(m);
       box.appendChild(a);
     });
-    byId('news-sub').textContent = records.length + ' recent stories';
+    byId('news-sub').textContent = scanned
+      ? records.length + ' of the last ' + scanned + ' stories touch the watchlist'
+      : records.length + ' recent stories';
   }
 
   /* ── Load ───────────────────────────────────────────────────────────────────── */
   get('/api/trading/zones')
-    .then(function (d) { GATE = (d && d.gate) || null; renderBook((d && d.zones) || {}); })
+    .then(function (d) {
+      GATE = (d && d.gate) || null;
+      SCAN_AT = (d && d.as_of) || null;
+      SCAN_STALE = !!(d && d.stale);
+      renderBook((d && d.zones) || {});
+      renderWeights();
+    })
     .catch(function (e) {
       fail(byId('book'), 'the engine', e);
       if (byId('hero-proof')) fail(byId('hero-proof'), 'the engine', e);
@@ -718,9 +820,38 @@
       .catch(function () { _econ = {}; if (_msum.id === 'economy') drawSummary(); });
   }
 
-  get('/api/trading/news/recent?limit=12')
-    .then(function (d) { renderNews((d && d.records) || []); })
-    .catch(function (e) { fail(byId('news'), 'market news', e); byId('news-sub').textContent = ''; });
+  /* The wire is the whole market; the page is sixteen funds. Unfiltered, this was the
+     TALLEST block on the page and almost none of it was about anything scored above it
+     \u2014 measured 2026-11-03, 15 of 200 recent stories tagged a watchlist symbol. So pull
+     a wide window and keep only the stories that name something the engine scores. If
+     none do, the section removes itself rather than padding the page with noise. */
+  Promise.all([
+    get('/api/trading/news/recent?limit=200').then(function (d) { return (d && d.records) || []; }),
+    get('/api/trading/watchlist-prices')
+      .then(function (d) { return Array.isArray(d) ? d : ((d && d.prices) || []); })
+      .catch(function () { return []; })
+  ]).then(function (r) {
+    var all = r[0], wl = {};
+    r[1].forEach(function (x) { if (x && x.ticker) wl[String(x.ticker).toUpperCase()] = 1; });
+    /* Age cap: widening the window to 200 reaches back weeks, and a three-week-old
+       headline under "Market news" is wrong even when it does name a watchlist fund.
+       A story with no date is kept \u2014 dropping it would hide a real story over a
+       missing field. */
+    var CUTOFF = Date.now() - 7 * 864e5;
+    var fresh = all.filter(function (n) {
+      if (!n.published) return true;
+      var t = new Date(n.published).getTime();
+      return isNaN(t) || t >= CUTOFF;
+    });
+    var hits = Object.keys(wl).length
+      ? fresh.filter(function (n) {
+          return (n.symbols || []).some(function (s) { return wl[String(s).toUpperCase()]; });
+        })
+      : fresh;   // watchlist unavailable \u2014 show the feed rather than an empty section
+    var sec = document.querySelector('section[aria-labelledby=\"news-h\"]');
+    if (!hits.length) { if (sec) sec.hidden = true; return; }
+    renderNews(hits.slice(0, 6), fresh.length);
+  }).catch(function (e) { fail(byId('news'), 'market news', e); byId('news-sub').textContent = ''; });
 })();
 </script>
 </body>

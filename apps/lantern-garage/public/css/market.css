@@ -412,13 +412,14 @@
     /* The honesty note, which sits at the end of "How the decision is made". */
     .note { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 18px 0 0; max-width: 72ch; }
 
-    /* The close — the one place the page speaks in first person. */
-    .close { max-width: 72ch; }
-    .close h2 { font-size: 24px; line-height: 1.3; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 18px; }
+    /* The close — the one place the page speaks in first person. The 72ch measure
+       moved to .close-main when the price card took the right column; keeping it here
+       would have capped the grid itself and left the card nowhere to go. */
+    .close { max-width: none; }
+    .close h2 { font-size: 24px; line-height: 1.3; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 18px;
+                max-width: 26ch; }
     @media (min-width: 561px) { .close h2 { font-size: 30px; } }
     .close p { font-size: 15.5px; line-height: 1.65; color: var(--text); margin: 0 0 16px; }
-    .close .close-price { color: var(--muted); }
-    .close .close-price b { color: var(--text); font-weight: 700; }
     .close a { color: var(--accent-strong); text-decoration: none; font-weight: 600; }
     .close a:hover { color: var(--accent-strong-hover); }
     .close-cta { margin-top: 26px; }
@@ -429,3 +430,43 @@
     [data-theme="dark"] .close-cta .cta { color: var(--bg); }
     .close-cta .cta-link { color: var(--muted); }
     .close-cta .cta-link:hover { color: var(--text); }
+
+    /* ── The published weights (2026-11-03) ───────────────────────────────────
+       The page claims the model's weights are published; this is where they land.
+       Rendered from the API, so the bar lengths are the real numbers and not a
+       drawing of them. A relative bar (longest = 100%) reads faster than twelve
+       two-decimal figures, and the figure stays beside it for anyone checking. */
+    .weights { margin: 22px 0 0; border: 1px solid var(--border); border-radius: 16px; padding: 18px 18px 14px; }
+    .weights-head h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+    .weights-head p { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 0 0 14px; max-width: 72ch; }
+    .wlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+    @media (min-width: 860px) { .wlist { grid-template-columns: 1fr 1fr; column-gap: 32px; } }
+    .wlist li { display: grid; grid-template-columns: minmax(0, 1fr) 84px 42px; align-items: center; gap: 10px; }
+    .wk { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wbar { height: 6px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
+    .wbar i { display: block; height: 100%; border-radius: 999px; background: var(--accent-strong); }
+    .wv { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+    .wfoot { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 14px 0 0; max-width: 78ch; }
+
+    /* ── The close, two columns ───────────────────────────────────────────────
+       The prose measure is 72ch, which left the right half of a 1440px canvas
+       empty under the signature. The price card fills it with the one thing a
+       reader at the bottom of the page is actually about to ask. */
+    .close-grid { display: grid; gap: 28px; align-items: start; }
+    /* Cap the GRID, not just the prose. Capping only .close-main left the measure
+       short inside a full-width column and opened a gap between the text and the
+       card; bounding the pair keeps them next to each other. */
+    @media (min-width: 900px) { .close-grid { grid-template-columns: minmax(0, 1fr) 340px; gap: 56px;
+                                              max-width: 1060px; } }
+    .close-main { min-width: 0; }
+    .close-side { min-width: 0; }
+    .price-card { padding: 20px; }
+    .price-card h3 { font-size: 15px; font-weight: 700; margin: 0 0 14px; }
+    .plans { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+    .plans li { display: grid; gap: 3px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .plans li:last-child { padding-bottom: 0; border-bottom: 0; }
+    .plans b { font-size: 14px; font-weight: 700; color: var(--text); }
+    .plans b i { font-style: normal; font-weight: 500; color: var(--muted); }
+    .plans span { font-size: 13px; line-height: 1.55; color: var(--muted); }
+    .plans .chip { margin-left: 6px; vertical-align: middle; }
+    .price-card .inlink { margin-top: 16px; display: inline-block; }
