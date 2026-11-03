@@ -17,8 +17,14 @@ const check = (name, fn) => {
   catch (e) { failures++; process.stderr.write('  FAIL- ' + name + '\n      ' + e.message + '\n'); }
 };
 
+// The demo's texture is seeded by the day, and a few 28-day windows draw no take_profit_R exit (those ending 2026-11-03..05
+// failed the slice check below for every PR): a test of the slices must not depend on the calendar. Pinned to a window with
+// every family.
+const realNow = Date.now;
+Date.now = () => Date.parse('2026-10-15T12:00:00Z');
 const a = journalRows();
 const b = journalRows();
+Date.now = realNow;
 
 check('deterministic within a day', () => {
   assert.deepStrictEqual(a, b);
