@@ -439,13 +439,17 @@
     .weights { margin: 22px 0 0; border: 1px solid var(--border); border-radius: 16px; padding: 18px 18px 14px; }
     .weights-head h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
     .weights-head p { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 0 0 14px; max-width: 72ch; }
-    .wlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-    @media (min-width: 860px) { .wlist { grid-template-columns: 1fr 1fr; column-gap: 32px; } }
-    .wlist li { display: grid; grid-template-columns: minmax(0, 1fr) 84px 42px; align-items: center; gap: 10px; }
-    .wk { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .wbar { height: 6px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
-    .wbar i { display: block; height: 100%; border-radius: 999px; background: var(--accent-strong); }
-    .wv { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+    /* Names in weight order, no coefficients -- the rank is the published part
+       (operator decision, 2026-11-03). Without bars and figures each row is one
+       line, so they tile two- and three-up and the list stops being the tallest
+       thing on a phone. The rank number is a CSS counter, so the ordering stays
+       visible without the markup carrying a value. */
+    .wlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: w; }
+    @media (min-width: 560px) { .wlist { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+    @media (min-width: 980px) { .wlist { grid-template-columns: repeat(3, 1fr); } }
+    .wk { font-size: 13px; color: var(--text); display: flex; gap: 9px; align-items: baseline; min-width: 0; }
+    .wk::before { counter-increment: w; content: counter(w); color: var(--muted);
+                  font-variant-numeric: tabular-nums; font-size: 12px; min-width: 13px; }
     .wfoot { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 14px 0 0; max-width: 78ch; }
 
     /* ── The close, two columns ───────────────────────────────────────────────

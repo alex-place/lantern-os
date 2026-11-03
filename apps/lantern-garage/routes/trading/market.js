@@ -187,11 +187,24 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       var gate = null;
       try {
         var evmod = require('../../lib/signal-engine/convergence-ev');
-        // The WEIGHTS go out with the gate (2026-11-03). The landing page states that
-        // the model's weights are published; serving them from the module that owns the
-        // decision is what makes that true, and keeps the page from carrying a
-        // transcribed copy that silently drifts the next time someone retunes a signal.
-        gate = { ev_min: evmod.EV_MIN, p_min: evmod.P_MIN, weights: evmod.WEIGHTS };
+        // The signal ORDER goes out with the gate (2026-11-03) -- the names ranked by
+        // weight, NOT the coefficients. The landing page names what the model looks at
+        // and in what order it matters; deriving that order here, from the module that
+        // owns the decision, keeps the page from carrying a transcribed list that
+        // silently drifts the next time someone retunes a signal.
+        //
+        // The coefficients themselves stay out of this response on purpose (operator
+        // decision, 2026-11-03): /zones is a public read, so anything in it is a
+        // published number. They remain readable in the source for anyone auditing the
+        // arithmetic -- this endpoint just does not broadcast them.
+        var W = evmod.WEIGHTS || {};
+        gate = {
+          ev_min: evmod.EV_MIN,
+          p_min: evmod.P_MIN,
+          signals: Object.keys(W)
+            .filter(function (k) { return Number(W[k]) > 0; })  // 0 = folded into base_rate
+            .sort(function (a, b) { return Number(W[b]) - Number(W[a]); }),
+        };
       } catch (e) { /* engine module unavailable — omit rather than guess */ }
       // as_of is the scan this response was BUILT from, not the moment of the request:
       // a cached scan can be minutes old, and a reader looking at a book of verdicts

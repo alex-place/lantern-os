@@ -100,9 +100,9 @@
             <circle cx="24" cy="24" r="15"/><path d="M24 14v10l7 4"/>
           </svg>
           <h3>A fixed calculation</h3>
-          <p>The evidence goes through a linear model whose weights are printed below,
-             straight from the scoring module. Same arithmetic for every symbol, every
-             pass — no discretion, nothing learned between runs.</p>
+          <p>The evidence goes through a linear model over the signals listed below.
+             Same arithmetic for every symbol, every pass — no discretion, nothing
+             learned between runs.</p>
         </div>
         <svg class="arrow" viewBox="0 0 24 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M0 6h20m0 0-5-5m5 5-5 5"/></svg>
         <div class="step">
@@ -117,13 +117,12 @@
       </div>
       <div class="weights" id="weights" hidden>
         <div class="weights-head">
-          <h3>The weights, exactly as the engine holds them</h3>
-          <p>Read live from the scoring module on every page load — not transcribed, so it
-             cannot drift from the code. Each signal is normalised to 0–1 where 0.5 is
-             neutral; the weight is how far a fully-confirming signal moves the win
-             probability.</p>
+          <h3>What the engine looks at, in order of weight</h3>
+          <p>Ranked live from the scoring module on every page load, so the order cannot
+             drift from the code. Each one is scored 0–1 where 0.5 is neutral; the ones
+             nearer the top move the win probability further when they agree.</p>
         </div>
-        <ul class="wlist" id="wlist"></ul>
+        <ol class="wlist" id="wlist"></ol>
         <p class="wfoot" id="wfoot"></p>
       </div>
 
@@ -432,33 +431,21 @@
     backtest: 'Backtest win rate'
   };
 
+  // The server sends the signal names already sorted by weight, so the page renders
+  // the ranking without ever holding a coefficient. The rank comes from the live
+  // module; the numbers are deliberately not part of the public surface.
   function renderWeights() {
     var wrap = byId('weights'), list = byId('wlist');
-    var W = GATE && GATE.weights;
-    if (!wrap || !list || !W) return;   // nothing published → leave the block hidden
-    var rows = Object.keys(W)
-      .map(function (k) { return [k, Number(W[k]) || 0]; })
-      .filter(function (r) { return r[1] > 0; })          // 0 means the signal is folded in elsewhere
-      .sort(function (a, b) { return b[1] - a[1]; });
-    if (!rows.length) return;
-    var max = rows[0][1];
+    var order = (GATE && GATE.signals) || null;
+    if (!wrap || !list || !order || !order.length) return;   // nothing to rank → stay hidden
     list.innerHTML = '';
-    rows.forEach(function (r) {
-      var li = el('li');
-      li.appendChild(el('span', 'wk', WLABEL[r[0]] || r[0]));
-      var track = el('span', 'wbar');
-      var fill = el('i');
-      fill.style.width = Math.round((r[1] / max) * 100) + '%';
-      track.appendChild(fill);
-      li.appendChild(track);
-      li.appendChild(el('span', 'wv', '+' + r[1].toFixed(2)));
-      list.appendChild(li);
-    });
+    order.forEach(function (k) { list.appendChild(el('li', 'wk', WLABEL[k] || k)); });
     var foot = byId('wfoot');
     if (foot && GATE.ev_min != null && GATE.p_min != null) {
-      foot.textContent = 'Start from the backtested win rate, add those, and enter only if the '
-        + 'expected value clears ' + GATE.ev_min.toFixed(2) + ' R and the win probability clears '
-        + Math.round(GATE.p_min * 100) + '%. Anything below either bar is turned down.';
+      foot.textContent = 'Start from the backtested win rate, move it by whichever of those '
+        + 'agree, and enter only if the expected value clears ' + GATE.ev_min.toFixed(2)
+        + ' R and the win probability clears ' + Math.round(GATE.p_min * 100)
+        + '%. Anything below either bar is turned down.';
     }
     wrap.hidden = false;
   }
