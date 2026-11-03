@@ -289,7 +289,9 @@ async function _autoscanTick() {
           try {
             await require('../lib/overnight-book').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
               getBars: (sym, tf) => require('../lib/market-data-yahoo').getBars(sym, tf),
-              quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; } });
+              quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; },
+              // the market-context tags (lib/entry-tags.js): journal only, never awaited
+              onBuy: (b) => require('../lib/auto-trader').tagEntry({ ...b, source: 'overnight_book' }) });
           } catch (e) { _logRow({ event: 'overnight_book_error', error: String((e && e.message) || e) }); }
         }
         // THE MISSED NIGHT (2026-10-30): after the close, one row when the book's entry window passed without deciding a

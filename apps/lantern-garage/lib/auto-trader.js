@@ -2216,6 +2216,40 @@ function _riseShadowTag(entry) {
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (_e) { /* journal only: a shadow never touches an entry */ }
 }
+// MARKET-CONTEXT TAGS (2026-11-02). lib/entry-tags.js writes one entry_tags row for every live entry: the prior
+// session's dealer gamma (SqueezeMetrics GEX tercile), the news intensity (Benzinga overnight and session rates,
+// terciles) and the VIX change at the entry (QUIET / MILD / FEAR), measured as the 11-01 research measured them, so the
+// live record can score them (ledger live-both-gamma-news-vix-tags-2026-11). Enabled by TRADER_ENTRY_TAGS=1; both boxes
+// point TRADER_ENTRY_TAGS_DIR at one directory, and only the process with TRADER_ENTRY_TAGS_NEWS_FETCH=1 (the engine)
+// refreshes the news counts with the Alpaca server keys — a box that merely HOLDS keys never calls (stable's env carries
+// the engine's own keys). Same contract as the shadows: journal only, never awaited, rows under the user 'entry-tags'.
+// The knobs and the keys are read here, synchronously, while this sleeve's env is the process env (the engine swaps env
+// per sleeve).
+const _knobOn = (k) => ['1', 'true', 'on'].includes(String(process.env[k] || '').trim().toLowerCase());
+function _entryTagsCfg() {
+  if (!_knobOn('TRADER_ENTRY_TAGS')) return null;
+  const et = require('./entry-tags');
+  const dir = String(process.env.TRADER_ENTRY_TAGS_DIR || '').trim();
+  return { dir: dir ? path.resolve(dir) : path.join(path.dirname(TRADES_LOG), 'entry-tags'),
+    headers: _knobOn('TRADER_ENTRY_TAGS_NEWS_FETCH') ? et.serverNewsHeaders() : null };
+}
+function _entryTagsKick(now) {
+  try {
+    const c = _entryTagsCfg();
+    if (!c) return;
+    const p = require('./entry-tags').kick(now, c);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a tag never breaks a pass */ }
+}
+/** One entry_tags row for a placed entry ({ symbol, account, qty, price, now, order_id, source }); never awaited. */
+function tagEntry(entry) {
+  try {
+    const c = _entryTagsCfg();
+    if (!c) return;
+    const p = require('./entry-tags').tag(entry, { ...c, log: (rec) => logTrade({ user: 'entry-tags', ...rec }), vixPrior: (n) => _vixPriorClose(n) });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a tag never touches an entry */ }
+}
 
 async function runAutoTrade(scan, opts = {}) {
   return _onePassPerAccount(opts,
@@ -2244,6 +2278,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   _trendShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js)
   _noiseShadowKick(now);   // journal only, never awaited (lib/trend-shadow.js createNoiseShadow)
   _riseShadowKick(now, scan);   // journal only, never awaited (lib/rise-shadow.js)
+  _entryTagsKick(now);   // journal only, never awaited (lib/entry-tags.js)
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
   if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
@@ -3806,6 +3841,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         }
       } catch (_e) { /* the judge must never touch an entry */ }
       _riseShadowTag({ symbol: sym, account: userId, qty, price, now });   // journal only, never awaited (lib/rise-shadow.js)
+      tagEntry({ symbol: sym, account: userId, qty, price, now, order_id: r.order_id ?? r.orderId, source: 'trader' });   // journal only, never awaited (lib/entry-tags.js)
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
@@ -4040,4 +4076,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _ordersSeenWorking.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
-module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE, logTrade };
+module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE, logTrade, tagEntry };

@@ -147,7 +147,7 @@ function _saleFields(h, fill) {
  * only. Outside 15:55-16:00 ET (12:55-13:00 on an early close), and outside the sell window while the book holds
  * nothing, it returns at once without a market-data read. Returns null when there is no book for this pass.
  */
-async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, getBars = null, quote = null, stateFile = null, env = process.env } = {}) {
+async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, getBars = null, quote = null, stateFile = null, env = process.env, onBuy = null } = {}) {
   const c = config(env);
   if (!c || userId !== USER || env.TRADER_AUTO_EXECUTE !== '1' || !facade || typeof getBars !== 'function') return null;
   const b = _book(userId, stateFile);
@@ -255,6 +255,10 @@ async function maybeRun({ facade, userId, at = Date.now(), journal = () => {}, g
         journal({ event: 'overnight_book_buy', symbol: s, qty, px: round(px), notional: Math.round(qty * px), equity: Math.round(equity),
           pct: c.pct, gross_before: Math.round(gross), cap_pct: cap, gate, bar: rd.bar || null, ok, status: r && r.status, orderId,
           reason: r && r.reason, warnings: (r && r.warnings) || undefined });
+        // A placed buy is a live entry: the caller's journal-only hook (the market-context tags), after the order, never awaited.
+        if (ok && typeof onBuy === 'function') {
+          try { const p = onBuy({ symbol: s, account: userId, qty, price: px, now: at, order_id: orderId }); if (p && typeof p.catch === 'function') p.catch(() => {}); } catch (_e) { /* journal only */ }
+        }
       }
     }
   }
