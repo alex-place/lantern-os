@@ -20,14 +20,23 @@
  *   3. restore the process baseline env.
  *
  * Both brains evaluate cfg() per call, so the env swap is honoured on every tick.
+ *
+ * THE ACCOUNT-WIDE CAP ON TRADES (2026-11-03, `maxTradesPct`, off unless set; operator: the trader keeps cash so a user
+ * never comes back to half their money gone). A brain's own TRADER_MAX_GROSS_PCT sees only its sleeve's positions, so no
+ * sleeve can bound the sum. The bridge can: a buy that would take the whole book past maxTradesPct of equity is refused,
+ * counted from this tick's broker read plus the buys placed since. The owner `capExemptOwner` (the cash reserve) is not a
+ * trade and does not count. Sells and stops are never refused, and a sale frees its room at the next tick's read. With
+ * no readable snapshot this tick a buy is refused: this is a limit on risk, so it fails closed.
  */
 
 const DEFAULT_KEY_RE = /^TRADER_/;
 
-function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', journal = null, keyRe = DEFAULT_KEY_RE } = {}) {
+function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', journal = null, keyRe = DEFAULT_KEY_RE, maxTradesPct = null, capExemptOwner = null } = {}) {
   if (!Array.isArray(sleeves) || !sleeves.length) throw new Error('two-sleeve engine: sleeves required');
   if (!facade) throw new Error('two-sleeve engine: facade required');
   if (!ownership) throw new Error('two-sleeve engine: ownership registry required');
+  const capPct = maxTradesPct == null || maxTradesPct === '' ? 0 : Number(maxTradesPct);
+  if (capPct !== 0 && !(capPct > 0 && capPct <= 100)) throw new Error(`two-sleeve engine: maxTradesPct ${maxTradesPct} must sit in (0, 100]`);
   const byId = Object.fromEntries(sleeves.map((s) => [s.id, s]));
   const seq = (order && order.length ? order : sleeves.map((s) => s.id)).filter((id) => byId[id]);
   const log = (row) => { if (typeof journal === 'function') { try { journal({ ts: new Date().toISOString(), ...row }); } catch (_e) { /* never break a tick for a journal row */ } } };
@@ -56,6 +65,18 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
   const fillTimeOf = (o) => { const v = o && (o.filled_at || o.filledAt || o.updated_at || o.updatedAt); const t = v ? Date.parse(v) : NaN; return Number.isFinite(t) ? t : null; };
 
   let _tickSnapshotWhy = null;   // set by tick(): why this tick's broker snapshot is unreadable (null = readable)
+  let _tickBook = null;          // set by tick() when the cap is on: { equity, trades } of the book this tick, buys added as they place
+  /** A position's dollars, as the brain's own gross cap reads them. */
+  const dollarsOf = (p) => Math.abs(Number(p && p.market_value) || (Number(p && (p.qty ?? p.quantity)) || 0) * (Number(p && (p.current_price ?? p.price)) || 0));
+  /** Why the cap refuses this buy, or null. */
+  function capRefusal(o) {
+    if (!capPct || !isBuy(o) || isStop(o)) return null;
+    if (!_tickBook) return `the broker snapshot is unreadable (${_tickSnapshotWhy || 'no tick yet'})`;
+    const room = (capPct / 100) * _tickBook.equity - _tickBook.trades;
+    const notional = (Number(o.qty) || 0) * (Number(o.refPrice ?? o.limitPrice) || 0);
+    if (!(notional > 0)) return 'the order has no price to size against the cap';
+    return notional > room ? `$${Math.round(notional)} would take the trades past ${capPct} % of equity ($${Math.round(_tickBook.trades)} held of $${Math.round((capPct / 100) * _tickBook.equity)})` : null;
+  }
   /** Why a positions read must not reconcile the registry, or null when it may. */
   function snapshotUnreadable(raw, acct) {
     if (raw == null) return 'positions read returned nothing';
@@ -115,13 +136,18 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
           if (isBuy(o) && !isStop(o)) { stats.collisions++; bump(stats.refusedBy, owner); log({ event: 'collision', symbol: sym, loser: owner, winner: w }); }
           return { status: 'error', reason: 'symbol owned by the other sleeve' };
         }
+        const capWhy = capRefusal(o);
+        if (capWhy) {
+          log({ event: 'trades_cap_refused', symbol: sym, owner, qty: o.qty, price: o.refPrice ?? o.limitPrice, capPct, why: capWhy });
+          return { status: 'error', reason: `account cap: ${capWhy}` };
+        }
         // `_owner` rides along for facades that attribute fills per sleeve (the replay
         // mock, the engine journal); a real broker facade ignores unknown fields.
         const res = await facade.placeIBKROrder(uid, { ...o, _owner: owner });
         const ok = res && res.status !== 'error' && !res.error;
         if (ok) {
           if (isStop(o)) bump(stats.stops, owner);
-          else if (isBuy(o)) { ownership.claim(sym, owner); bump(stats.buys, owner); }
+          else if (isBuy(o)) { ownership.claim(sym, owner); bump(stats.buys, owner); if (capPct && _tickBook) _tickBook.trades += (Number(o.qty) || 0) * (Number(o.refPrice ?? o.limitPrice) || 0); }
           else bump(stats.sells, owner);
           ownership.tagOrder(idOf(res) ?? res.order_id, sym, owner);
         }
@@ -147,15 +173,21 @@ function createEngine({ sleeves, order, facade, ownership, defaultOwner = 'S', j
       const raw = await facade.getIBKRPositions(uid);
       const why = snapshotUnreadable(raw, acct);
       _tickSnapshotWhy = why;
+      _tickBook = null;
       if (why) log({ event: 'reconcile_skipped', why });
       else {
-        const { released, adopted } = ownership.reconcile(Array.isArray(raw) ? raw : (raw.positions || []));
+        const rows = Array.isArray(raw) ? raw : (raw.positions || []);
+        const { released, adopted } = ownership.reconcile(rows);
+        if (capPct && Number(acct && acct.equity) > 0) {
+          const counted = rows.filter((p) => !capExemptOwner || ownership.ownerOf(symOf(p)) !== capExemptOwner);
+          _tickBook = { equity: Number(acct.equity), trades: counted.reduce((a, p) => a + dollarsOf(p), 0) };
+        }
         // `owner` stays the default sleeve for readers of this row; `owners` names each symbol's adopter (a reserved
         // symbol goes to its reserved owner, lib/two-sleeve/reserve.js).
         if (adopted.length) log({ event: 'ownership_adopted', symbols: adopted, owner: defaultOwner, owners: Object.fromEntries(adopted.map((s) => [s, ownership.ownerOf(s)])) });
         if (released.length) log({ event: 'ownership_released', symbols: released });
       }
-    } catch (e) { log({ event: 'reconcile_error', error: String(e && e.message || e) }); }
+    } catch (e) { _tickBook = null; log({ event: 'reconcile_error', error: String(e && e.message || e) }); }
     for (const id of seq) {
       const sl = byId[id];
       const uni = sl.universe ? new Set([...sl.universe].map((s) => String(s).toUpperCase())) : null;
