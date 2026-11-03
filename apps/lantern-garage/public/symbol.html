@@ -357,9 +357,10 @@
   ];
   var curRange = '6M';
 
-  function areaChart(bars) {
+  // Takes the closes directly: the bars endpoint is asked for fields=close, so there
+  // is no OHLCV object here to pick a field out of.
+  function areaChart(closes) {
     var W = 1000, H = 260, PAD = 8;
-    var closes = bars.map(function (b) { return Number(b.close); }).filter(isFinite);
     var s = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', class: 'bigchart', role: 'img',
                          'aria-label': T + ' price, ' + closes.length + ' bars' });
     if (closes.length < 2) return s;
@@ -386,22 +387,23 @@
     var box = byId('chart');
     box.innerHTML = '';
     box.appendChild(el('div', 'state', 'Loading ' + curRange + '…'));
-    get('/api/trading/bars?ticker=' + encodeURIComponent(T) + '&timeframe=' + r.tf + '&limit=' + r.limit)
+    /* fields=close -- this is an area chart of closes; it never read open/high/low or
+       the per-bar timestamps, and the full form measured ~19 KB per range switch. */
+    get('/api/trading/bars?ticker=' + encodeURIComponent(T) + '&timeframe=' + r.tf + '&limit=' + r.limit + '&fields=close')
       .then(function (d) {
-        var bars = (d && d.bars) || [];
+        var closes = ((d && d.closes) || []).map(Number).filter(isFinite);
         box.innerHTML = '';
-        if (bars.length < 2) {
+        if (closes.length < 2) {
           box.appendChild(el('div', 'state', 'No price history for ' + T + ' over this range.'));
           byId('chSub').textContent = '';
           return;
         }
-        box.appendChild(areaChart(bars));
-        var closes = bars.map(function (b) { return Number(b.close); }).filter(isFinite);
+        box.appendChild(areaChart(closes));
         var lo = Math.min.apply(null, closes), hi = Math.max.apply(null, closes);
         var chg = closes[0] ? ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100 : null;
         var sub = byId('chSub');
         sub.textContent = '';
-        sub.appendChild(el('span', null, bars.length + ' bars · ' + fmt(lo, 2) + '–' + fmt(hi, 2) + ' · '));
+        sub.appendChild(el('span', null, closes.length + ' bars · ' + fmt(lo, 2) + '–' + fmt(hi, 2) + ' · '));
         sub.appendChild(el('span', dirCls(chg), pct(chg) + ' over ' + curRange));
       })
       .catch(function (e) { fail(box, 'the chart', e); byId('chSub').textContent = ''; });

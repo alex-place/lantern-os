@@ -146,8 +146,11 @@ test('the design system is shared, not copied', () => {
 
 test('the page says which window the chart covers', () => {
   // A range switcher that silently showed a different span than its label would be worse
-  // than no switcher: the subtitle is derived from the bars that actually came back.
-  assert.match(SYM, /bars\.length \+ ' bars · '/);
+  // than no switcher: the subtitle is derived from what actually came back, never from
+  // the limit that was requested. Since 2026-11-03 the chart asks for fields=close, so
+  // "what came back" is the closes array rather than a list of OHLCV bars.
+  assert.match(SYM, /closes\.length \+ ' bars · '/);
+  assert.match(SYM, /&fields=close/, 'and it is the compact response being counted');
   assert.match(SYM, /' over ' \+ curRange/);
   assert.match(SYM, /\{ id: '1D'/);
   assert.match(SYM, /\{ id: '5Y'/);

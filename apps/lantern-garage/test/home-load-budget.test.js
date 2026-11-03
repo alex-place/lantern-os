@@ -37,6 +37,7 @@ const path = require('node:path');
 const APP = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(APP, p), 'utf8').replace(/\r\n/g, '\n');
 const HOME = read('public/index.html');
+const SYMBOL = read('public/symbol.html');
 const ZONES = read('routes/trading/market.js');
 const NEWS = read('routes/trading/news.js');
 
@@ -116,6 +117,39 @@ test('a news symbol is a link to that symbol, not decoration', () => {
   // NOT the trader: a story can name a symbol that is not on the watchlist, and the
   // trader has no bars for one -- it would silently land the reader on SPY.
   assert.doesNotMatch(HOME, /cs\.href = '\/stock-trader\.html/, 'a news symbol never goes to the trader');
+});
+
+test('bars are sent at float32 precision, not float64 artefact', () => {
+  // A close of $773.09 was going out as 773.0900268554688: eighteen characters, twelve of
+  // them an artefact of widening a float32 to a float64. The cut has to be SIGNIFICANT
+  // DIGITS -- toFixed(6) still yields 773.090027, and a fixed decimal scale would wreck
+  // crypto, whose significant digits start six places in.
+  assert.match(ZONES, /v\.toPrecision\(7\)/, 'seven significant digits == float32 precision');
+  // The CODE form, not the words: the comment beside it explains why toFixed(6) fails.
+  assert.doesNotMatch(ZONES, /Number\(v\.toFixed\(/, 'decimal rounding does not remove the artefact');
+  // Volume is an exact count; 7 significant digits would round 123456789 to 123456800.
+  assert.match(ZONES, /Number\.isInteger\(v\)/, 'integers are left alone');
+});
+
+test('a line chart can ask for closes instead of full OHLCV', () => {
+  assert.match(ZONES, /url\.searchParams\.get\('fields'\) \|\| ''\) === 'close'/, 'the compact form exists');
+  assert.match(ZONES, /closes: window\.map/, 'it sends bare numbers');
+  // spanLabel needs the window, and only its two ends -- not a 24-character timestamp
+  // repeated on all 120 bars.
+  assert.match(ZONES, /t0: window\.length \? window\[0\]\.timestamp : null/, 'with the window start');
+  assert.match(ZONES, /t1: window\.length \? window\[window\.length - 1\]\.timestamp : null/, 'and its end');
+  // Opt-in: anything already calling this keeps the shape it had.
+  assert.match(ZONES, /bars: window\.map\(\(b\) => \{ const o = \{\}/, 'the default response is unchanged in shape');
+});
+
+test('both pages that draw a line ask for the compact form', () => {
+  assert.match(HOME, /'&fields=close'/, 'the home page');
+  assert.match(SYMBOL, /'&fields=close'/, 'the symbol page');
+  // And they read the compact shape, not the old one.
+  assert.match(HOME, /closes: \(d && d\.closes\) \|\| \[\]/, 'the home page reads closes');
+  assert.match(HOME, /var t0 = Date\.parse\(b\.t0\), t1 = Date\.parse\(b\.t1\);/, 'and the window from t0/t1');
+  assert.doesNotMatch(HOME, /bs\[0\]\.timestamp/, 'no per-bar timestamp read is left behind');
+  assert.match(SYMBOL, /var closes = \(\(d && d\.closes\) \|\| \[\]\)/, 'the symbol page reads closes');
 });
 
 test('the note accounts for the two inputs that really are models', () => {

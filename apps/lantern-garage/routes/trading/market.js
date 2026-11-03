@@ -270,7 +270,41 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     try {
       const result = await traderAgent.getBars(ticker, timeframe);
       const all = Array.isArray(result) ? result : ((result && result.bars) || []);
-      sendJson(res, { ticker, timeframe, bars: all.slice(-limit) }, 200);
+      const window = all.slice(-limit);
+
+      /* Prices arrive as float64 widenings of float32 inputs, so a close of $773.09 goes
+         out as 773.0900268554688 -- eighteen characters, six of them the number and twelve
+         the artefact. The cut is SIGNIFICANT DIGITS, not decimal places: float32 carries
+         about 7 of them, so toPrecision(7) reproduces the stored value exactly while the
+         artefact disappears (773.0900268554688 -> 773.09). Decimal rounding cannot do
+         this job -- toFixed(6) still returns 773.090027 -- and a fixed scale would wreck
+         crypto, where the significant digits start six places in.
+
+         Integers are left alone: volume is an exact count, and 7 significant digits would
+         round 123456789 to 123456800. Every caller benefits, so it is unconditional. */
+      const trim = (v) => (typeof v !== 'number' || !Number.isFinite(v) || Number.isInteger(v)
+        ? v : Number(v.toPrecision(7)));
+
+      /* fields=close is for a LINE chart, which wants the closes and the window they
+         cover and nothing else. The home page drew six card charts and six sparklines
+         out of full OHLCV carrying a 24-character timestamp on every bar: measured
+         19 KB a request to plot one 320x78 line, 265 KB for one page load. Here the
+         closes are bare numbers and the window is two timestamps.
+
+         Opt-in, so the default shape is unchanged for anything already calling this. */
+      if ((url.searchParams.get('fields') || '') === 'close') {
+        sendJson(res, {
+          ticker, timeframe,
+          closes: window.map((b) => trim(Number(b.close))).filter((v) => Number.isFinite(v)),
+          t0: window.length ? window[0].timestamp : null,
+          t1: window.length ? window[window.length - 1].timestamp : null,
+        }, 200);
+        return true;
+      }
+      sendJson(res, {
+        ticker, timeframe,
+        bars: window.map((b) => { const o = {}; for (const k in b) o[k] = trim(b[k]); return o; }),
+      }, 200);
     } catch (error) {
       console.error('[Trading] /bars error:', error.message);
       sendJson(res, { ticker, timeframe, bars: [], error: error.message }, 500);
