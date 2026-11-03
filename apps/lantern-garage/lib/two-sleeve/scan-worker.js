@@ -22,6 +22,8 @@
  * TWO_SLEEVE_WORKER_SCAN=closeibs (2026-10-03): the sleeve buys index funds that close near their session low
  * (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe (TWO_SLEEVE_WORKER_UNIVERSE, required), entry depth
  * TRADER_CLOSE_IBS_MAX (default 0.15). The reply's `closeIbs` field carries the per-name reads.
+ * TRADER_CLOSE_IBS_ONE_BAR=1 (2026-11-03) decides on the 15:50 bar alone; TRADER_CLOSE_IBS_NEWS_GATE=1 adds the news gate on the
+ * shared tag files (TRADER_ENTRY_TAGS_DIR, required with it), one close_ibs_gate row a decision day in the worker's own log.
  *
  * TWO_SLEEVE_WORKER_SCAN=overnight (2026-10-09, draft): the overnight book. The sleeve holds its index funds from the
  * 15:55 print to the 09:40 print when the name's prior close is above its trailing 200-session mean
@@ -126,12 +128,20 @@ async function drain() {
     }
     if (String(process.env.TWO_SLEEVE_WORKER_SCAN || '').toLowerCase() === 'closeibs') {
       const yahoo = require(path.join(app, 'lib', 'market-data-yahoo'));
-      const { createCloseIbsScan } = require(path.join(app, 'lib', 'two-sleeve', 'closeibs-scan'));
+      const { createCloseIbsScan, ONE_DECISION_BAR } = require(path.join(app, 'lib', 'two-sleeve', 'closeibs-scan'));
       if (!Array.isArray(universe) || !universe.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=closeibs needs the sleeve s universe (its index funds)');
       const ibsMax = process.env.TRADER_CLOSE_IBS_MAX ? Number(process.env.TRADER_CLOSE_IBS_MAX) : 0.15;
-      closeIbs = createCloseIbsScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), ibsMax });
+      const oneBar = process.env.TRADER_CLOSE_IBS_ONE_BAR === '1';
+      const gateOn = process.env.TRADER_CLOSE_IBS_NEWS_GATE === '1';
+      const newsGateDir = gateOn ? String(process.env.TRADER_ENTRY_TAGS_DIR || '').trim() : null;
+      if (gateOn && !newsGateDir) throw new Error('TRADER_CLOSE_IBS_NEWS_GATE=1 needs TRADER_ENTRY_TAGS_DIR (the shared gex.json and news.json)');
+      const ownLog = process.env.TRADER_TRADES_LOG || null;
+      const fq = gateOn && ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;
+      closeIbs = createCloseIbsScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), ibsMax, newsGateDir,
+        ...(oneBar ? { decisionBars: ONE_DECISION_BAR } : {}),
+        log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'closeibs', watchlist: closeIbs.symbols.length,
-        symbols: closeIbs.symbols.join(','), ibsMax, pMin: null, shortEdge: null });
+        symbols: closeIbs.symbols.join(','), ibsMax, oneBar, newsGate: gateOn, pMin: null, shortEdge: null });
       drain();
       return;
     }

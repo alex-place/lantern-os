@@ -397,6 +397,14 @@ function newsReading(st, now) {
     ...(t.g ? {} : { types_why: 'no type counts for the day yet' }),
     ...(t.g && !histOk ? { types_why: `${typed} of ${NEWS_N} history sessions have type counts` } : {}) };
 }
+/**
+ * The gamma and news readings for a decision at `now`, from the shared files alone: no fetch, the scan's read (lib/two-sleeve/closeibs-scan.js).
+ * Each is shaped as gammaReading / newsReading return it ({ why } when missing).
+ */
+function readContext(dir, now) {
+  const gex = readJson(path.join(dir, 'gex.json'));
+  return { gamma: gammaReading(gex && gex.rows, cal.etOf(now).day), news: newsReading(readJson(path.join(dir, 'news.json')), now) };
+}
 async function newsFor(c, now) {
   const p = newsEnsure(c, now);
   if (p) await Promise.race([p, new Promise((r) => setTimeout(r, WAIT_MS).unref())]);
@@ -482,7 +490,7 @@ async function tag(entry, c) {
 function _reset({ clock } = {}) { _clock = clock || (() => Date.now()); _g = null; _n = null; _v = { key: null, p: null }; }
 
 module.exports = {
-  kick, tag, serverNewsHeaders,
+  kick, tag, serverNewsHeaders, readContext,
   parseGex, gammaReading, sessionRow, windows, etMs, newsReading, newsDue, vixReading, rankOf, tercile, categorize, groupTimes,
   GEX_N, NEWS_N, VIX_FEAR, GEX_URL, NEWS_URL, VIX_URL, NEWS_SYMBOLS, NEWS_RX, TYPES, _reset,
 };

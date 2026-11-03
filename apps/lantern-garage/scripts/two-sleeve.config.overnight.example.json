@@ -103,6 +103,8 @@
       "scan": "closeibs",
       "env": {
         "TRADER_CLOSE_IBS_MAX": "0.15",
+        "TRADER_CLOSE_IBS_ONE_BAR": "",
+        "TRADER_CLOSE_IBS_NEWS_GATE": "",
         "TRADER_MAX_CONCURRENT": "3",
         "TRADER_POSITION_PCT": "12",
         "TRADER_MAX_POSITION_PCT": "12",
