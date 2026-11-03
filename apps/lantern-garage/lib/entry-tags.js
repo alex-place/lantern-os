@@ -32,6 +32,15 @@
  *          ten calls a session. Every other process (stable) reads the same file and never calls.
  *          The history is seeded from the research's own archive by scripts/entry-tags-news-seed.js, counted by this
  *          module's sessionRow(), the function the live counts use.
+ *          THE TYPE OF THE NEWS (2026-11-03, ledger tier0-news-type-sleeves-2016-2026): each headline also goes through
+ *          the research's keyword categories (NEWS_RX below, copied verbatim: DATA, FED, TRADE, GEO, POLICY, HEALTH, CORP,
+ *          and WRAP = market-reaction content, not news). NEWS = not WRAP, SHOCK = NEWS and TRADE|GEO|POLICY, RATES = NEWS
+ *          and DATA|FED; a WRAP headline counts only as WRAP. C's washouts paid on HIGH-SHOCK sessions (+$104 | +$69 a
+ *          trade vs about $0 on LOW) and not on HIGH-RATES ones, inside every VIX-change bucket and gamma tercile, in 9 of
+ *          11 years; found in-sample, no rule (gate GS passed tier 0: tier0-c-shock-tilt-gate-2016-2026). Each window of the
+ *          row carries `types` { NEWS, SHOCK, RATES }: { n, rate, rank, tercile } ranked as above, and `counts` for the rest;
+ *          `mix` says which of SHOCK and RATES had more session headlines. A recent history row without type counts (written
+ *          before this shipped) is counted again by the next refresh, in the same call.
  *   vix    prior = the prior session's close (the brain's own _vixPriorClose, Yahoo ^VIX daily; when that read fails, the
  *          1m chart's own previous close, labelled prior_src 'chart_meta'); now = the Yahoo ^VIX 1m chart's
  *          meta.regularMarketPrice; as_of = its meta.regularMarketTime (the quote's own time, not the fetch time);
@@ -66,6 +75,7 @@ const OPEN_MIN = 570;                // 09:30 ET
 const PRIOR_CLOSE_MIN = 960;         // 16:00 ET of the prior session: the overnight window opens
 const DECIDE_MIN = 950;              // 15:50 ET: the history's session window ends (C's decision)
 const SESSION_MIN_HOURS = 0.5;       // a shorter session window gets no rank
+const SESSION_HOURS = (DECIDE_MIN - OPEN_MIN) / 60;   // the history's session window, 09:30-15:50
 const LIVE_MS = 10 * 60000;          // a pass further than this from the real clock is not live
 const GEX_RETRY_MS = 60 * 60000;     // the CSV is asked again no sooner than an hour after a try
 const GEX_KEEP = 400;                // CSV rows kept (the rank needs 253)
@@ -102,11 +112,62 @@ function windows(day) {
 }
 function lowerBound(a, x) { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; }
 const countIn = (sorted, a, b) => lowerBound(sorted, b) - lowerBound(sorted, a);
-/** One session's history row from sorted headline times (ms): counts and per-hour rates, as the research counted them. */
-function sessionRow(sorted, day) {
+/**
+ * The keyword categories of the Benzinga index-tagged headlines (multi-label, on the lower-cased text), verbatim from the
+ * research (fixed 2026-11-02 from the headline text alone, before any trade split).
+ */
+const NEWS_RX = {
+  DATA: /\b(cpi|ppi|pce|non-?farm|payrolls?|jobless claims|initial claims|continuing claims|unemployment rate|jolts|adp|gdp|ism|pmi|retail sales|durable goods|industrial production|housing starts|building permits|new home sales|existing home sales|pending home sales|consumer (confidence|sentiment)|michigan|empire state|philly fed|philadelphia fed|chicago pmi|trade balance|factory orders|wholesale (trade|inventories|sales)|business inventories|average hourly earnings|unit labor|import prices|export prices|personal (income|spending)|crude (oil )?(stock|inventor\w*)|api crude|eia|mom\b|yoy\b)|\bvs\.? [^,;]*\b(est|estimate|expected|consensus)\b/,
+  FED: /\b(fed|fed's|feds|fomc|powell|bernanke|warsh|federal reserve|rate (hike|hikes|cut|cuts|increase|decrease)s?|basis points?|bps|dot plot|beige book|quantitative|taper\w*|williams|bullard|kashkari|waller|brainard|clarida|mester|daly|bostic|logan|musalem|barkin|goolsbee|harker|kaplan|evans|rosengren|esther george|jefferson|lisa cook|barr|bowman|hammack|schmid|kugler|miran|lagarde|draghi|ecb|boj|kuroda|ueda|boe|central bank\w*)\b/,
+  TRADE: /\b(tariffs?|trade (war|deal|talks|agreement|negotiat\w*|truce|tensions?|dispute|team|representative)|section (232|301)|lighthizer|navarro|greer|export controls?|import duties|retaliat\w*|usmca|nafta)\b/,
+  GEO: /\b(russia\w*|ukrain\w*|putin|zelensk\w*|kremlin|iran\w*|israel\w*|gaza|hamas|hezbollah|houthi\w*|north korea\w*|kim jong\w*|missiles?|military|troops|invasion|airstrikes?|nato|taiwan|south china sea|syria\w*|venezuela\w*|hormuz|terror\w*|nuclear|ceasefire)\b|(?<!trade |price |currency )\bwar\b/,
+  POLICY: /\b(trump\w*|biden\w*|obama|harris|white house|congress\w*|senate|senator\w*|speaker|pelosi|mcconnell|schumer|mccarthy|shutdown|debt (ceiling|limit)|stimulus|infrastructure|tax (cut|cuts|bill|reform|plan)|election\w*|impeach\w*|supreme court|treasury secretary|mnuchin|bessent|yellen|executive order|doge|reconciliation)\b/,
+  HEALTH: /\b(coronavirus|covid\w*|pandemic|vaccine\w*|virus|lockdowns?|omicron|infections?|outbreak)\b/,
+  CORP: /\b(earnings|eps|revenue|guidance|quarterly|beats? (estimates|expectations)|misses (estimates|expectations)|buybacks?|ipo|merger|acquisition)\b/,
+  WRAP: /\b(stock market today|stocks? (rise|rises|fall|falls|rally|rallies|slide|slides|tumble|tumbles|surge|surges|climb|climbs|drop|drops|jump|jumps|sink|sinks|edge|edges|open|opens|close|closes|end|ends|finish|finishes|trade|trading|higher|lower|mixed)|futures (trading|rise|fall|higher|lower|point|are|edge|slip|gain|drop)|imbalance|technical alert|how to trade|check out|what'?s going on|why (is|are|the)|midday|mid-day|movers|market (update|wrap|recap|summary|clubhouse)|pre-?market|after-?hours|index futures|(dow|nasdaq|s&p( 500)?|russell 2000) (up|down|rises|falls|gains|loses|jumps|drops|tops|closes|ends|opens|surges|tumbles|slides|futures)|options activity|unusual options|whale|etf)\b/,
+};
+const CATS = Object.keys(NEWS_RX);
+const HEADLINE_MAX = 600;            // the regexes read at most this much (the 84k archived headlines end by 512)
+const TYPES = ['NEWS', 'WRAP', 'SHOCK', 'RATES', 'DATA', 'FED', 'TRADE', 'GEO', 'POLICY', 'HEALTH', 'CORP'];
+const RANKED_TYPES = ['NEWS', 'SHOCK', 'RATES'];
+const SUB_TYPES = ['DATA', 'FED', 'TRADE', 'GEO', 'POLICY', 'HEALTH', 'CORP'];
+/** The categories of one headline, a Set. */
+function categorize(h) {
+  const s = String(h || '').slice(0, HEADLINE_MAX).toLowerCase();
+  const out = new Set();
+  for (const k of CATS) if (NEWS_RX[k].test(s)) out.add(k);
+  return out;
+}
+/** Sorted headline times (ms) of ALL and of each of TYPES, from [{ t, h }]; a WRAP headline counts only as ALL and WRAP. */
+function groupTimes(items) {
+  const g = { ALL: [] };
+  for (const k of TYPES) g[k] = [];
+  for (const it of items) {
+    const c = categorize(it.h);
+    g.ALL.push(it.t);
+    if (c.has('WRAP')) { g.WRAP.push(it.t); continue; }
+    g.NEWS.push(it.t);
+    if (c.has('TRADE') || c.has('GEO') || c.has('POLICY')) g.SHOCK.push(it.t);
+    if (c.has('DATA') || c.has('FED')) g.RATES.push(it.t);
+    for (const k of SUB_TYPES) if (c.has(k)) g[k].push(it.t);
+  }
+  for (const k of Object.keys(g)) g[k].sort((a, b) => a - b);
+  return g;
+}
+/**
+ * One session's history row, as the research counted it: counts and per-hour rates of all headlines (d, nOn, nSe, on, se),
+ * the overnight hours (onH) and, from groupTimes() output, each type's [overnight, session] counts (g). A plain sorted
+ * array of times gives the row without g.
+ */
+function sessionRow(groups, day) {
+  const typed = !Array.isArray(groups);
+  const all = typed ? groups.ALL : groups;
   const w = windows(day);
-  const nOn = countIn(sorted, w.from, w.open), nSe = countIn(sorted, w.open, w.dec);
-  return { d: day, nOn, nSe, on: nOn / ((w.open - w.from) / 3600e3), se: nSe / ((w.dec - w.open) / 3600e3) };
+  const onH = (w.open - w.from) / 3600e3;
+  const nOn = countIn(all, w.from, w.open), nSe = countIn(all, w.open, w.dec);
+  const row = { d: day, nOn, nSe, on: nOn / onH, se: nSe / ((w.dec - w.open) / 3600e3), onH };
+  if (typed) { row.g = {}; for (const k of TYPES) row.g[k] = [countIn(groups[k], w.from, w.open), countIn(groups[k], w.open, w.dec)]; }
+  return row;
 }
 /** The share of `sample` strictly below `v`. */
 function rankOf(v, sample) { let lt = 0; for (const x of sample) if (x < v) lt++; return lt / sample.length; }
@@ -229,8 +290,8 @@ function newsDue(s, now) {
   if (now >= w.dec) return Date.parse(t.se_to) < w.dec;
   return now - Date.parse(t.fetched_at) >= NEWS_EVERY_MS;
 }
-/** Every headline time (ms, sorted) tagged with the five index funds in [startMs, endMs]; throws on any failed page. */
-async function fetchNewsTimes(startMs, endMs, headers, fetchFn) {
+/** Every headline [{ t, h }] tagged with the five index funds in [startMs, endMs]; throws on any failed page. */
+async function fetchNewsItems(startMs, endMs, headers, fetchFn) {
   const seen = new Map();
   let token = null, pages = 0;
   do {
@@ -241,12 +302,12 @@ async function fetchNewsTimes(startMs, endMs, headers, fetchFn) {
     const j = JSON.parse(r.text);
     for (const n of (j && j.news) || []) {
       const t = Date.parse(n && n.created_at);
-      if (Number.isFinite(t)) seen.set(n.id != null ? `#${n.id}` : `${n.created_at}|${n.headline}`, t);
+      if (Number.isFinite(t)) seen.set(n.id != null ? `#${n.id}` : `${n.created_at}|${n.headline}`, { t, h: n.headline });
     }
     token = j && j.next_page_token; pages++;
   } while (token && pages < PAGE_MAX);
   if (token) throw new Error(`more than ${PAGE_MAX} pages`);
-  return [...seen.values()].sort((a, b) => a - b);
+  return [...seen.values()];
 }
 async function refreshNews(s, now, headers, fetchFn) {
   try {
@@ -258,23 +319,29 @@ async function refreshNews(s, now, headers, fetchFn) {
     const missing = [];
     if (last) for (let d = cal.nextTradingDay(last); d && d < day && missing.length <= NEWS_BACKFILL; d = cal.nextTradingDay(d)) missing.push(d);
     const backfill = missing.length <= NEWS_BACKFILL ? missing : [];   // a longer gap stays a gap
+    const heal = hist.slice(-NEWS_BACKFILL).filter((h) => !h.g && h.d < day).map((h) => h.d);   // rows from before the types
+    const redo = [...heal, ...backfill];
     // The overnight count is read again until a refresh 15 minutes past the open has counted it (a headline can reach
     // the API a little after its created_at); after that only the session is read.
-    const onSettled = !!(st.today && st.today.d === day && st.today.on_final);
+    const onSettled = !!(st.today && st.today.d === day && st.today.on_final && st.today.g);
     const end = Math.min(now, w.dec);
-    const start = backfill.length ? windows(backfill[0]).from : (onSettled ? w.open : w.from);
-    const ts = await fetchNewsTimes(start, end, headers, fetchFn);
-    for (const d of backfill) hist.push(sessionRow(ts, d));
-    const nOn = onSettled ? st.today.nOn : countIn(ts, w.from, w.open);
-    const nSe = countIn(ts, w.open, end);
+    const start = redo.length ? windows(redo[0]).from : (onSettled ? w.open : w.from);
+    const g = groupTimes(await fetchNewsItems(start, end, headers, fetchFn));
+    for (const d of heal) hist[hist.findIndex((h) => h.d === d)] = sessionRow(g, d);
+    for (const d of backfill) hist.push(sessionRow(g, d));
+    const nOn = onSettled ? st.today.nOn : countIn(g.ALL, w.from, w.open);
+    const nSe = countIn(g.ALL, w.open, end);
+    const tg = {};
+    for (const k of TYPES) tg[k] = [onSettled ? st.today.g[k][0] : countIn(g[k], w.from, w.open), countIn(g[k], w.open, end)];
     const final = now >= w.dec + NEWS_GRACE_MS;   // the settled 09:30-15:50 count: the day joins the history
-    st.today = { d: day, nOn, on_final: onSettled || now >= w.open + NEWS_GRACE_MS, nSe, se_to: iso(end), final, fetched_at: iso(now) };
+    st.today = { d: day, nOn, on_final: onSettled || now >= w.open + NEWS_GRACE_MS, nSe, g: tg, se_to: iso(end), final, fetched_at: iso(now) };
     if (final && !(hist.length && hist[hist.length - 1].d === day)) {
-      hist.push({ d: day, nOn, nSe, on: nOn / ((w.open - w.from) / 3600e3), se: nSe / ((w.dec - w.open) / 3600e3) });
+      const onH = (w.open - w.from) / 3600e3;
+      hist.push({ d: day, nOn, nSe, on: nOn / onH, se: nSe / SESSION_HOURS, onH, g: tg });
     }
     st.history = hist.slice(-NEWS_KEEP);
     st.v = 1;
-    st.backfilled = backfill.length ? backfill : undefined;
+    st.backfilled = redo.length ? redo : undefined;
     st.gap = missing.length > NEWS_BACKFILL ? `${missing.length}+ sessions after ${last} not backfilled` : undefined;
     s.st = st; s.failedAt = 0; s.err = null;
     writeJson(path.join(s.dir, 'news.json'), st);
@@ -287,6 +354,20 @@ function newsEnsure(c, now) {
   loadNewsFile(s);               // a cheap stat: another refresher's write (or a re-seed) is seen before deciding
   if (!s.p && newsDue(s, now)) s.p = refreshNews(s, now, c.headers, c.fetchFn || globalThis.fetch).finally(() => { s.p = null; });
   return s.p;
+}
+/** A window's type readings: `types` { NEWS, SHOCK, RATES } with ranks against `hist` when `ok`, `counts` for the sub-types. */
+function typeFields(t, hist, idx, hours, ok) {
+  if (!t.g) return {};
+  const types = {}, counts = {};
+  for (const k of SUB_TYPES) counts[k] = t.g[k][idx];
+  counts.WRAP = t.g.WRAP[idx];
+  for (const k of RANKED_TYPES) {
+    const n = t.g[k][idx];
+    if (!ok) { types[k] = { n, rate: null, rank: null, tercile: null }; continue; }
+    const rate = n / hours, p = rankOf(rate, hist.map((h) => h.g[k][idx] / (idx === 0 ? h.onH : SESSION_HOURS)));
+    types[k] = { n, rate: round(rate, 3), rank: round(p, 3), tercile: tercile(p) };
+  }
+  return { types, counts };
 }
 /** The news reading for an entry at `now` from the counts file: { day, as_of, overnight, session, ... } or { why }. */
 function newsReading(st, now) {
@@ -305,8 +386,16 @@ function newsReading(st, now) {
     const se = t.nSe / seH, pSe = rankOf(se, hist.map((h) => h.se));
     Object.assign(session, { rate: round(se, 3), rank: round(pSe, 3), tercile: tercile(pSe) });
   } else Object.assign(session, { rate: null, rank: null, tercile: null, why: `under ${SESSION_MIN_HOURS * 60} minutes of session` });
-  return { day, as_of: t.fetched_at, history: NEWS_N, history_to: hist[hist.length - 1].d,
-    overnight: { n: t.nOn, hours: round(onH, 2), rate: round(on, 3), rank: round(pOn, 3), tercile: tercile(pOn) }, session };
+  const typed = hist.filter((h) => h.g).length;
+  const histOk = typed === NEWS_N;
+  const overnight = { n: t.nOn, hours: round(onH, 2), rate: round(on, 3), rank: round(pOn, 3), tercile: tercile(pOn) };
+  Object.assign(overnight, typeFields(t, hist, 0, onH, histOk));
+  Object.assign(session, typeFields(t, hist, 1, seH, histOk && seH >= SESSION_MIN_HOURS));
+  const sh = t.g ? t.g.SHOCK[1] : null, ra = t.g ? t.g.RATES[1] : null;
+  return { day, as_of: t.fetched_at, history: NEWS_N, history_to: hist[hist.length - 1].d, overnight, session,
+    mix: t.g ? (sh > ra ? 'SHOCK' : ra > sh ? 'RATES' : 'TIE') : null,
+    ...(t.g ? {} : { types_why: 'no type counts for the day yet' }),
+    ...(t.g && !histOk ? { types_why: `${typed} of ${NEWS_N} history sessions have type counts` } : {}) };
 }
 async function newsFor(c, now) {
   const p = newsEnsure(c, now);
@@ -394,6 +483,6 @@ function _reset({ clock } = {}) { _clock = clock || (() => Date.now()); _g = nul
 
 module.exports = {
   kick, tag, serverNewsHeaders,
-  parseGex, gammaReading, sessionRow, windows, etMs, newsReading, newsDue, vixReading, rankOf, tercile,
-  GEX_N, NEWS_N, VIX_FEAR, GEX_URL, NEWS_URL, VIX_URL, NEWS_SYMBOLS, _reset,
+  parseGex, gammaReading, sessionRow, windows, etMs, newsReading, newsDue, vixReading, rankOf, tercile, categorize, groupTimes,
+  GEX_N, NEWS_N, VIX_FEAR, GEX_URL, NEWS_URL, VIX_URL, NEWS_SYMBOLS, NEWS_RX, TYPES, _reset,
 };

@@ -12,7 +12,8 @@
  * without keys; vix = now / prior - 1 at gate GV's fixed cut points (0 is QUIET, +8 % is FEAR), the
  * quote's own time and the measured lag, a quote from another day refused, the chart's previous close when the daily
  * read fails (labelled); one quote per scan with entries; the CSV once a day; a pass off the real clock writes nothing;
- * every failure is null with its reason; and in the brain: off without TRADER_ENTRY_TAGS, and on, the entry places
+ * every failure is null with its reason; the news types (the research's keywords, WRAP apart, SHOCK and RATES groups, ranks
+ * per window, the session mix, no rank without the typed history, the upgrade's recount); and in the brain: off without TRADER_ENTRY_TAGS, and on, the entry places
  * exactly as before while one entry_tags row lands under the user 'entry-tags'; a box that merely holds the Alpaca keys
  * never calls the news API, only the fetch role (TRADER_ENTRY_TAGS_NEWS_FETCH=1) does. The overnight book's hook is
  * pinned in overnight-book.test.js.
@@ -39,10 +40,13 @@ function gexCsv(last, n, value) {
   const days = [last, ...sessionsBefore(last, n - 1).reverse()].reverse();
   return 'date,price,dix,gex\n' + days.map((d, i) => `${d},5000.1,0.41,${value(i, n)}`).join('\n') + '\n';
 }
-/** A counts history: `n` sessions before `day` whose rates are 1..n headlines over a weeknight (17.5 h) and a session (6 h 20). */
+/** A counts history: `n` sessions before `day` whose rates are 1..n headlines over a weeknight (17.5 h) and a session (6 h 20), of every type. */
 function history(day, n = 120) {
-  return sessionsBefore(day, n).map((d, i) => ({ d, nOn: i + 1, nSe: i + 1, on: (i + 1) / 17.5, se: (i + 1) / (19 / 3) }));
+  return sessionsBefore(day, n).map((d, i) => ({ d, nOn: i + 1, nSe: i + 1, on: (i + 1) / 17.5, se: (i + 1) / (19 / 3), onH: 17.5,
+    g: Object.fromEntries(et.TYPES.map((k) => [k, [i + 1, i + 1]])) }));
 }
+const noTypes = (rows) => rows.map(({ d, nOn, nSe, on, se }) => ({ d, nOn, nSe, on, se }));   // a row from before the types shipped
+const zeroTypes = (over = {}) => Object.fromEntries(et.TYPES.map((k) => [k, over[k] || [0, 0]]));
 /** A Yahoo ^VIX 1m chart whose meta says `px` at `atMs`, previous close `prev`. */
 const vixChart = (px, atMs, prev = null) => ({ chart: { result: [{ meta: { symbol: '^VIX', regularMarketPrice: px, regularMarketTime: Math.floor(atMs / 1000), chartPreviousClose: prev } }] } });
 
@@ -96,10 +100,64 @@ test('news reading: each rate ranked against the 120 sessions before; short hist
   assert.match(et.newsReading(null, at(DAY, 12, 31)).why, /no news counts file/);
 });
 
+test('the news types: the research keywords, a WRAP headline counts only as WRAP, SHOCK and RATES are groups of NEWS', () => {
+  const cats = (h) => [...et.categorize(h)].sort();
+  assert.deepStrictEqual(cats('USA CPI (MoM) For February 0.2%  Vs 0.3% Est.; 0.5% Prior'), ['DATA']);
+  assert.deepStrictEqual(cats('Initial Jobless Claims 217K vs 227K Est.'), ['DATA']);
+  assert.deepStrictEqual(cats("Fed's Powell Says We Will Continue To Make Decisions Meeting By Meeting"), ['FED']);
+  assert.deepStrictEqual(cats('President Trump Says Not Going To Change Mind On April 2 Tariffs'), ['POLICY', 'TRADE']);
+  assert.deepStrictEqual(cats("Iran's Deputy FM Says Tehran Ready for Possibility of War with US"), ['GEO']);
+  assert.deepStrictEqual(cats('Trade War Escalates As Talks Stall'), ['TRADE'], 'a trade war is not a war');
+  assert.deepStrictEqual(cats('CDC Reports 72,045 New Coronavirus Cases Yesterday'), ['HEALTH']);
+  assert.deepStrictEqual(cats('The Nvidia Chart Shows The Importance Of Earnings From Tesla'), ['CORP']);
+  assert.deepStrictEqual(cats('S&P 500 Index Futures Clinging To Gains'), ['WRAP']);
+  assert.deepStrictEqual(cats('Carl Icahn Says Is Shorting The S&P'), []);
+  assert.deepStrictEqual(cats(null), []);
+  const g = et.groupTimes([{ t: 5, h: 'Stocks Fall Trump Begins China Presser' }, { t: 3, h: 'Trump Says Tariffs Stay' }, { t: 4, h: "Fed's Waller Says Rate Cuts Ahead" }, { t: 2, h: 'Carl Icahn Says Is Shorting The S&P' }, { t: 1, h: 'CPI 3.1% vs 3.0% Est.' }]);
+  assert.deepStrictEqual(g.ALL, [1, 2, 3, 4, 5], 'sorted');
+  assert.deepStrictEqual(g.WRAP, [5], 'a wrap headline naming Trump is a wrap');
+  assert.deepStrictEqual(g.NEWS, [1, 2, 3, 4]);
+  assert.deepStrictEqual(g.SHOCK, [3]); assert.deepStrictEqual(g.POLICY, [3]); assert.deepStrictEqual(g.TRADE, [3]);
+  assert.deepStrictEqual(g.RATES, [1, 4]); assert.deepStrictEqual(g.DATA, [1]); assert.deepStrictEqual(g.FED, [4]);
+  const w = et.windows(DAY);
+  const r = et.sessionRow(et.groupTimes([{ t: w.from + 1000, h: 'Trump Says Tariffs Stay' }, { t: w.open + 1000, h: 'Stocks Rise At The Open' }, { t: w.open + 2000, h: "Fed's Powell Speaks" }]), DAY);
+  assert.deepStrictEqual([r.nOn, r.nSe, r.onH], [1, 2, 17.5]);
+  assert.deepStrictEqual([r.g.SHOCK, r.g.RATES, r.g.WRAP, r.g.NEWS], [[1, 0], [0, 1], [0, 1], [1, 1]]);
+  assert.strictEqual(et.sessionRow([w.open + 1], DAY).g, undefined, 'a plain time list has no types');
+});
+
+test('the type reading: NEWS, SHOCK and RATES ranked per window, counts for the rest, the session mix; no rank without the history', () => {
+  const g = zeroTypes({ NEWS: [100, 33], SHOCK: [100, 30], RATES: [1, 2], WRAP: [7, 8], POLICY: [60, 20], GEO: [40, 10], FED: [1, 2] });
+  const today = { d: DAY, nOn: 107, nSe: 41, g, se_to: iso(at(DAY, 12, 30)), final: false, fetched_at: iso(at(DAY, 12, 30)) };
+  const rd = et.newsReading({ history: history(DAY), today }, at(DAY, 12, 31));
+  assert.deepStrictEqual(rd.overnight.types.SHOCK, { n: 100, rate: 5.714, rank: 0.825, tercile: 'HIGH' }, '100 over 17.5 h against 1..120 over 17.5 h');
+  assert.deepStrictEqual(rd.session.types.SHOCK, { n: 30, rate: 10, rank: 0.525, tercile: 'MID' }, '30 in 3 h against the full sessions 1..120 over 6 h 20');
+  assert.deepStrictEqual(rd.session.types.RATES, { n: 2, rate: 0.667, rank: 0.033, tercile: 'LOW' });
+  assert.strictEqual(rd.overnight.types.NEWS.n, 100);
+  assert.deepStrictEqual(rd.session.counts, { DATA: 0, FED: 2, TRADE: 0, GEO: 10, POLICY: 20, HEALTH: 0, CORP: 0, WRAP: 8 });
+  assert.strictEqual(rd.mix, 'SHOCK'); assert.strictEqual(rd.types_why, undefined);
+  assert.strictEqual(et.newsReading({ history: history(DAY), today: { ...today, g: zeroTypes({ RATES: [0, 3], SHOCK: [0, 2] }) } }, at(DAY, 12, 31)).mix, 'RATES');
+  assert.strictEqual(et.newsReading({ history: history(DAY), today: { ...today, g: zeroTypes() } }, at(DAY, 12, 31)).mix, 'TIE');
+  // the total's rank is unchanged by the types; a day without type counts reads as before
+  const plain = et.newsReading({ history: history(DAY), today: { ...today, g: undefined } }, at(DAY, 12, 31));
+  assert.strictEqual(plain.session.types, undefined); assert.strictEqual(plain.mix, null); assert.strictEqual(plain.session.tercile, rd.session.tercile);
+  assert.match(plain.types_why, /no type counts for the day/);
+  // a history row without types: the counts stay, the ranks go, the total's rank stands
+  const hist = history(DAY); hist[50] = noTypes([hist[50]])[0];
+  const part = et.newsReading({ history: hist, today }, at(DAY, 12, 31));
+  assert.deepStrictEqual(part.session.types.SHOCK, { n: 30, rate: null, rank: null, tercile: null });
+  assert.match(part.types_why, /119 of 120 history sessions have type counts/);
+  assert.strictEqual(part.session.tercile, 'HIGH', '41 in 3 h: the total still ranks');
+  // under 30 minutes of session: no session rank, the overnight ranks stand
+  const early = et.newsReading({ history: history(DAY), today: { ...today, se_to: iso(at(DAY, 9, 30, 25)) } }, at(DAY, 9, 45));
+  assert.strictEqual(early.session.types.SHOCK.tercile, null); assert.strictEqual(early.overnight.types.SHOCK.tercile, 'HIGH');
+});
+
 /** A news server: every headline (created_at) in [start, end], 50 a page, page tokens = offsets. It also serves the CSV
  *  (the pass's kick fetches it on any trading-day pass), which `calls` does not count. */
-function newsServer(times, { fail = () => false, visible = () => true } = {}) {
+function newsServer(items, { fail = () => false, visible = () => true } = {}) {
   const calls = [];
+  const rows = items.map((x) => (typeof x === 'number' ? { t: x, h: `h${x}` } : x));
   const csv = gexCsv(cal.prevTradingDay(DAY), 300, (i) => i + 1);
   const fetchFn = async (url, opts) => {
     if (url === et.GEX_URL) return resp(200, csv);
@@ -108,9 +166,9 @@ function newsServer(times, { fail = () => false, visible = () => true } = {}) {
     calls.push({ url, start: u.searchParams.get('start'), end: u.searchParams.get('end'), token: u.searchParams.get('page_token'), headers: opts.headers });
     if (fail(calls.length)) return resp(500, 'down');
     const a = Date.parse(u.searchParams.get('start')), b = Date.parse(u.searchParams.get('end'));
-    const all = times.filter((t) => t >= a && t <= b && visible(t)).sort((x, y) => x - y);
+    const all = rows.filter((r) => r.t >= a && r.t <= b && visible(r.t)).sort((x, y) => x.t - y.t);
     const off = Number(u.searchParams.get('page_token') || 0);
-    return resp(200, { news: all.slice(off, off + 50).map((t, i) => ({ id: t + i, created_at: iso(t).replace('.000Z', 'Z'), headline: `h${t}` })), next_page_token: off + 50 < all.length ? String(off + 50) : null });
+    return resp(200, { news: all.slice(off, off + 50).map((r) => ({ id: `${r.t}|${r.h}`, created_at: iso(r.t).replace('.000Z', 'Z'), headline: r.h })), next_page_token: off + 50 < all.length ? String(off + 50) : null });
   };
   return { fetchFn, calls };
 }
@@ -120,8 +178,9 @@ test('the refresh (server keys): 09:30 with a missed session backfilled, the ove
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, 'news.json'), JSON.stringify({ v: 1, history: history('2026-11-03'), today: null }));   // ends 11-02: 11-03 is missing
   const w3 = et.windows('2026-11-03'), w4 = et.windows(DAY);
-  const times = [...spread(4, w3.from, w3.open), ...spread(60, w3.open, w3.dec), ...spread(5, w4.from, at(DAY, 9, 0)), at(DAY, 9, 29, 50),
-    ...spread(3, w4.open, at(DAY, 10, 0)), ...spread(2, at(DAY, 10, 40), at(DAY, 15, 0)), at(DAY, 15, 45), at(DAY, 15, 49, 30), at(DAY, 15, 52)];
+  const headed = (ts, h) => ts.map((t) => ({ t, h }));
+  const times = [...spread(4, w3.from, w3.open), ...spread(60, w3.open, w3.dec), ...headed(spread(5, w4.from, at(DAY, 9, 0)), 'Trump Says Tariffs Stay'), { t: at(DAY, 9, 29, 50), h: 'Stocks Fall Before The Open' },
+    ...headed(spread(3, w4.open, at(DAY, 10, 0)), "Fed's Powell Says Rates Stay"), ...headed(spread(2, at(DAY, 10, 40), at(DAY, 15, 0)), 'Russia Says Missile Test Done'), at(DAY, 15, 45), at(DAY, 15, 49, 30), at(DAY, 15, 52)];
   let now = at(DAY, 9, 29);
   const srv = newsServer(times, { visible: (t) => t + 60000 <= now });   // the API shows a headline a minute after its created_at
   const c = { dir, headers: { 'APCA-API-KEY-ID': 'k', 'APCA-API-SECRET-KEY': 's' }, fetchFn: srv.fetchFn };
@@ -137,9 +196,11 @@ test('the refresh (server keys): 09:30 with a missed session backfilled, the ove
   assert.match(srv.calls[0].url, /symbols=SPY,QQQ,SMH,DIA,IWM/); assert.match(srv.calls[0].url, /include_content=false/); assert.match(srv.calls[0].url, /sort=asc/);
   assert.strictEqual(srv.calls[0].headers['APCA-API-KEY-ID'], 'k');
   let st = read();
-  assert.deepStrictEqual(st.history[st.history.length - 1], et.sessionRow(times.slice().sort((a, b) => a - b), '2026-11-03'), 'the backfill is counted as the seed counts');
+  const seedRow = et.sessionRow(et.groupTimes(times.map((x) => (typeof x === 'number' ? { t: x, h: `h${x}` } : x))), '2026-11-03');
+  assert.deepStrictEqual(st.history[st.history.length - 1], seedRow, 'the backfill is counted as the seed counts, types included');
   assert.deepStrictEqual(st.backfilled, ['2026-11-03']);
   assert.deepStrictEqual([st.today.d, st.today.nOn, st.today.on_final, st.today.nSe, st.today.final], [DAY, 5, false, 0, false], 'the 09:29:50 headline is not visible yet');
+  assert.deepStrictEqual([st.today.g.SHOCK, st.today.g.POLICY, st.today.g.TRADE, st.today.g.WRAP], [[5, 0], [5, 0], [5, 0], [0, 0]], 'the types of the overnight window');
   now = at(DAY, 10, 0); await et.kick(now, c);
   assert.strictEqual(srv.calls.length, 2, 'not due before the hour');
   now = at(DAY, 10, 30, 30); await et.kick(now, c);
@@ -147,8 +208,11 @@ test('the refresh (server keys): 09:30 with a missed session backfilled, the ove
   assert.strictEqual(srv.calls[2].start, '2026-11-03T21:00:00Z', 'the overnight window is read again once the open is 15 minutes old');
   st = read();
   assert.deepStrictEqual([st.today.nOn, st.today.on_final, st.today.nSe], [6, true, 3], 'the late headline is counted, and the overnight count settles');
+  assert.deepStrictEqual([st.today.g.WRAP, st.today.g.RATES, st.today.g.FED, st.today.g.NEWS], [[1, 0], [0, 3], [0, 3], [5, 3]], 'the late one is a WRAP; the session s are RATES');
   now = at(DAY, 11, 30, 35); await et.kick(now, c);
   assert.strictEqual(srv.calls[3].start, '2026-11-04T14:30:00Z', 'then the session only');
+  st = read();
+  assert.deepStrictEqual([st.today.g.SHOCK, st.today.g.WRAP], [[5, 0], [1, 0]], 'the settled overnight types are kept when only the session is read');
   now = at(DAY, 15, 50, 25); await et.kick(now, c);
   st = read();
   assert.strictEqual(srv.calls[srv.calls.length - 1].end, '2026-11-04T20:50:00Z', 'C s count ends at 15:50');
@@ -161,7 +225,8 @@ test('the refresh (server keys): 09:30 with a missed session backfilled, the ove
   assert.strictEqual(srv.calls.length, n + 1);
   assert.deepStrictEqual([st.today.nSe, st.today.final], [7, true], 'the settled count has it');
   const last = st.history[st.history.length - 1];
-  assert.deepStrictEqual([last.d, last.nOn, last.nSe], [DAY, 6, 7], 'and the day joins the history');
+  assert.deepStrictEqual([last.d, last.nOn, last.nSe, last.onH], [DAY, 6, 7, 17.5], 'and the day joins the history');
+  assert.deepStrictEqual([last.g.SHOCK, last.g.RATES, last.g.WRAP, last.g.NEWS], [[5, 2], [0, 3], [1, 0], [5, 7]], 'with its types');
   now = at(DAY, 16, 10); assert.strictEqual(et.kick(now, c), null, 'nothing more');
   assert.strictEqual(srv.calls.length, n + 1);
   // a reader without keys (stable) gets the same reading from the same file, and never calls
@@ -172,6 +237,38 @@ test('the refresh (server keys): 09:30 with a missed session backfilled, the ove
   now = at(DAY, 16, 10, 30);
   await et.tag({ symbol: 'SPY', qty: 10, price: 700, now }, { ...reader, log: (r) => rows.push(r) });
   assert.strictEqual(rows[0].news.session.n, 7); assert.strictEqual(rows[0].news.day, DAY);
+  assert.deepStrictEqual([rows[0].news.session.types.SHOCK.n, rows[0].news.session.types.SHOCK.tercile, rows[0].news.session.types.RATES.n], [2, 'LOW', 3], 'the row carries the types, ranked');
+  assert.deepStrictEqual([rows[0].news.overnight.types.SHOCK.n, rows[0].news.overnight.counts.WRAP, rows[0].news.mix], [5, 1, 'RATES']);
+});
+
+test('the upgrade: recent history rows without type counts are counted again by the next refresh, in the same call', async () => {
+  const dir = tmpDir();
+  const hist = history(DAY);
+  hist[hist.length - 1] = noTypes([hist[hist.length - 1]])[0];                 // 11-03, as the first build wrote it
+  fs.writeFileSync(path.join(dir, 'news.json'), JSON.stringify({ v: 1, history: hist, today: null }));
+  const w3 = et.windows('2026-11-03'), w4 = et.windows(DAY);
+  const items = [{ t: w3.from + 1000, h: 'Trump Says Tariffs Stay' }, { t: w3.open + 1000, h: "Fed's Powell Says Rates Stay" }, { t: w4.from + 1000, h: 'Russia Says Missile Test Done' }];
+  const srv = newsServer(items);
+  const now = at(DAY, 9, 31);
+  et._reset({ clock: () => now });
+  await et.kick(now, { dir, headers: { 'APCA-API-KEY-ID': 'k', 'APCA-API-SECRET-KEY': 's' }, fetchFn: srv.fetchFn });
+  assert.strictEqual(srv.calls.length, 1, 'one call');
+  assert.strictEqual(srv.calls[0].start, iso(w3.from).replace('.000Z', 'Z'), 'from that row s own overnight window');
+  const st = JSON.parse(fs.readFileSync(path.join(dir, 'news.json'), 'utf8'));
+  const row = st.history.find((h) => h.d === '2026-11-03');
+  assert.deepStrictEqual([row.nOn, row.nSe, row.g.SHOCK, row.g.RATES, row.onH], [1, 1, [1, 0], [0, 1], 17.5]);
+  assert.strictEqual(st.history.length, hist.length, 'in place, no new row');
+  assert.deepStrictEqual(st.backfilled, ['2026-11-03']);
+  assert.deepStrictEqual([st.today.nOn, st.today.g.SHOCK], [1, [1, 0]], 'and today s overnight window from the same call');
+  // the older ones with no type counts are the seed's job: a refresh does not reach past its backfill window
+  const dir2 = tmpDir();
+  fs.writeFileSync(path.join(dir2, 'news.json'), JSON.stringify({ v: 1, history: noTypes(history(DAY)), today: null }));
+  const srv2 = newsServer([]);
+  et._reset({ clock: () => now });
+  await et.kick(now, { dir: dir2, headers: { 'APCA-API-KEY-ID': 'k', 'APCA-API-SECRET-KEY': 's' }, fetchFn: srv2.fetchFn });
+  const st2 = JSON.parse(fs.readFileSync(path.join(dir2, 'news.json'), 'utf8'));
+  assert.strictEqual(st2.history.filter((h) => h.g).length, 10, 'the last ten rows only');
+  assert.strictEqual(st2.history.length, 120);
 });
 
 test('a failed refresh is retried after ten minutes; no keys, no call; a pass off the real clock does nothing', async () => {

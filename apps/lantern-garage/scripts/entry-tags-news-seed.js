@@ -28,14 +28,15 @@ if (!archive || !out) { console.error('usage: entry-tags-news-seed.js --archive 
 
 const files = fs.readdirSync(archive).filter((f) => /^bz_\d{4}-\d{2}\.json$/.test(f)).sort();
 if (!files.length) { console.error(`no bz_YYYY-MM.json in ${archive}`); process.exit(2); }
-const seen = new Set(); const ts = [];
+const seen = new Set(); const items = [];
 for (const f of files) {
   for (const n of JSON.parse(fs.readFileSync(path.join(archive, f), 'utf8'))) {
     const k = `${n.t}|${n.h}`; if (seen.has(k)) continue; seen.add(k);
-    const t = Date.parse(n.t); if (Number.isFinite(t)) ts.push(t);
+    const t = Date.parse(n.t); if (Number.isFinite(t)) items.push({ t, h: n.h });
   }
 }
-ts.sort((a, b) => a - b);
+const groups = et.groupTimes(items);
+const ts = groups.ALL;
 // The archive's end: the first instant after its last month file (the fetcher's own month bounds are UTC).
 const [ly, lm] = files[files.length - 1].slice(3, 10).split('-').map(Number);
 const archiveEnd = Date.UTC(lm === 12 ? ly + 1 : ly, lm === 12 ? 0 : lm, 1);
@@ -51,7 +52,7 @@ const days = [];
 for (let d = through; days.length < KEEP && d; d = cal.prevTradingDay(d)) days.unshift(d);
 const firstNeeded = et.windows(days[0]).from;
 if (!ts.length || ts[0] > firstNeeded) console.warn(`warning: the archive starts at ${ts.length ? new Date(ts[0]).toISOString() : '-'}, after ${days[0]}'s overnight window`);
-const seeded = days.map((d) => et.sessionRow(ts, d));
+const seeded = days.map((d) => et.sessionRow(groups, d));
 
 const file = path.join(out, 'news.json');
 let prev = null; try { prev = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_e) { prev = null; }
@@ -60,7 +61,7 @@ const st = { v: 1, history: [...seeded, ...live].slice(-KEEP), today: (prev && p
   seeded: { from: archive, files: files.length, headlines: ts.length, through, sessions: seeded.length, at: new Date().toISOString() } };
 
 console.info(`headlines ${ts.length} (${files.length} month files) | seeded ${seeded.length} sessions ${days[0]} .. ${through} | live rows kept ${live.length}`);
-for (const h of seeded.slice(-5)) console.info(`  ${h.d}  overnight ${h.nOn} (${h.on.toFixed(3)}/h)  session ${h.nSe} (${h.se.toFixed(3)}/h)`);
+for (const h of seeded.slice(-5)) console.info(`  ${h.d}  overnight ${h.nOn} (${h.on.toFixed(3)}/h)  session ${h.nSe} (${h.se.toFixed(3)}/h)  session SHOCK ${h.g.SHOCK[1]} RATES ${h.g.RATES[1]} WRAP ${h.g.WRAP[1]}`);
 if (dry) { console.info('--dry: nothing written'); process.exit(0); }
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(file, JSON.stringify(st));
