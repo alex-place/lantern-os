@@ -21,7 +21,33 @@ module.exports = async function newsRoutes(req, res, url, ctx) {
       const ticker = url.searchParams.get('ticker') || '';
       const sentiment = url.searchParams.get('sentiment') || '';
       const records = tradingNews.queryRecentNews({ limit, ticker, sentiment });
-      sendJson(res, { records, count: records.length }, 200);
+      /* symbols= and sinceHours= narrow the WIRE, not just the render (2026-11-03).
+         The home page wants "recent stories that name one of the sixteen funds we
+         score". It was pulling limit=200 and discarding ~94% of it in the browser:
+         measured 276 KB over the network to draw six rows. Filtering here sends ~10 KB.
+
+         `scanned` is the size of the window the symbol filter ran over (after the age
+         cut, before the symbol cut), so the page can still say "6 of the last 89".
+         Both params are optional and absent ones change nothing, so every existing
+         caller keeps the response it had. */
+      const want = (url.searchParams.get('symbols') || '')
+        .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+      const sinceHours = Number(url.searchParams.get('sinceHours')) || 0;
+      let out = records;
+      if (sinceHours > 0) {
+        const cutoff = Date.now() - sinceHours * 3600e3;
+        out = out.filter((r) => {
+          const t = Date.parse(r.published || r.date || '');
+          // A missing or unparseable date is not a reason to hide a real story.
+          return Number.isNaN(t) ? true : t >= cutoff;
+        });
+      }
+      const scanned = out.length;
+      if (want.length) {
+        const set = new Set(want);
+        out = out.filter((r) => (r.symbols || []).some((s) => set.has(String(s).toUpperCase())));
+      }
+      sendJson(res, { records: out, count: out.length, scanned }, 200);
     } catch (error) {
       sendJson(res, { error: 'News query failed', details: error.message, records: [] }, 500);
     }

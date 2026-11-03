@@ -540,3 +540,20 @@ html[data-theme="dark"] .vp-go:not(.quiet):hover { background: #22d3ee; }
   .vp-act .vp-go { margin-left: 0; width: 100%; min-height: 44px; }
   .vp-read { min-height: 44px; }
 }
+
+/* ── News rows: the symbols are links now ─────────────────────────────────────
+   The row used to be ONE anchor with the symbol chips as spans inside it, so the
+   chips inherited cursor:pointer, looked clickable, and navigated to the story
+   instead of the symbol. The row is a div, the headline carries the story link,
+   and each symbol is its own link to /symbol.html -- not to the trader, which has
+   no bars for a symbol that is not on the watchlist and would land on SPY. */
+.nrow .nh { display: block; color: inherit; text-decoration: none; }
+.nrow .nh:hover { text-decoration: underline; }
+.chip-sym { display: inline-flex; align-items: center; min-height: 26px; padding: 4px 9px;
+            border: 1px solid var(--border); text-decoration: none;
+            transition: color .15s ease, border-color .15s ease; }
+/* .nrow:hover paints the row --surface2, the same colour as .chip, so without the
+   border above the chips vanish under the cursor. */
+.chip-sym:hover { color: var(--accent-strong); border-color: var(--accent-strong); }
+.nrow .nh:focus-visible, .chip-sym:focus-visible {
+  outline: 2px solid var(--accent-strong); outline-offset: 2px; }

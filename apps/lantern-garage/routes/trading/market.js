@@ -66,13 +66,32 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       return true;
     }
     try {
+      /* The gate is STATIC ENGINE CONFIG, not scan output, so it goes out on every
+         branch (2026-11-03). It used to ship only on the warm path, which meant that
+         whenever the scan was cold the home page's signals block stayed hidden -- while
+         the sentence above it read "a linear model over the signals listed below",
+         pointing at nothing. Nothing here depends on a scan having run. */
+      const engineGate = () => {
+        try {
+          const evmod = require('../../lib/signal-engine/convergence-ev');
+          const W = evmod.WEIGHTS || {};
+          return {
+            ev_min: evmod.EV_MIN,
+            p_min: evmod.P_MIN,
+            signals: Object.keys(W)
+              .filter((k) => Number(W[k]) > 0)              // 0 = folded into base_rate
+              .sort((a, b) => Number(W[b]) - Number(W[a])),
+          };
+        } catch (e) { return null; }   // engine module unavailable — omit rather than guess
+      };
+      const withGate = (body) => { const g = engineGate(); return g ? Object.assign({ gate: g }, body) : body; };
       // Never block a page GET on a fresh 90s market scan (#1227). Serve the
       // last-good cached scan instantly; warm/refresh the cache in the background.
       // Cold cache → honest "not ready" now; data appears on a later poll.
       const cacheEntry = traderAgent.cache && traderAgent.cache['market_scan'];
       if (!cacheEntry || !cacheEntry.data) {
         traderAgent.scanMarket().catch(() => {}); // background warm
-        sendJson(res, { zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }, 200);
+        sendJson(res, withGate({ zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }), 200);
         return true;
       }
       // A cached scan that FAILED (#1861) is not "warming up" — surface the honest
@@ -87,10 +106,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         // fall back to the first line. Strip CRs so the message stays one line.
         const lines = String(cacheEntry.data.error).replace(/\r/g, '').split('\n').map((s) => s.trim()).filter(Boolean);
         const cause = [...lines].reverse().find((l) => /error|exception/i.test(l)) || lines[0] || 'backend error';
-        sendJson(res, {
+        sendJson(res, withGate({
           zones: {}, available: false, failed: true,
           reason: 'market data unavailable — ' + cause.slice(0, 160),
-        }, 200);
+        }), 200);
         return true;
       }
       const scanFresh = (Date.now() - cacheEntry.time) < traderAgent.cacheExpiry;
@@ -184,28 +203,16 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       // to tell whether an EV of 0.78 R is marginal or comfortable, and the landing
       // page would have to hardcode the bar — which then silently drifts the day
       // someone retunes EV_MIN. Read from the module that owns the decision.
-      var gate = null;
-      try {
-        var evmod = require('../../lib/signal-engine/convergence-ev');
-        // The signal ORDER goes out with the gate (2026-11-03) -- the names ranked by
-        // weight, NOT the coefficients. The landing page names what the model looks at
-        // and in what order it matters; deriving that order here, from the module that
-        // owns the decision, keeps the page from carrying a transcribed list that
-        // silently drifts the next time someone retunes a signal.
-        //
-        // The coefficients themselves stay out of this response on purpose (operator
-        // decision, 2026-11-03): /zones is a public read, so anything in it is a
-        // published number. They remain readable in the source for anyone auditing the
-        // arithmetic -- this endpoint just does not broadcast them.
-        var W = evmod.WEIGHTS || {};
-        gate = {
-          ev_min: evmod.EV_MIN,
-          p_min: evmod.P_MIN,
-          signals: Object.keys(W)
-            .filter(function (k) { return Number(W[k]) > 0; })  // 0 = folded into base_rate
-            .sort(function (a, b) { return Number(W[b]) - Number(W[a]); }),
-        };
-      } catch (e) { /* engine module unavailable — omit rather than guess */ }
+      /* The signal ORDER goes out with the gate — the names ranked by weight, NOT the
+         coefficients. The landing page names what the model looks at and in what order it
+         matters; deriving that order from the module that owns the decision keeps the page
+         from carrying a transcribed list that silently drifts on the next retune.
+
+         The coefficients themselves stay out of this response on purpose (operator
+         decision, 2026-11-03): /zones is a public read, so anything in it is a published
+         number. They remain readable in the source for anyone auditing the arithmetic —
+         this endpoint just does not broadcast them. See engineGate() above. */
+      var gate = engineGate();
       // as_of is the scan this response was BUILT from, not the moment of the request:
       // a cached scan can be minutes old, and a reader looking at a book of verdicts
       // cannot otherwise tell this morning's pass from last Tuesday's.

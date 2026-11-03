@@ -128,8 +128,11 @@
 
       <p class="note">
         Two things worth being plain about. The scoring is deterministic technical analysis
-        with a hand-weighted linear model — arithmetic, not a language model, and not
-        something that learns; the AI here is the assistant. And the sizes are quoted in
+        through a hand-weighted linear model: the same arithmetic on every pass, and nothing
+        learns between runs. Two of its inputs — the Grok and Claude rows above — are
+        themselves model opinions, but they enter as numbers and are weighted by the same
+        fixed table as every other signal, so nothing a model says can change the
+        arithmetic around it. And the sizes are quoted in
         <b>R</b>, the trade’s own risk: 1&nbsp;R is what you would lose if the stop hit, so an
         expected value of 0.80&nbsp;R is about $80 for every $100 put at risk.
       </p>
@@ -631,7 +634,11 @@
         proof.appendChild(cap);
         proof.appendChild(verdictPanel(pick[0], pick[1], true));   // lean: no R above the fold
       } else {
-        proof.appendChild(el('div', 'state', 'The engine has not scored this pass yet.'));
+        proof.appendChild(el('div', 'state', (SCAN_STATE && SCAN_STATE.failed)
+          ? (SCAN_STATE.reason || 'Market data is unavailable right now.')
+          : (SCAN_STATE && SCAN_STATE.available === false)
+            ? 'The first scan is still running — this fills in by itself.'
+            : 'The engine has not scored this pass yet.'));
       }
     }
 
@@ -642,7 +649,15 @@
     var box = byId('book');
     box.innerHTML = '';
     if (!picks.length) {
-      box.appendChild(el('div', 'state', 'The engine has not scored anything on this pass.'));
+      /* Three different situations used to print one sentence. The server distinguishes
+         them; say which one it is, in its own words. */
+      var st = SCAN_STATE || {};
+      var msg = 'The engine has not scored anything on this pass.', cls = 'state';
+      if (st.failed) { msg = st.reason || 'Market data is unavailable right now.'; cls = 'state err'; }
+      else if (st.available === false) {
+        msg = (st.reason || 'The first scan is still running') + ' — this fills in by itself.';
+      }
+      box.appendChild(el('div', cls, msg));
       byId('book-sub').textContent = '';
       return;
     }
@@ -683,6 +698,12 @@
 
   function renderMarkets(rows) {
     var box = byId('mkt');
+    /* This box is rebuilt wholesale every 60 seconds. Anything focused inside it is
+       removed from the document, so the focus falls back to <body> and a keyboard user is
+       thrown to the top of the page once a minute — and there are now buttons in here to
+       lose. Remember what was focused by a stable key and put it back. */
+    var ae = document.activeElement;
+    var keep = (ae && box.contains(ae)) ? ae.getAttribute('data-fkey') : null;
     box.innerHTML = '';
     if (!rows.length) { box.appendChild(el('div', 'state', 'No tickers are being tracked yet.')); return; }
     var sorted = rows.slice().sort(function (a, b) { return Math.abs(Number(b.chg_pct) || 0) - Math.abs(Number(a.chg_pct) || 0); });
@@ -696,6 +717,7 @@
         // them pointed at the bare terminal before (founder, 2026-10-11): clicking AAPL
         // and clicking TSLA arrived at the same screen.
         var a = el('a', 'row'); a.href = '/symbol.html?t=' + encodeURIComponent(r.ticker);
+        a.setAttribute('data-fkey', 'row:' + r.ticker);   // survives the 60s re-render
         a.appendChild(badge(r.ticker));
         var g = el('div', 'grow'), l1 = el('div', 'l1');
         l1.appendChild(el('span', 'sym', r.ticker));
@@ -717,12 +739,15 @@
         var rgo = el('a', 'row-go', 'Chart');
         rgo.href = '/stock-trader.html?ticker=' + encodeURIComponent(r.ticker);
         rgo.setAttribute('aria-label', 'Chart ' + r.ticker + ' in the trader');
+        rgo.setAttribute('data-fkey', 'go:' + r.ticker);
         rw.appendChild(rgo);
         c.appendChild(rw);
 
         /* Sparklines are progressive enhancement: one light request each, and if it
            fails the row simply stays a row. */
-        if (withSpark) {
+        /* market.css hides .spark under 401px, so on a phone these six requests bought
+           nothing: measured 19 KB each, 115 KB thrown away on the narrowest connection. */
+        if (withSpark && window.innerWidth > 400) {
           bars(r.ticker, '1d', 90)
             .then(function (bs) {
               var closes = closesOf(bs);
@@ -740,6 +765,10 @@
     // the 16 while the heading above it said "16 tracked".
     box.appendChild(listCard('The rest of the watchlist', 'Everything else being tracked.', sorted.slice(6), false));
     byId('mkt-sub').textContent = rows.length + ' tracked';
+    if (keep) {
+      var back = box.querySelector('[data-fkey="' + keep + '"]');
+      if (back) back.focus();
+    }
   }
 
   /* ── News ───────────────────────────────────────────────────────────────────── */
@@ -751,15 +780,28 @@
       // The headline opens OUR summary of the story; the original is a separate,
       // labelled link on that page (founder, 2026-10-11). A story with no id has no
       // page of its own, so it still goes straight to the publisher.
-      var a = el('a', 'nrow');
+      /* The row was ONE anchor and the symbol chips were spans inside it, so they
+         inherited cursor:pointer, looked clickable, and then navigated to the story
+         rather than to the symbol. An <a> may not contain an <a>, so the row becomes a
+         div and the headline carries the link. */
+      var a = el('div', 'nrow');
       var nid = n.news_id || n.id;
-      if (nid) { a.href = '/news-article.html?id=' + encodeURIComponent(nid); }
-      else if (n.url) { a.href = n.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
-      a.appendChild(el('div', 'nh', n.headline || n.text || '(untitled)'));
+      var h = el('a', 'nh', n.headline || n.text || '(untitled)');
+      if (nid) { h.href = '/news-article.html?id=' + encodeURIComponent(nid); }
+      else if (n.url) { h.href = n.url; h.target = '_blank'; h.rel = 'noopener noreferrer'; }
+      a.appendChild(h);
       var m = el('div', 'nm');
       if (n.source) m.appendChild(el('span', null, n.source));
       if (n.published) m.appendChild(el('span', null, ago(n.published)));
-      (n.symbols || []).slice(0, 4).forEach(function (s) { m.appendChild(el('span', 'chip', s)); });
+      /* To symbol.html, NOT the trader: a story can name a symbol that is not on the
+         watchlist, and the trader has no bars for one — it would land the reader on SPY.
+         The symbol page works for anything. */
+      (n.symbols || []).slice(0, 4).forEach(function (s) {
+        var cs = el('a', 'chip chip-sym', s);
+        cs.href = '/symbol.html?t=' + encodeURIComponent(s);
+        cs.setAttribute('aria-label', s + ' — what the engine sees');
+        m.appendChild(cs);
+      });
       if (n.direction && n.direction !== 'neutral') {
         m.appendChild(el('span', 'chip ' + (n.direction === 'bullish' ? 'up' : 'down'), n.direction));
       }
@@ -772,19 +814,48 @@
   }
 
   /* ── Load ───────────────────────────────────────────────────────────────────── */
-  get('/api/trading/zones')
-    .then(function (d) {
-      GATE = (d && d.gate) || null;
-      SCAN_AT = (d && d.as_of) || null;
-      SCAN_STALE = !!(d && d.stale);
-      renderBook((d && d.zones) || {});
-      renderWeights();
-    })
-    .catch(function (e) {
-      fail(byId('book'), 'the engine', e);
-      if (byId('hero-proof')) fail(byId('hero-proof'), 'the engine', e);
-      byId('book-sub').textContent = '';
-    });
+  /* The engine, on a RETRY loop rather than one shot (2026-11-03).
+
+     This was fetched EXACTLY ONCE. The scan cache is cold right after a deploy and for
+     the first visitor of the morning, and in that window the server honestly answers
+     {zones:{}, available:false} — so the book rendered empty, the signals block stayed
+     hidden, and both stayed that way until the reader manually reloaded. It is the worst
+     possible first impression and it is the state a brand-new visitor is most likely to
+     hit. The page also discarded `available`, `failed` and `reason`, which the server
+     sends precisely so a reader can tell "still warming up" from "the market backend is
+     down" from "a real pass that scored nothing" — all three printed the same sentence. */
+  var SCAN_STATE = null;
+  var _zoneTries = 0, _zoneAt = 0;
+  function loadZones() {
+    _zoneAt = Date.now();
+    return get('/api/trading/zones')
+      .then(function (d) {
+        d = d || {};
+        GATE = d.gate || GATE || null;   // static engine config: present on every branch
+        SCAN_AT = d.as_of || null;
+        SCAN_STALE = !!d.stale;
+        SCAN_STATE = { available: d.available, failed: !!d.failed, reason: d.reason || '' };
+        renderBook(d.zones || {});
+        renderWeights();
+        // Keep asking only while the server says it is warming up. A failed backend has
+        // its own backoff, and a warm pass needs nothing further.
+        if (d.available === false && !d.failed && _zoneTries < 20) {
+          _zoneTries++;
+          setTimeout(loadZones, 6000);
+        }
+      })
+      .catch(function (e) {
+        fail(byId('book'), 'the engine', e);
+        if (byId('hero-proof')) fail(byId('hero-proof'), 'the engine', e);
+        byId('book-sub').textContent = '';
+      });
+  }
+  loadZones();
+  /* A phone that has been in a pocket for an hour comes back to an hour-old book with a
+     timestamp on it saying so. Throttled, because this is a 50 KB response. */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - _zoneAt > 60000) loadZones();
+  });
 
   function loadMarket() {
     get('/api/trading/market-status').then(renderPulse).catch(function (e) { fail(byId('pulse'), 'market status', e); });
@@ -807,7 +878,17 @@
     { id: 'forex', label: 'Forex', all: 'See all major pairs', href: '/market.html?c=forex&g=majors' },
     { id: 'economy', label: 'Economy', all: 'See the US economy', href: '/market.html?c=economy' }
   ];
-  var _hub = null, _econ = null, _msum = MSUM[0];
+  var _hub = null, _econ = null, _msum = MSUM[0], _econAsked = false;
+  /* The economy figures are 182 KB — the second-largest thing the page pulls — and they
+     were fetched on every load for a tab most readers never open. Fetched once, on the
+     first time it is actually selected. */
+  function loadEcon() {
+    if (_econAsked) return;
+    _econAsked = true;
+    get('/api/trading/markets?c=economy')
+      .then(function (d) { _econ = d || {}; if (_msum.id === 'economy') drawSummary(); })
+      .catch(function () { _econ = {}; if (_msum.id === 'economy') drawSummary(); });
+  }
   function drawSummary() {
     var U = window.MarketUI, box = byId('msum');
     if (!U || !box) return;
@@ -833,14 +914,13 @@
   if (window.MarketUI && byId('msumTabs')) {
     byId('msumTabs').appendChild(window.MarketUI.rangeBar(MSUM.map(function (m) { return m.label; }), _msum.label, function (label) {
       _msum = MSUM.filter(function (m) { return m.label === label; })[0] || MSUM[0];
+      if (_msum.id === 'economy') loadEcon();
       drawSummary();
     }));
     drawSummary();
     loadSummary();
     setInterval(loadSummary, 60000);
-    get('/api/trading/markets?c=economy')
-      .then(function (d) { _econ = d || {}; if (_msum.id === 'economy') drawSummary(); })
-      .catch(function () { _econ = {}; if (_msum.id === 'economy') drawSummary(); });
+    if (_msum.id === 'economy') loadEcon();   // only if it is the tab we open on
   }
 
   /* The wire is the whole market; the page is sixteen funds. Unfiltered, this was the
@@ -848,33 +928,32 @@
      \u2014 measured 2026-11-03, 15 of 200 recent stories tagged a watchlist symbol. So pull
      a wide window and keep only the stories that name something the engine scores. If
      none do, the section removes itself rather than padding the page with noise. */
-  Promise.all([
-    get('/api/trading/news/recent?limit=200').then(function (d) { return (d && d.records) || []; }),
-    get('/api/trading/watchlist-prices')
-      .then(function (d) { return Array.isArray(d) ? d : ((d && d.prices) || []); })
-      .catch(function () { return []; })
-  ]).then(function (r) {
-    var all = r[0], wl = {};
-    r[1].forEach(function (x) { if (x && x.ticker) wl[String(x.ticker).toUpperCase()] = 1; });
-    /* Age cap: widening the window to 200 reaches back weeks, and a three-week-old
-       headline under "Market news" is wrong even when it does name a watchlist fund.
-       A story with no date is kept \u2014 dropping it would hide a real story over a
-       missing field. */
-    var CUTOFF = Date.now() - 7 * 864e5;
-    var fresh = all.filter(function (n) {
-      if (!n.published) return true;
-      var t = new Date(n.published).getTime();
-      return isNaN(t) || t >= CUTOFF;
-    });
-    var hits = Object.keys(wl).length
-      ? fresh.filter(function (n) {
-          return (n.symbols || []).some(function (s) { return wl[String(s).toUpperCase()]; });
-        })
-      : fresh;   // watchlist unavailable \u2014 show the feed rather than an empty section
-    var sec = document.querySelector('section[aria-labelledby=\"news-h\"]');
-    if (!hits.length) { if (sec) sec.hidden = true; return; }
-    renderNews(hits.slice(0, 6), fresh.length);
-  }).catch(function (e) { fail(byId('news'), 'market news', e); byId('news-sub').textContent = ''; });
+  get('/api/trading/watchlist-prices')
+    .then(function (d) { return Array.isArray(d) ? d : ((d && d.prices) || []); })
+    .catch(function () { return []; })
+    .then(function (prices) {
+      var syms = prices.map(function (x) { return x && x.ticker; }).filter(Boolean);
+      /* The filtering moved to the server (2026-11-03). Pulling limit=200 and discarding
+         94% of it in the browser measured 276 KB over the wire to draw six rows; asking
+         for the window pre-filtered sends about 10 KB. If the price feed did not answer
+         we have no symbol list, so we fall back to the unfiltered window rather than
+         sending symbols= and getting nothing back. */
+      var q = '/api/trading/news/recent?limit=200&sinceHours=168'
+            + (syms.length ? '&symbols=' + encodeURIComponent(syms.join(',')) : '');
+      return get(q).then(function (d) {
+        return { hits: (d && d.records) || [], scanned: (d && d.scanned) || 0, filtered: !!syms.length };
+      });
+    })
+    .then(function (r) {
+      /* The age cap (7 days = 168h) and the symbol match both happen on the server now;
+         what comes back is already the answer. `scanned` is the size of the aged window
+         the symbol filter ran over, so the sub-line can still say "6 of the last 89". */
+      var sec = document.querySelector('section[aria-labelledby=\"news-h\"]');
+      if (!r.hits.length) { if (sec) sec.hidden = true; return; }
+      if (sec) sec.hidden = false;
+      renderNews(r.hits.slice(0, 6), r.filtered ? r.scanned : 0);
+    })
+    .catch(function (e) { fail(byId('news'), 'market news', e); byId('news-sub').textContent = ''; });
 })();
 </script>
 </body>
