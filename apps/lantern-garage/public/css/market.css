@@ -72,7 +72,12 @@
     .cta { display: inline-flex; align-items: center; justify-content: center; height: 50px; padding: 0 28px;
            border-radius: 12px; background: var(--accent-strong); color: #04121a; font-size: 16px; font-weight: 700;
            text-decoration: none; box-shadow: 0 8px 24px -10px rgba(34,211,238,.7); }
-    .cta:hover { background: #67e8f9; }
+    /* #67e8f9 is a BAND literal. Outside the band .cta is --accent-strong (#0369a1) with
+       WHITE text, so swapping in a pale cyan took "Create a free account" from 5.93:1 to
+       1.45:1 on hover -- measured. Scope the literal; give the canvas button a hover that
+       keeps its contrast. */
+    .band .cta:hover { background: #67e8f9; }
+    .cta:hover { background: var(--accent-strong-hover); }
     .cta-ghost { display: inline-flex; align-items: center; height: 50px; padding: 0 20px; border-radius: 12px;
                  border: 1px solid #2b3648; color: var(--text); text-decoration: none; font-size: 15px; font-weight: 600; }
     .cta-ghost:hover { border-color: var(--muted); background: rgba(255,255,255,.03); }
@@ -87,7 +92,13 @@
     .sym { font-size: 17px; font-weight: 700; letter-spacing: .01em; }
     .chip { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: var(--surface2); color: var(--text); }
     .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 8px; border-radius: 6px; background: var(--surface2); }
-    .tag.enter { color: var(--up); } .tag.skip { color: var(--down); }
+    /* --up/--down are band-local ON PURPOSE (see .band above): the AA-tuned light --green
+       measures ~2.3:1 on that background. But .tag mostly lives OUTSIDE the band, where the
+       undefined var made every ENTER and SKIP in the book fall back to plain body text --
+       measured rgb(17,24,39) on 6 of 7 tags, i.e. the page's single most important signal
+       rendered colourless in both themes. The fallback keeps the band's tuned pair inside
+       the band and the global AA pair everywhere else. */
+    .tag.enter { color: var(--up, var(--green)); } .tag.skip { color: var(--down, var(--red)); }
     .vhead .spacer { flex: 1 1 auto; }
 
     .chartbox { position: relative; border-radius: 12px; overflow: hidden; background: rgba(10,14,23,.5); }
@@ -474,3 +485,58 @@
     .plans span { font-size: 13px; line-height: 1.55; color: var(--muted); }
     .plans .chip { margin-left: 6px; vertical-align: middle; }
     .price-card .inlink { margin-top: 16px; display: inline-block; }
+
+/* ── Ticker actions (operator UI pass, 2026-11-03) ───────────────────────────
+   Every verdict card and market row is ABOUT one symbol, and now says where it goes.
+   Both controls are real links and always SIBLINGS, never nested: the card became an
+   <article> and the row's action sits outside the row's own anchor. Geometry is
+   borrowed from .cta-line / .chip rather than inventing a twelfth button style. */
+.vp-act { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+          margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--border); }
+.vp-read { display: inline-flex; align-items: center; min-height: 34px; font-size: 13px;
+           font-weight: 600; color: var(--muted); text-decoration: none; }
+.vp-read:hover { color: var(--text); text-decoration: underline; }
+.vp-act .vp-go { margin-left: auto; }
+.vp-go { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+         min-height: 34px; padding: 0 15px; border-radius: 999px; white-space: nowrap;
+         background: var(--accent-strong); color: #fff;
+         font-size: 13px; font-weight: 700; text-decoration: none;
+         transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.vp-go:hover { background: var(--accent-strong-hover); }
+/* Dark flips --accent-strong to a bright cyan (#06b6d4) that white text fails on, so the
+   label goes dark there and the hover brightens instead of darkening.
+   :not(.quiet) is load-bearing -- these selectors outrank .vp-go.quiet (0,2,1 vs 0,2,0),
+   so without it the hero's OUTLINE button was painted #04121a on the dark canvas:
+   measured 1.02:1, an invisible label. */
+html[data-theme="dark"] .vp-go:not(.quiet) { color: #04121a; }
+html[data-theme="dark"] .vp-go:not(.quiet):hover { background: #22d3ee; }
+.band .vp-go:not(.quiet) { color: #04121a; }
+.band .vp-go:not(.quiet):hover { background: #67e8f9; }
+/* The hero already sits beside the page's filled cyan CTA; a second filled button
+   there competes with it. */
+.vp-go.quiet { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.vp-go.quiet:hover { background: var(--surface); border-color: var(--accent-strong); color: var(--accent-strong); }
+
+.row-wrap { display: flex; align-items: center; gap: 6px; }
+.row-wrap .row { flex: 1 1 auto; min-width: 0; }
+.row-go { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+          min-height: 44px; padding: 0 14px; border-radius: 8px; white-space: nowrap;
+          border: 1px solid var(--border); color: var(--text); text-decoration: none;
+          font-size: 13px; font-weight: 600;
+          transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.row-go:hover { background: var(--surface); border-color: var(--accent-strong); color: var(--accent-strong); }
+
+/* The rendered page carried zero author-written focus rules of any kind; these are all
+   keyboard targets. No border-radius:inherit -- the outline already follows each
+   element's own box, and inheriting squares off the pills. */
+.vp-go:focus-visible, .vp-read:focus-visible, .row-go:focus-visible,
+.row:focus-visible, .cta-line:focus-visible, .inlink:focus-visible {
+  outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+@media (max-width: 420px) {
+  /* Keep the label -- an unlabelled glyph is the thing this pass exists to remove.
+     The card's two actions stack, each spanning the card, and each gets a 44px target. */
+  .vp-act { gap: 6px; }
+  .vp-act .vp-go { margin-left: 0; width: 100%; min-height: 44px; }
+  .vp-read { min-height: 44px; }
+}

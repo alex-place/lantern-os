@@ -8,6 +8,11 @@
  * TSLA arrived at the same screen. TradingView's equivalent is a page per symbol, and
  * that is what /symbol.html is.
  *
+ * 2026-11-03 — each ticker now offers TWO named destinations: the symbol page (why the
+ * engine took or refused it) and the terminal charting that symbol. Both carry the symbol,
+ * and the trader finally READS it: `?ticker=` had been emitted by symbol.html since #3744
+ * with no receiver on the other end, so that CTA had always landed on SPY.
+ *
  * Two things here are load-bearing beyond "the link works":
  *
  *   PUBLIC. The symbol page is the destination of a link on a PUBLIC page. Gating it
@@ -31,16 +36,52 @@ const HOME = read('index.html');
 const SYM = read('symbol.html');
 const CSS = read('css/market.css');
 const PAGES = fs.readFileSync(path.join(__dirname, '..', 'routes', 'pages.js'), 'utf8').replace(/\r\n/g, '\n');
+const TRADER = read('stock-trader.html');
 
 test('every ticker on the home page leads to that ticker, not to the bare terminal', () => {
   assert.match(HOME, /a\.href = '\/symbol\.html\?t=' \+ encodeURIComponent\(r\.ticker\);/,
     'the Markets rows');
-  assert.match(HOME, /a\.href = '\/symbol\.html\?t=' \+ encodeURIComponent\(symbol\);/,
+  // The verdict panel stopped being one whole-card anchor on 2026-11-03 (an <a> may not
+  // contain an <a>, and the card now carries two named actions), so the symbol-page link
+  // is the card's own "why/setup" action rather than the card element itself.
+  assert.match(HOME, /read\.href = '\/symbol\.html\?t=' \+ encodeURIComponent\(symbol\);/,
     'the engine verdict panels');
   // The links that SHOULD still go to the terminal are the ones that are about acting,
   // not about a symbol: the hero CTA and the product card.
   assert.match(HOME, /href="\/stock-trader\.html"/, 'the terminal is still linked');
   assert.doesNotMatch(HOME, /el\('a', 'row'\);\s*a\.href = '\/stock-trader\.html'/, 'no bare row link left');
+});
+
+test('the per-ticker trader action carries its symbol, on every surface', () => {
+  // The other half of the same rule. Added 2026-11-03: the page now offers a SECOND
+  // destination per ticker -- the terminal, charting that symbol -- and a symbol-blind
+  // version of it is the exact defect this file was opened for.
+  assert.match(HOME, /go\.href = '\/stock-trader\.html\?ticker=' \+ encodeURIComponent\(symbol\);/,
+    'the verdict panels');
+  assert.match(HOME, /rgo\.href = '\/stock-trader\.html\?ticker=' \+ encodeURIComponent\(r\.ticker\);/,
+    'the Markets rows');
+  // It was EMITTED twice with identical text and no symbol on it. Match the emission,
+  // not the words: the comment that records why it went still names it.
+  assert.doesNotMatch(HOME, /el\('a', 'inlink', 'Open any of these in the trader'\)/,
+    'the symbol-blind duplicate is gone');
+  // The symbol belongs on the visible face: six cards reading "Open in trader" are six
+  // identical slabs, and a reader cannot tell which one they are about to open.
+  assert.match(HOME, /'Open ' \+ symbol \+ ' in the trader'/, 'the card names its symbol');
+  assert.match(HOME, /'Chart ' \+ r\.ticker \+ ' in the trader'/, 'the row names its symbol');
+});
+
+test('the trader actually receives the ticker those links send', () => {
+  // symbol.html has emitted /stock-trader.html?ticker=X as its primary CTA since #3744
+  // and explore.html emits ?symbol=; nothing in the trader ever read either, so every one
+  // of those links landed on SPY. Shipping the home-page buttons without the receiver
+  // would have added a third surface to the same dead end.
+  assert.match(TRADER, /q\.get\('ticker'\) \|\| q\.get\('symbol'\)/, 'both shipped spellings');
+  assert.match(TRADER, /fullRefresh\(\)\.finally\(applyTickerDeepLink\)/,
+    'hung on the first completed refresh, so wlPrices is populated and a failed loader cannot swallow it');
+  // jumpToSymbol adds the symbol to the watchlist first, and that POST 401s for the
+  // signed-out visitor these public links mostly carry.
+  assert.doesNotMatch(TRADER, /applyTickerDeepLink[\s\S]{0,900}jumpToSymbol\(/,
+    'the deep link must not route through jumpToSymbol');
 });
 
 test('the symbol page is PUBLIC — it is the destination of a link on a public page', () => {

@@ -5333,9 +5333,18 @@ function visibleTickers(){
   //  phones no longer offer ⊞ All — see buildLayoutOptions, #2501 item 5.)
   if(!slotCount){
     const order={open:0,watching:1,quiet:2};
-    return all.slice()
+    const shown = all.slice()
       .sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})])
       .slice(0, cap);                               // ⊞ All still respects the small-screen cap
+    // The focused symbol is always one of the cards. ⊞ All is the DEFAULT deck
+    // (slotCount 0) and the cap renders only 2 of 16 at <=1024px, so picking a symbol
+    // outside that pair -- from the watchlist, or now from a ?ticker= deep link -- moved
+    // the details, the ticket and the highlight while the deck kept showing two other
+    // symbols. Swapping it in costs the last (quietest) card and nothing is persisted.
+    if(activeTicker && shown.length && all.indexOf(activeTicker) >= 0 && shown.indexOf(activeTicker) < 0){
+      shown[shown.length - 1] = activeTicker;
+    }
+    return shown;
   }
   // Drop any duplicates/blanks a previous wrap-fill may have persisted.
   chartSlots = chartSlots.filter((t,i)=> t && chartSlots.indexOf(t) === i);
@@ -11552,7 +11561,41 @@ function startDashboard(){
     clearTimeout(_retileTimer);
     _retileTimer = setTimeout(()=>{ applyGridCols(); renderCards(); }, 120);
   });
-  fullRefresh();
+  /* ── ?ticker= / ?symbol= deep link (2026-11-03) ─────────────────────────────
+     symbol.html's primary CTA has emitted /stock-trader.html?ticker=X since #3744 and
+     explore.html emits ?symbol=; nothing here ever read either, so every one of those
+     links has quietly landed on SPY with the symbol still sitting in the address bar.
+     The home page's new per-ticker actions emit the same param, so one receiver serves
+     all three surfaces.
+
+     Hung on the FIRST fullRefresh, not DOMContentLoaded: focusTicker charts through
+     _chartInSlotZero, whose wlPrices membership test declines silently before prices
+     land, which leaves the deck blank and then seeds SPY on the next poll. .finally so a
+     loader that rejects cannot swallow the link. It lands before the 1600ms symbol-restore
+     timer above, whose `!activeTicker` guard then leaves our pick alone. */
+  function applyTickerDeepLink(){
+    const q = new URLSearchParams(location.search);
+    const want = (q.get('ticker') || q.get('symbol') || '').trim().toUpperCase();
+    if(!want) return;
+    // Scrub it whatever happens next: a param left in the bar makes the URL assert a
+    // symbol the screen is not showing. (Same move as the ?alpaca= handler.)
+    q.delete('ticker'); q.delete('symbol');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    if(!/^[A-Z][A-Z.\-]{0,5}$/.test(want)) return;
+    if(!wlPrices.length) return;                                   // feed never answered
+    if(!wlPrices.some(w => w.ticker === want)) return;             // not on this watchlist
+    // focusTicker, NOT jumpToSymbol: jumpToSymbol adds the symbol to the watchlist first,
+    // and that POST 401s for the signed-out visitor these links mostly carry.
+    focusTicker(want);
+    // focusTicker only re-renders the deck when it actually moved a chart slot, which it
+    // only does in a one-chart deck. Under the DEFAULT \u229e All deck it moved the
+    // highlight, the details and the ticket and left the grid alone -- so the
+    // keep-the-focused-symbol-visible swap in visibleTickers never got a chance to run and
+    // the deep-linked symbol stayed off the grid. Measured: ?ticker=SOXS highlighted SOXS
+    // and charted SPY/QQQ/GLD/TLT.
+    if(!document.querySelector('#cardsGrid .card[data-ticker="' + want + '"]')) renderCards();
+  }
+  fullRefresh().finally(applyTickerDeepLink);
   loadBars();
   loadOrders();
   setInterval(fullRefresh,         30000);

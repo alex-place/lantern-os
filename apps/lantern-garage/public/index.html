@@ -489,8 +489,12 @@
     var up = String(sig.direction || '').toUpperCase() === 'BULLISH';
     var skipped = !!conv.skip_reason || (conv.decision && conv.decision !== 'ENTER');
 
-    var a = el('a', 'vp');
-    a.href = '/symbol.html?t=' + encodeURIComponent(symbol);   // the verdict is about THIS symbol
+    // An <a> may not contain an <a>, so the card can only carry real, labelled actions
+    // once it stops being a link itself. It was a whole-card anchor to symbol.html with
+    // nothing on it saying so -- measured: 0 of 25 ticker surfaces had a caret, an
+    // underline, a button or an aria-label. The two destinations are now named in the
+    // footer (operator UI pass, 2026-11-03).
+    var a = el('article', 'vp');
 
     var head = el('div', 'vp-head');
     head.appendChild(badge(symbol));
@@ -512,7 +516,13 @@
       stats.appendChild(s);
     }
     if (isFinite(Number(conv.p_win))) stat('Win prob.', (Number(conv.p_win) * 100).toFixed(1) + '%');
-    if (!lean && isFinite(Number(conv.ev_r))) stat('Exp. value', fmt(conv.ev_r, 2) + ' R', Number(conv.ev_r) > 0 ? 'up' : 'down');
+    // Colour by the decision, not the sign. A refused trade can carry a POSITIVE expected
+    // value -- it is refused because the win probability missed the floor -- so colouring
+    // by sign alone printed "Exp. value 1.16 R" in green on a SKIP card, and the three
+    // largest elements on a refusal all argued for the trade the engine had just declined.
+    if (!lean && isFinite(Number(conv.ev_r))) {
+      stat('Exp. value', fmt(conv.ev_r, 2) + ' R', skipped ? null : (Number(conv.ev_r) > 0 ? 'up' : 'down'));
+    }
     if (isFinite(Number(plan.stop))) stat('Stop', fmt(plan.stop, 2));
     a.appendChild(stats);
 
@@ -553,6 +563,20 @@
         cap.title = closes.length + ' daily closes, ' + sp.range;
       } else { cap.remove(); }
     }).catch(function () { chart.remove(); cap.remove(); });
+
+    /* Both destinations, named. The symbol rides on the BUTTON FACE rather than only in
+       an aria-label: six cards side by side reading "Open in trader" are six identical
+       slabs, and a reader scanning them cannot tell which symbol they are about to open.
+       The hero (lean) sits a few pixels from the page's filled cyan "Open the trader", so
+       a second filled button there would compete with it -- it gets the quiet treatment. */
+    var act = el('div', 'vp-act');
+    var read = el('a', 'vp-read', skipped ? 'Why it was turned down' : 'See the full setup');
+    read.href = '/symbol.html?t=' + encodeURIComponent(symbol);
+    act.appendChild(read);
+    var go = el('a', 'vp-go' + (lean ? ' quiet' : ''), 'Open ' + symbol + ' in the trader');
+    go.href = '/stock-trader.html?ticker=' + encodeURIComponent(symbol);
+    act.appendChild(go);
+    a.appendChild(act);
 
     return a;
   }
@@ -684,7 +708,17 @@
         n.appendChild(el('div', 'px', r.price != null ? fmt(r.price, Number(r.price) < 10 ? 4 : 2) : '—'));
         n.appendChild(el('div', 'ch ' + dirCls(r.chg_pct), pct(r.chg_pct)));
         a.appendChild(n);
-        c.appendChild(a);
+        /* The row keeps its own anchor and its whole-row hit area; the trader action is a
+           SIBLING of it, never a child. "Chart" rather than "Trader" because the word has
+           to mean something to a first-time reader, and the symbol rides in the accessible
+           name so twelve rows are not twelve identical pills. */
+        var rw = el('div', 'row-wrap');
+        rw.appendChild(a);
+        var rgo = el('a', 'row-go', 'Chart');
+        rgo.href = '/stock-trader.html?ticker=' + encodeURIComponent(r.ticker);
+        rgo.setAttribute('aria-label', 'Chart ' + r.ticker + ' in the trader');
+        rw.appendChild(rgo);
+        c.appendChild(rw);
 
         /* Sparklines are progressive enhancement: one light request each, and if it
            fails the row simply stays a row. */
@@ -697,12 +731,14 @@
             .catch(function () {});
         }
       });
-      var link = el('a', 'inlink', 'Open any of these in the trader'); link.href = '/stock-trader.html';
-      c.appendChild(link);
+      // The generic "Open any of these in the trader" went here twice with identical text
+      // and no symbol. Every row now carries its own, so it is redundant.
       return c;
     }
     box.appendChild(listCard('Movers', 'Largest absolute move on the watchlist.', sorted.slice(0, 6), true));
-    box.appendChild(listCard('The rest of the watchlist', 'Everything else being tracked.', sorted.slice(6, 12), false));
+    // slice(6, 12) under a card that says "Everything else being tracked" dropped 4 of
+    // the 16 while the heading above it said "16 tracked".
+    box.appendChild(listCard('The rest of the watchlist', 'Everything else being tracked.', sorted.slice(6), false));
     byId('mkt-sub').textContent = rows.length + ' tracked';
   }
 
