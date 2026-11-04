@@ -40,6 +40,13 @@
  * window ever opening for a name journals one `overnight_entry_missed` row after the close: the names, the window's
  * reads, and the end time of each name's newest settled bar at the last read. A scan that never read the window (a worker
  * started after 16:00) cannot tell and says nothing.
+ *
+ * THE BOND GATE, OFF BY DEFAULT (2026-11-04, the design G1, ledger tier2-winrate-gate-le-g1-30-quarters): no entry on a night after bonds fell. In
+ * the entry window, with TLT's entry-bar close down more than 0.30 % on the prior session's last close, a name above its trend reads NEUTRAL. Passed
+ * as bondGate: { shadow }, TRADER_OVERNIGHT_BOND_GATE=1 in the worker ('shadow' journals the same read and trades nothing). The morning sale is
+ * untouched. A reading it cannot trust is no reading and the gate stays OPEN. One overnight_bond_gate row a day, plus one with ret_pct null the
+ * first time the day has no reading. TLT's price is not dividend adjusted, as in the replay: its ex-date, the month's first session, reads about
+ * 0.3 % low.
  */
 const { sessionBars, etOf } = require('../trend-shadow');
 const { closeOffset, inRegularSession } = require('../market-calendar');
@@ -54,12 +61,23 @@ const CLOSE_MIN = 960;                   // no entry decision at or after 16:00 
 // nothing at or after 13:00), and the next morning's exit reads the entry at that session's own entry bar.
 const TREND_N = 200;
 const TREND_MIN = 120;                   // sessions of history needed before the gate reads at all
+const BOND_SYMBOL = 'TLT';
+const BOND_CUT_PCT = -0.30;              // the bond gate closes at or below this day move, in %
+const BOND_MAX_MOVE_PCT = 15;            // a larger move is a bad print: no reading
 
 const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 const round = (x, d = 4) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d);
 const dayOf = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 
-function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = ENTRY_BAR, sellBar = SELL_BAR, shadow = false, greenShadow = false, log = null } = {}) {
+/** The bond gate from the prior close and the entry bar's close: { open, why, ret_pct }. */
+function bondVerdict(prior, px) {
+  if (!(prior > 0) || !(px > 0)) return { open: true, ret_pct: null, why: `no reading: ${!(px > 0) ? 'no entry bar' : 'no prior close'}` };
+  const r = 100 * (px / prior - 1);
+  if (!(Math.abs(r) < BOND_MAX_MOVE_PCT)) return { open: true, ret_pct: null, why: `no reading: a move of ${round(r, 2)} %` };
+  return { open: r > BOND_CUT_PCT, ret_pct: round(r, 3), why: `${BOND_SYMBOL} ${round(r, 2)} % on the day` };
+}
+
+function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = ENTRY_BAR, sellBar = SELL_BAR, shadow = false, greenShadow = false, bondGate = null, log = null } = {}) {
   const S = [...new Set((Array.isArray(symbols) ? symbols : String(symbols || '').split(','))
     .map((s) => String(s).trim().toUpperCase()).filter(Boolean))];
   if (typeof getBars !== 'function') throw new Error('overnight scan: getBars(sym, tf) required');
@@ -68,6 +86,8 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
   const lastEntry = {};        // sym -> { day, px } (shadow: the 15:55 price the exit row is scored against)
   const loggedGreen = {};      // sym -> { early: day, close: day } (green-exit shadow)
   const windowSeen = {};       // day -> { reads, open: { sym: true }, bars, last, logged } (the missed-night row)
+  let bondDay = null, bondSaved = null;   // the day's one bond decision, from its first read with a reading
+  let bondMissedDay = null;               // the day whose no-reading row is written
 
   async function rawOf(sym, tf) { try { const r = await getBars(sym, tf); return (r && r.bars) || null; } catch (_e) { return null; } }
 
@@ -79,6 +99,19 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
       const x = etOf(t); if (x.day < day && inRegularSession(x.day, x.min) && (!best || x.day > best)) best = x.day;
     }
     return best;
+  }
+
+  /** The day's bond gate in the entry window. A reading is kept for the day; no reading is open and read again at the next scan. */
+  async function bondRead(day, now, off) {
+    if (bondDay === day) return bondSaved;
+    const raw = await rawOf(BOND_SYMBOL, '5m');
+    const cur = raw ? sessionBars(raw, day).find((b) => b.min === entryBar - off && b.t + BAR_MS + SETTLE_MS <= now) : null;
+    const prevDay = raw ? priorSessionDay(raw, day) : null;
+    const prev = prevDay ? sessionBars(raw, prevDay) : [];
+    const pc = prev.length ? prev[prev.length - 1].c : null;
+    const v = { ...bondVerdict(pc, cur ? cur.c : null), px: cur ? round(cur.c) : null, prior: pc == null ? null : round(pc), shadow: !!(bondGate && bondGate.shadow) };
+    if (v.ret_pct != null) { bondDay = day; bondSaved = v; }
+    return v;
   }
 
   /** Green-exit shadow: the 09:35 read and the first sell-window read journal what the rule would do (see the header). */
@@ -122,6 +155,7 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
   async function scan(now = Date.now()) {
     const e = etOf(now);
     const signals = []; const reads = []; let window = null;
+    let bond = null, bondRow = null; const offered = [], refused = [];
     for (const sym of S) {
       const raw = await rawOf(sym, '5m');
       const done = raw ? sessionBars(raw, e.day).filter((b) => b.t + BAR_MS + SETTLE_MS <= now) : [];
@@ -136,8 +170,16 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
       if (inEntry) {
         gate = await trendRead(sym, e.day);
         if (!gate || gate.above == null) why = gate ? `trend: ${gate.n} sessions, need ${TREND_MIN}` : 'no daily bars';
-        else if (gate.above) { direction = 'BULLISH'; dec = 'ENTER'; }
-        else why = 'below the trend';
+        else if (gate.above) {
+          if (bondGate && !bond) {
+            const fresh = bondDay !== e.day;
+            bond = await bondRead(e.day, now, off);
+            if (fresh && bondDay === e.day) bondRow = bond;
+            else if (fresh && bondMissedDay !== e.day) { bondMissedDay = e.day; bondRow = bond; }
+          }
+          if (bond && !bond.open && !bond.shadow) { why = `bond gate: ${bond.why}`; refused.push(sym); }
+          else { direction = 'BULLISH'; dec = 'ENTER'; offered.push(sym); }
+        } else why = 'below the trend';
         if (shadow && last) {
           const L = logged[sym] = logged[sym] || {};
           if (L.entry !== e.day) { L.entry = e.day; if (gate && gate.above) lastEntry[sym] = { day: e.day, px: last.c }; if (log) log({ event: 'overnight_shadow', symbol: sym, day: e.day, bar: hhmm(last.min + 5), px: round(last.c), above: gate ? gate.above : null, prior: gate ? round(gate.prior) : null, mean: gate ? round(gate.mean) : null, n: gate ? gate.n : 0, would: gate && gate.above ? 'buy' : 'skip', shadow: true }); }
@@ -157,8 +199,11 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
       });
       reads.push({ symbol: sym, bar: last ? hhmm(last.min + 5) : null, gate: gate ? { above: gate.above, prior: round(gate.prior), mean: round(gate.mean), n: gate.n } : null, why });
     }
+    if (bondRow && log) {
+      try { log({ event: 'overnight_bond_gate', day: e.day, at: new Date(now).toISOString(), open: bondRow.open, why: bondRow.why, ret_pct: bondRow.ret_pct, cut_pct: BOND_CUT_PCT, px: bondRow.px, prior: bondRow.prior, shadow: bondRow.shadow, offered, refused }); } catch (_e) { /* journal only */ }
+    }
     missedNight(e, now, signals, reads);
-    return { signals, overnight: { at: new Date(now).toISOString(), window, shadow: !!shadow, trendN, reads } };
+    return { signals, overnight: { at: new Date(now).toISOString(), window, shadow: !!shadow, trendN, reads, ...(bond ? { bond } : {}) } };
   }
 
   /** The missed-night row (see the header): count the entry window's reads, journal once after the close if it never opened. */
@@ -183,4 +228,4 @@ function createOvernightScan({ symbols, getBars, trendN = TREND_N, entryBar = EN
   return { symbols: S, scan, trendRead, shadow: !!shadow, greenShadow: !!greenShadow };
 }
 
-module.exports = { createOvernightScan, ENTRY_BAR, SELL_BAR, GREEN_BAR, TREND_N, TREND_MIN, SETTLE_MS };
+module.exports = { createOvernightScan, bondVerdict, BOND_SYMBOL, BOND_CUT_PCT, ENTRY_BAR, SELL_BAR, GREEN_BAR, TREND_N, TREND_MIN, SETTLE_MS };

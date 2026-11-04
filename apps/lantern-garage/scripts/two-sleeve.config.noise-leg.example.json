@@ -70,6 +70,7 @@
       "scan": "noise",
       "env": {
         "TRADER_NOISE_LEG_PAIRS": "SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS",
+        "TRADER_NOISE_CONTEXT_GATE": "",
         "TRADER_MAX_CONCURRENT": "3",
         "TRADER_POSITION_PCT": "18",
         "TRADER_MAX_POSITION_PCT": "18",

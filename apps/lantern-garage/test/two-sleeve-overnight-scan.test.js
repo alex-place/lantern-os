@@ -12,14 +12,15 @@
  *   - the shadow reads the same, offers nothing, and journals one entry row and one exit row per name per day, with the
  *     overnight return between the 15:55 and the 09:40 prints;
  *   - every name is in every scan; a name with no bars is NEUTRAL with the reason said;
- *   - the scan worker runs it under TWO_SLEEVE_WORKER_SCAN=overnight over the sleeve's universe, as a shadow or armed.
+ *   - the scan worker runs it under TWO_SLEEVE_WORKER_SCAN=overnight over the sleeve's universe, as a shadow or armed;
+ *   - THE BOND GATE (2026-11-04, off by default): no entry on a night after bonds fell, and the morning sale stands.
  */
 const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createOvernightScan } = require('../lib/two-sleeve/overnight-scan');
+const { createOvernightScan, bondVerdict, BOND_SYMBOL, BOND_CUT_PCT } = require('../lib/two-sleeve/overnight-scan');
 const { ScanWorker } = require('../lib/two-sleeve/runner-support');
 
 // 2026-09-22 is a Tuesday, 09-23 a Wednesday; EDT (ET = UTC-4)
@@ -161,4 +162,163 @@ test('the worker runs it under TWO_SLEEVE_WORKER_SCAN=overnight, as a shadow or 
     await assert.rejects(bad.scan(), /exited|failed|universe/);
     assert.ok(log.some((x) => x.event === 'scan_worker_failed' && x.sleeve === 'X' && /universe/.test(String(x.error))));
   } finally { W.stop(); A.stop(); bad.stop(); }
+});
+
+// ---- THE BOND GATE --------------------------------------------------------------------------------------------------------
+/** market() plus TLT: D1 closes `prior` on its last bar, D2 trades at `today` from the first bar. `m.tlt` counts the fetches. */
+function bondMarket({ prior = 100, today = 99, tlt = true } = {}) {
+  const m = market();
+  const base = m.getBars;
+  m.tlt = 0;
+  const fmt = (b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c });
+  const S = tlt ? [...session('2026-09-21', flat(prior)), ...session(D1, flat(today))] : [];
+  m.getBars = async (sym, tf) => {
+    if (sym !== BOND_SYMBOL) return base(sym, tf);
+    m.tlt++;
+    return { bars: S.filter((b) => b.t <= m.now).map(fmt) };
+  };
+  return m;
+}
+
+test('the bond verdict: closed at or below the cut, open above it; a move it cannot trust is no reading', () => {
+  assert.equal(BOND_SYMBOL, 'TLT'); assert.equal(BOND_CUT_PCT, -0.30);
+  assert.equal(bondVerdict(100, 99.7).open, false, 'exactly at the cut');
+  assert.equal(bondVerdict(100, 99.69).open, false);
+  assert.equal(bondVerdict(100, 99.71).open, true);
+  assert.equal(bondVerdict(100, 101).open, true);
+  assert.equal(bondVerdict(100, 99.5).ret_pct, -0.5); assert.equal(bondVerdict(100, 99.5).why, 'TLT -0.5 % on the day');
+  for (const [p, c, why] of [[null, 99, /no prior close/], [0, 99, /no prior close/], [100, null, /no entry bar/], [100, 0, /no entry bar/], [100, 84, /a move of -16/], [100, 116, /a move of 16/]]) {
+    const v = bondVerdict(p, c);
+    assert.equal(v.open, true, `${p} ${c}`); assert.equal(v.ret_pct, null); assert.match(v.why, why); assert.match(v.why, /^no reading/);
+  }
+});
+
+test('bonds down: the name above its trend reads neutral with the reason said, one row a day, and the morning sale stands', async () => {
+  const m = bondMarket({ prior: 100, today: 99 }); const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA', 'BBB'], getBars: m.getBars, bondGate: {}, log: (r) => rows.push(r) });
+  m.now = at(D1, 15, 55, 30); let r = await s.scan(m.now);
+  assert.equal(r.overnight.window, 'entry');
+  assert.equal(sig(r, 'AAA').direction, 'NEUTRAL'); assert.equal(sig(r, 'AAA').convergence.decision, 'SKIP');
+  assert.match(r.overnight.reads.find((x) => x.symbol === 'AAA').why, /bond gate: TLT -1 % on the day/);
+  assert.equal(r.overnight.bond.open, false); assert.equal(r.overnight.bond.ret_pct, -1);
+  assert.equal(sig(r, 'BBB').direction, 'NEUTRAL'); assert.match(r.overnight.reads.find((x) => x.symbol === 'BBB').why, /below the trend/);
+  const fetched = m.tlt;
+  m.now = at(D1, 15, 57, 30); r = await s.scan(m.now);
+  assert.equal(sig(r, 'AAA').direction, 'NEUTRAL'); assert.equal(m.tlt, fetched, 'the day has its reading: no second fetch');
+  const bond = rows.filter((x) => x.event === 'overnight_bond_gate');
+  assert.equal(bond.length, 1, 'one row a day');
+  assert.equal(bond[0].day, D1); assert.equal(bond[0].open, false); assert.equal(bond[0].ret_pct, -1); assert.equal(bond[0].cut_pct, -0.3); assert.equal(bond[0].px, 99); assert.equal(bond[0].prior, 100);
+  assert.deepEqual(bond[0].refused, ['AAA']); assert.deepEqual(bond[0].offered, []); assert.equal(bond[0].shadow, false);
+  m.now = at(D2, 9, 40, 30); r = await s.scan(m.now);
+  assert.equal(r.overnight.window, 'sell'); assert.equal(sig(r, 'AAA').direction, 'BEARISH', 'a name bought the night before is still sold');
+  assert.equal(r.overnight.bond, undefined);
+});
+
+test('bonds up or little changed: the entry goes through and the row says who passed', async () => {
+  const m = bondMarket({ prior: 100, today: 99.8 }); const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA'], getBars: m.getBars, bondGate: {}, log: (r) => rows.push(r) });
+  m.now = at(D1, 15, 55, 30); const r = await s.scan(m.now);
+  assert.equal(sig(r, 'AAA').direction, 'BULLISH'); assert.equal(r.overnight.bond.open, true);
+  assert.deepEqual(rows[0].offered, ['AAA']); assert.deepEqual(rows[0].refused, []);
+});
+
+test('the shadow reads the same and trades as without it', async () => {
+  const m = bondMarket({ prior: 100, today: 99 }); const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA'], getBars: m.getBars, bondGate: { shadow: true }, log: (r) => rows.push(r) });
+  m.now = at(D1, 15, 55, 30); const r = await s.scan(m.now);
+  assert.equal(sig(r, 'AAA').direction, 'BULLISH'); assert.equal(r.overnight.bond.open, false);
+  const bond = rows.filter((x) => x.event === 'overnight_bond_gate');
+  assert.equal(bond.length, 1); assert.equal(bond[0].open, false); assert.equal(bond[0].shadow, true); assert.deepEqual(bond[0].offered, ['AAA']);
+});
+
+test('no reading: open, said once, read again, and a later reading closes the night', async () => {
+  const m = bondMarket({ tlt: false }); const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA'], getBars: m.getBars, bondGate: {}, log: (r) => rows.push(r) });
+  m.now = at(D1, 15, 55, 30); let r = await s.scan(m.now);
+  assert.equal(sig(r, 'AAA').direction, 'BULLISH', 'with no data the sleeve trades as it would without the gate');
+  assert.match(r.overnight.bond.why, /no reading/);
+  m.now = at(D1, 15, 56, 30); await s.scan(m.now);
+  let bond = rows.filter((x) => x.event === 'overnight_bond_gate');
+  assert.equal(bond.length, 1, 'said once'); assert.equal(bond[0].ret_pct, null); assert.equal(bond[0].open, true);
+  assert.ok(m.tlt >= 2, 'read again at the next scan');
+  const rows2 = []; let feed = bondMarket({ tlt: false }); const live = { fn: feed.getBars };
+  const s2 = createOvernightScan({ symbols: ['AAA'], getBars: (a, b) => live.fn(a, b), bondGate: {}, log: (x) => rows2.push(x) });
+  feed.now = at(D1, 15, 55, 30); r = await s2.scan(feed.now);
+  assert.equal(sig(r, 'AAA').direction, 'BULLISH');
+  feed = bondMarket({ prior: 100, today: 99 }); live.fn = feed.getBars; feed.now = at(D1, 15, 56, 30);
+  r = await s2.scan(feed.now);
+  assert.equal(sig(r, 'AAA').direction, 'NEUTRAL', 'the reading arrived inside the window');
+  bond = rows2.filter((x) => x.event === 'overnight_bond_gate');
+  assert.equal(bond.length, 2); assert.equal(bond[0].ret_pct, null); assert.equal(bond[1].ret_pct, -1);
+});
+
+test('a 13:00 close: the entry bar moves with the close, and the prior close is the last session bar', async () => {
+  const day = '2026-12-24';   // Thursday, a 13:00 close; EST
+  const est = (hh, mm, ss = 0) => Date.parse(`${day}T${String(hh + 5).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}Z`);
+  const sess = (d, closes) => closes.map((c, i) => ({ t: Date.parse(`${d}T14:30:00Z`) + i * 300000, h: c + 0.05, l: c - 0.05, c }));
+  const fmt = (b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c });
+  const feed = { AAA: [...sess('2026-12-23', Array(78).fill(100)), ...sess(day, Array(42).fill(100))], TLT: [...sess('2026-12-23', Array(78).fill(100)), ...sess(day, Array(42).fill(99))] };
+  let now = 0;
+  const daily = dailyBars(day, 260, 0.05);
+  const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA'], getBars: async (sym, tf) => (tf === '1d' ? { bars: daily } : { bars: (feed[sym] || []).filter((b) => b.t <= now).map(fmt) }), bondGate: {}, log: (r) => rows.push(r) });
+  now = est(12, 55, 30); const r = await s.scan(now);
+  assert.equal(r.overnight.window, 'entry');
+  assert.equal(sig(r, 'AAA').direction, 'NEUTRAL'); assert.equal(r.overnight.bond.ret_pct, -1);
+  assert.equal(rows.filter((x) => x.event === 'overnight_bond_gate').length, 1);
+});
+
+test('off by default: TLT is never fetched, no row, no field', async () => {
+  const m = bondMarket({ prior: 100, today: 90 }); const rows = [];
+  const s = createOvernightScan({ symbols: ['AAA'], getBars: m.getBars, log: (r) => rows.push(r) });
+  m.now = at(D1, 15, 55, 30); const r = await s.scan(m.now);
+  assert.equal(sig(r, 'AAA').direction, 'BULLISH'); assert.equal(m.tlt, 0); assert.equal(r.overnight.bond, undefined);
+  assert.equal(rows.filter((x) => x.event === 'overnight_bond_gate').length, 0);
+});
+
+test('a name below its trend needs no bond read: no name to refuse, no fetch, no row', async () => {
+  const m = bondMarket({ prior: 100, today: 99 }); const rows = [];
+  const s = createOvernightScan({ symbols: ['BBB'], getBars: m.getBars, bondGate: {}, log: (r) => rows.push(r) });
+  m.now = at(D1, 15, 55, 30); const r = await s.scan(m.now);
+  assert.equal(sig(r, 'BBB').direction, 'NEUTRAL'); assert.equal(m.tlt, 0); assert.equal(rows.filter((x) => x.event === 'overnight_bond_gate').length, 0);
+});
+
+test('the worker: the knob reaches the scan, ready says so, the row lands in its own log', async () => {
+  const app = fs.mkdtempSync(path.join(os.tmpdir(), 'overnight-bond-app-'));
+  fs.mkdirSync(path.join(app, 'lib', 'two-sleeve'), { recursive: true });
+  const reExport = (rel) => `module.exports = require(${JSON.stringify(path.resolve(__dirname, '..', rel).replace(/\\/g, '/'))});\n`;
+  fs.writeFileSync(path.join(app, 'lib', 'two-sleeve', 'overnight-scan.js'), reExport('lib/two-sleeve/overnight-scan.js'));
+  fs.writeFileSync(path.join(app, 'lib', 'file-queue.js'), reExport('lib/file-queue.js'));
+  const fmt = (b) => ({ timestamp: new Date(b.t).toISOString(), open: b.c, high: b.h, low: b.l, close: b.c });
+  fs.writeFileSync(path.join(app, 'feed.json'), JSON.stringify({
+    d: dailyBars(D1, 260, 0.05),
+    AAA: session(D1, flat(100)).map(fmt),
+    TLT: [...session('2026-09-21', flat(100)), ...session(D1, flat(99))].map(fmt),
+  }));
+  fs.writeFileSync(path.join(app, 'lib', 'market-data-yahoo.js'), [
+    "'use strict';",
+    "const S = require('../feed.json');",
+    "module.exports = { getBars: async (s, tf) => ({ bars: tf === '1d' ? S.d : (S[s] || []) }) };",
+  ].join('\n'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'overnight-bond-dir-'));
+  const log = [];
+  const worker = (id, env) => new ScanWorker({ id, app, envFile: null, env, universe: ['AAA'], dir, timeoutMs: 8000, log: (r) => log.push(r), scan: 'overnight', fakeNow: new Date(at(D1, 15, 55, 30)).toISOString() });
+  const armed = worker('OA', { TRADER_OVERNIGHT_BOND_GATE: '1' });
+  const shadow = worker('OS', { TRADER_OVERNIGHT_BOND_GATE: 'shadow' });
+  const off = worker('OO', { TRADER_OVERNIGHT_BOND_GATE: '' });
+  try {
+    const r = await armed.scan();
+    assert.equal(sig(r, 'AAA').direction, 'NEUTRAL'); assert.equal(r.overnight.bond.open, false);
+    assert.equal(log.find((x) => x.event === 'scan_worker_ready' && x.sleeve === 'OA').bondGate, 'armed');
+    const own = path.join(dir, 'OA.scan.jsonl');
+    for (let i = 0; i < 40 && !fs.existsSync(own); i++) await new Promise((res) => setTimeout(res, 50));
+    const rows = fs.readFileSync(own, 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l)).filter((x) => x.event === 'overnight_bond_gate');
+    assert.equal(rows.length, 1); assert.equal(rows[0].open, false); assert.ok(rows[0].ts);
+    const sh = await shadow.scan();
+    assert.equal(sig(sh, 'AAA').direction, 'BULLISH'); assert.equal(sh.overnight.bond.open, false);
+    assert.equal(log.find((x) => x.event === 'scan_worker_ready' && x.sleeve === 'OS').bondGate, 'shadow');
+    const o2 = await off.scan();
+    assert.equal(sig(o2, 'AAA').direction, 'BULLISH'); assert.equal(o2.overnight.bond, undefined);
+    assert.equal(log.find((x) => x.event === 'scan_worker_ready' && x.sleeve === 'OO').bondGate, null);
+  } finally { armed.stop(); shadow.stop(); off.stop(); }
 });

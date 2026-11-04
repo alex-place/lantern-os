@@ -41,6 +41,7 @@
       "scan": "noise",
       "env": {
         "TRADER_NOISE_LEG_PAIRS": "SPY:UPRO:SPXS,QQQ:TQQQ:SQQQ,SMH:SOXL:SOXS",
+        "TRADER_NOISE_CONTEXT_GATE": "",
         "TRADER_MAX_CONCURRENT": "3",
         "TRADER_POSITION_PCT": "18",
         "TRADER_MAX_POSITION_PCT": "18",
@@ -167,6 +168,7 @@
       "envFile": "C:/dev/lantern-os-stable/.env.local",
       "scan": "overnight",
       "env": {
+        "TRADER_OVERNIGHT_BOND_GATE": "",
         "TRADER_OVERNIGHT_SHADOW": "1",
         "TRADER_OVERNIGHT_TREND_N": "200",
         "TRADER_MAX_CONCURRENT": "3",
