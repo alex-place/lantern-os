@@ -39,9 +39,19 @@
  *                      make; the brain's 15:50 exit rows give the other leg of the comparison);
  *   late_drift_shadow  once the 15:55 bar is in: the day's own observation.
  * Signals are untouched by it.
+ *
+ * THE CONTEXT GATE, OFF BY DEFAULT (2026-11-04, the design LE, ledger tier2-winrate-gate-le-g1-30-quarters): a break the market does not back is
+ * refused. At a decision bar the trade scores the prior session's dealer gamma (tercile of 252 sessions: LOW +1, HIGH -1) plus the sectors (of
+ * XLE XLK KRE XRT ITB IGV XBI XME, the share moving with the break since the session's first bar: 4 of 8 or fewer -1, 7 of 8 or more +1), and a
+ * score below zero offers no NEW entry. The wrapper reads NEUTRAL, so a held one is held; every sell read is untouched. Passed as contextGate:
+ * { dir, shadow, log }, TRADER_NOISE_CONTEXT_GATE=1 in the worker ('shadow' journals the same read and trades nothing). Gamma comes from the file
+ * lib/entry-tags.js keeps (TRADER_ENTRY_TAGS_DIR), the sectors from the feed, only at a decision bar outside the band. A reading it cannot trust is
+ * no reading and the gate stays OPEN: it closes only on both readings. One leg_context_gate row per pair and decision bar in the worker's log, plus
+ * one with score null the first time a bar has no reading, so a stale file cannot switch the gate off unseen.
  */
 const { noiseBand, sessionBars, parseNoisePairs, NOISE_DECISIONS, etOf } = require('../trend-shadow');
 const { closeOffset, inRegularSession } = require('../market-calendar');
+const { readContext } = require('../entry-tags');
 const fs = require('fs');
 const path = require('path');
 
@@ -67,11 +77,40 @@ const LATE_KEEP = 400;                // observations kept per proxy in the stat
 // calendar days reach ~25 sessions; with the scan's own ~18 that is the 40-session reading from the first day.
 const LATE_BOOT_SLICES = [[57, 40], [40, 22]];   // [from, to] in calendar days before the day
 
+// The context gate (see the header).
+const CONTEXT_SECTORS = ['XLE', 'XLK', 'KRE', 'XRT', 'ITB', 'IGV', 'XBI', 'XME'];
+const SECTOR_FIRST_BAR = 570;         // the 09:30 bar: a move is measured from its close, as the replay's caches read it
+const SECTOR_MIN_READ = 5;            // fewer sectors with both bars is no reading
+const SECTOR_LOW_MAX = 4 / 8, SECTOR_HIGH_MIN = 7 / 8;
+const SECTOR_MAX_MOVE = 0.25;         // a larger move since the first bar is a bad print: the sector is not counted
+
 const tOf = (b) => Date.parse(b.timestamp != null ? b.timestamp : b.t);
 const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 const round = (x, d = 4) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d);
 
-function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = ENTRY_WINDOW_MS, lateGate = null } = {}) {
+/** The sectors moving with the break at bar `min`: { share, n, with } or { why }. `sessions` = session bars per sector. */
+function sectorRead(sessions, min, side) {
+  let n = 0, withIt = 0;
+  for (const sym of CONTEXT_SECTORS) {
+    const bars = (sessions && sessions[sym]) || [];
+    const first = bars.find((b) => b.min === SECTOR_FIRST_BAR), cur = bars.find((b) => b.min === min);
+    if (!first || !cur) continue;
+    const r = cur.c / first.c - 1;
+    if (!(Math.abs(r) <= SECTOR_MAX_MOVE)) continue;
+    n++;
+    if (side === 'up' ? r > 0 : r < 0) withIt++;
+  }
+  return n >= SECTOR_MIN_READ ? { share: round(withIt / n), n, with: withIt } : { why: `${n} of ${CONTEXT_SECTORS.length} sectors have both bars` };
+}
+/** The verdict from the two readings: { open, why, score }. Closed only on both readings and a score below zero. */
+function contextVerdict(gamma, sector) {
+  const g = gamma && gamma.tercile, sh = sector && sector.share;
+  if (!g || sh == null) return { open: true, score: null, why: `no reading: ${[!g && ((gamma && gamma.why) || 'no gamma'), sh == null && ((sector && sector.why) || 'no sectors')].filter(Boolean).join('; ')}` };
+  const score = (g === 'LOW' ? 1 : g === 'HIGH' ? -1 : 0) + (sh <= SECTOR_LOW_MAX ? -1 : sh >= SECTOR_HIGH_MIN ? 1 : 0);
+  return { open: score >= 0, score, why: `gamma ${g}, sectors ${sector.with} of ${sector.n}` };
+}
+
+function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = ENTRY_WINDOW_MS, lateGate = null, contextGate = null } = {}) {
   const P = Array.isArray(pairs) ? pairs : parseNoisePairs(pairs);
   if (typeof getBars !== 'function') throw new Error('noise scan: getBars(sym, tf) required');
   const histCache = new Map();   // `${sym}:${day}` -> { bars, tries }
@@ -97,6 +136,34 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
   }
   async function rawOf(sym) {
     try { const r = await getBars(sym, '5m'); return (r && r.bars) || null; } catch (_e) { return null; }
+  }
+  // ---- the context gate (see the header): read once per pair and decision bar, from the first read with a verdict on both readings.
+  const ctxGate = contextGate && contextGate.dir ? contextGate : null;
+  const ctxRead = (ctxGate && ctxGate.read) || readContext;
+  const ctxDone = new Map();   // `${proxy}:${day}:${min}` -> the verdict
+  const ctxMissed = new Set(); // the same keys: the bars whose no-reading row is written
+  async function contextAt(pr, side, day, min, now) {
+    const key = `${pr.proxy}:${day}:${min}`;
+    if (ctxDone.has(key)) return ctxDone.get(key);
+    const sessions = {};
+    for (const sym of CONTEXT_SECTORS) {
+      const raw = await rawOf(sym);
+      sessions[sym] = raw ? sessionBars(raw, day) : [];     // read at bar `min`, which has settled on the proxy
+    }
+    let gamma;
+    try { ({ gamma } = ctxRead(ctxGate.dir, now)); } catch (e) { gamma = { why: String((e && e.message) || e).slice(0, 120) }; }
+    const sector = sectorRead(sessions, min, side);
+    const v = { ...contextVerdict(gamma, sector), side,
+      gamma: gamma && gamma.tercile ? { tercile: gamma.tercile, rank: gamma.rank, as_of: gamma.as_of } : { tercile: null, why: (gamma && gamma.why) || 'no gamma' },
+      sector };
+    for (const seen of [ctxDone, ctxMissed]) for (const k of [...seen.keys()]) if (!k.includes(`:${day}:`)) seen.delete(k);
+    const noReading = v.score == null;     // open, and read again at the next scan of the window
+    if (noReading && ctxMissed.has(key)) return v;
+    if (noReading) ctxMissed.add(key); else ctxDone.set(key, v);
+    if (typeof ctxGate.log === 'function') {
+      try { ctxGate.log({ event: 'leg_context_gate', day, at: new Date(now).toISOString(), bar: hhmm(min + 5), proxy: pr.proxy, side, open: v.open, why: v.why, score: v.score, gamma: v.gamma, sector, shadow: !!ctxGate.shadow }); } catch (_e) { /* journal only */ }
+    }
+    return v;
   }
   // ---- the late-reversal gate, journal-only (see the header). Nothing here touches a signal.
   const late = lateGate && typeof lateGate === 'object' ? lateGate : null;
@@ -237,16 +304,19 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
         const on = g.n >= 60 && g.gate60 != null ? g.gate60 : g.gate40;
         gateOn = on === true;
       }
+      const context = ctxGate && decision && !gateOn ? await contextAt(pr, state, e.day, last.min, now) : null;
+      const refused = !!(context && !context.open && !ctxGate.shadow);
       for (const [sym, side] of [[pr.up, 'up'], [pr.dn, 'dn']]) {
         const w = await wrapperRead(sym, e.day, now);
         prices[side] = w.px;
         let direction = 'NEUTRAL', dec = 'SKIP';
         if (gateOn) { direction = 'BEARISH'; dec = 'ENTER'; }                                // the late-reversal gate: sell the leg at the 15:30 price
         else if (state && state !== side) { direction = 'BEARISH'; dec = 'ENTER'; }         // back inside, or through: sell a held one
-        else if (decision && state === side) { direction = 'BULLISH'; dec = 'ENTER'; }      // a decision bar outside the band on this side
+        else if (decision && state === side && !refused) { direction = 'BULLISH'; dec = 'ENTER'; }   // a decision bar outside the band on this side
         const ctx = { ibs: w.ibs, spy_tape: 0, noise: state, noise_proxy: pr.proxy, noise_side: side,
           noise_bar: last ? hhmm(last.min + 5) : null, noise_decision: decision };
         if (late && late.armed) ctx.noise_late_gate = gateOn;
+        if (context && state === side) ctx.noise_context = { open: context.open, score: context.score, why: context.why };
         signals.push({
           symbol: sym, direction, entry_price: w.px, price: w.px, noise_leg: true,
           decision_context: ctx,
@@ -256,7 +326,7 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
       let lateInfo = null;
       try { lateInfo = await lateTick(pr, raw, e, now, last, prices); } catch (_e) { lateInfo = null; }   // journal-only: never a scan error
       read.push({ proxy: pr.proxy, state, bar: last ? hhmm(last.min + 5) : null, close: last ? round(last.c) : null,
-        upper: lim ? round(lim.upper) : null, lower: lim ? round(lim.lower) : null, decision, why: why || undefined, late: lateInfo || undefined });
+        upper: lim ? round(lim.upper) : null, lower: lim ? round(lim.lower) : null, decision, why: why || undefined, late: lateInfo || undefined, context: context || undefined });
     }
     return { signals, noise: { at: new Date(now).toISOString(), pairs: read } };
   }
@@ -264,4 +334,4 @@ function createNoiseScan({ pairs, getBars, getHistory = null, entryWindowMs = EN
   return { pairs: P, scan, lateGate: late ? { read: lateRead, observations: lateObservations, armed: !!late.armed } : null };
 }
 
-module.exports = { createNoiseScan, ENTRY_WINDOW_MS, CLOSE_MIN, LATE_LOOKBACKS };
+module.exports = { createNoiseScan, sectorRead, contextVerdict, CONTEXT_SECTORS, ENTRY_WINDOW_MS, CLOSE_MIN, LATE_LOOKBACKS };

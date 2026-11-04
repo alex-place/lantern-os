@@ -18,6 +18,8 @@
  * TRADER_NOISE_LATE_GATE_SHADOW=1 (2026-10-05): the noise scan also runs its journal-only late-reversal gate (see
  * noise-scan.js), writing late_gate_shadow / late_drift_shadow rows to the worker's own log (<dir>/<id>.scan.jsonl)
  * and keeping its observations in TWO_SLEEVE_WORKER_STATE_FILE (<dir>/<id>.scan-state.json, set by the runner).
+ * TRADER_NOISE_CONTEXT_GATE=1 (2026-11-04) refuses new entries on breaks dealer gamma and the sectors do not back, 'shadow' journals the same read;
+ * it needs TRADER_ENTRY_TAGS_DIR (the shared gex.json), one leg_context_gate row per pair and decision bar in the worker's own log.
  *
  * TWO_SLEEVE_WORKER_SCAN=closeibs (2026-10-03): the sleeve buys index funds that close near their session low
  * (lib/two-sleeve/closeibs-scan.js) over the sleeve s universe (TWO_SLEEVE_WORKER_UNIVERSE, required), entry depth
@@ -33,6 +35,8 @@
  * TRADER_OVERNIGHT_GREEN_SHADOW=1 keeps the book as it is and journals the 09:35 green-exit rule beside it
  * (overnight_green_shadow / overnight_green_shadow_close rows; ready reports overnight 'armed+green-shadow').
  * Armed or shadow, a night the entry window never opened gets an overnight_entry_missed row after the close (2026-10-30).
+ * TRADER_OVERNIGHT_BOND_GATE=1 (2026-11-04) refuses the night's entries when TLT is down more than 0.30 % at the entry bar, 'shadow' journals the
+ * same read; one overnight_bond_gate row a day in the worker's own log.
  */
 const path = require('path');
 
@@ -42,6 +46,8 @@ let noise = null;   // the noise-area leg s scan when TWO_SLEEVE_WORKER_SCAN=noi
 let closeIbs = null;   // the close-IBS sleeve s scan when TWO_SLEEVE_WORKER_SCAN=closeibs
 let overnight = null;   // the overnight book s scan when TWO_SLEEVE_WORKER_SCAN=overnight
 let draining = false;
+// A gate knob: '1' armed, 'shadow' journal-only, anything else off.
+const gateKnob = (v) => { const k = String(v || '').trim().toLowerCase(); return k === '1' ? 'armed' : k === 'shadow' ? 'shadow' : null; };
 // The clock the custom scans read: the real one, or a dry run's pin (TWO_SLEEVE_WORKER_FAKE_NOW, set by the runner only with --dry).
 const clock = () => { const f = Date.parse(process.env.TWO_SLEEVE_WORKER_FAKE_NOW || ''); return Number.isFinite(f) ? f : Date.now(); };
 
@@ -94,16 +100,22 @@ async function drain() {
           armed: lateArmed,
         };
       }
+      const ctxKnob = gateKnob(process.env.TRADER_NOISE_CONTEXT_GATE);
+      const ctxDir = ctxKnob ? String(process.env.TRADER_ENTRY_TAGS_DIR || '').trim() : null;
+      if (ctxKnob && !ctxDir) throw new Error('TRADER_NOISE_CONTEXT_GATE needs TRADER_ENTRY_TAGS_DIR (the shared gex.json)');
+      const ctxLogFile = ctxKnob ? process.env.TRADER_TRADES_LOG || null : null;
+      const ctxFq = ctxLogFile ? require(path.join(app, 'lib', 'file-queue')) : null;
       noise = createNoiseScan({
         pairs: process.env.TRADER_NOISE_LEG_PAIRS || '',
         getBars: (s, tf) => yahoo.getBars(s, tf),
         getHistory: typeof yahoo.getBarsWindow === 'function' ? (s, from, to) => yahoo.getBarsWindow(s, '5m', from, to) : null,
         lateGate,
+        contextGate: ctxKnob ? { dir: ctxDir, shadow: ctxKnob === 'shadow', log: (row) => { if (ctxFq) ctxFq.appendJsonlQueued(ctxLogFile, { ts: new Date().toISOString(), ...row }).catch(() => {}); } } : null,
       });
       if (!noise.pairs.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=noise needs TRADER_NOISE_LEG_PAIRS (proxy:long:inverse,...)');
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'noise', watchlist: noise.pairs.length * 2,
         pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null,
-        lateGate: lateGate ? (lateGate.armed ? 'armed' : 'shadow') : null, stateFile: lateGate ? lateGate.stateFile : null });
+        lateGate: lateGate ? (lateGate.armed ? 'armed' : 'shadow') : null, stateFile: lateGate ? lateGate.stateFile : null, contextGate: ctxKnob });
       drain();
       return;
     }
@@ -119,10 +131,12 @@ async function drain() {
       const ownLog = process.env.TRADER_TRADES_LOG || null;
       const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;   // armed too: the missed-night row
       const trendN = process.env.TRADER_OVERNIGHT_TREND_N ? Number(process.env.TRADER_OVERNIGHT_TREND_N) : TREND_N;
+      const bondKnob = gateKnob(process.env.TRADER_OVERNIGHT_BOND_GATE);
       overnight = createOvernightScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), trendN, shadow, greenShadow,
+        bondGate: bondKnob ? { shadow: bondKnob === 'shadow' } : null,
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'overnight', watchlist: overnight.symbols.length,
-        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : (greenShadow ? 'armed+green-shadow' : 'armed'), trendN, ibsMax: null, pMin: null, shortEdge: null });
+        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : (greenShadow ? 'armed+green-shadow' : 'armed'), trendN, ibsMax: null, pMin: null, shortEdge: null, bondGate: bondKnob });
       drain();
       return;
     }
