@@ -605,8 +605,8 @@ class CIO_SDE(nn.Module):
 
         # Σ₀ gating: freeze only the members that independently satisfy the gate.
         if self.collapse_op is not None:
-            per_sample_eval = getattr(self.collapse_op, "evaluate_per_sample", None)
-            supports_per_sample = callable(per_sample_eval)
+            per_sample_evaluator = getattr(self.collapse_op, "evaluate_per_sample", None)
+            supports_per_sample = callable(per_sample_evaluator)
             if supports_per_sample:
                 mro = type(self.collapse_op).__mro__
                 per_owner = next((cls for cls in mro if "evaluate_per_sample" in cls.__dict__), None)
@@ -615,7 +615,7 @@ class CIO_SDE(nn.Module):
                     supports_per_sample = mro.index(per_owner) <= mro.index(scalar_owner)
 
             if supports_per_sample:
-                res = per_sample_eval(self, x, u, shape_current, A, exclude_mask=anti_active_mask)
+                res = per_sample_evaluator(self, x, u, shape_current, A, exclude_mask=anti_active_mask)
             elif not anti_active:
                 # Legacy custom collapse operators retain their batch-wide evaluate() contract.
                 res = self.collapse_op.evaluate(self, x, u, shape_current, A)
