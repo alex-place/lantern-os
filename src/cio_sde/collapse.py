@@ -28,6 +28,7 @@ Outcomes:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -45,13 +46,20 @@ def _batch_members(A: Tensor) -> List[Tensor]:
 
     A batch certifies only if every member does. Averaging first certifies nothing: the mean
     of diag(1.5, 0.1) and diag(0.1, 1.5) contracts while both members diverge. An identical
-    batch (LinearDynamics) reduces to one member, so it costs one evaluation.
+    batch (LinearDynamics) reduces to one member, so it costs one evaluation. Identical means
+    exactly: 0.999995·I and 1.000004·I are "close" and sit on opposite sides of the boundary.
     """
     if A.dim() != 3:
         return [A]
-    if A.shape[0] == 1 or torch.allclose(A, A[0].expand_as(A)):
+    if A.shape[0] == 1 or torch.equal(A, A[0].expand_as(A)):
         return [A[0]]
     return list(A)
+
+
+def _worst_value(certs, attr: str, pick=max) -> float:
+    """One number for a batch: the worst member's, or NaN if any member could not compute it."""
+    vals = [getattr(c, attr) for c in certs]
+    return float("nan") if any(math.isnan(v) for v in vals) else pick(vals)
 
 
 class CollapseOutcome(str, Enum):
@@ -106,6 +114,8 @@ class SemanticCollapseOperator:
         # a(Σ)·μ·√(d−1) = ‖Σ−μI‖_F, the form the lift proof uses.
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
         ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
+        if ev.shape[-1] < 2:                     # one eigenvalue has no spread; std would read NaN
+            return torch.zeros_like(ev[..., 0])
         return ev.std(dim=-1) / ev.mean(dim=-1)
 
     @torch.no_grad()
@@ -139,10 +149,12 @@ class SemanticCollapseOperator:
 
     @torch.no_grad()
     def _collapse_state(self, x: Tensor, A: Tensor) -> tuple[Tensor, CollapseOutcome]:
-        # Project onto null(A), the actual fixed points of the linearised flow, so f(x*)≈0 for
-        # ANY A. The null space of A_s is a different set: a rotation block has A_s=0 and keeps
-        # moving, so projecting there left ‖Ax*‖ large even for normal A. Uses the same relative
-        # singular-value cutoff as _effective_rank, so cond_rank firing implies k ≥ d/2.
+        # Project onto null(A), the actual fixed points of the linearised flow, so that
+        # ‖Ax*‖ ≤ eig_eps·‖A‖₂·‖x*‖ for ANY A. That is a statement about the linear part: an affine
+        # or nonlinear drift can still move at x*. The null space of A_s is a different set: a
+        # rotation block has A_s=0 and keeps moving, so projecting there left ‖Ax*‖ large even for
+        # normal A. Uses the same relative singular-value cutoff as _effective_rank, so cond_rank
+        # firing implies k ≥ d/2.
         Abar = A.mean(0) if A.dim() == 3 else A
         _, s, Vh = torch.linalg.svd(Abar)
         null_mask = s <= self.eig_eps * s.max()
@@ -245,7 +257,23 @@ class CollapseCertificate:
         return self.gate_numerical_range or self.gate_lyapunov
 
 
-def _null_block_kind(A_N: Tensor, tol: float) -> str:
+def _worst_collapse(certs: Sequence[CollapseCertificate]) -> CollapseCertificate:
+    """A batch is guaranteed only if every member is. Gates are ANDed and numbers report the worst
+    member, so no field of the result speaks for one lucky member."""
+    return replace(
+        min(certs, key=lambda c: (c.guaranteed, c.contraction_rate)),
+        alpha=_worst_value(certs, "alpha"),
+        spectral_abscissa=_worst_value(certs, "spectral_abscissa"),
+        full_contracting=all(c.full_contracting for c in certs),
+        numerical_range_abscissa=_worst_value(certs, "numerical_range_abscissa"),
+        gate_numerical_range=all(c.gate_numerical_range for c in certs),
+        gate_lyapunov=all(c.gate_lyapunov for c in certs),
+        lyapunov_transient_bound=_worst_value(certs, "lyapunov_transient_bound"),
+        cross_term=_worst_value(certs, "cross_term"),
+    )
+
+
+def _null_block_kind(A_N: Tensor, tol: float, eps: float) -> str:
     """How the near-null block behaves on its own, given the split is A-invariant."""
     import numpy as np
     if A_N.numel() == 0:
@@ -256,7 +284,7 @@ def _null_block_kind(A_N: Tensor, tol: float) -> str:
         return "growing"
     if float(w.real.max()) < -tol:
         return "decaying"
-    return _boundary_kind(M, w, np.abs(w.real) <= tol, 0.0, tol)
+    return _boundary_kind(M, w, np.abs(w.real) <= tol, 0.0, tol, eps)
 
 
 @torch.no_grad()
@@ -272,8 +300,7 @@ def collapse_certificate(A: Tensor, eig_eps: float = 1e-2,
     """
     members = _batch_members(A)
     if len(members) > 1:
-        certs = [collapse_certificate(m, eig_eps, margin) for m in members]
-        return min(certs, key=lambda c: (c.guaranteed, c.contraction_rate))
+        return _worst_collapse([collapse_certificate(m, eig_eps, margin) for m in members])
     Abar = members[0]
     A_s = 0.5 * (Abar + Abar.T)
     evals, evecs = torch.linalg.eigh(A_s)
@@ -298,15 +325,18 @@ def collapse_certificate(A: Tensor, eig_eps: float = 1e-2,
     # The theorem's hypothesis, measured: A commutes with P_M ⟺ P_M A P_N = 0 (A_s is block
     # diagonal in this split, so the off-diagonal blocks are the skew part's and vanish together).
     Vm, Vn = evecs[:, ~null_mask], evecs[:, null_mask]
+    # Both thresholds sit just above rounding, measured on frozen and normal matrices up to d=512:
+    # the cross-term reaches 9·eps·‖A‖ and null-block eigenvalues 1.4·eps·‖A‖. A fixed relative
+    # tolerance read a real +0.009 growth or a rotation at ω=2 as rounding next to one large mode.
     scale = max(1.0, torch.linalg.norm(Abar, ord=2).item())
-    tol = max(1e-9, 20.0 * torch.finfo(Abar.dtype).eps) * scale
+    eps = torch.finfo(Abar.dtype).eps
     cross = (torch.linalg.norm(Vm.T @ Abar @ Vn, ord=2).item()
              if active_dim and null_dim else 0.0)
-    null_kind = _null_block_kind(Vn.T @ Abar @ Vn, tol)
+    null_kind = _null_block_kind(Vn.T @ Abar @ Vn, max(1e-9, 4.0 * eps * scale), eps)
 
     guaranteed = (
         (active_dim == 0 or alpha_sym < -margin)
-        and cross <= tol
+        and cross <= max(1e-9, 12.0 * eps * scale)
         and null_kind in ("none", "decaying", "frozen")
     )
     return CollapseCertificate(
@@ -358,11 +388,8 @@ class StabilityGates:
 
 def _worst_gates(gates: Sequence[StabilityGates]) -> StabilityGates:
     """A batch passes a gate only if every member does; numbers report the worst member."""
-    import math
-
     def worst(attr: str) -> float:
-        vals = [getattr(g, attr) for g in gates]
-        return float("nan") if any(math.isnan(v) for v in vals) else max(vals)
+        return _worst_value(gates, attr)
 
     return replace(
         max(gates, key=lambda g: g.spectral_abscissa),
@@ -504,8 +531,17 @@ def stability_gates(A: Tensor, margin: float = 0.0, pseudo_eps: float = 1e-2) ->
 
 # ── #768 contraction half — Theorem 1 for NON-NORMAL A (spectral dichotomy) ───
 
-def _boundary_kind(M, w, on_boundary, frozen_value: float, tol: float) -> str:
-    """Classify the eigenvalues sitting on the stability boundary of M.
+def _rounding_tol(M, tol: float, eps: float) -> float:
+    """tol, but never below the rounding in M's eigenvalues, which measured up to 5·eps·‖M‖₂ on
+    frozen matrices up to d=512. `eps` is the input's: a float32 matrix has float32 error even
+    after it is cast to float64."""
+    import numpy as np
+    return max(tol, 16.0 * eps * float(np.linalg.norm(M, 2)))
+
+
+def _boundary_kind(M, w, on_boundary, frozen_value: float, tol: float, eps: float) -> str:
+    """Classify the eigenvalues sitting on the stability boundary of M. Pass the slow block, not
+    the whole matrix: a large active mode must not set the scale of what counts as "the same".
 
     "frozen"    every boundary mode is semisimple at `frozen_value` (λ=0 for a flow, λ=1 for a
                 map): the state stops on a manifold of true fixed points.
@@ -518,7 +554,7 @@ def _boundary_kind(M, w, on_boundary, frozen_value: float, tol: float) -> str:
     scale = max(1.0, float(np.linalg.norm(M, 2)))
     # Merge generously: a Jordan block's eigenvalues split by ~√machine-eps, and a false merge
     # can only report "defective", which is the conservative side.
-    near = max(10.0 * tol, 1e-6) * scale
+    near = max(10.0 * tol, 1e-6, 4.0 * math.sqrt(eps)) * scale
     kind = "frozen"
     seen: List[complex] = []
     for lam in w[on_boundary]:
@@ -562,10 +598,16 @@ def _eigenbasis_condition(T) -> float:
     return float(np.linalg.cond(np.linalg.eig(T)[1]))
 
 
-def _worst_fate(certs, extreme_of):
-    """A batch collapses only if every member does; report the worst member."""
+def _worst_fate(certs, extreme_of, **worse):
+    """A batch collapses only if every member does: the fate is the worst member's, and each bound
+    the worst of any member's, so a bound holds for the whole batch and not just for that member.
+    `worse` names the extra fields and which way is worse for each."""
     rank = {"COLLAPSE": 0, "MARGINAL": 1, "DIVERGE": 2}
-    return max(certs, key=lambda c: (rank[c.fate], not c.collapses, extreme_of(c)))
+    bounds = {attr: _worst_value(certs, attr)
+              for attr in ("transient_bound", "coupling_norm", "full_transient_bound",
+                           "invariance_residual")}
+    bounds.update({attr: _worst_value(certs, attr, pick) for attr, pick in worse.items()})
+    return replace(max(certs, key=lambda c: (rank[c.fate], not c.collapses, extreme_of(c))), **bounds)
 
 
 @dataclass
@@ -602,7 +644,8 @@ class DichotomyCertificate:
     this reduces to Theorem 1 exactly.
 
     HONEST SCOPE: the LOCAL linear Jacobian only — NOT a global statement. Nonlinear systems
-    also have limit cycles and chaos. Grounding remains the safety mechanism.
+    also have limit cycles and chaos. Grounding remains the safety mechanism. Rates and couplings
+    below `tol` read as zero, which is a limit of resolution, not a finding that they are.
     See docs/SIGMA0-T1-NONNORMAL-DICHOTOMY.md.
     """
     fate: str                  # "COLLAPSE" | "MARGINAL" | "DIVERGE"
@@ -649,36 +692,7 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
     members = _batch_members(A)
     if len(members) > 1:
         return _worst_fate([dichotomy_certificate(m, delta, tol) for m in members],
-                           lambda c: c.slow_abscissa)
-    M = members[0].detach().cpu().numpy().astype(float)
-    n = M.shape[0]
-
-    # eigenvalues (values only) for the split counts + abscissae; the SUBSPACE comes
-    # from an ordered Schur factorization below, never from these eigenvectors
-    w = np.linalg.eigvals(M)
-    active_mask = w.real < -delta
-    n_active = int(active_mask.sum())
-    n_slow = n - n_active
-    active_abscissa = float(w.real[active_mask].max()) if n_active else float("-inf")
-    slow_abscissa = float(w.real[~active_mask].max()) if n_slow else float("-inf")
-
-    # fate — decided by the slow block's abscissa β, and on the boundary by its structure
-    marginal_kind = "none"
-    if slow_abscissa > tol:
-        fate, collapses = "DIVERGE", False
-    elif slow_abscissa < -tol:
-        fate, collapses = "COLLAPSE", True
-    else:
-        marginal_kind = _boundary_kind(M, w, np.abs(w.real) <= tol, 0.0, tol)
-        fate, collapses = _settle_boundary(marginal_kind)
-
-    # invariant-subspace split via ORDERED REAL SCHUR (orthonormal Z; #1989): the
-    # leading sdim columns span the active invariant subspace EXACTLY (block-triangular
-    # T ⇒ (I−BBᵀ)MB = 0 to machine eps), with NO eigenvector inverse — robust even for
-    # DEFECTIVE A, where the old eig + oblique-Riesz split was ill-conditioned / abstained.
-    invariance_residual = 0.0
-    rate, transient = 0.0, float("nan")
-    coupling, full = float("nan"), float("nan")
+                           lambda c: c.slow_abscissa, active_decay_rate=min)
     # A MISSING DEPENDENCY must not be indistinguishable from "the rate is zero".
     # This import used to sit inside the broad `except Exception: pass` below, so on any
     # box without scipy the function silently returned a certificate claiming
@@ -693,9 +707,53 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
             "solve_continuous_lyapunov) to compute the Lyapunov rate. Refusing to "
             "return an uncomputed certificate. Install scipy, or guard the caller."
         ) from exc
+    M = members[0].detach().cpu().numpy().astype(float)
+    n = M.shape[0]
+    eps = torch.finfo(members[0].dtype).eps
+    tol = _rounding_tol(M, tol, eps)
+
+    # eigenvalues (values only) for the split counts + abscissae; the SUBSPACE comes
+    # from an ordered Schur factorization below, never from these eigenvectors.
+    # The cut sits tol inside the boundary. Rounding scatters a boundary eigenvalue to either side
+    # of it, and a rotation at −1e-17 ± 2i counted as active would leave the slow block empty and
+    # read as COLLAPSE. It stays slow, where its structure gets looked at.
+    w = np.linalg.eigvals(M)
+    cut = -delta - tol
+    active_mask = w.real < cut
+    n_active = int(active_mask.sum())
+    n_slow = n - n_active
+    active_abscissa = float(w.real[active_mask].max()) if n_active else float("-inf")
+    slow_abscissa = float(w.real[~active_mask].max()) if n_slow else float("-inf")
+
+    # invariant-subspace split via ORDERED REAL SCHUR (orthonormal Z; #1989): the
+    # leading sdim columns span the active invariant subspace EXACTLY (block-triangular
+    # T ⇒ (I−BBᵀ)MB = 0 to machine eps), with NO eigenvector inverse — robust even for
+    # DEFECTIVE A, where the old eig + oblique-Riesz split was ill-conditioned / abstained.
+    T, Z, r = None, None, 0
     try:
-        T, Z, sdim = schur(M, output="real", sort=lambda z: z.real < -delta)
+        T, Z, sdim = schur(M, output="real", sort=lambda z: z.real < cut)
         r = int(sdim)
+    except (np.linalg.LinAlgError, ValueError):
+        pass
+
+    # fate — decided by the slow block's abscissa β, and on the boundary by its structure
+    marginal_kind = "none"
+    if slow_abscissa > tol:
+        fate, collapses = "DIVERGE", False
+    elif slow_abscissa < -tol:
+        fate, collapses = "COLLAPSE", True
+    else:
+        S = T[r:, r:] if T is not None and r < n else M
+        ws = np.linalg.eigvals(S)
+        marginal_kind = _boundary_kind(S, ws, np.abs(ws.real) <= tol, 0.0, tol, eps)
+        fate, collapses = _settle_boundary(marginal_kind)
+
+    invariance_residual = 0.0
+    rate, transient = 0.0, float("nan")
+    coupling, full = float("nan"), float("nan")
+    try:
+        if T is None:
+            raise ValueError("no Schur split")
         if 0 < r <= n:
             B = Z[:, :r]
             invariance_residual = float(np.linalg.norm((np.eye(n) - B @ B.T) @ M @ B))
@@ -836,28 +894,53 @@ def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
     on defective A (orthonormal Schur basis, no eigenvector inverse).
 
     `delta ∈ [0,1)` shrinks the split circle; use a value inside a spectral gap so
-    the Schur reordering stays well-conditioned. Counts + fate are numpy-only (always
-    computed); the certified Lyapunov/Kreiss metrics need scipy and degrade to nan if
-    it is absent. Never raises on degeneracy.
+    the Schur reordering stays well-conditioned. Requires scipy, and refuses rather than
+    report an uncomputed rate. Never raises on degeneracy.
     """
     import numpy as np
     members = _batch_members(A)
     if len(members) > 1:
         return _worst_fate([discrete_dichotomy_certificate(m, delta, tol) for m in members],
-                           lambda c: c.slow_radius)
+                           lambda c: c.slow_radius, active_decay_factor=max, kreiss_bound=max)
+    # Same reasoning as the continuous certificate above: a missing dependency must not
+    # be reported as "rate_factor = 0.0", which reads as a computed result.
+    try:
+        from scipy.linalg import schur, solve_discrete_lyapunov
+    except ImportError as exc:
+        raise RuntimeError(
+            "discrete_dichotomy_certificate requires scipy (scipy.linalg.schur + "
+            "solve_discrete_lyapunov). Refusing to return an uncomputed certificate."
+        ) from exc
     M = members[0].detach().cpu().numpy().astype(float)
     n = M.shape[0]
     radius = 1.0 - float(delta)
+    eps = torch.finfo(members[0].dtype).eps
+    tol = _rounding_tol(M, tol, eps)
 
     # eigen-moduli: split counts + slow-block radius (values only; the SUBSPACE comes
-    # from Schur below, never from these eigenvectors)
+    # from Schur below, never from these eigenvectors). The cut sits tol inside the circle, for
+    # the same reason as the continuous certificate: an orthogonal map's eigenvalues land on both
+    # sides of |z|=1 by rounding, and they must stay slow.
     w = np.linalg.eigvals(M)
     moduli = np.abs(w)
-    active_mask = moduli < radius
+    cut = radius - tol
+    active_mask = moduli < cut
     n_active = int(active_mask.sum())
     n_slow = n - n_active
     active_radius = float(moduli[active_mask].max()) if n_active else 0.0
     slow_radius = float(moduli[~active_mask].max()) if n_slow else 0.0
+
+    # ordered real Schur: active (|λ|<cut) eigenvalues to the top-left block.
+    # Z orthonormal ⇒ leading sdim columns span the active invariant subspace
+    # EXACTLY (block-triangular T ⇒ (I−BBᵀ)MB=0 to machine eps) — defective-safe.
+    # The callback takes two arguments because real Schur passes (Re λ, Im λ). Given one it sees
+    # only Re λ, which sorted every rotation and unstable complex pair into the active block.
+    T, Z, r = None, None, 0
+    try:
+        T, Z, sdim = schur(M, output="real", sort=lambda re, im: abs(complex(re, im)) < cut)
+        r = int(sdim)
+    except (np.linalg.LinAlgError, ValueError):
+        pass
 
     # fate — decided by the slow block's spectral radius ρ_N = ρ(A), and at the circle by
     # its structure
@@ -869,27 +952,17 @@ def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
     elif slow_radius < 1.0 - tol:
         fate, collapses = "COLLAPSE", True
     else:
-        marginal_kind = _boundary_kind(M, w, np.abs(moduli - 1.0) <= tol, 1.0, tol)
+        S = T[r:, r:] if T is not None and r < n else M
+        ws = np.linalg.eigvals(S)
+        marginal_kind = _boundary_kind(S, ws, np.abs(np.abs(ws) - 1.0) <= tol, 1.0, tol, eps)
         fate, collapses = _settle_boundary(marginal_kind)
 
     invariance_residual = float("nan")
     rate_factor, transient, kreiss = 0.0, float("nan"), float("nan")
     coupling, full = float("nan"), float("nan")
-    # Same reasoning as the continuous certificate above: a missing dependency must not
-    # be reported as "rate_factor = 0.0", which reads as a computed result.
     try:
-        from scipy.linalg import schur, solve_discrete_lyapunov
-    except ImportError as exc:
-        raise RuntimeError(
-            "discrete_dichotomy_certificate requires scipy (scipy.linalg.schur + "
-            "solve_discrete_lyapunov). Refusing to return an uncomputed certificate."
-        ) from exc
-    try:
-        # ordered real Schur: active (|λ|<radius) eigenvalues to the top-left block.
-        # Z orthonormal ⇒ leading sdim columns span the active invariant subspace
-        # EXACTLY (block-triangular T ⇒ (I−BBᵀ)MB=0 to machine eps) — defective-safe.
-        T, Z, sdim = schur(M, output="real", sort=lambda z: abs(z) < radius)
-        r = int(sdim)
+        if T is None:
+            raise ValueError("no Schur split")
         invariance_residual = 0.0
         if 0 < r <= n:
             B = Z[:, :r]
@@ -1023,7 +1096,9 @@ def jsrr_certificate(A: Tensor, margin: float = 0.0, seed: int = 0) -> JsrrCerti
     if rho != rho:                       # nan ⇒ cannot certify → do not accept
         regime, stable = "divergent", False
     elif abs(rho - 1.0) < 1e-9:
-        regime, stable = "critical", (rho < 1.0 - margin)
+        regime, stable = "critical", False   # ρ on the boundary is not contraction, whichever side
+                                             # rounding put it: 13 of 200 random orthogonal maps read
+                                             # just under 1 and would have been accepted.
     elif rho < 1.0:
         regime, stable = "contraction", (rho < 1.0 - margin)
     else:
@@ -1040,8 +1115,24 @@ def jsrr_certificate(A: Tensor, margin: float = 0.0, seed: int = 0) -> JsrrCerti
     )
 
 
+def _contraction_from_residuals(residuals: Sequence[float],
+                                floor: float) -> Tuple[float, float, float]:
+    """(ratio, net, rise) from one token's residual norms ‖e₀‖…‖eₙ‖. See depth_contraction_stats."""
+    if not all(math.isfinite(x) for x in residuals):
+        return math.inf, math.inf, math.inf
+    e = [max(x, floor) for x in residuals]
+    rise = max(e[j] / min(e[:j + 1]) for j in range(len(e)))
+    if e[-1] <= floor:
+        return 0.0, 0.0, rise
+    n = len(e) - 1
+    net = (e[-1] / e[0]) ** (1.0 / n)
+    half = math.ceil(n / 2)
+    deep = (e[-1] / e[-1 - half]) ** (1.0 / half)
+    return max(net, deep), net, rise
+
+
 def depth_contraction_stats(hidden_per_step: Sequence[Tensor],
-                            tol: float = 1e-6) -> Optional[Tuple[float, float]]:
+                            tol: float = 1e-6) -> Optional[Tuple[float, float, float]]:
     """One token's contraction, measured on the loop's own iterates h¹…hᴷ.
 
     With residuals eₖ = hᵏ⁺¹ − hᵏ we have eₖ₊₁ = f(hᵏ⁺¹) − f(hᵏ) ≈ J·eₖ, so ‖eₖ₊₁‖/‖eₖ‖ is a
@@ -1049,38 +1140,39 @@ def depth_contraction_stats(hidden_per_step: Sequence[Tensor],
     no extra forward passes, does not depend on the scale of h, and is a norm rather than an
     eigenvalue, so it sees non-normal growth.
 
-    Returns (ratio, amplification), or None with fewer than three iterates:
-      ratio          ‖e_last‖/‖e_prev‖ at the deepest step still above numerical noise
-      amplification  max_k ‖eₖ‖/‖e₁‖, the residual growth anywhere inside the loop
-    Residuals below the numerical floor (tol·‖h‖, or 8 machine epsilons·‖h‖ if larger: float16
-    is what the serve path runs) count as converged, so a token already at its fixed point
-    reads (0.0, 1.0) rather than dividing noise by noise.
+    Returns (ratio, net, rise), or None with fewer than three iterates:
+      ratio  the larger of net and the same geometric mean over the deepest half of the loop, so
+             the whole loop and its end must both be shrinking. No single step decides: a last-step
+             ratio accepted a period-2 map with ρ>1 whenever the loop stopped on its low step.
+      net    (‖eₙ‖/‖e₀‖)^(1/n), the geometric-mean factor per step over the whole loop
+      rise   max_j ‖eⱼ‖ / min_{i≤j} ‖eᵢ‖, the largest climb above any earlier residual
+    Residuals are clamped at the numerical floor (tol·‖h‖, or 8 machine epsilons·‖h‖ if larger:
+    float16 is what the serve path runs), so growth starting below it is still seen. A token whose
+    last residual is at the floor has reached a numerical fixed point and reads (0.0, 0.0, rise).
+    A non-finite iterate reads (inf, inf, inf): a loop that overflowed did not converge.
     """
     hs = list(hidden_per_step)
     if len(hs) < 3:
         return None
     noise = 8.0 * torch.finfo(hs[0].dtype).eps
+    # Norms in float64: float16 can hold a state whose norm it cannot represent (above 65504).
+    hs = [h.detach().double() for h in hs]
     floor = max(tol, noise) * (max(float(h.norm()) for h in hs) or 1.0)
-    e = [float((hs[k + 1] - hs[k]).norm()) for k in range(len(hs) - 1)]
-    if e[0] <= floor:
-        return 0.0, 1.0
-    ratio = 0.0
-    for k in range(len(e) - 1, 0, -1):
-        if e[k - 1] > floor:
-            ratio = e[k] / e[k - 1]
-            break
-    return ratio, max(e) / e[0]
+    return _contraction_from_residuals(
+        [float((hs[k + 1] - hs[k]).norm()) for k in range(len(hs) - 1)], floor)
 
 
 @dataclass
 class LoopContractionCertificate:
     """Did the recurrent loop contract on this generation? Measured, not proven: it covers the
     residuals the loop actually produced, not every direction, and it is not a statement about
-    truth. Takes the 90th percentile across tokens, so one odd token does not decide.
-    `transient_max` is a design default, not calibrated on a real model."""
-    factor: float           # 90th percentile of per-token last-step ‖e_last‖/‖e_prev‖
+    truth. Takes the 90th percentile across tokens, so one odd token does not decide, unless it
+    went non-finite, which rejects the generation. `transient_max` and the plateau band are design
+    defaults, not calibrated on a real model."""
+    factor: float           # 90th percentile of per-token ratio (depth_contraction_stats)
     worst_factor: float     # max over tokens
-    transient: float        # 90th percentile of per-token residual amplification inside the loop
+    net_factor: float       # 90th percentile of per-token net shrink per step over the whole loop
+    transient: float        # 90th percentile of per-token rise: climb above an earlier residual
     n_tokens: int
     margin: float           # stable demands factor < 1 − margin
     transient_max: float    # stable demands transient ≤ this
@@ -1101,15 +1193,22 @@ def loop_contraction_certificate(stats, margin: float = 0.0, transient_max: floa
     usable = [s for s in (stats or []) if s is not None]
     if not usable:
         return None
-    ratios = np.array([s[0] for s in usable], dtype=float)
-    amps = np.array([s[1] for s in usable], dtype=float)
+    table = np.array(usable, dtype=float)
+    if not np.isfinite(table).all():
+        return LoopContractionCertificate(
+            factor=math.inf, worst_factor=math.inf, net_factor=math.inf, transient=math.inf,
+            n_tokens=len(usable), margin=float(margin), transient_max=float(transient_max),
+            stable=False, regime="divergent")
+    ratios, nets, rises = table[:, 0], table[:, 1], table[:, 2]
     factor = float(np.quantile(ratios, quantile))
-    transient = float(np.quantile(amps, quantile))
+    net_factor = float(np.quantile(nets, quantile))
+    transient = float(np.quantile(rises, quantile))
     if factor >= 1.0:
-        # Stopped shrinking. Past its starting size that is growth; below it, the loop has settled
-        # on a non-zero plateau, which is what real Ouro does past its trained depth (residuals fall
-        # from ~30 to ~3 and stay there): bounded, moving, and neither frozen nor diverging.
-        regime = "divergent" if transient >= 1.25 else "plateau"
+        # Stopped shrinking. A residual that is flat, or nearly so, has settled on a non-zero
+        # plateau: bounded, moving, and neither frozen nor diverging. Saved Ouro runs do this past
+        # their trained depth, falling from ~30 to ~3 and staying there. Anything steeper is growth.
+        growing = factor >= 1.25 or net_factor > 1.05 or transient > transient_max
+        regime = "divergent" if growing else "plateau"
     elif transient > transient_max:
         regime = "transient"
     elif factor >= 1.0 - margin:
@@ -1119,6 +1218,7 @@ def loop_contraction_certificate(stats, margin: float = 0.0, transient_max: floa
     return LoopContractionCertificate(
         factor=factor,
         worst_factor=float(ratios.max()),
+        net_factor=net_factor,
         transient=transient,
         n_tokens=len(usable),
         margin=float(margin),
@@ -1170,7 +1270,8 @@ class AntiCollapseOperator:
     """
 
     # Target a(Σ⁺) ≥ 1.02·ε_a, so that a(Σ_next) ≥ ε_a survives raising near-zero eigenvalues to
-    # the covariance floor, whenever d·eps/sigma_max ≤ 9e-4 (d up to ~9000 at the defaults).
+    # the covariance floor. With ρ = d·eps/sigma_max, a(Σ_next) ≥ (a(Σ⁺) − √(d/(d−1))·ρ)/(1+ρ), which
+    # needs ρ ≤ 6e-4 for every d ≥ 2 (d up to 6000 at the defaults).
     LIFT_MARGIN = 1.02
 
     def __init__(self, detector: Optional[SemanticCollapseOperator] = None,
@@ -1287,6 +1388,8 @@ class AntiCollapseOperator:
 
         coeff = noise @ null                              # (B, m) random in null
         dx_extra = self._kick_scale(p) * (coeff @ null.T)  # back to state space
+        if d < 2:                       # one eigenvalue has no shape to restore: C3 needs d ≥ 2, S1 does not
+            return dx_extra, torch.zeros_like(sigma)
 
         b_cov = self._cov_floor(sigma, d, m).clamp_min(self.strength * p)  # each sample ≥ its Δ
         sigma_extra = b_cov.unsqueeze(-1).unsqueeze(-1) * (null @ null.T)  # (B, d, d), rank m
