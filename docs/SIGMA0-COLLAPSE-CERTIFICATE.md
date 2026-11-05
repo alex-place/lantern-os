@@ -30,6 +30,16 @@ account of why an ungrounded self-improving system tends to collapse or diverge.
 
 ---
 
+> **Correction — 2026-11-05 (read this before citing anything below).** An engine-level audit,
+> including an independent one (`lantern-os-research` PR #1), found several headline claims stronger
+> than their evidence, and shipped code that violated some of the theorems. The code is fixed and
+> pinned by new tests; [Appendix C](#appendix-c--corrections-register-consolidated) lists every
+> correction. In short: the "900/900 prevented" figure is **retired** (a placebo scored the same);
+> C3 is about the gate, not the state; "no third fate" is false even in the linear regime (rotation);
+> the small-gain "proven bound" bounded nothing; and the former acceptance proxy tracked the size of
+> the hidden state rather than its dynamics. The companion proofs in the private research repo
+> (`SIGMA0-C3-…`, `SIGMA0-T1-…`, `SIGMA0-L2-…`) still carry the older wording.
+
 ## What this document is — and is not
 
 **It is:** the internal, evidence-classed design-and-theory record for one system's *Verify*
@@ -77,7 +87,10 @@ since carry a verified-on date.
 
 Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
 were run against this revision on 2026-07-17 (91 tests, all passing; the gate self-test was
-last run 2026-07-07). The **Part I backbone was re-run 2026-07-21** with no drift
+last run 2026-07-07). Rows added 2026-11-05 were run on 2026-11-05. On a fresh clone, only the rows
+whose artifacts are still in this repo can run; the rest moved to the private research repo (see the
+note at the top), which by the rule below means they are unverifiable from here. The **Part I
+backbone was re-run 2026-07-21** with no drift
 (`tests/test_cio_sde.py` → 46 passed; `tests/test_sigma0_jsrr_gate.py` → 12 passed); the other
 suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem — but its active-loop
 *harness* is unit-tested logic and its two datapoints are real-surface runs (last two rows below):
@@ -85,8 +98,12 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
+| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 27 passed |
+| Certificate boundary cases checked against the actual flow: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 20 passed |
+| Loop-contraction verdict on trajectories of known contraction; scale invariance; non-normal growth (§1.2.3) | MEASURED signal, synthetic trajectories | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 33 passed |
+| Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py` |
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
-| 900-run collapse-prevention sweep (§3) | MEASURED | `data/sigma0_regime_sweep_report.json`; regenerate: `python experiments/sigma0_regime_sweep.py` |
+| ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
 | Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
 | Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
 | Phase 0.5 prospective shot-call on the trained reservoir: sliver call held; anchor/ceiling ratio 1.4·10⁴ (§3.1, [#2690]) | MEASURED (real learned system) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
@@ -140,38 +157,42 @@ Internal names are project identifiers, not claimed technical contributions:
 updates itself over time, together with an honest account of what happens to a
 self-improving system that has *no contact with outside reality*.
 
-**The one-line result.** A system that only ever optimizes against its own
-internal picture of the world — *in the regime the theorems below cover (local
-linear Jacobian; see each section's status line)* — has two failure modes and no
-happy third one: it
-either **collapses** onto a single frozen, self-agreeing state (nicknamed the
-"42-state"), or it **diverges** and runs away. The only escape is an **external
-anchor** — real data, a measurement, a market, a ground truth. **Grounding is the
-safety mechanism.** This is the same thing machine-learning researchers call
-**model collapse** — train a model on its own output long enough and it degrades.
+**The one-line result.** The linearized dynamics of a system with no input have exactly three
+outcomes, decided by the spectrum of `A`: it **settles** (onto a frozen, self-agreeing state, the
+"42-state", when the settling leaves a fixed manifold behind), it **diverges**, or it **rotates**
+forever, bounded and never frozen. That is linear algebra, and it holds for a grounded system with
+the same `A` too: the theorem has no grounded/ungrounded variable in it. The claim this project
+actually cares about — that a system optimizing only against its own picture of the world degrades,
+and that an **external anchor** (real data, a measurement, a market, a ground truth) is what rescues
+it — rests on the model-collapse literature (§7) and on this project's own measurements (§8.4).
+**Grounding is the safety mechanism** is that empirical claim, not a corollary of Theorem 1.
 
 **How sure are we of each part?** Every claim below is labelled:
-- **PROVEN** — the core collapse theorem (Theorem 1), for the well-behaved
-  (symmetric / normal) case; **and** that the anti-collapse operator *prevents
-  permanent freeze* (§3, Theorem C3) — now for **all `A`, normal and non-normal**
-  (the alignment hypothesis was removable; 2026-06-26). *46 of 46 tests pass* (incl. the non-normal contraction dichotomy, [#768], the discrete-time dichotomy, [#1988], and the defective-`A` Schur split, [#1989]).
-- **MEASURED** — the early-warning "canary" (§4) and the operator's broader escape
-  behavior: demonstrated over **900 forced-collapse runs (100% prevented)** plus
-  passing integration tests, beyond what the freeze theorem covers.
-- **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational
-  definition, deliberately *not* dressed up as a theorem.
+- **PROVEN** — Theorem 1 for normal `A`; the spectral dichotomy for every `A` (standard linear
+  algebra); **C3**, that when the operator acts, the four-signal gate cannot be true on two consecutive
+  steps, through the engine's own projection, for all `A` and every dimension; and **S1**, that each
+  firing moves the state out of the near-target ball with probability ≥ ½. Tests are in the audit
+  table. "Proven" here means closed-form argument plus tests, not a formal proof.
+- **MEASURED** — the operator against a placebo (§3): the gate never stays true for two steps, against
+  runs of 60 for the placebo. The early-warning "canary" (§4).
+- **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational definition,
+  deliberately *not* dressed up as a theorem. The acceptance gate's transient threshold (§1.2.3).
+- **NOT CLAIMED** — that the state keeps moving. A system with no drift, no noise and no grounding
+  rests at an equilibrium once the gate has cleared, and a test pins that. Nothing here is a global
+  guarantee, and Σ₀⁻¹ is observe-only by default in the live engine.
 
-**What's left.** Both halves of [#768] are now closed (in-regime). Theorem 1's
-**contraction** for non-normal *drift* (the §1 cross-term) — whether an ungrounded
-system collapses vs. diverges — is resolved by the spectral (Riesz) dichotomy
-(`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`, 2026-06-26):
-split by `A`'s own spectrum so the cross-term vanishes by invariance; the active
-block contracts (Lyapunov) and the slow block's abscissa sign gives collapse-vs-
-diverge, no third fate. The anti-collapse *freeze* claim is likewise proven for all
-`A`. ("Machine-checked" throughout means closed-form algebra + numerical sweep +
-pytest, **not** a Lean/Mathlib formal proof; and every theorem here certifies the
-**local linear Jacobian**, not a global guarantee — grounding remains the safety
-mechanism.)
+**What's left.** The theorem-level questions about non-normal `A` are answered, but that is less than
+it sounds, because three things they do not cover are the ones that matter next:
+1. **Transient amplification in the gates.** R2's Kreiss-inflated thresholds remain a conjecture;
+   [#2789](https://github.com/alex-place/lantern-os/issues/2789) and
+   [#2854](https://github.com/alex-place/lantern-os/issues/2854) were closed in a backlog prune on
+   2026-08-02, unsolved.
+2. **Jacobians that change over time.** Everything in Part I is one fixed `A`. Passing at each step
+   says nothing about the product: `[[0,2],[0,0]]` and `[[0,0],[2,0]]` both have ρ=0, and their product
+   has ρ=4. The loop-contraction verdict (§1.2.3) measures this on real iterates; nothing proves it.
+3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves
+   once. A lower bound on what the state retains (for example σ_min of the transition product) would be
+   the real theorem. It does not exist yet.
 
 **Part II in one line.** For the *slow* timescale — deciding whether a retrained model may replace
 the current one — the measured version of the same principle is: **a system's self-checks can spot
@@ -220,13 +241,19 @@ carry the falsification plans.
 
 ### R1 · The collapse guarantee — the foundation `PROVEN (machine-checked)`
 ![collapse guarantee](assets/cert/rho-gate.svg)
-Ungrounded self-update contracts to a frozen fixed point (or diverges) — no third fate. Classical
-Lyapunov/Banach machinery; the *certificate quantities and tests* (§1, 46/46 green) are ours.
+A linear flow settles, diverges, or rotates: three outcomes, decided by `A`'s spectrum, for grounded
+and ungrounded systems alike. Classical Lyapunov/Banach machinery; the *certificate quantities and
+tests* (§1) are ours. **Corrected 2026-11-05:** this entry used to read "no third fate", and the code
+counted rotation as collapse.
 
 ### R2 · Kreiss-inflated canary thresholds (M4/L3) `CONJECTURE · theorem IMPORTED` ★application
 ![kreiss](assets/cert/kreiss.svg)
 The Kreiss matrix theorem bounds transient growth of non-normal systems; inflating canary
 thresholds by 𝒦(A) closes the certificate's non-normal gap (§4, [#2789](https://github.com/alex-place/lantern-os/issues/2789)).
+**Still a conjecture (2026-11-05):** that issue was closed in a backlog prune, unsolved. Its ensemble
+check used n=6 and T=200, and "0 bound violations" only re-tests the Kreiss theorem. The threshold
+scales with dimension: at d=2048, e·n·𝒦 ≥ 5,567, so a mode growing 20% per step needs 47 steps to
+trip it. Whether that catches anything at real loop depth is untested.
 Fielded cross-domain precedent: Iterative Learning Control's contraction requirement (patent
 landscape, 2026-07-22).
 
@@ -386,13 +413,12 @@ run 2 fixes composition before dose); the escalation-rate-only-falls design. **O
 ---
 
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **46 passing, 0 xfail**) **for the symmetric / normal case**.
-The **anti-collapse operator's freeze-prevention (§3) is now also PROVEN** — Theorem C3,
-for **all `A`** (normal and non-normal; 2026-06-26). The collapse trigger (§2) and the
-early-warning readout (§4) remain control-design heuristics — empirically supported, not
-theorems. The §6 demonstration is **reproducible**: both driver scripts are
-committed and produce checked-in run logs (see §6). Read the per-section status
-lines before relying on any claim here.
+`tests/test_cio_sde.py`) **for `A` that commutes with its active projector**, which includes normal
+`A`. The spectral dichotomy gives the fate of every `A`, as three outcomes rather than two. **C3 and S1
+are proven in-regime** (§3): the gate cannot be true on consecutive steps, and each firing moves the
+state with probability ≥ ½. Neither says the state keeps moving. The collapse trigger (§2) and the
+early-warning readout (§4) remain control-design heuristics. The §6 demonstration is **reproducible**.
+Read the per-section status lines before relying on any claim here.
 
 > **Provenance:** every reconcile pass and closed-gap record since 2026-06-16 is preserved
 > verbatim in [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) —
@@ -488,7 +514,13 @@ $$\alpha = \max\{\, \lambda_i(A_s) : v_i \in M \,\}.$$
 **Theorem (contraction on the active subspace).**
 Assume `α < 0` **and** the active subspace `M` is *A-invariant*, i.e.
 
-$$P_M\,A\,P_N = 0 \qquad\text{(equivalently: A is normal, } A = A_s\text{, or A commutes with }P_M\text{).}$$
+$$P_M\,A\,P_N = 0 \qquad\text{(equivalently: A commutes with }P_M\text{; implied by A normal).}$$
+
+(`M` and `N` are eigenspaces of `A_s`, so `A_s` is block-diagonal in this split and the off-diagonal
+blocks of `A` belong to its skew part. They therefore vanish together, which is why one condition is
+enough.) `collapse_certificate().guaranteed` measures this as `cross_term`, and also requires the
+null block to settle: without that check, a mode growing at +0.009 sits inside the null band and the
+"collapse" diverges.
 
 Then
 
@@ -518,28 +550,27 @@ energy bound can fail outright:
 > *different* argument (below), not by the energy proof.
 >
 > *In plain words:* this is us being honest about a limit. For swirling systems the simple energy argument can wrongly suggest things are blowing up; the system still settles, but only a more careful argument proves it.
+>
+> **Note (2026-11-05):** `‖x‖` itself never grows here. `ω(A) = 0`, so `‖e^{tA}‖₂ ≤ 1`. What grows is `V`, the projection onto one coordinate, as energy rotates into it. Earlier versions of this document called this matrix a transient-growth example. It is not one; `[[−1,10],[0,−1]]` is.
 
 So for non-normal `A`, the §1 energy proof is **insufficient on its own**; the
 cross term must be separately bounded (e.g. via `‖P_M A P_N‖` and a small-gain /
 Young's-inequality argument that tightens `α` to an effective rate), or one must
 fall back to the full-spectrum test.
 
-**Implementation (as of 2026-06-15).** The `collapse_certificate()` function now
-uses a small-gain theorem bound for the non-normal case:
-
-$$\alpha_{\text{bound}} = \max_i \lambda_i(A_s) + \|A - A_s\|_2$$
-
-where `A_s = (A + A^T)/2` is the symmetric part. This provides a conservative
-bound that accounts for cross-terms in the non-normal case. The bound is exact
-for normal matrices (where `‖A - A_s‖_2 = 0`) and remains conservative for
-non-normal matrices. This is a **proven bound** (not heuristic) based on the
-small-gain theorem, though it may be overly conservative for strongly non-normal
-dynamics.
+**Correction (2026-11-05): the small-gain index is not a bound.** From 2026-06-15 until this
+correction, this section called `α_bound = max λ(A_s) + ‖A − A_s‖₂` a proven bound, and
+`collapse_certificate` used it for `guaranteed`. It bounds nothing here. `V̇` picks up
+`‖A_k‖·‖P_M x‖·‖P_N x‖`, which `‖A_k‖·‖P_M x‖²` does not dominate once `‖P_N x‖ > ‖P_M x‖`. For
+`[[−1,0.5],[−0.5,0]]` the index is `−0.5`, yet from `x₀ = (0,1)` the active part starts at 0 and reaches
+0.37. `guaranteed` now requires `cross_term ≈ 0` and a settling null block. `alpha` remains as
+telemetry only.
 
 ### 1.2 The authoritative test: full-spectrum, not A_s alone
 
-`α < 0` on the symmetric part is **necessary but not sufficient** for strict
-contraction of the full system. The conservative, always-correct condition is
+`α < 0` on the symmetric part is **neither necessary nor sufficient** for
+contraction of the full system: `[[−0.3,1.5],[−0.5,−0.6]]` contracts with `α > 0`, and the rotation
+below has `α < 0` and never does. The condition that decides the asymptotics is
 
 $$\max \operatorname{Re}\,\lambda(A) < 0 \quad\text{on the \emph{full} } A \ (\text{via } \texttt{eig}, \text{ not } \texttt{eigvalsh}).$$
 
@@ -551,10 +582,10 @@ center that never collapses in its rotating plane.
 **Recommended:** report **both** `α = max λᵢ(A_s)` (the energy abscissa, exact
 under the §1 hypothesis) **and** `max Re λ(A)` on the full Jacobian (the
 authoritative contraction test). As of [#505], `collapse_certificate()` now
-computes **both**: `alpha` (a conservative small-gain bound `max λ(A_s) + ‖A−A_s‖₂`)
+computes **both**: `alpha` (the small-gain index `max λ(A_s) + ‖A−A_s‖₂`, telemetry only)
 and `spectral_abscissa` (the exact `max Re λ(A)` via `eig`, with a `full_contracting`
-flag). The full-spectrum test is tighter — it certifies genuinely-contracting
-non-normal systems that the small-gain bound over-rejects (see
+flag). The full-spectrum test is tighter — it covers genuinely-contracting
+non-normal systems that the small-gain index over-rejects (see
 `test_certificate_full_spectrum_abscissa`).
 
 [#505]: https://github.com/alex-place/lantern-os/issues/505
@@ -573,9 +604,9 @@ sufficient, provable** contraction certificates — each strictly wider than sma
    `∃P≻0 : (A+mI)ᵀP+P(A+mI) ≺ 0 ⟺ max Re λ(A) < −m` (classical Lyapunov theorem;
    `= inf_T μ₂(TAT⁻¹) < −m`). Certified by solving `(A+mI)ᵀP+P(A+mI) = −I` and checking
    `P≻0` (with a relative ill-conditioning guard, so the stability boundary is never
-   certified independent of solver warnings). Accepts strongly non-normal `A` with
-   transient growth (e.g. `[[−1,3],[−3,0]]`, Hurwitz at `−0.5`) that small-gain
-   over-rejects. `√cond(P₀)` (from the margin-0 solve) upper-bounds the Euclidean
+   certified independent of solver warnings). Accepts strongly non-normal `A`, with
+   transient growth (`[[−1,10],[0,−1]]`) or without it (`[[−1,3],[−3,0]]`, Hurwitz at `−0.5`,
+   where `ω = 0`). `√cond(P₀)` (from the margin-0 solve) upper-bounds the Euclidean
    transient `sup_t ‖e^{tA}‖`.
 3. **ε-pseudospectral abscissa + Kreiss constant (transient-aware).** The field-of-values
    resolvent bound `‖(zI−A)⁻¹‖₂ ≤ 1/dist(z, W(A))` gives a **provable** upper bound on the
@@ -588,8 +619,8 @@ sufficient, provable** contraction certificates — each strictly wider than sma
 
 **Acceptance gate.** `loop_lm.generate()` **consumes** the certificate (it was previously
 computed but unused): a generation's latent trajectory carries an explicit
-convergence-accept/reject verdict (`None` when too few tokens to certify). As of 2026-07-07
-the **primary** acceptance criterion is the *discrete* JSRR gate `ρ(A) < 1` (§1.2.3); the
+convergence-accept/reject verdict (`None` when too few tokens to certify). As of 2026-11-05
+the **primary** acceptance criterion is the measured loop contraction (§1.2.3); the
 continuous `proven_contracting` above is demoted to diagnostic telemetry + acceptance
 **fallback**. The two answer different questions — the continuous gates certify `e^{tA}`
 contraction and over-reject non-normal `A` with transient growth, while the loop is a
@@ -597,13 +628,14 @@ contraction and over-reject non-normal `A` with transient growth, while the loop
 not the abscissa.
 
 **Honest scope.** Sufficient, not necessary; they certify the **full Jacobian's**
-contraction, not collapse-onto-manifold (the L1 alignment gap is separate). The PROVEN
-transient constant is **Crouzeix–Palencia (2017): `‖e^{tA}‖ ≤ (1+√2)` when `W(A) ⊂ LHP`**
-(`ω ≤ 0`); the sharper constant `2` is Crouzeix's still-open conjecture. Verified by
+contraction, not collapse-onto-manifold (the L1 alignment gap is separate). When
+`W(A) ⊂` closed LHP (`ω ≤ 0`), `‖e^{tA}‖₂ ≤ 1` (Lumer–Phillips), so there is no Euclidean transient
+at all. Earlier versions reported Crouzeix–Palencia's `1+√2` here as "the proven transient constant",
+which is true and vacuous. Verified by
 `test_stability_gates.py` (the `[[−1,3],[−3,0]]` case, a 400-matrix red-team showing no
 false-positive certificates, the `α_ε ≤ ω+ε` upper bound and `K(A) ≤ sup_t‖e^{tA}‖` lower
-bound, and matrix-exponential checks that the monotone (`e^{ωt}`), Lyapunov (`√cond(P)`),
-and Crouzeix–Palencia (`1+√2`) bounds each hold).
+bound, and matrix-exponential checks that the monotone (`e^{ωt}`, and `≤ 1`) and Lyapunov
+(`√cond(P)`) bounds each hold).
 These **extend the proven region of §1; they do not make the system globally uncollapsible.**
 
 [#768]: https://github.com/alex-place/lantern-os/issues/768
@@ -628,12 +660,42 @@ top-k; (3) do not quote §1 numbers for a routed loop without naming the routing
 this certificate currently proves things about one sub-network at a time, and "how often it
 swaps" becomes a stability quantity of its own.
 
-#### 1.2.3 The discrete acceptance gate: JSRR (`ρ(A) < 1`), externally validated
+#### 1.2.3 The acceptance verdict: measured loop contraction, with JSRR (`ρ < 1`) as fallback
+
+**Correction (2026-11-05): JSRR is no longer the verdict, and its old input was not a Jacobian.**
+The matrix this gate used was a mean of `Δh/‖h‖ ⊗ h` taken across **tokens**. It scales linearly with
+`‖h‖` and estimates `(J−I)·C` rather than `J`, so its verdict tracked the size of the hidden state. On
+trajectories with a known per-step factor:
+
+| True factor per step | `‖h‖` = 0.01 | `‖h‖` = 1 | `‖h‖` = 100 |
+|---|---|---|---|
+| 0.5 (stable) | accept | accept | reject |
+| 1.1 (unstable) | accept | accept | reject |
+| 1.5 (unstable) | accept | reject | reject |
+
+Caveat (2) below disclosed "proxy", but not this. Even a true `ρ` reads only the spectrum:
+`[[.99,1000],[0,.99]]` passes with 37,000× transient growth.
+
+**The verdict is now `loop_contraction_certificate`.** For one token's depth iterates `h¹…hᴷ`, with
+residuals `eₖ = hᵏ⁺¹ − hᵏ`, we have `eₖ₊₁ = f(hᵏ⁺¹) − f(hᵏ) ≈ J·eₖ`. So `‖eₖ₊₁‖/‖eₖ‖` is a finite-difference
+Jacobian-vector norm of the recurrent map, along its own residual. It costs no extra forward passes,
+ignores the scale of `h`, and is a norm, so it sees non-normal growth. A generation is accepted iff the
+90th percentile across tokens of the last-step ratio is `< 1 − margin` and the residual never grows more
+than 10× inside the loop (`SIGMA0_LOOP_TRANSIENT_MAX`, a design default, **not calibrated**).
+
+**Honest scope.** MEASURED on the residuals the loop actually produced: it does not cover every
+direction, and it is not a statement about truth. Tested on synthetic trajectories of known contraction;
+**not yet run on a real Ouro generation**, so the acceptance rate on real models is unknown. Expect it to be
+low on today's Ouro: ADR-0024 records a true `ρ(J) ≈ 8–11` (expansive) from the autograd JVP (#2029), against
+which the old proxy's accepts meant nothing. Reported, not enforced: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a
+`next_action`. JSRR remains as telemetry and fallback, now on a scale-invariant least-squares
+token-transition operator (exact DMD), whose radius is a Ritz estimate that tends to read low when `T < d`.
+The rest of this section is the original adoption record.
 
 **Status: ADOPTED external method; the gate's verdict is MACHINE-CHECKED, not a new theorem.**
 The §1.2.1 gates are *continuous-time* — they certify contraction of `e^{tA}`. But the serve
 loop is a **discrete iteration** `h_{k+1} = f(h_k)`, whose fixed point `h*` is asymptotically
-stable **iff the spectral radius `ρ(J(h*)) < 1`** — the abscissa is the wrong invariant, and a
+stable **if `ρ(J(h*)) < 1`** and unstable if `ρ > 1` (`ρ = 1` is undecided by the linearization) — the abscissa is the wrong invariant, and a
 pure rotation (`ρ = |λ| = 1`, `Re λ = 0`) that the continuous numerical-range gate can wave
 through is correctly rejected by `ρ < 1`.
 
@@ -649,7 +711,7 @@ a competitor:
   power-iteration surrogate `‖Av‖₂²` (their Eq. 3, reusable as a training regulariser).
   numpy-only, so it gates acceptance even in the minimal inference venv where scipy (the
   §1.2.1 Lyapunov/Kreiss legs) is absent.
-- `loop_lm.generate()` accepts iff `ρ(A) < 1 − margin` (`margin` via `SIGMA0_JSRR_MARGIN`,
+- Until 2026-11-05, `loop_lm.generate()` accepted iff `ρ(A) < 1 − margin` (`margin` via `SIGMA0_JSRR_MARGIN`,
   default `0` = STARS' literal `ρ<1`; CART, [arXiv:2606.01495](https://arxiv.org/abs/2606.01495),
   found trained gates settle `ρ∈[0.79,0.83]`, comfortably inside a `0.05` band).
 
@@ -698,8 +760,9 @@ the certificate is a conservative gate, not an exact rate.
 If `α ≥ 0`, some active mode is non-contracting — the system may wander or
 diverge — and collapse is **not** guaranteed. The code reports `guaranteed=False`
 at the `α = 0` boundary, which is the correct conservative choice. The entirely
-null case (`active_dim = 0`) returns `guaranteed=True`, vacuously: the state is
-already on the invariant manifold.
+null case (`active_dim = 0`) is `guaranteed` only if the null block itself settles, with rate 0. It used
+to return `guaranteed=True` with rate ∞ for everything, including a pure rotation and `0.005·I`, which
+grows 22,000× by `t = 2000`.
 
 ---
 
@@ -738,18 +801,22 @@ $$x^\* = P\,x, \qquad P = V_{\text{null}} V_{\text{null}}^\top.$$
 The result is the **"42-state"** (colloquial name, no formal meaning): the
 operator *clamps* the state onto the null subspace of `A_s`.
 
-**Caveat — `x* = Px` is a true fixed point only when A is normal.** The
-projection uses `A_s`, while the integrated dynamics use the full `A`. For
-non-normal `A`, projecting kills the symmetric part but the skew rotation leaves
-`‖A·x*‖` large (measured ≈ 17.9 on a non-normal example), so `x*` is *not* an
-equilibrium of the real flow. Moreover, in the implementation the apparent
-"freeze" is produced by the integrator **overwriting `x_next = x*` and
-discarding the diffusion term `dW`** (`engine.py forward_step`) — not by an
-emergent equilibrium. The same drift-zeroed system with collapse *off*
-random-walks freely. **The operator enforces a clamp; the state is generally not
-a fixed point of the dynamics.** (`SemanticCollapseOperator`.)
+**`x*` is now a true fixed point (corrected 2026-11-05).** The projection used to target the null
+space of `A_s`, so `‖A·x*‖` stayed large for non-normal `A`, and also for normal `A` with a rotation block,
+where `A_s = 0` while the state keeps moving. It now targets `null(A)`, the actual fixed points of the
+linearized flow, so `f(x*) ≈ 0` for any `A`. The freeze itself is still produced by the integrator
+**overwriting `x_next = x*` and discarding the diffusion term `dW`** (`engine.py forward_step`). The same
+drift-zeroed system with collapse *off* random-walks freely. **The operator enforces a clamp**; what
+changed is that the clamp now lands on an equilibrium. (`SemanticCollapseOperator`.)
 
-**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04).** The four-signal
+**`‖∂H/∂u‖` now means that (corrected 2026-11-05).** The trigger's control signal was the gradient of the
+stage cost alone, which reads 0 at `u = 0` however much leverage the control has. It is now
+`∂L/∂u + λᵀ∂f/∂u` with `λ = ∇ₓL`. It still sees only the model's own cost: a goal held outside it (a Question
+Machine terminal anchor) reaches the gate through `x_target`. Both this signal and `‖∇ₓL‖` were also being
+divided by the batch size, which made `ε_g` and `ε_c` 8× looser at `B = 8` than they claim. They are now per
+sample.
+
+**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04; predates the two corrections above, so it needs a re-run to be current).** The four-signal
 AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` calls the
 real operator over **960 samples** spanning the collapse regime and its complements and
 scores it against the *spectral* ground truth (does `A_s` actually carry a null manifold
@@ -765,81 +832,81 @@ control signal is trivially satisfied (this calibrates the grad∧rank∧flat su
 non-normality `ν>0` shifts the exact zero eigenvalue of `A_s` (so the clean collapse regime is
 the `ν=0` case). **This upgrades §2 from bare HEURISTIC to a MEASURED soundness profile — it
 does *not* make `trigger ⇒ α<0` a theorem.** The one clean sub-statement *is*
-provable-by-construction: a collapse manifold exists ⟺ `A_s` is near-singular (else
+provable-by-construction: a collapse manifold exists ⟺ `A` is near-singular (else
 `_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch).
 
 ---
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: PROVEN for all `A` (covariance leg, machine-checked 2026-06-26).**
-The §3 sufficiency claim — *Σ₀⁻¹ prevents permanent freeze* — is now closed for **normal
-and non-normal `A` alike**. The 2026-06-25 proof closed the normal/symmetric regime; the
-2026-06-26 strengthening **L2′** removed the alignment hypothesis L1 (the one place
-normality was used) via a Frobenius reverse-triangle bound, so the conclusion holds for
-all `A`. *Distinct from this:* Theorem 1's **contraction** for non-normal `A` (whether the
-ungrounded drift collapses vs. diverges — the §1 cross-term) is the *drift* question — now
-also closed in-regime via the spectral dichotomy
-(`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`, [#768]); C3 is the
-*rescue*, not the *drift*. Theorem C3
-chains the lemmas — `L2′ ∧ L3 ∧ L4 ∧ L5 ⇒ P(permanent freeze) = 0` — where
-L2 is closed-form proven and L4/L5 are
-machine-checked (`tests/test_cio_sde.py::test_c3_no_consecutive_freeze`,
-`::test_l4_floor_lifts_anisotropy`, `::test_l4_floor_scale_equivariant`,
-`::test_g13_no_zero_rank_bump`; sweep `experiments/prove_c3_noncollapse.py` — 3000
-configs, 0 floor counterexamples, 0 cond_flat survivals, old scale-blind bump fails
-100% → the floor is necessary). Closing it required two **code fixes** to the shipped
-operator (`AntiCollapseOperator`): a **μ-aware covariance floor** (`b_cov ≥ Δ`, so the
-bump is not scale-blind) and **banded near-null aiming clamped to `1 ≤ m ≤ d−1`** (so
-the bump is never zero-rank — G13 — and never a uniform shift that *lowers* anisotropy).
-Two honest scopes remain: (i) C3 is no-permanent-*freeze*, not contraction — Theorem 1's
-**non-normal drift** case (the §1 cross-term) is the separate *drift* question, itself now
-closed in-regime by the spectral dichotomy ([#768]); C3 governs the *rescue*, not the drift;
-(ii) the proof governs the operator's *action* — in the
-live engine Σ₀⁻¹ is observe-only by default (intervention policy, #1138), so C3 is
-conditional on the operator being permitted to act. The non-normal *freeze* gap is now
-**closed** by L2′ (see §7 of the C3 doc), not merely measured.**
+**Status: C3 and S1 PROVEN in-regime, with engine-level tests (corrected 2026-11-05). The operator beats a
+placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists.**
 
-Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects energy **along** it:
+Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it:
 
-$$dx = f\,dt + dW + \Sigma_0^{-1}, \qquad \Sigma_0^{-1} = s\cdot p \cdot (V_{\text{null}}\,\xi)$$
+$$dx = f\,dt + dW + \kappa\,P\xi, \qquad \Sigma^{+} = \Sigma_{\text{pred}} + b\,P,$$
 
-with `ξ` random and `p ∈ [0,1]` the **collapse proximity** — 0 far from the
-boundary (a no-op that costs nothing), rising toward 1 as `∇L`, rank, anisotropy,
-and control sensitivity all approach their thresholds. The implementation
-(`AntiCollapseOperator.excite` in `src/cio_sde/collapse.py`) injects along the
-**banded near-null subspace** (`_near_null_basis`, `1 ≤ m ≤ d−1` modes) and
-re-anisotropizes `Σ` with a **μ-aware floor** (`_cov_floor`) so the covariance bump
-clears L2's threshold `Δ` even when the gate is weak. The proximity gate
-(`AntiCollapseOperator.proximity`) is the soft-AND `min(p_grad, p_rank, p_flat,
-p_ctrl)` over the four §2 signals; the floor decouples the **covariance leg** (which
-breaks `cond_flat`, the certificate leg) from the random **state-kick leg** (which
-raises `‖x‖` and so `cond_grad`).
+with `P` the orthogonal projector onto a banded near-null subspace of rank `m`, `ξ` the same standard normal
+that drives `dW`, and `p ∈ [0,1]` the **collapse proximity**. `p > 0` holds exactly when all four §2
+conditions hold. (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`.)
 
-**What is and isn't claimed.** Re-exciting directions that have gone flat keeps the
-system off the null manifold. There is now a companion theorem —
-Theorem C3 — that Σ₀⁻¹ *prevents permanent freeze*
-(the gate cannot fire on two consecutive steps) for **all `A`, normal and non-normal**:
-the alignment hypothesis L1 was removable (L2′, a Frobenius reverse-triangle bound — at
-`cond_flat` Σ≈μI, so *any* rank-`m` bump lifts anisotropy). The 900-run distribution
-([#658]) is now corroboration, not the primary support. The companion *drift* question —
-Theorem 1's **contraction** for non-normal `A` (the §1 cross-term, [#768]), a different claim
-from C3's anti-freeze — is now also closed in-regime via the spectral dichotomy
-(`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`).
+**Lemma L2′ (one-step lift, any projector).** Let `Σ ≻ 0` with eigenvalue mean `μ` and unbiased coefficient of
+variation `a`, and let `P` be any rank-`m` orthogonal projector, `1 ≤ m ≤ d−1`. Then `b ≥ Δ = (ε+a)μd / (√(m(d−m)) − εm)`,
+when that denominator is positive, implies `a(Σ+bP) ≥ ε`. *Proof:* `Σ+bP − μ⁺I = (Σ−μI) + b(P − (m/d)I)`, and the
+reverse triangle inequality in Frobenius norm gives the bound. No alignment and no normality. Independently
+re-derived twice (the audit in the research repo, and the 2026-11-05 review).
 
-**Empirical evidence (MEASURED, [#658] — landed 2026-06-19).**
-`experiments/sigma0_regime_sweep.py` runs forced-collapse rollouts with and without
-Σ₀⁻¹ across an α × non-normality × noise grid (fixed 3-dim-null Jacobian). Over the
-**900 trials that genuinely collapse without protection**, Σ₀⁻¹ suppressed collapse
-and re-excited the state in **100%** (`data/sigma0_regime_sweep_report.json`:
-`collapse_prone_trials_total=900`, `headline_conditional_prevention_rate=1.0`).
-This upgrades §3 from N=1 HEURISTIC to MEASURED-over-distribution; a sufficiency
-theorem is still future work. *(The original single-run observation: Σ₀ fired every
-step and the state froze; with Σ₀⁻¹ active, Σ₀ stopped firing and the state escaped
-the manifold.)* (`AntiCollapseOperator`; the forced-collapse tests in
-`tests/test_cio_sde.py` run for 20–30 steps and assert weaker directional
-properties — the often-quoted "40/40 → 0/40" and "0.05 → 12.9" figures are
-illustrative log values, not pinned by any test. Cite the tests, not the prose.)
+**Theorem C3 (engine level).** Suppose the operator acts on a step (policy armed, budget left), and
+`d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to about 9000). Then `a(Σ_next) ≥ ε_a` for every sample, where
+`Σ_next` is what the next evaluation actually reads, so the four-signal gate is false on the next step. This holds
+for all `A` and every dimension. *Proof:* L2′ per sample, targeting `1.02·ε_a`, gives `a(Σ_pred + bP) ≥ 1.02·ε_a`.
+`project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase it. Raising
+eigenvalues below `eps` costs at most `1.05·d·eps/σ_max`, which the margin absorbs. `m ≤ d/(1+4ε²)` keeps the denominator
+positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects stood between the lemma and this statement:
+
+| Defect | Failure | Fix |
+|---|---|---|
+| The `σ_max` clip applied after the bump | at `Σ_pred = σ_max·I`, `a` went 0 → 0.058 → **0** (found by the research audit) | scale, don't clip |
+| One batch-wide floor | a high-scale sample stayed flat beside a low-scale one (also the audit) | floor per sample |
+| `a` clipped at `ε_a` in the floor | `excite` reads the Riccati-propagated `Σ`, and a bump could flatten it: `diag(1,.5,.5,.5)` + 0.5·P = `I` | use the actual `a` |
+| `m` up to `d−1` | above `d = 401` no rank-`(d−1)` bump can reach `ε_a`, and the floor silently returned 0 | cap `m`; raise on an infeasible rank |
+
+**Lemma S1 (the state leg).** Let `x⁺ = c + (D + κP)ξ` with `D ⪰ 0` diagonal, `c` independent of `ξ`, and
+`κ ≥ r/median(χ₁)`. Then `P(‖x⁺‖ ≥ r) ≥ ½`. *Proof:* by Anderson's inequality `P(‖c+Mξ‖ < r) ≤ P(‖Mξ‖ < r)` for symmetric
+`M = D + κP`. By Weyl, `M ⪰ κP` gives `M` at least `m` eigenvalues `≥ κ`, so `‖Mξ‖ ≥ κ·χ_m` in distribution, and `χ_m` is
+stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_g/2`, each firing leaves `{‖∇ₓL‖ < ε_g}` with
+probability ≥ ½, for any drift and any `p`. The kick used to be `strength·p`, which vanishes at the gate boundary:
+the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. This is per trajectory. The gate itself
+averages `‖∇ₓL‖` over the batch.
+
+**What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the
+state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no
+grounding, the state rests at an equilibrium once the gate has cleared
+(`test_c3_does_not_promise_perpetual_motion`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`"
+in earlier versions meant only that the gate cannot latch, which is a narrower thing than its plain reading. Σ₀⁻¹ is
+observe-only by default in the live engine (#1138), and lives on this synthetic SDE, not a real model.
+
+**Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite whenever the operator fired, and
+`proximity > 0` is exactly the trigger condition, so an attached operator records zero overwrites by construction. The
+sweep's other condition, final norm above initial norm, is what diffusion does anyway. A placebo that fires and does
+nothing scored 36/36 on a 108-trial sample of the pre-fix engine, with the same one-third collapse-prone rate. Every collapse-prone
+trial was also `ν = 0`, because the sweep's non-normal cells were full-rank and never entered the gate, so the figure
+said nothing about non-normal `A`. And the script as written now finds 0 collapse-prone trials, because the
+engine defaults to observe-only.
+
+**Placebo-controlled measurement (MEASURED, 2026-11-05).** 18 cells over `α`, non-normality and noise, all rank-1, so
+every cell can enter the gate; 10 trials each; `python experiments/sigma0_placebo_control.py`:
+
+| Arm | Trials with an overwrite | Steps with gate true | Longest gate-true run | State moved |
+|---|---|---|---|---|
+| No operator | 180/180 | 100% | 60 | 0.0007 |
+| Placebo (fires, does nothing) | 0/180 | 14.9% | 60 | 0.023 |
+| Covariance leg only | 0/180 | 1.9% | **1** | 0.024 |
+| Real operator | 0/180 | 1.7% | **1** | **0.59** |
+
+The overwrite column shows why the old metric could not fail. The longest run is C3, measured. The covariance leg alone
+clears the gate and does not move the state beyond what noise does; only the kick does. That the state moved says nothing
+about whether it moved anywhere useful. Synthetic SDE only.
 
 **On "persistent excitation."** The classical PE result (Anderson 1977) concerns
 *estimator/parameter* convergence under `∫φφᵀ ≥ αI`. Here there is no estimator
@@ -1304,8 +1371,9 @@ converge to reflecting) is *literally model collapse renamed*.
 
 Two honest qualifications:
 
-- The strict **"collapse OR diverge, no third option"** dichotomy is the
-  *linearized* certificate's framing, not a general ML theorem. Real training
+- The strict **"collapse OR diverge, no third option"** dichotomy is not a general ML
+  theorem, and it is not true of the linearized certificate either: a rotating mode is bounded and
+  never frozen (corrected 2026-11-05). Real training
   also admits limit cycles and partial-information equilibria — better stated as
   "tends to degenerate or destabilize absent grounding."
 - The in-repo §6 demonstration is now reproducible (scripts committed, real
@@ -2129,6 +2197,16 @@ for produced results and Appendix A for the original design sketch.*
 
 | Date | What was claimed | What survived (the correction) | Where |
 |---|---|---|---|
+| 2026-11-05 | "900/900 forced-collapse runs prevented" | **retired**: the metric could not fail (the engine skips the overwrite whenever the operator fires) and a do-nothing placebo matched it; all collapse-prone trials were `ν=0`; the script no longer reproduces under the observe-only default. Replaced by a placebo-controlled measurement | [§3](#3-the-anti-collapse-operator-σ₀¹) |
+| 2026-11-05 | C3: "PROVEN for all `A`", "`P(permanent freeze) = 0`" | the lemma holds; the engine violated it (σ_max cap, batch floor, clipped `a`, `d > 400`). Fixed, and restated as a gate statement. It does not mean the state keeps moving | [§3](#3-the-anti-collapse-operator-σ₀¹) |
+| 2026-11-05 | "no third fate"; `collapses=True` on any bounded slow block | rotation is a third outcome of the linear system; Jordan blocks on the boundary grow, against the T1 doc's own caveat. `marginal_kind` added, `collapses` corrected | [§1](#1-the-collapse-guarantee-theorem), [R1](#r1--the-collapse-guarantee--the-foundation-proven-machine-checked) |
+| 2026-11-05 | small-gain `α_bound` "a proven bound"; `guaranteed` built on it, rate ∞ on the all-null case | it bounds nothing here; a counterexample is pinned. `guaranteed` now requires commutation and a settling null block | [§1.1](#11-why-the-hypothesis-is-required-the-dropped-cross-term) |
+| 2026-11-05 | non-normality "shows up only as a bounded overshoot" `√cond(P)` | that is the active block's overshoot in oblique coordinates; `[[−1,1000],[0,0]]` reports 1 and peaks at 1000. `coupling_norm` and `full_transient_bound` added | `dichotomy_certificate` |
+| 2026-11-05 | `[[−1,3],[−3,0]]` a transient-growth example; Crouzeix–Palencia `1+√2` "the proven transient constant" | `ω=0`, so `‖e^{tA}‖₂ ≤ 1`: no transient, and the constant is vacuous | [§1.2.1](#121-provable-region-wideners-for-non-normal-a-768) |
+| 2026-11-05 | JSRR "validated as the right stability object" on the serve path | the input was not a Jacobian: its verdict tracked `‖h‖`. Replaced by a measured loop contraction; not yet run on a real model | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
+| 2026-11-05 | `x* = Px` "a true fixed point when `A` is normal" | false for a rotation block. `x*` now targets `null(A)`, an equilibrium for any `A` | [§2](#2-the-collapse-trigger-σ₀) |
+| 2026-11-05 | trigger's `‖∂H/∂u‖`; thresholds `ε_g`, `ε_c` | it read the stage cost only, and both signals were divided by the batch size. Now the Hamiltonian gradient, per sample. The #1990 calibration needs a re-run | [§2](#2-the-collapse-trigger-σ₀) |
+| 2026-11-05 | certificates on a batched Jacobian | they averaged it, and the mean of two unstable maps can contract. Now every member must pass | `_batch_members` |
 | 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
 | 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
 | 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |
