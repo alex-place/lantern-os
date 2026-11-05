@@ -1272,7 +1272,6 @@ class AntiCollapseOperator:
         return max(1, min(d - 1, int(d / (1.0 + 4.0 * eps * eps))))
 
     @torch.no_grad()
-    @torch.no_grad()
     def _near_null_projector_per_sample(self, A: Tensor, batch_size: int) -> tuple[Tensor, Tensor]:
         """Batched right near-kernel projectors from each member's SVD.
 
@@ -1306,6 +1305,7 @@ class AntiCollapseOperator:
         projector = (basis * mask.unsqueeze(1)) @ basis.transpose(-1, -2)
         return projector, m
 
+    @torch.no_grad()
     def _cov_floor(self, sigma: Tensor, d: int, m: Tensor | int) -> Tensor:
         """Per-sample L2′ bump threshold for each sample's own projector rank."""
         eps = self.detector.anisotropy_eps * self.LIFT_MARGIN
