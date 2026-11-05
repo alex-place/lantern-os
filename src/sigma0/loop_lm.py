@@ -46,77 +46,125 @@ def _finite(x):
     return round(float(x), 4) if (x == x and abs(x) != float("inf")) else None
 
 
-# P0 serve-path budgets (env-tunable). The empirical Jacobian is (d,d) with d = hidden size
-# (2048 for Ouro-1.4B), but it is rank ≤ T-1 (a mean of T token-transitions), so ρ — the JSRR
-# acceptance object — is computed EXACTLY from a (T-1,T-1) reduced Gram (see generate()). We
-# additionally window T so the reduced eigenproblem stays cheap on very long generations, and cap
-# the geometry-dependent continuous diagnostics (which need the full (d,d) and cost ~7s at d=2048)
-# to a small dimension — they are diagnostic + acceptance-fallback only, never the primary gate.
+# P0 serve-path budgets (env-tunable). The token-transition operator is (d,d) with d = hidden size
+# (2048 for Ouro-1.4B), but it has rank ≤ T-1, so its nonzero spectrum comes from a (T-1,T-1)
+# reduction (see _empirical_transition). We additionally window T so that stays cheap on very long
+# generations, and cap the geometry-dependent continuous diagnostics (which need the full (d,d)
+# and cost ~7s at d=2048) to a small dimension. Neither is the primary verdict: that is the
+# per-token loop contraction (depth_contraction_stats).
 _JAC_TOKEN_WINDOW = int(os.environ.get("SIGMA0_JAC_TOKEN_WINDOW", "256") or 256)
 _CONT_GATE_MAX_DIM = int(os.environ.get("SIGMA0_CONT_GATE_MAX_DIM", "512") or 512)
 
 
-def _stability_gates(A_tensor, jsrr_matrix=None):
-    """Stability certificate on the empirical loop Jacobian A. Returns a dict, or None on
-    total failure (never raises). Two independently-computed layers:
+def _depth_stats(hidden_states_list):
+    """One token's contraction stats from its per-depth hidden states, or None. Telemetry must
+    never break generation, so any failure reads as 'no stats for this token'."""
+    try:
+        _src = os.path.join(os.path.dirname(__file__), "..", "..")
+        if _src not in sys.path:
+            sys.path.insert(0, _src)
+        from cio_sde.collapse import depth_contraction_stats  # noqa: PLC0415
+        return depth_contraction_stats([h[0, -1, :] for h in hidden_states_list])
+    except Exception:
+        return None
 
-      • JSRR (acceptance gate) — the DISCRETE spectral-radius criterion ρ(A)<1 (STARS,
-        arXiv:2605.26733), numpy-only, computed FIRST so it survives even in the minimal
-        inference venv where scipy (needed by the continuous gates below) is absent. When
-        `jsrr_matrix` is supplied it is the exact low-rank reduction of `A_tensor` (same
-        nonzero spectrum, hence identical ρ and accept verdict) — used so the serve path
-        never eigvals a (2048,2048) matrix; ρ/regime/stable are exact, σ_max/‖Av‖ telemetry
-        reflect the reduced matrix.
-      • #768 continuous region-wideners + non-normal dichotomy — best-effort telemetry
-        (scipy-dependent Lyapunov/Kreiss legs); a stricter, over-rejecting sufficient
-        contraction test kept for diagnostics and as an acceptance FALLBACK. Skipped when
-        `A_tensor` is larger than `_CONT_GATE_MAX_DIM` (they need the full geometry and are
-        O(d³) — the reduction does not apply to them, and they are not the primary gate).
+
+def _empirical_transition(H, rcond=1e-6, max_full_dim=None):
+    """Least-squares operator from one generation's per-token hidden vectors (exact DMD).
+
+    Fits h[t+1] ≈ J h[t] for H of shape (T, d): J = H₊ᵀ(H₀ᵀ)⁺, whose nonzero spectrum equals that
+    of the (T-1,T-1) reduction (H₀ᵀ)⁺H₊ᵀ. Scale-invariant: H ↦ cH leaves J unchanged. Returns
+    (J or None above the diagnostic cap, reduction).
+
+    This is the TOKEN-to-token map, not the recurrent map's Jacobian, and with T < d its radius is
+    a Ritz estimate, which tends to read low. Telemetry and a fallback only. It replaces a mean of
+    Δh/‖h‖ ⊗ h, which scaled with ‖h‖ and estimated (J−I)·C rather than J, so its verdict tracked
+    the size of the hidden state instead of the dynamics.
+    """
+    import torch  # noqa: PLC0415
+    H0, H1 = H[:-1].double(), H[1:].double()
+    U, S, Vh = torch.linalg.svd(H0.T, full_matrices=False)
+    keep = S > rcond * S.max().clamp_min(1e-300)
+    U, S, Vh = U[:, keep], S[keep], Vh[keep]
+    reduced = (Vh.T / S) @ (U.T @ H1.T)
+    cap = _CONT_GATE_MAX_DIM if max_full_dim is None else max_full_dim
+    full = None if H.shape[1] > cap else ((H1.T @ Vh.T) / S) @ U.T
+    return full, reduced
+
+
+def _stability_gates(A_tensor, jsrr_matrix=None, depth_stats=None):
+    """Stability certificate for one generation. Returns a dict, or None on total failure (never
+    raises). Three independently-computed layers:
+
+      • Loop contraction (the verdict) — from `depth_stats`, the per-token
+        depth_contraction_stats. Measured on the recurrent map's own iterates, numpy-only, and
+        independent of the scale of the hidden state.
+      • JSRR — the discrete spectral-radius criterion ρ<1 (STARS, arXiv:2605.26733) on the token-
+        transition operator, numpy-only, so it survives in the minimal inference venv. Telemetry,
+        and the verdict only when there are no depth stats. `jsrr_matrix`, when supplied, is the
+        low-rank reduction of `A_tensor` (same nonzero spectrum, identical ρ), so the serve path
+        never eigvals a (2048,2048) matrix. σ_max/‖Av‖ telemetry reflect the reduced matrix.
+      • #768 continuous gates + discrete dichotomy on `A_tensor` — best-effort telemetry (scipy).
+        `A_tensor` is the discrete map J, so the continuous gates read its flow embedding J−I.
+        Skipped when `A_tensor` is None or larger than `_CONT_GATE_MAX_DIM` (O(d³)).
     """
     try:
         _src = os.path.join(os.path.dirname(__file__), "..", "..")
         if _src not in sys.path:
             sys.path.insert(0, _src)
-        # jsrr_certificate is numpy-only; importing it must not depend on scipy.
-        from cio_sde.collapse import jsrr_certificate  # noqa: PLC0415
+        # both are numpy-only; importing them must not depend on scipy.
+        from cio_sde.collapse import jsrr_certificate, loop_contraction_certificate  # noqa: PLC0415
     except Exception:
         return None
 
     out = {}
-    # JSRR discrete acceptance gate — the object externally validated on real looped LLMs.
     # Margin tunable via SIGMA0_JSRR_MARGIN (default 0.0 = STARS' literal ρ<1).
     try:
         _margin = float(os.environ.get("SIGMA0_JSRR_MARGIN", "0.0") or 0.0)
     except Exception:
         _margin = 0.0
     try:
-        j = jsrr_certificate(jsrr_matrix if jsrr_matrix is not None else A_tensor, margin=_margin)
-        out["jsrr"] = {
-            "spectral_radius": _finite(j.spectral_radius),
-            "radius_estimate": _finite(j.radius_estimate),
-            "spectral_norm": _finite(j.spectral_norm),
-            "penalty": _finite(j.penalty),
-            "margin": _finite(j.margin),
-            "regime": j.regime,
-            "stable": bool(j.stable),
-        }
+        _transient_max = float(os.environ.get("SIGMA0_LOOP_TRANSIENT_MAX", "10") or 10)
+        lc = loop_contraction_certificate(depth_stats, margin=_margin, transient_max=_transient_max)
+        if lc is not None:
+            out["loop_contraction"] = {
+                "factor": _finite(lc.factor),
+                "worst_factor": _finite(lc.worst_factor),
+                "transient": _finite(lc.transient),
+                "n_tokens": lc.n_tokens,
+                "margin": _finite(lc.margin),
+                "transient_max": _finite(lc.transient_max),
+                "regime": lc.regime,
+                "stable": bool(lc.stable),
+            }
     except Exception:
-        out["jsrr"] = None
-
-    # #768 continuous region-wideners (numerical-range, Lyapunov, ε-pseudospectral, Kreiss)
-    # — scipy-dependent; best-effort. Certify contraction of the FULL Jacobian and
-    # over-reject non-normal A, so they are diagnostic + acceptance fallback, not primary.
-    try:
-        # geometry-dependent continuous gates need the full (d,d) and are O(d³); skip them above
-        # the cap (they are diagnostic + fallback, and JSRR above already gave the exact verdict).
+        pass
+    _matrix = jsrr_matrix if jsrr_matrix is not None else A_tensor
+    if _matrix is not None:
         try:
-            _d = int(A_tensor.shape[0])
+            j = jsrr_certificate(_matrix, margin=_margin)
+            out["jsrr"] = {
+                "spectral_radius": _finite(j.spectral_radius),
+                "radius_estimate": _finite(j.radius_estimate),
+                "spectral_norm": _finite(j.spectral_norm),
+                "penalty": _finite(j.penalty),
+                "margin": _finite(j.margin),
+                "regime": j.regime,
+                "stable": bool(j.stable),
+            }
         except Exception:
-            _d = 0
-        if _d > _CONT_GATE_MAX_DIM:
+            out["jsrr"] = None
+
+    # #768 continuous gates (numerical-range, Lyapunov, ε-pseudospectral, Kreiss) — scipy-
+    # dependent; best-effort. They certify the flow ẋ=(J−I)x and over-reject non-normal maps, so
+    # they are diagnostic + a last-resort fallback.
+    try:
+        # geometry-dependent gates need the full (d,d) and are O(d³); skip them above the cap.
+        if A_tensor is None or int(A_tensor.shape[0]) > _CONT_GATE_MAX_DIM:
             return out or None
-        from cio_sde.collapse import stability_gates, dichotomy_certificate  # noqa: PLC0415
-        g = stability_gates(A_tensor, margin=0.0)
+        import torch  # noqa: PLC0415
+        from cio_sde.collapse import stability_gates, discrete_dichotomy_certificate  # noqa: PLC0415
+        g = stability_gates(A_tensor - torch.eye(A_tensor.shape[0], dtype=A_tensor.dtype), margin=0.0)
         out.update({
             "gate_numerical_range": g.gate_numerical_range,
             "gate_lyapunov": g.gate_lyapunov,
@@ -128,40 +176,44 @@ def _stability_gates(A_tensor, jsrr_matrix=None):
             "lyapunov_transient_bound": _finite(g.lyapunov_transient_bound),
             "kreiss_bound": _finite(g.kreiss_bound),
         })
-        # #768 contraction half — the non-normal spectral dichotomy: splits by A's own
-        # spectrum (cross-term vanishes by invariance) and reports the ungrounded decode
-        # drift's fate (COLLAPSE onto the slow manifold vs DIVERGE). Purely diagnostic.
+        # Fate of the token-transition map under the discrete dichotomy. Purely diagnostic.
         try:
-            dc = dichotomy_certificate(A_tensor, delta=0.0)
+            dc = discrete_dichotomy_certificate(A_tensor, delta=0.0)
             out["dichotomy"] = {
                 "fate": dc.fate,
                 "collapses": dc.collapses,
+                "marginal_kind": dc.marginal_kind,
                 "active_dim": dc.active_dim,
                 "slow_dim": dc.slow_dim,
-                "slow_abscissa": _finite(dc.slow_abscissa),
-                "active_decay_rate": _finite(dc.active_decay_rate),
+                "slow_radius": _finite(dc.slow_radius),
+                "active_decay_factor": _finite(dc.active_decay_factor),
                 "transient_bound": _finite(dc.transient_bound),
+                "coupling_norm": _finite(dc.coupling_norm),
+                "full_transient_bound": _finite(dc.full_transient_bound),
                 "invariance_residual": _finite(dc.invariance_residual),
             }
         except Exception:
             out["dichotomy"] = None
     except Exception:
-        pass  # continuous gates unavailable (e.g. no scipy) — JSRR still gates acceptance
+        pass  # continuous gates unavailable (e.g. no scipy) — the verdict above still stands
 
     return out or None
 
 
 def _accept_stability(cert):
-    """Convergence-acceptance verdict for a generation's empirical loop Jacobian.
+    """Convergence-acceptance verdict for a generation.
 
-    Primary signal is the JSRR discrete criterion ρ(A)<1 (STARS, arXiv:2605.26733) — the
-    stability object validated on real looped LLMs. Falls back to the #768 continuous
-    `proven_contracting` gate when JSRR is absent (older cert dict / compute failure).
+    Primary signal is the measured loop contraction (depth_contraction_stats): a norm on the
+    recurrent map's own iterates. Falls back to JSRR ρ<1 on the token-transition operator when
+    there are no depth stats, then to the continuous gate on an older certificate dict.
     Returns None when there is no certificate at all (too few tokens) — an honest unknown,
     never a fabricated False (and None is falsy, so a consumer that requires acceptance
     safely declines rather than trusting an un-certified trajectory)."""
     if not isinstance(cert, dict):
         return None
+    lc = cert.get("loop_contraction")
+    if isinstance(lc, dict) and lc.get("stable") is not None:
+        return bool(lc["stable"])
     jsrr = cert.get("jsrr")
     if isinstance(jsrr, dict) and jsrr.get("stable") is not None:
         return bool(jsrr["stable"])
@@ -201,23 +253,25 @@ def assemble_reason_verdict(out):
     dichotomy = gates.get("dichotomy") if isinstance(gates.get("dichotomy"), dict) else {}
     jsrr = gates.get("jsrr") if isinstance(gates.get("jsrr"), dict) else {}
     fate = str(dichotomy.get("fate") or "").upper()
-    regime = str(jsrr.get("regime") or "").lower()   # JSRR discrete verdict (primary gate)
+    lc = gates.get("loop_contraction") if isinstance(gates.get("loop_contraction"), dict) else {}
+    primary = lc or jsrr                             # measured contraction, else JSRR
+    regime = str(primary.get("regime") or "").lower()
     signal = out.get("canary_signal", "none")
 
-    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. The JSRR DISCRETE acceptance
-    # (ρ<1−margin) is AUTHORITATIVE for an iterated loop; the #768 continuous proven_contracting gate
-    # certifies e^{tA} (max Re λ<0) — a DIFFERENT criterion that must NEVER override a discrete
-    # 'divergent' (ρ≥1) verdict (a λ=−2 loop is continuous-stable yet ρ=2 DIVERGES). So JSRR decides
-    # when present; proven_contracting/fate are the FALLBACK only when JSRR is absent (older cert),
-    # preserving the prior reason_verdict contract. Keying on jsrr.stable (not regime=='contraction')
-    # also respects the margin — the near-critical band ρ∈[1−margin,1) is 'spiral', not 'contract'.
+    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. The measured discrete verdict
+    # (loop contraction, else JSRR ρ<1−margin) is AUTHORITATIVE for an iterated loop; the #768
+    # continuous proven_contracting gate certifies a flow — a DIFFERENT criterion that must NEVER
+    # override a discrete 'divergent' verdict. So the discrete signal decides when present;
+    # proven_contracting/fate are the FALLBACK only when it is absent (older cert), preserving the
+    # prior reason_verdict contract. Keying on `stable` (not regime=='contraction') also respects
+    # the margin: rejected-but-not-divergent (near-critical, or transient growth) is 'spiral'.
     # (Fix 2026-07-23, math-check: OR-ing the continuous gate mislabelled a discrete-divergent loop
     # 'contract' → a false 'grounded' when external_grounded=True.)
-    jsrr_accept = jsrr.get("stable")   # True ⟺ ρ<1−margin (margin-respecting); None when no JSRR ran
-    if jsrr_accept is True:
+    primary_accept = primary.get("stable")   # None when no discrete signal ran
+    if primary_accept is True:
         stable = "contract"
-    elif jsrr_accept is False:
-        stable = "diverge" if regime == "divergent" else "spiral"   # rejected: diverging vs near-critical
+    elif primary_accept is False:
+        stable = "diverge" if regime == "divergent" else "spiral"   # rejected: diverging vs not
     elif gates.get("proven_contracting"):
         stable = "contract"          # FALLBACK: continuous gate, only when the discrete JSRR is absent
     elif fate == "DIVERGE":
@@ -255,8 +309,8 @@ def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None, exper
     an ACTIVE last leg.
 
     An answer is Σ₀-GROUNDED iff BOTH hold:
-      1. the reasoning loop was STABLE — it contracted (JSRR ρ<1), i.e. it did not collapse
-         onto a frozen self-agreeing state nor diverge (PROVEN-in-regime; §1/§1.2.3). Necessary,
+      1. the reasoning loop was STABLE — it contracted (measured loop contraction), i.e. it did not collapse
+         onto a frozen self-agreeing state nor diverge (MEASURED on the iterates; §1.2.3). Necessary,
          NOT sufficient.
       2. an EXTERNAL verifier confirmed the answer — execution/held-out tests, or a groundedness
          signal. A loop-stability signal only becomes a factuality signal once external grounding
@@ -288,7 +342,7 @@ def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None, exper
     """
     rv = assemble_reason_verdict(out) if "stable" not in out else out
     stable = rv.get("stable")
-    loop_certified = (stable == "contract")   # PROVEN-in-regime contraction gate
+    loop_certified = (stable == "contract")   # the measured contraction verdict
 
     if not loop_certified:
         # loop collapsed / diverged / too-few-tokens-to-certify → NOT grounded; escalate & retry
@@ -550,7 +604,8 @@ class Sigma0LoopLM:
         ids = ids.to(self._backbone().device if hasattr(self._backbone(), "device") else "cuda")
         depths = []
         exit_deltas = []   # contraction trajectory per token (converge mode)
-        exit_hiddens = []  # per-token exit-depth hidden vectors (#768 Jacobian)
+        exit_hiddens = []  # per-token exit-depth hidden vectors (token-transition telemetry)
+        depth_stats = []   # per-token depth_contraction_stats (the acceptance verdict)
         eos = self.tok.eos_token_id
         bb = self._backbone()
         lm_head = self.model.lm_head if hasattr(self.model, "lm_head") else bb.lm_head
@@ -629,6 +684,7 @@ class Sigma0LoopLM:
                 depths.append(step)
                 hidden = hidden_states_list[step - 1][:, -1:, :]   # hidden at exit depth, last token
                 exit_hiddens.append(hidden[0, 0].detach().float().cpu())
+                depth_stats.append(_depth_stats(hidden_states_list))
                 logits = lm_head(hidden)[0, -1]
                 if rep_cur and rep_cur != 1.0 and depths:
                     # CTRL-style repetition penalty over tokens already generated this turn
@@ -682,9 +738,7 @@ class Sigma0LoopLM:
         text = _trunc_text if _trunc_text is not None else self.tok.decode(ids[0, -len(depths):], skip_special_tokens=True)
         mean_depth = sum(depths) / len(depths) if depths else 0
 
-        # #768: empirical discrete Jacobian from consecutive exit-depth hidden vectors.
-        # A[t] ≈ (h[t+1] - h[t]) / ||h[t]|| — the per-token "transition" in hidden space.
-        # We compute a mean outer-product as a compact batch approximation.
+        # Stability certificate: measured loop contraction (verdict) + token-transition telemetry.
         stability_cert = None
         if len(exit_hiddens) >= 2:
             try:
@@ -699,23 +753,9 @@ class Sigma0LoopLM:
                 # ρ to machine precision; the window is a deliberate recency change (SIGMA0_JAC_TOKEN_WINDOW).
                 if H.shape[0] > _JAC_TOKEN_WINDOW + 1:
                     H = H[-(_JAC_TOKEN_WINDOW + 1):]
-                dH = H[1:] - H[:-1]                   # (T-1, d) deltas
-                norms = H[:-1].norm(dim=-1, keepdim=True).clamp(min=1e-9)
-                dH_norm = dH / norms                   # normalized transitions
-                Hprev = H[:-1]                          # (T-1, d)
-                # A_emp = (1/(T-1)) Σ_t dH_norm[t] ⊗ Hprev[t] = (1/(T-1)) dH_normᵀ Hprev — a (d,d)
-                # matrix of rank ≤ T-1. Its NONZERO spectrum (hence ρ, the JSRR acceptance object)
-                # equals that of the (T-1,T-1) Gram G = (1/(T-1)) Hprev dH_normᵀ (UVᵀ↔VᵀU identity),
-                # so ρ is computed EXACTLY from the tiny matrix — ~570× cheaper at d=2048, machine-
-                # precision match (experiments/p0_gate_measure.py M5). eigvals(d=2048)≈7s/gen → sub-
-                # ms. σ_max/‖Av‖ telemetry is NOT preserved by the reduction, so the diagnostic
-                # continuous gates still see the full A_emp (capped by dim so they never cost 7s).
-                Tm1 = Hprev.shape[0]
-                jsrr_mat = (Hprev @ dH_norm.transpose(-1, -2)) / max(Tm1, 1)   # (T-1, T-1), exact ρ
-                # (d,d) via matmul — mathematically the same mean-outer-product, but WITHOUT the
-                # (T-1,d,d) broadcast intermediate (≈2GB at d=2048); only the diagnostics use it.
-                A_emp = (dH_norm.transpose(-1, -2) @ Hprev) / max(Tm1, 1)       # (d, d)
-                stability_cert = _stability_gates(A_emp, jsrr_matrix=jsrr_mat)
+                full, reduced = _empirical_transition(H)
+                stability_cert = _stability_gates(full, jsrr_matrix=reduced,
+                                                  depth_stats=depth_stats[-_JAC_TOKEN_WINDOW:])
             except Exception:
                 pass
 
@@ -734,14 +774,11 @@ class Sigma0LoopLM:
             # #768: Lyapunov / numerical-range / ε-pseudospectral gates + Kreiss bound on
             # the empirical Jacobian. None = not enough tokens to estimate.
             "stability_gates": stability_cert,
-            # Acceptance gate — the certificate is CONSUMED here (not just reported): the
-            # generation's latent exit-depth trajectory is convergence-ACCEPTED iff its
-            # empirical loop Jacobian passes the JSRR discrete criterion ρ(A)<1 (STARS,
-            # arXiv:2605.26733) — the stability object externally validated on real looped
-            # LLMs, and the criterion appropriate to a DISCRETE iterated loop. The #768
-            # continuous gate (proven_contracting) is a stricter, over-rejecting sufficient
-            # condition kept as fallback when JSRR is unavailable, and as telemetry above.
-            # None = no certificate (too few tokens to estimate the Jacobian).
+            # Acceptance verdict: the generation is convergence-ACCEPTED iff the recurrent loop
+            # measurably contracted on its own iterates (loop_contraction), with JSRR ρ<1 on the
+            # token-transition operator as the fallback. Reported here, not enforced: the text is
+            # returned either way, and sigma0_grounding_verdict turns this into a next_action.
+            # None = no certificate (too few tokens to estimate anything).
             "stability_accepted": _accept_stability(stability_cert),
         }
         if dc is not None:   # Σ₀ decode canary telemetry (#766)
