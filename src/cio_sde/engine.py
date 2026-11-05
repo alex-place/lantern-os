@@ -455,6 +455,14 @@ class CIO_SDE(nn.Module):
         if self.anti_collapse_op is not None:
             per_sample_method = getattr(self.anti_collapse_op, "proximity_per_sample", None)
             supports_per_sample = callable(per_sample_method)
+            if isinstance(self.anti_collapse_op, AntiCollapseOperator):
+                # A subclass that overrides the legacy scalar proximity() but does
+                # not explicitly override proximity_per_sample() keeps its old contract.
+                supports_per_sample = (
+                    type(self.anti_collapse_op) is AntiCollapseOperator
+                    or type(self.anti_collapse_op).proximity_per_sample
+                    is not AntiCollapseOperator.proximity_per_sample
+                )
             if supports_per_sample:
                 proximity_per_sample = per_sample_method(self, x, u, sigma, A)
                 sigma0_proximity = float(proximity_per_sample.max().item())
