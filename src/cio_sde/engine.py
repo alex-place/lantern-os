@@ -396,7 +396,10 @@ class CIO_SDE(nn.Module):
         # stability_gates (matrix-measure contraction analysis: Lohmiller & Slotine 1998,
         # Automatica 34(6):683-696).
         A = drift_jacobian(node, x.detach(), u.detach())
-        q_diag = (g.detach() ** 2)
+        # The state receives diag(g * dilation) dW, not diag(g) dW.
+        # Keep the Riccati process-noise term consistent with that executed map.
+        effective_diffusion = g.detach() * dilation.detach()
+        q_diag = effective_diffusion.square()
         sigma_next = self.cov.step(sigma, A, q_diag, dt)
 
         info = {"u": u, "f": f, "g": g, "dilation": dilation.squeeze(-1),

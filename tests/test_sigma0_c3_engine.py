@@ -60,7 +60,9 @@ def _cap_fixed_point_model():
     """A=diag(500,0,0,0), Σ=1000·I, Q=diag(0,1e6,1e6,1e6): an exact Riccati fixed point
     sitting on the σ_max cap, so Σ_pred = σ_max·I and the bump has no headroom."""
     A = torch.diag(torch.tensor([500.0, 0.0, 0.0, 0.0], dtype=torch.float64))
-    gain = torch.tensor([0.0, 1000.0, 1000.0, 1000.0], dtype=torch.float64)
+    # The engine's actual diffusion gain is g*dilation, with dilation=1001 here.
+    gain = torch.tensor([0.0, 1000.0 / 1001.0, 1000.0 / 1001.0,
+                         1000.0 / 1001.0], dtype=torch.float64)
     m = CIO_SDE(dim=4, ctrl_dim=2, hidden=8).double()
     m.graph.active = _DiagonalNoise(A, gain).double()
     _zero_policy(m)
@@ -631,3 +633,27 @@ def test_semantic_evaluate_legacy_batch_summary_remains_available():
     assert legacy.triggered is False
     assert per_sample.triggered is True
     assert per_sample.triggered_mask.tolist() == [False, True]
+
+
+def test_riccati_process_noise_matches_the_state_diffusion_map():
+    """With A=0 and Sigma=0, one Euler step must add (g*dilation)^2*dt."""
+    dim = 3
+    m = CIO_SDE(dim=dim, ctrl_dim=2, hidden=4)
+    m.graph.active = LinearDynamics(
+        torch.zeros(dim, dim),
+        B=torch.zeros(dim, 2),
+        noise=2.0,
+    )
+    _zero_policy(m)
+    x = torch.zeros(1, dim)
+    sigma = torch.zeros(1, dim, dim)
+    dt = 0.2
+    _, sigma_next, _ = m.forward_step(
+        x, sigma, dt, torch.ones_like(x), step=0
+    )
+    expected = (2.0 ** 2) * dt
+    assert torch.allclose(
+        sigma_next,
+        torch.eye(dim).unsqueeze(0) * expected,
+        atol=1e-6,
+    )
