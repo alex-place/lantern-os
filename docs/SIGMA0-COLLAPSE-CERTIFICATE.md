@@ -98,10 +98,10 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 27 passed |
-| Certificate boundary cases checked against the actual flow: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 20 passed |
-| Loop-contraction verdict on trajectories of known contraction; scale invariance; non-normal growth (§1.2.3) | MEASURED signal, synthetic trajectories | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 38 passed |
-| Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py` |
+| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 28 passed |
+| Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 603 passed |
+| Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 111 passed |
+| Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
 | Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
@@ -158,7 +158,7 @@ updates itself over time, together with an honest account of what happens to a
 self-improving system that has *no contact with outside reality*.
 
 **The one-line result.** The linearized dynamics of a system with no input have exactly three
-outcomes, decided by the spectrum of `A`: it **settles** (onto a frozen, self-agreeing state, the
+outcomes, decided by the spectrum of `A` and, on the stability boundary, by its Jordan structure: it **settles** (onto a frozen, self-agreeing state, the
 "42-state", when the settling leaves a fixed manifold behind), it **diverges**, or it **rotates**
 forever, bounded and never frozen. That is linear algebra, and it holds for a grounded system with
 the same `A` too: the theorem has no grounded/ungrounded variable in it. The claim this project
@@ -170,7 +170,7 @@ it — rests on the model-collapse literature (§7) and on this project's own me
 **How sure are we of each part?** Every claim below is labelled:
 - **PROVEN** — Theorem 1 for normal `A`; the spectral dichotomy for every `A` (standard linear
   algebra); **C3**, that when the operator acts, the four-signal gate cannot be true on two consecutive
-  steps, through the engine's own projection, for all `A` and every dimension; and **S1**, that each
+  steps, through the engine's own projection, for all `A` and every dimension `d ≥ 2`; and **S1**, that each
   firing moves the state out of the near-target ball with probability ≥ ½. Tests are in the audit
   table. "Proven" here means closed-form argument plus tests, not a formal proof.
 - **MEASURED** — the operator against a placebo (§3): the gate never stays true for two steps, against
@@ -192,7 +192,12 @@ it sounds, because three things they do not cover are the ones that matter next:
    has ρ=4. The loop-contraction verdict (§1.2.3) measures this on real iterates; nothing proves it.
 3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves
    once. A lower bound on what the state retains (for example σ_min of the transition product) would be
-   the real theorem. It does not exist yet.
+   the real theorem. It does not exist yet, and C3 and S1 cannot imply it. With `A₁ = diag(0, −1/Δt)` and then
+   `A₂ = diag(−1/Δt, 0)`, both Euler maps are non-expansive and their product is 0, so the next regime erases
+   the kick exactly while the gate stays clear (`lantern-os-research` PR #14; through the real engine,
+   `test_a_switching_jacobian_can_erase_the_kick`). Retention needs a lower bound on the switched product restricted
+   to the kicked subspace, or a common invariant subspace. And what a kick adds is random: even if it survives, it
+   does not restore information the state had lost.
 4. **Whether Part I describes a real looped model at all.** Its fates are statements about `t → ∞` for one
    fixed `A`. Real loops stop at 2–4 steps, and their Jacobians vary widely from step to step. Saved Ouro runs
    read `ρ(J) ≈ 8–11` while the residual shrinks and then plateaus (§1.2.3). Mixture-of-Recursions
@@ -247,8 +252,8 @@ carry the falsification plans.
 
 ### R1 · The collapse guarantee — the foundation `PROVEN (machine-checked)`
 ![collapse guarantee](assets/cert/rho-gate.svg)
-A linear flow settles, diverges, or rotates: three outcomes, decided by `A`'s spectrum, for grounded
-and ungrounded systems alike. Classical Lyapunov/Banach machinery; the *certificate quantities and
+A linear flow settles, diverges, or rotates: three outcomes, decided by `A`'s spectrum and, on the
+boundary, its Jordan structure, for grounded and ungrounded systems alike. Classical Lyapunov/Banach machinery; the *certificate quantities and
 tests* (§1) are ours. **Corrected 2026-11-05:** this entry used to read "no third fate", and the code
 counted rotation as collapse.
 
@@ -368,7 +373,7 @@ chat wiring still owed).
 **Certificate objects:** R1 (ρ(J)<1, **PROVEN**) · R2 (Kreiss thresholds) · R9 (basin
 determinism ✓). **Research base:** looped/equilibrium models (Ouro 2510.25741; FPRM 2606.18206;
 Equilibrium Reasoners 2605.21488; STARS 2605.26733); four decades of Iterative Learning Control
-(patents US7345448B2/US8094405B1 — contraction or divergence, no third fate). **In-repo:** the
+(patents US7345448B2/US8094405B1 — contraction or divergence). **In-repo:** the
 Ouro kernel's `converge`/`accel` exits are equilibrium halting (v1.10 §6c); the probe ladder
 measured truth linearly decodable at 7B (factual 1.000 / assoc 0.924, on-box). **Open:**
 [#2854](https://github.com/alex-place/lantern-os/issues/2854) Kreiss-safe halting;
@@ -585,6 +590,10 @@ real parts but does not by itself certify them. A perpetual rotation such as
 `A = [[−1,0,0],[0,0,2],[0,−2,0]]` has `α = −1` yet eigenvalues `{−1, ±2i}` — a
 center that never collapses in its rotating plane.
 
+The fates resolve rates and couplings only down to a tolerance, `tol = max(10⁻⁷, 16·eps·‖A‖₂)`. Growth at
+`9·10⁻⁸` per unit time, or a Jordan coupling of `5·10⁻⁷`, reads as frozen. That is a limit of resolution, not a
+finding that they are zero.
+
 **Recommended:** report **both** `α = max λᵢ(A_s)` (the energy abscissa, exact
 under the §1 hypothesis) **and** `max Re λ(A)` on the full Jacobian (the
 authoritative contraction test). As of [#505], `collapse_certificate()` now
@@ -685,13 +694,28 @@ Caveat (2) below disclosed "proxy", but not this. Even a true `ρ` reads only th
 **The verdict is now `loop_contraction_certificate`.** For one token's depth iterates `h¹…hᴷ`, with
 residuals `eₖ = hᵏ⁺¹ − hᵏ`, we have `eₖ₊₁ = f(hᵏ⁺¹) − f(hᵏ) ≈ J·eₖ`. So `‖eₖ₊₁‖/‖eₖ‖` is a finite-difference
 Jacobian-vector norm of the recurrent map, along its own residual. It costs no extra forward passes,
-ignores the scale of `h`, and is a norm, so it sees non-normal growth. A generation is accepted iff the
-90th percentile across tokens of the last-step ratio is `< 1 − margin` and the residual never grows more
-than 10× inside the loop (`SIGMA0_LOOP_TRANSIENT_MAX`, a design default, **not calibrated**).
+ignores the scale of `h`, and is a norm, so it sees non-normal growth.
+
+No single ratio decides. A period-2 map with `ρ > 1` alternates high and low residuals, and a last-step ratio
+accepted it whenever the loop stopped on a low step. So each token reports three numbers, over `n` steps:
+
+| Number | Definition | What it asks |
+|---|---|---|
+| `net` | `(‖eₙ‖/‖e₀‖)^(1/n)` | did the loop as a whole shrink the residual? |
+| `ratio` | the larger of `net` and the same geometric mean over the deepest half of the loop | is the end of the loop shrinking too? |
+| `rise` | `maxⱼ ‖eⱼ‖ / min_{i≤j} ‖eᵢ‖` | how far did the residual climb above an earlier value? |
+
+A generation is accepted iff, at the 90th percentile across tokens, `ratio < 1 − margin` and `rise ≤ 10`
+(`SIGMA0_LOOP_TRANSIENT_MAX`). A rejection is a **plateau** when the residual stopped shrinking without real growth
+(`ratio < 1.25`, `net ≤ 1.05`, `rise` within the limit), and **divergent** otherwise. All of these numbers are design
+defaults, **not calibrated**. One non-finite iterate on any token rejects the generation as divergent: the
+percentile tolerates an odd token, not an overflow. Residuals are clamped at a numerical floor of
+`max(10⁻⁶, 8·eps)·‖h‖` rather than ignored below it, so growth that starts under the floor is still seen. A token whose
+last residual is at the floor has reached a numerical fixed point.
 
 **Honest scope.** MEASURED on the residuals the loop actually produced: it does not cover every
-direction, and it is not a statement about truth. **Not yet run through `generate()` on a live model**, so the
-wiring and the acceptance rate on real generations are unverified. Reported, not enforced: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a
+direction, and it is not a statement about truth. It has run through `generate()` only on a stub backbone, which checks
+the wiring. **It has not run on a live model**, so the acceptance rate on real generations is unknown. Reported, not enforced: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a
 `next_action`. JSRR remains as telemetry and fallback, now on a scale-invariant least-squares
 token-transition operator (exact DMD), whose radius is a Ritz estimate that tends to read low when `T < d`.
 
@@ -702,14 +726,24 @@ token only, so a small sample):
 | Depth | Factor (90th percentile) | Regime | Accepted |
 |---|---|---|---|
 | 3 | 0.87 | contraction | yes |
-| **4 (trained)** | **0.67** | contraction | yes |
-| 6 | 1.06 | plateau | no |
-| 8 | 1.06 | plateau | no |
-| 12 | 1.09 | plateau | no |
+| **4 (trained)** | **0.68** | contraction | yes |
+| 5 | 0.75 | contraction | yes |
+| 6 | 0.94 | contraction | yes |
+| 7 | 0.92 | contraction | yes |
+| 8 | 0.93 | contraction | yes |
+| 9 | 1.15 | plateau | no |
+| 10 | 1.13 | plateau | no |
+| 11 | 1.02 | plateau | no |
+| 12 | 1.05 | plateau | no |
+
+So acceptance runs four steps past the trained depth, and stops where half the tokens spike at step 8. The first
+version of this table read the last-step ratio, listed only depths 3, 4, 6, 8 and 12, and appeared to show acceptance
+stopping at the trained depth. That was an artifact: the single-step statistic also accepted the omitted depths 5, 7
+and 10. Eight tokens is a small sample, and depth 4 being "accepted" is not evidence that depth 4 is special.
 
 At the same model's operating points, autograd measures a true `ρ(J)` of about 8–11, and up to 28, with `‖J‖₂ ≈ 127`
 (`data/sigma0/true_jacobian_report.json`, ADR-0024). Taken at face value, the local-linear theory says DIVERGE. In fact the
-residual shrinks 2–7× over 4 steps and then settles on a non-zero plateau with occasional spikes. It never reaches
+residual shrinks 2–7× by the trained depth and then settles on a non-zero plateau with occasional spikes. It never reaches
 a fixed point. So **an accept means the residual shrank on this generation; it does not mean the loop is locally
 stable**, and the two measurements disagree by an order of magnitude. The residual is evidently not along the
 dominant direction, or the linearization does not hold at this amplitude. The saved data cannot say which.
@@ -818,17 +852,19 @@ conditions fire" and "`α < 0`" is a **modeling assumption**, not a proof. This
 is stated plainly because it is the most honest part of the construction — do
 not upgrade it to a theorem.
 
-When triggered, Σ₀ projects the state onto the null eigenmodes of `A_s`:
+When triggered, Σ₀ projects the state onto `null(A)`:
 
 $$x^\* = P\,x, \qquad P = V_{\text{null}} V_{\text{null}}^\top.$$
 
 The result is the **"42-state"** (colloquial name, no formal meaning): the
-operator *clamps* the state onto the null subspace of `A_s`.
+operator *clamps* the state onto that subspace.
 
-**`x*` is now a true fixed point (corrected 2026-11-05).** The projection used to target the null
+**`x*` now targets the real fixed points (corrected 2026-11-05).** The projection used to target the null
 space of `A_s`, so `‖A·x*‖` stayed large for non-normal `A`, and also for normal `A` with a rotation block,
 where `A_s = 0` while the state keeps moving. It now targets `null(A)`, the actual fixed points of the
-linearized flow, so `f(x*) ≈ 0` for any `A`. The freeze itself is still produced by the integrator
+linearized flow, so `‖A·x*‖ ≤ eig_eps·‖A‖₂·‖x*‖` for any `A`. That bound is the rank cutoff, not zero: under
+`diag(100, 0.5, 0)` the 0.5 mode counts as null. And it covers the linear part only: an affine or nonlinear drift
+can still move at `x*`. The freeze itself is still produced by the integrator
 **overwriting `x_next = x*` and discarding the diffusion term `dW`** (`engine.py forward_step`). The same
 drift-zeroed system with collapse *off* random-walks freely. **The operator enforces a clamp**; what
 changed is that the clamp now lands on an equilibrium. (`SemanticCollapseOperator`.)
@@ -881,11 +917,13 @@ reverse triangle inequality in Frobenius norm gives the bound. No alignment and 
 re-derived twice (the audit in the research repo, and the 2026-11-05 review).
 
 **Theorem C3 (engine level).** Suppose the operator acts on a step (policy armed, budget left), and
-`d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to about 9000). Then `a(Σ_next) ≥ ε_a` for every sample, where
+`ρ = d·eps/σ_max ≤ 6·10⁻⁴` (at the defaults, `d` up to 6000). Then `a(Σ_next) ≥ ε_a` for every sample, where
 `Σ_next` is what the next evaluation actually reads, so the four-signal gate is false on the next step. This holds
-for all `A` and every dimension. *Proof:* L2′ per sample, targeting `1.02·ε_a`, gives `a(Σ_pred + bP) ≥ 1.02·ε_a`.
-`project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase it. Raising
-eigenvalues below `eps` costs at most `1.05·d·eps/σ_max`, which the margin absorbs. `m ≤ d/(1+4ε²)` keeps the denominator
+for all `A` and every dimension `d ≥ 2`. (At `d = 1` there is no shape to restore: the covariance leg does nothing, and
+only S1 applies.) *Proof:* L2′ per sample, targeting `1.02·ε_a`, gives `a₊ = a(Σ_pred + bP) ≥ 1.02·ε_a`.
+`project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase it. Eigenvalues can
+fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ σ_max/d`. Raising them to `eps` then gives
+`a(Σ_next) ≥ (a₊ − √(d/(d−1))·ρ)/(1+ρ)`, which is at least `ε_a` under the hypothesis, for every `d ≥ 2`. `m ≤ d/(1+4ε²)` keeps the denominator
 positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects stood between the lemma and this statement:
 
 | Defect | Failure | Fix |
@@ -901,12 +939,13 @@ positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects st
 stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_g/2`, each firing leaves `{‖∇ₓL‖ < ε_g}` with
 probability ≥ ½, for any drift and any `p`. The kick used to be `strength·p`, which vanishes at the gate boundary:
 the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. This is per trajectory. The gate itself
-averages `‖∇ₓL‖` over the batch.
+averages `‖∇ₓL‖` over the batch, so one sample at 7·ε_g among eight can still fire it.
 
 **What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the
 state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no
 grounding, the state rests at an equilibrium once the gate has cleared
-(`test_c3_does_not_promise_perpetual_motion`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`"
+(`test_c3_does_not_promise_perpetual_motion`), and when `A` changes, the next regime can erase the kick outright
+(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`"
 in earlier versions meant only that the gate cannot latch, which is a narrower thing than its plain reading. Σ₀⁻¹ is
 observe-only by default in the live engine (#1138), and lives on this synthetic SDE, not a real model.
 
@@ -919,7 +958,7 @@ said nothing about non-normal `A`. And the script as written now finds 0 collaps
 engine defaults to observe-only.
 
 **Placebo-controlled measurement (MEASURED, 2026-11-05).** 18 cells over `α`, non-normality and noise, all rank-1, so
-every cell can enter the gate; 10 trials each; `python experiments/sigma0_placebo_control.py`:
+every cell can enter the gate; 10 trials each; `python experiments/sigma0_placebo_control.py --trials 10`:
 
 | Arm | Trials with an overwrite | Steps with gate true | Longest gate-true run | State moved |
 |---|---|---|---|---|
@@ -2231,6 +2270,11 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-11-05 | `x* = Px` "a true fixed point when `A` is normal" | false for a rotation block. `x*` now targets `null(A)`, an equilibrium for any `A` | [§2](#2-the-collapse-trigger-σ₀) |
 | 2026-11-05 | trigger's `‖∂H/∂u‖`; thresholds `ε_g`, `ε_c` | it read the stage cost only, and both signals were divided by the batch size. Now the Hamiltonian gradient, per sample. The #1990 calibration needs a re-run | [§2](#2-the-collapse-trigger-σ₀) |
 | 2026-11-05 | certificates on a batched Jacobian | they averaged it, and the mean of two unstable maps can contract. Now every member must pass | `_batch_members` |
+| 2026-11-05 | the first fix to the verdict: the last-step ratio, and "accepted at the trained depth, plateau past it" | an independent review of that fix broke it. One step accepted a period-2 map with `ρ > 1` and a residual that dipped and then grew 900×; non-finite iterates passed; growth starting under the noise floor read as converged. The statistic now reads the whole loop and its deepest half. On the same saved data it accepts depths 3–8, not 3–4 | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
+| 2026-11-05 | the first fix to the fates, `Re λ < −δ` | rounding counted rotations and Jordan blocks at `δ = 0` as active, which read COLLAPSE on 75 of 200 random bases of §1's own example. Scaling the boundary tolerance by `‖A‖` then blurred them next to any large mode. The cut now sits `tol` inside the boundary, and the boundary is read on the slow block | `dichotomy_certificate` |
+| 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Every rotation and unstable complex pair went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
+| 2026-11-05 | a batch "reports the worst member" | the bounds and gates came from one member, so a batch could read `proven_contracting` beside a diverging member, or quote one member's bound for another's 1000× transient, depending on order. Gates are now ANDed and each bound is the worst of any member's | `_worst_fate`, `_worst_collapse` |
+| 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence` stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied | `src/cio_sde/question.py` |
 | 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
 | 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
 | 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |
