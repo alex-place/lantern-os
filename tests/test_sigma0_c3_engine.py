@@ -873,3 +873,37 @@ def test_per_sample_gate_refuses_cross_sample_stage_cost_coupling():
     A = torch.zeros(2, 2, 2)
     with pytest.raises(RuntimeError, match="stage_cost couples batch members"):
         op.proximity_per_sample(model, x, u, sigma, A)
+
+
+
+def test_rollout_measurement_schedule_assimilates_only_supplied_observations():
+    model = CIO_SDE(dim=2, ctrl_dim=1, hidden=4).double()
+    model.graph.active = LinearDynamics(
+        torch.zeros(2, 2, dtype=torch.float64),
+        B=torch.zeros(2, 1, dtype=torch.float64), noise=0.0,
+    ).double()
+    _zero_policy(model)
+    x0 = torch.zeros(1, 2, dtype=torch.float64)
+    P0 = torch.eye(2, dtype=torch.float64).unsqueeze(0)
+    S0 = P0.clone()
+    y = torch.tensor([[2.0]], dtype=torch.float64)
+    H = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    R = torch.tensor([[1.0]], dtype=torch.float64)
+
+    x_final, P_final, _ = rollout(
+        model, x0, P0, steps=1, dt=0.1, base_seed=4,
+        shape_sigma0=S0, measurement_schedule={0: (y, H, R)},
+    )
+    assert torch.allclose(x_final, torch.tensor([[1.0, 0.0]], dtype=torch.float64))
+    assert torch.allclose(P_final, torch.diag(torch.tensor([0.5, 1.0], dtype=torch.float64)).unsqueeze(0))
+
+
+def test_measurement_assimilation_rejects_non_spd_noise_covariance():
+    cov = CovarianceField(2)
+    x = torch.zeros(1, 2)
+    P = torch.eye(2).unsqueeze(0)
+    y = torch.zeros(1, 1)
+    H = torch.tensor([[1.0, 0.0]])
+    R = torch.tensor([[-1.0]])
+    with pytest.raises(ValueError, match="positive definite"):
+        cov.assimilate(x, P, y, H, R)
