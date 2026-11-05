@@ -446,3 +446,39 @@ def test_one_dimensional_state_has_no_shape_and_still_gets_its_kick():
     assert info["anti_collapse_p"] > 0.0
     assert float((next_x - x).norm()) > 0.0
     assert sigma.shape == (1, 1, 1) and torch.isfinite(sigma).all()
+
+
+# ── the re-check: float32 boundary structure, and the resolution limits the docs state ────────────
+
+@pytest.mark.parametrize("A", [
+    torch.tensor([[0.0, 1e-3], [0.0, 0.0]], dtype=torch.float32),
+    torch.tensor([[-1.0, 0, 0], [0, 0, 1e-3], [0, 0, 0]], dtype=torch.float32),
+    torch.tensor([[-1e4, 0, 0], [0, 0, 0.1], [0, 0, 0]], dtype=torch.float32),
+])
+def test_a_float32_jordan_block_is_not_read_as_frozen(A):
+    """One tolerance served for clustering and for rank, at 4·√eps: 1.4·10⁻³ in float32. A large
+    active mode also widened it. Each of these read collapses=True."""
+    c = dichotomy_certificate(A)
+    assert (c.fate, c.collapses, c.marginal_kind) == ("DIVERGE", False, "defective")
+
+
+def test_a_float32_discrete_jordan_block_is_not_read_as_frozen():
+    c = discrete_dichotomy_certificate(torch.tensor([[1.0, 1e-3], [0.0, 1.0]], dtype=torch.float32))
+    assert (c.fate, c.collapses, c.marginal_kind) == ("DIVERGE", False, "defective")
+
+
+def test_a_null_band_narrower_than_rounding_certifies_nothing():
+    """In float32 at ‖A‖ = 10⁵ rounding is 0.05 wide, against a null band of 0.01: growth of 0.009
+    inside it read as frozen and guaranteed."""
+    c = collapse_certificate(torch.diag(torch.tensor([-1e5, 0.009], dtype=torch.float32)))
+    assert c.guaranteed is False and c.null_kind == "unresolved"
+    c = collapse_certificate(torch.diag(torch.tensor([-1e5, 0.009], dtype=torch.float64)))
+    assert c.guaranteed is False and c.null_kind == "growing"
+
+
+def test_float32_resolves_rates_only_down_to_its_rounding():
+    """The documented limit, pinned: rates below 16·eps·‖A‖₂ read as zero. In float32 next to a −10⁴
+    mode that is 0.019, so growth of 0.009 reads frozen. Next to −10³ it is 0.0019, and it does not."""
+    near_limit = dichotomy_certificate(torch.diag(torch.tensor([-1e4, 0.009], dtype=torch.float32)))
+    assert near_limit.marginal_kind == "frozen"
+    assert dichotomy_certificate(torch.diag(torch.tensor([-1e3, 0.009], dtype=torch.float32))).fate == "DIVERGE"

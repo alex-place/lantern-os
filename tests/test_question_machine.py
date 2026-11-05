@@ -329,6 +329,16 @@ def test_a_nan_signal_never_reads_as_fine():
     _, _, _, settled = _plan(QuestionMachine())
     assert reconcile(settled, [0.0, float("nan")]).action == "revise_model"
     assert reconcile(settled, [float("nan"), 0.0]).action == "revise_model"
+    settled.uncertainty = [float("nan")]
+    assert reconcile(settled, [0.0]).action == "gather_evidence"    # was the one check written as >
+
+
+def test_evidence_that_did_not_run_this_plan_is_not_enough_to_act():
+    _, _, _, settled = _plan(QuestionMachine())
+    assert reconcile(settled, [0.0]).action == "act"
+    verdict = reconcile(settled, [0.0], covers_plan=False)
+    assert verdict.action == "gather_evidence" and "this plan" in verdict.reason
+    assert reconcile(settled, [1.0], covers_plan=False).action == "revise_model"   # a failed model still says so
 
 
 @pytest.mark.parametrize("states", [1, 2, 4])

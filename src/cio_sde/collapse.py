@@ -239,6 +239,7 @@ class CollapseCertificate:
     lyapunov_transient_bound: float = float("nan")  # √cond(P): bound on sup_t‖e^{tA}‖
     cross_term: float = 0.0             # ‖P_M A P_N‖₂: the theorem's hypothesis is cross_term≈0
     null_kind: str = "none"             # none | decaying | frozen | rotating | defective | growing
+                                        # | unresolved (frozen, to a rounding as wide as the band)
 
     def summary(self) -> str:
         verdict = "GUARANTEED" if self.guaranteed else "NOT guaranteed"
@@ -273,7 +274,7 @@ def _worst_collapse(certs: Sequence[CollapseCertificate]) -> CollapseCertificate
     )
 
 
-def _null_block_kind(A_N: Tensor, tol: float, eps: float) -> str:
+def _null_block_kind(A_N: Tensor, tol: float, abs_err: float) -> str:
     """How the near-null block behaves on its own, given the split is A-invariant."""
     import numpy as np
     if A_N.numel() == 0:
@@ -284,7 +285,7 @@ def _null_block_kind(A_N: Tensor, tol: float, eps: float) -> str:
         return "growing"
     if float(w.real.max()) < -tol:
         return "decaying"
-    return _boundary_kind(M, w, np.abs(w.real) <= tol, 0.0, tol, eps)
+    return _boundary_kind(M, w, np.abs(w.real) <= tol, 0.0, 1e-9, abs_err)
 
 
 @torch.no_grad()
@@ -332,7 +333,13 @@ def collapse_certificate(A: Tensor, eig_eps: float = 1e-2,
     eps = torch.finfo(Abar.dtype).eps
     cross = (torch.linalg.norm(Vm.T @ Abar @ Vn, ord=2).item()
              if active_dim and null_dim else 0.0)
-    null_kind = _null_block_kind(Vn.T @ Abar @ Vn, max(1e-9, 4.0 * eps * scale), eps)
+    kind_tol = max(1e-9, 4.0 * eps * scale)
+    null_kind = _null_block_kind(Vn.T @ Abar @ Vn, kind_tol, eps * scale)
+    # "Frozen" means within rounding of zero. When rounding is as wide as the null band itself, that
+    # says nothing: growth anywhere in the band reads the same (float32 beyond ‖A‖ ≈ 2·10⁴ at the
+    # default eig_eps). A rotation or a Jordan block well outside the rounding is still read.
+    if null_kind == "frozen" and kind_tol >= eig_eps:
+        null_kind = "unresolved"
 
     guaranteed = (
         (active_dim == 0 or alpha_sym < -margin)
@@ -531,17 +538,20 @@ def stability_gates(A: Tensor, margin: float = 0.0, pseudo_eps: float = 1e-2) ->
 
 # ── #768 contraction half — Theorem 1 for NON-NORMAL A (spectral dichotomy) ───
 
-def _rounding_tol(M, tol: float, eps: float) -> float:
-    """tol, but never below the rounding in M's eigenvalues, which measured up to 5·eps·‖M‖₂ on
-    frozen matrices up to d=512. `eps` is the input's: a float32 matrix has float32 error even
-    after it is cast to float64."""
+def _rounding(M, tol: float, eps: float) -> Tuple[float, float]:
+    """(tol for the fates, rounding in M's entries). Eigenvalues of normal matrices moved by up to
+    5·eps·‖M‖₂ in measurements up to d=512, so the fates use 16·eps·‖M‖₂ when that is larger. It
+    does not cover strongly non-normal M, where rounding moves them by up to κ(V)·eps·‖M‖₂.
+    `eps` is the input's: a float32 matrix has float32 error even after it is cast to float64."""
     import numpy as np
-    return max(tol, 16.0 * eps * float(np.linalg.norm(M, 2)))
+    abs_err = eps * float(np.linalg.norm(M, 2))
+    return max(tol, 16.0 * abs_err), abs_err
 
 
-def _boundary_kind(M, w, on_boundary, frozen_value: float, tol: float, eps: float) -> str:
-    """Classify the eigenvalues sitting on the stability boundary of M. Pass the slow block, not
-    the whole matrix: a large active mode must not set the scale of what counts as "the same".
+def _boundary_kind(M, w, on_boundary, frozen_value: float, tol: float, abs_err: float) -> str:
+    """Classify the eigenvalues sitting on the stability boundary of M. Pass the slow block, with
+    `abs_err` the rounding in the entries of the matrix it came from: a large active mode makes the
+    slow block's entries less certain, but must not set how large a gap counts as "the same".
 
     "frozen"    every boundary mode is semisimple at `frozen_value` (λ=0 for a flow, λ=1 for a
                 map): the state stops on a manifold of true fixed points.
@@ -551,22 +561,26 @@ def _boundary_kind(M, w, on_boundary, frozen_value: float, tol: float, eps: floa
     """
     import numpy as np
     n = M.shape[0]
-    scale = max(1.0, float(np.linalg.norm(M, 2)))
-    # Merge generously: a Jordan block's eigenvalues split by ~√machine-eps, and a false merge
-    # can only report "defective", which is the conservative side.
-    near = max(10.0 * tol, 1e-6, 4.0 * math.sqrt(eps)) * scale
+    size = float(np.linalg.norm(M, 2))
+    # Two tolerances. A computed eigenvalue is exact for a matrix abs_err away, so a singular value,
+    # or a distance from the boundary point, within `zero` cannot be told apart from zero. Clusters
+    # merge more generously: rounding splits a Jordan block of coupling c by about √(c·abs_err), and
+    # a false merge can only report "defective", which is the conservative side. One tolerance for
+    # both read a float32 Jordan block with coupling 10⁻³ as frozen.
+    zero = max(max(10.0 * tol, 1e-6) * max(1.0, size), 10.0 * abs_err)
+    merge = max(zero, 4.0 * math.sqrt(abs_err * size))
     kind = "frozen"
     seen: List[complex] = []
     for lam in w[on_boundary]:
-        if any(abs(lam - s) <= near for s in seen):
+        if any(abs(lam - s) <= merge for s in seen):
             continue
         seen.append(lam)
-        algebraic = int(np.sum(np.abs(w - lam) <= near))
+        algebraic = int(np.sum(np.abs(w - lam) <= merge))
         singular = np.linalg.svd(M - lam * np.eye(n), compute_uv=False)
-        geometric = int(np.sum(singular <= near))
+        geometric = int(np.sum(singular <= zero))
         if geometric < algebraic:
             return "defective"
-        if abs(lam - frozen_value) > near:
+        if abs(lam - frozen_value) > zero:
             kind = "rotating"
     return kind
 
@@ -709,8 +723,8 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
         ) from exc
     M = members[0].detach().cpu().numpy().astype(float)
     n = M.shape[0]
-    eps = torch.finfo(members[0].dtype).eps
-    tol = _rounding_tol(M, tol, eps)
+    base_tol = tol
+    tol, abs_err = _rounding(M, tol, torch.finfo(members[0].dtype).eps)
 
     # eigenvalues (values only) for the split counts + abscissae; the SUBSPACE comes
     # from an ordered Schur factorization below, never from these eigenvectors.
@@ -745,7 +759,7 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
     else:
         S = T[r:, r:] if T is not None and r < n else M
         ws = np.linalg.eigvals(S)
-        marginal_kind = _boundary_kind(S, ws, np.abs(ws.real) <= tol, 0.0, tol, eps)
+        marginal_kind = _boundary_kind(S, ws, np.abs(ws.real) <= tol, 0.0, base_tol, abs_err)
         fate, collapses = _settle_boundary(marginal_kind)
 
     invariance_residual = 0.0
@@ -914,8 +928,8 @@ def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
     M = members[0].detach().cpu().numpy().astype(float)
     n = M.shape[0]
     radius = 1.0 - float(delta)
-    eps = torch.finfo(members[0].dtype).eps
-    tol = _rounding_tol(M, tol, eps)
+    base_tol = tol
+    tol, abs_err = _rounding(M, tol, torch.finfo(members[0].dtype).eps)
 
     # eigen-moduli: split counts + slow-block radius (values only; the SUBSPACE comes
     # from Schur below, never from these eigenvectors). The cut sits tol inside the circle, for
@@ -954,7 +968,7 @@ def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
     else:
         S = T[r:, r:] if T is not None and r < n else M
         ws = np.linalg.eigvals(S)
-        marginal_kind = _boundary_kind(S, ws, np.abs(np.abs(ws) - 1.0) <= tol, 1.0, tol, eps)
+        marginal_kind = _boundary_kind(S, ws, np.abs(np.abs(ws) - 1.0) <= tol, 1.0, base_tol, abs_err)
         fate, collapses = _settle_boundary(marginal_kind)
 
     invariance_residual = float("nan")
@@ -1124,10 +1138,14 @@ def _contraction_from_residuals(residuals: Sequence[float],
     rise = max(e[j] / min(e[:j + 1]) for j in range(len(e)))
     if e[-1] <= floor:
         return 0.0, 0.0, rise
-    n = len(e) - 1
-    net = (e[-1] / e[0]) ** (1.0 / n)
+    # The larger of each two consecutive residuals. A period-2 map alternates high and low, and a
+    # window over the raw sequence can start on one phase and end on the other; the envelope of a
+    # growing period-2 sequence never decreases. With two residuals there is no pair to take.
+    p = [max(e[k], e[k + 1]) for k in range(len(e) - 1)] if len(e) > 2 else e
+    n = len(p) - 1
+    net = (p[-1] / p[0]) ** (1.0 / n)
     half = math.ceil(n / 2)
-    deep = (e[-1] / e[-1 - half]) ** (1.0 / half)
+    deep = (p[-1] / p[-1 - half]) ** (1.0 / half)
     return max(net, deep), net, rise
 
 
@@ -1140,21 +1158,24 @@ def depth_contraction_stats(hidden_per_step: Sequence[Tensor],
     no extra forward passes, does not depend on the scale of h, and is a norm rather than an
     eigenvalue, so it sees non-normal growth.
 
-    Returns (ratio, net, rise), or None with fewer than three iterates:
+    Returns (ratio, net, rise), or None with fewer than three iterates. With pₖ = max(‖eₖ‖, ‖eₖ₊₁‖):
       ratio  the larger of net and the same geometric mean over the deepest half of the loop, so
-             the whole loop and its end must both be shrinking. No single step decides: a last-step
-             ratio accepted a period-2 map with ρ>1 whenever the loop stopped on its low step.
-      net    (‖eₙ‖/‖e₀‖)^(1/n), the geometric-mean factor per step over the whole loop
+             the whole loop and its end must both be shrinking. A last-step ratio accepted a
+             period-2 map with ρ>1 whenever the loop stopped on its low step, and so did a window
+             over the raw residuals that started and ended on different phases. From four iterates
+             on, the envelope p closes that. With three, one ratio still decides.
+      net    (pₙ₋₁/p₀)^(1/(n−1)), the geometric-mean factor per step over the whole loop
       rise   max_j ‖eⱼ‖ / min_{i≤j} ‖eᵢ‖, the largest climb above any earlier residual
-    Residuals are clamped at the numerical floor (tol·‖h‖, or 8 machine epsilons·‖h‖ if larger:
-    float16 is what the serve path runs), so growth starting below it is still seen. A token whose
-    last residual is at the floor has reached a numerical fixed point and reads (0.0, 0.0, rise).
+    Residuals are clamped at the numerical floor (tol·‖h‖, or 4 machine epsilons·‖h‖ if larger:
+    float16 is what the serve path runs). Growth that rises above the floor is seen; growth that
+    stays under it is not. A token whose last residual is at the floor has reached a numerical
+    fixed point and reads (0.0, 0.0, rise).
     A non-finite iterate reads (inf, inf, inf): a loop that overflowed did not converge.
     """
     hs = list(hidden_per_step)
     if len(hs) < 3:
         return None
-    noise = 8.0 * torch.finfo(hs[0].dtype).eps
+    noise = 4.0 * torch.finfo(hs[0].dtype).eps
     # Norms in float64: float16 can hold a state whose norm it cannot represent (above 65504).
     hs = [h.detach().double() for h in hs]
     floor = max(tol, noise) * (max(float(h.norm()) for h in hs) or 1.0)

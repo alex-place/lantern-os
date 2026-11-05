@@ -97,13 +97,14 @@ REAL_OURO_RESIDUALS = [
 
 
 def _real_ouro_at_depth(depth):
-    """depth iterates give depth−1 residuals. No state norm was saved; these are far above any floor."""
+    """depth iterates give depth−1 residuals. No state norm was saved, so this assumes they sit above
+    the floor: true for ‖h‖ below about 500 in float16 (see the doc)."""
     return loop_contraction_certificate(
         [_contraction_from_residuals(e[:depth - 1], 1e-6) for e in REAL_OURO_RESIDUALS])
 
 
-@pytest.mark.parametrize("depth,factor", [(3, 0.873), (4, 0.681), (5, 0.753), (6, 0.937), (7, 0.917),
-                                          (8, 0.928)])
+@pytest.mark.parametrize("depth,factor", [(3, 0.873), (4, 0.750), (5, 0.670), (6, 0.753), (7, 0.938),
+                                          (8, 0.917)])
 def test_real_ouro_contracts_through_depth_8(depth, factor):
     """An accept here sits next to a true rho(J) of 8-11 at the same operating points, so it means
     the residual shrank on this generation. It does not mean the loop is locally stable. This table
@@ -113,7 +114,7 @@ def test_real_ouro_contracts_through_depth_8(depth, factor):
     assert cert.stable is True and cert.regime == "contraction"
 
 
-@pytest.mark.parametrize("depth,factor", [(9, 1.145), (10, 1.128), (11, 1.023), (12, 1.048)])
+@pytest.mark.parametrize("depth,factor", [(9, 1.179), (10, 1.131), (11, 1.140), (12, 1.028)])
 def test_real_ouro_plateaus_from_depth_9_rather_than_diverging(depth, factor):
     """Half the tokens spike at step 8. Well below where they started, and it does not run away."""
     cert = _real_ouro_at_depth(depth)
@@ -158,8 +159,8 @@ def _iterate(J, h0, steps):
     return hs
 
 
-@pytest.mark.parametrize("a", [2.0, 3.0, 5.0])
-@pytest.mark.parametrize("steps", [4, 5, 6, 7])
+@pytest.mark.parametrize("a", [2.0, 2.5, 3.0, 5.0])
+@pytest.mark.parametrize("steps", [4, 5, 6, 7, 8, 11])
 @pytest.mark.parametrize("h0", [(1.0, 1.0), (1.0, 0.3), (0.3, 1.0)])
 def test_a_map_that_does_not_contract_is_rejected_whichever_step_the_loop_stops_on(a, steps, h0):
     """J² = (a/2)·I, so ρ(J) ≥ 1 for every a here. The residual alternates high and low, and a
@@ -167,6 +168,30 @@ def test_a_map_that_does_not_contract_is_rejected_whichever_step_the_loop_stops_
     J = torch.tensor([[0.0, a], [0.5, 0.0]], dtype=torch.float64)
     trajectory = _iterate(J, torch.tensor(h0, dtype=torch.float64), steps)
     assert loop_contraction_certificate([depth_contraction_stats(trajectory)] * 8).stable is False
+
+
+def _from_residual(J, e0, iterates):
+    """A trajectory of h ↦ J·h whose first residual is e0 (fixed point at 0)."""
+    h = torch.linalg.solve(J - torch.eye(2, dtype=J.dtype), e0)
+    return _iterate(J, h, iterates)
+
+
+@pytest.mark.parametrize("a,b", [(2.5, 0.5), (2.8, 0.5), (5.63, 0.3), (100.0, 0.1)])
+@pytest.mark.parametrize("iterates", [4, 5, 6, 7, 11])
+def test_a_period_2_map_cannot_hide_on_its_low_phase(a, b, iterates):
+    """Starting on the high phase, a window over the raw residuals ends on a low one, and the first
+    version of this statistic accepted ρ=1.118 at seven iterates. The pairwise envelope does not."""
+    J = torch.tensor([[0.0, a], [b, 0.0]], dtype=torch.float64)
+    stats = depth_contraction_stats(_from_residual(J, torch.tensor([1.0, 0.0], dtype=torch.float64), iterates))
+    assert stats[0] >= 1.0
+    assert loop_contraction_certificate([stats] * 8).stable is False
+
+
+def test_at_three_iterates_one_ratio_still_decides():
+    """The documented limit: two residuals leave no pair for the envelope, so ρ=3.16 passes."""
+    J = torch.tensor([[0.0, 100.0], [0.1, 0.0]], dtype=torch.float64)
+    stats = depth_contraction_stats(_from_residual(J, torch.tensor([1.0, 0.0], dtype=torch.float64), 3))
+    assert loop_contraction_certificate([stats] * 8).stable is True
 
 
 def test_a_dip_followed_by_growth_is_rejected():
@@ -178,9 +203,18 @@ def test_growth_after_a_drop_is_divergence_not_a_plateau():
     assert _regime([30.0, 3.0, 6.0, 12.0, 24.0]) == ("divergent", False)
 
 
-@pytest.mark.parametrize("residuals", [[5.0] * 5, [30.0, 3.0, 3.0, 3.0, 3.0], [5.0, 5.1, 4.9, 5.05, 5.02]])
+@pytest.mark.parametrize("residuals", [[5.0] * 5, [30.0, 3.0, 3.0, 3.0, 3.0], [5.0, 5.1, 4.9, 5.1, 5.0]])
 def test_a_flat_residual_is_a_plateau(residuals):
     assert _regime(residuals) == ("plateau", False)
+
+
+def test_a_residual_drifting_down_slowly_needs_a_margin_to_be_refused():
+    """Its envelope falls 0.3% per step. At margin 0, STARS' literal ρ<1, that reads as contraction;
+    demanding a margin is how to refuse it."""
+    stats = [_contraction_from_residuals([5.0, 5.1, 4.9, 5.05, 5.02], 1e-9)] * 8
+    assert loop_contraction_certificate(stats).stable is True
+    refused = loop_contraction_certificate(stats, margin=0.05)
+    assert refused.stable is False and refused.regime == "critical"
 
 
 def test_steady_slow_growth_is_divergence_not_a_plateau():
@@ -227,6 +261,13 @@ def _along(residuals, h_norm, dtype, d=64):
         h = h + r * v
         out.append(torch.tensor(h, dtype=dtype))
     return out
+
+
+@pytest.mark.parametrize("residuals,h_norm", [([0.5, 1.0, 2.0, 4.0, 7.0], 900.0), ([1.0, 2.0, 3.5], 500.0)])
+def test_growth_that_ends_near_the_old_floor_is_seen(residuals, h_norm):
+    """At 8 machine epsilons these all sat under the float16 floor and read as converged."""
+    assert loop_contraction_certificate(
+        [depth_contraction_stats(_along(residuals, h_norm, torch.float16))]).stable is False
 
 
 def test_growth_starting_below_the_noise_floor_is_seen():

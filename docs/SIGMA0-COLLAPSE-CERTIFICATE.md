@@ -98,9 +98,9 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 34 passed |
-| Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 603 passed |
-| Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 111 passed |
+| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` on `null(A)`, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 34 passed |
+| Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
+| Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
@@ -590,9 +590,14 @@ real parts but does not by itself certify them. A perpetual rotation such as
 `A = [[−1,0,0],[0,0,2],[0,−2,0]]` has `α = −1` yet eigenvalues `{−1, ±2i}` — a
 center that never collapses in its rotating plane.
 
-The fates resolve rates and couplings only down to a tolerance, `tol = max(10⁻⁷, 16·eps·‖A‖₂)`. Growth at
-`9·10⁻⁸` per unit time, or a Jordan coupling of `5·10⁻⁷`, reads as frozen. That is a limit of resolution, not a
-finding that they are zero.
+The fates resolve only down to the rounding of their input, in its own precision. Rates are resolved to
+`tol = max(10⁻⁷, 16·eps·‖A‖₂)`, and couplings and rotation frequencies on the boundary to about
+`max(10⁻⁶, 10·eps·‖A‖₂)`. Below that they read as zero, which is a limit of resolution, not a finding. In float64 at
+`‖A‖ ≈ 1` growth at `9·10⁻⁸` reads as frozen. In float32 the floor is far coarser: next to a `−10⁴` mode, growth at
+0.009 per unit time reads as frozen. `collapse_certificate` reports `null_kind = "unresolved"` when rounding is as
+wide as its null band. None of this covers strongly non-normal `A`, where rounding moves eigenvalues by up to
+`κ(V)·eps·‖A‖₂` (Bauer–Fike). At an eigenvector condition of 10⁵, a discrete rotation read COLLAPSE in 7 of 100
+random bases, and a frozen mode beside a coupling of 10⁵ read DIVERGE in 26.
 
 **Recommended:** report **both** `α = max λᵢ(A_s)` (the energy abscissa, exact
 under the §1 hypothesis) **and** `max Re λ(A)` on the full Jacobian (the
@@ -692,26 +697,30 @@ Caveat (2) below disclosed "proxy", but not this. Even a true `ρ` reads only th
 `[[.99,1000],[0,.99]]` passes with 37,000× transient growth.
 
 **The verdict is now `loop_contraction_certificate`.** For one token's depth iterates `h¹…hᴷ`, with
-residuals `eₖ = hᵏ⁺¹ − hᵏ`, we have `eₖ₊₁ = f(hᵏ⁺¹) − f(hᵏ) ≈ J·eₖ`. So `‖eₖ₊₁‖/‖eₖ‖` is a finite-difference
+residuals `eₖ = hᵏ⁺¹ − hᵏ`, and one map `f` at every step, we have `eₖ₊₁ = f(hᵏ⁺¹) − f(hᵏ) ≈ J·eₖ`. So `‖eₖ₊₁‖/‖eₖ‖` is a finite-difference
 Jacobian-vector norm of the recurrent map, along its own residual. It costs no extra forward passes,
 ignores the scale of `h`, and is a norm, so it sees non-normal growth.
 
-No single ratio decides. A period-2 map with `ρ > 1` alternates high and low residuals, and a last-step ratio
-accepted it whenever the loop stopped on a low step. So each token reports three numbers, over `n` steps:
+A period-2 map with `ρ > 1` alternates high and low residuals. A last-step ratio accepted it whenever the loop
+stopped on a low step, and a window over the raw residuals did too whenever it started and ended on different phases.
+So the statistic reads the envelope `pₖ = max(‖eₖ‖, ‖eₖ₊₁‖)`, which never falls for a growing period-2 sequence, and
+each token reports three numbers:
 
 | Number | Definition | What it asks |
 |---|---|---|
-| `net` | `(‖eₙ‖/‖e₀‖)^(1/n)` | did the loop as a whole shrink the residual? |
-| `ratio` | the larger of `net` and the same geometric mean over the deepest half of the loop | is the end of the loop shrinking too? |
+| `net` | `(pₙ₋₁/p₀)^(1/(n−1))` | did the loop as a whole shrink the residual? |
+| `ratio` | the larger of `net` and the same geometric mean over the deepest half of `p` | is the end of the loop shrinking too? |
 | `rise` | `maxⱼ ‖eⱼ‖ / min_{i≤j} ‖eᵢ‖` | how far did the residual climb above an earlier value? |
+
+At depth 3 there are only two residuals and no pair to take, so one ratio still decides, and a period-2 map can pass.
 
 A generation is accepted iff, at the 90th percentile across tokens, `ratio < 1 − margin` and `rise ≤ 10`
 (`SIGMA0_LOOP_TRANSIENT_MAX`). A rejection is a **plateau** when the residual stopped shrinking without real growth
 (`ratio < 1.25`, `net ≤ 1.05`, `rise` within the limit), and **divergent** otherwise. All of these numbers are design
 defaults, **not calibrated**. One non-finite iterate on any token rejects the generation as divergent: the
 percentile tolerates an odd token, not an overflow. Residuals are clamped at a numerical floor of
-`max(10⁻⁶, 8·eps)·‖h‖` rather than ignored below it, so growth that starts under the floor is still seen. A token whose
-last residual is at the floor has reached a numerical fixed point.
+`max(10⁻⁶, 4·eps)·‖h‖`, 0.4% of `‖h‖` in float16. Growth that rises above the floor is seen; growth that stays
+under it is not. A token whose last residual is at the floor has reached a numerical fixed point.
 
 **Honest scope.** MEASURED on the residuals the loop actually produced: it does not cover every
 direction, and it is not a statement about truth. It has run through `generate()` only on a stub backbone, which checks
@@ -726,27 +735,32 @@ token only, so a small sample):
 | Depth | Factor (90th percentile) | Regime | Accepted |
 |---|---|---|---|
 | 3 | 0.87 | contraction | yes |
-| **4 (trained)** | **0.68** | contraction | yes |
-| 5 | 0.75 | contraction | yes |
-| 6 | 0.94 | contraction | yes |
-| 7 | 0.92 | contraction | yes |
-| 8 | 0.93 | contraction | yes |
-| 9 | 1.15 | plateau | no |
+| **4 (trained)** | **0.75** | contraction | yes |
+| 5 | 0.67 | contraction | yes |
+| 6 | 0.75 | contraction | yes |
+| 7 | 0.94 | contraction | yes |
+| 8 | 0.92 | contraction | yes |
+| 9 | 1.18 | plateau | no |
 | 10 | 1.13 | plateau | no |
-| 11 | 1.02 | plateau | no |
-| 12 | 1.05 | plateau | no |
+| 11 | 1.14 | plateau | no |
+| 12 | 1.03 | plateau | no |
 
 So acceptance runs four steps past the trained depth, and stops where half the tokens spike at step 8. The first
 version of this table read the last-step ratio, listed only depths 3, 4, 6, 8 and 12, and appeared to show acceptance
 stopping at the trained depth. That was an artifact: the single-step statistic also accepted the omitted depths 5, 7
-and 10. Eight tokens is a small sample, and depth 4 being "accepted" is not evidence that depth 4 is special.
+and 10. Eight tokens is a small sample, and depth 4 being "accepted" is not evidence that depth 4 is special. No state
+norm was saved with these runs, so the table assumes the residuals sit above the floor. The smallest plateau residual,
+2.0, clears float16's floor for `‖h‖` below about 500. Above that, deep plateaus would start to read as converged.
 
 At the same model's operating points, autograd measures a true `ρ(J)` of about 8–11, and up to 28, with `‖J‖₂ ≈ 127`
 (`data/sigma0/true_jacobian_report.json`, ADR-0024). Taken at face value, the local-linear theory says DIVERGE. In fact the
 residual shrinks 2–7× by the trained depth and then settles on a non-zero plateau with occasional spikes. It never reaches
 a fixed point. So **an accept means the residual shrank on this generation; it does not mean the loop is locally
-stable**, and the two measurements disagree by an order of magnitude. The residual is evidently not along the
-dominant direction, or the linearization does not hold at this amplitude. The saved data cannot say which.
+stable**, and the two measurements disagree by an order of magnitude. The residual may not lie along the
+dominant direction, or the linearization may not hold at this amplitude. A third possibility: Ouro feeds the step index
+(`current_ut`) into every step, so consecutive steps are not one map, and `eₖ₊₁ ≈ J·eₖ + (bₖ₊₁ − bₖ)`. A step-dependent
+offset can shrink the residual while `J` expands: `J = 2I` with such offsets passes this statistic. The saved data cannot
+say which of the three it is.
 
 The rest of this section is the original adoption record.
 
@@ -867,7 +881,7 @@ linearized flow, so `‖A·x*‖ ≤ eig_eps·‖A‖₂·‖x*‖` for any `A`.
 can still move at `x*`. The freeze itself is still produced by the integrator
 **overwriting `x_next = x*` and discarding the diffusion term `dW`** (`engine.py forward_step`). The same
 drift-zeroed system with collapse *off* random-walks freely. **The operator enforces a clamp**; what
-changed is that the clamp now lands on an equilibrium. (`SemanticCollapseOperator`.)
+changed is that the clamp now lands on the linear part's fixed points, up to the rank cutoff. (`SemanticCollapseOperator`.)
 
 **`‖∂H/∂u‖` now means that (corrected 2026-11-05).** The trigger's control signal was the gradient of the
 stage cost alone, which reads 0 at `u = 0` however much leverage the control has. It is now
@@ -2277,15 +2291,15 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-11-05 | non-normality "shows up only as a bounded overshoot" `√cond(P)` | that is the active block's overshoot in oblique coordinates; `[[−1,1000],[0,0]]` reports 1 and peaks at 1000. `coupling_norm` and `full_transient_bound` added | `dichotomy_certificate` |
 | 2026-11-05 | `[[−1,3],[−3,0]]` a transient-growth example; Crouzeix–Palencia `1+√2` "the proven transient constant" | `ω=0`, so `‖e^{tA}‖₂ ≤ 1`: no transient, and the constant is vacuous | [§1.2.1](#121-provable-region-wideners-for-non-normal-a-768) |
 | 2026-11-05 | JSRR "validated as the right stability object" on the serve path | the input was not a Jacobian: its verdict tracked `‖h‖`. Replaced by a measured loop contraction; not yet run on a real model | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
-| 2026-11-05 | `x* = Px` "a true fixed point when `A` is normal" | false for a rotation block. `x*` now targets `null(A)`, an equilibrium for any `A` | [§2](#2-the-collapse-trigger-σ₀) |
+| 2026-11-05 | `x* = Px` "a true fixed point when `A` is normal" | false for a rotation block. `x*` now targets `null(A)`: a fixed point of the linear part, up to the rank cutoff, for any `A` | [§2](#2-the-collapse-trigger-σ₀) |
 | 2026-11-05 | trigger's `‖∂H/∂u‖`; thresholds `ε_g`, `ε_c` | it read the stage cost only, and both signals were divided by the batch size. Now the Hamiltonian gradient, per sample. The #1990 calibration needs a re-run | [§2](#2-the-collapse-trigger-σ₀) |
 | 2026-11-05 | certificates on a batched Jacobian | they averaged it, and the mean of two unstable maps can contract. Now every member must pass | `_batch_members` |
 | 2026-11-05 | S1: "probability ≥ ½, for any drift and any `p`" | it assumes `D ⪰ 0`, and `LinearDynamics` accepted negative noise, which gives 0.40 on the real engine (found by `lantern-os-research` PR #14). Now enforced, and the lemma's other hypotheses are stated | [§3](#3-the-anti-collapse-operator-σ₀¹) |
-| 2026-11-05 | the first fix to the verdict: the last-step ratio, and "accepted at the trained depth, plateau past it" | an independent review of that fix broke it. One step accepted a period-2 map with `ρ > 1` and a residual that dipped and then grew 900×; non-finite iterates passed; growth starting under the noise floor read as converged. The statistic now reads the whole loop and its deepest half. On the same saved data it accepts depths 3–8, not 3–4 | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
+| 2026-11-05 | the first fix to the verdict: the last-step ratio, and "accepted at the trained depth, plateau past it" | an independent review of that fix broke it. One step accepted a period-2 map with `ρ > 1` and a residual that dipped and then grew 900×; non-finite iterates passed; growth starting under the noise floor read as converged. The statistic now reads the whole loop and its deepest half, over a pairwise envelope, because a second review found that a window over the raw residuals still let a period-2 map through. On the same saved data it accepts depths 3–8, not 3–4 | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
 | 2026-11-05 | the first fix to the fates, `Re λ < −δ` | rounding counted rotations and Jordan blocks at `δ = 0` as active, which read COLLAPSE on 75 of 200 random bases of §1's own example. Scaling the boundary tolerance by `‖A‖` then blurred them next to any large mode. The cut now sits `tol` inside the boundary, and the boundary is read on the slow block | `dichotomy_certificate` |
 | 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Any rotation or unstable complex pair with `|Re λ| < 1` went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
 | 2026-11-05 | a batch "reports the worst member" | the bounds and gates came from one member, so a batch could read `proven_contracting` beside a diverging member, or quote one member's bound for another's 1000× transient, depending on order. Gates are now ANDed and each bound is the worst of any member's | `_worst_fate`, `_worst_collapse` |
-| 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence` stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied | `src/cio_sde/question.py` |
+| 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence`, or from sources that disagree, stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied, and supports acting only if it ran this plan. Still unchecked, and stated: whether the goal is reachable at all, and whether a channel's self-reported confidence is honest | `src/cio_sde/question.py` |
 | 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
 | 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
 | 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |

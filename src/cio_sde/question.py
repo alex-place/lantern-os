@@ -206,7 +206,7 @@ def _worst(values: Sequence[float]) -> float:
 
 def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = None,
               unresolved: int = 0, seam_tol: float = 1e-2, defect_tol: float = 1e-2,
-              uncertainty_tol: float = 1.0) -> Reconciliation:
+              uncertainty_tol: float = 1.0, covers_plan: bool = True) -> Reconciliation:
     """Turn the signals into one next step. Checked in this order because each later signal is
     only as good as the earlier ones: the seam is computed through the model, so a failed model
     makes it meaningless, and a clean plan on thin evidence is still thin.
@@ -215,6 +215,7 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
         defect > defect_tol       revise_model      the model failed against reality
         seam > seam_tol           replan            a better admissible action exists
         blocked > seam_tol        blocked           stationary only because the way on is denied
+        not covers_plan           gather_evidence   the observations did not run this plan
         unresolved > 0            gather_evidence   named unknowns remain (e.g. blind dims)
         uncertainty > tol         gather_evidence   model and plan agree, on thin evidence
         otherwise                 act
@@ -227,6 +228,11 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
     A NAP denial or the u_max clamp is a constraint, not a disagreement, so it stays out of the
     seam. It is still not "act": the plan is the best one allowed, and whoever holds the authority
     decides whether that is good enough.
+
+    "act" means that none of these checks objects, which is less than it sounds. Nothing here
+    checks that the plan reaches the goal: a goal dimension that no allowed control moves (zero
+    control authority there) reads "act" with the gap unclosed. The defect is absolute, so a model
+    tested only at small amplitude passes.
 
     The tolerances are the caller's: there is no calibrated default, and they should tighten
     for actions that are hard to reverse. defect_tol has to sit above measurement noise: a correct
@@ -248,11 +254,14 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
         return out("replan", f"plan is not stationary: seam {seam:.4g}")
     if not blocked <= seam_tol:
         return out("blocked", f"plan is stationary only under a constraint: pressure {blocked:.4g}")
+    if not covers_plan:
+        return out("gather_evidence", "the observations were not taken under this plan")
     if unresolved > 0:
         return out("gather_evidence", f"{unresolved} unresolved unknowns")
-    if spread is not None and spread > uncertainty_tol:
+    if spread is not None and not spread <= uncertainty_tol:
         return out("gather_evidence", f"model and plan agree, but tr(Σ) reaches {spread:.4g}")
-    return out("act", "model matches observation, plan is stationary, evidence is sufficient")
+    return out("act", "no check here objects: the model matched what it was tested on, the plan "
+                      "is stationary, and nothing is unresolved")
 
 
 # ── the machine ──────────────────────────────────────────────────────────────
