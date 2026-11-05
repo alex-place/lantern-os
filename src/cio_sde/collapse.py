@@ -1359,6 +1359,49 @@ def lyapunov_value(x: Tensor, A: Tensor, eig_eps: float = 1e-2) -> float:
 
 # ── Σ₀⁻¹ Anti-Collapse Operator ──────────────────────────────────────────────
 
+def _assert_samplewise_independent(model, x: Tensor, u: Tensor, sigma: Tensor,
+                                  atol: float = 1e-8) -> None:
+    """Reject cross-member coupling before using per-sample gradient/rank gates.
+
+    The per-sample formulas below differentiate a sum of member costs. That equals
+    independent member gradients only when the batch Jacobians are block diagonal.
+    Check the cost, policy, and dynamics (w.r.t. both x and u) on the actual batch.
+    """
+    active = getattr(getattr(model, "graph", None), "active", None)
+    policy = getattr(model, "pcsf", None)
+    def check(name, jac):
+        # jac has output batch axis first and input batch axis third (or second for scalar outputs).
+        b = x.shape[0]
+        if jac.ndim == 3:  # (B, B, d): scalar cost output per member
+            mask = ~torch.eye(b, device=jac.device, dtype=torch.bool)
+            off = jac[mask]
+        elif jac.ndim == 4:  # (B, out, B, in)
+            mask = ~torch.eye(b, device=jac.device, dtype=torch.bool)
+            off = jac.permute(0, 2, 1, 3)[mask]
+        else:
+            raise RuntimeError(f"cannot validate batch coupling for {name}: Jacobian shape {tuple(jac.shape)}")
+        scale = jac.detach().abs().max().clamp_min(1.0)
+        if off.numel() and bool((off.detach().abs().max() > atol * scale).item()):
+            raise RuntimeError(
+                f"per-sample anti-collapse is invalid: {name} couples batch members; "
+                "use independent samples or a full joint-batch Jacobian"
+            )
+    try:
+        check("stage_cost", torch.func.jacrev(lambda z: model.stage_cost(z, u))(x))
+        if policy is not None:
+            check("policy", torch.func.jacrev(lambda z: policy(z, sigma))(x))
+        if active is not None:
+            check("dynamics/state", torch.func.jacrev(lambda z: active.drift(z, u))(x))
+            check("dynamics/control", torch.func.jacrev(lambda z: active.drift(x, z))(u))
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(
+            "could not verify sample independence; refusing per-sample anti-collapse "
+            "for an unvalidated batched module"
+        ) from exc
+
+
 class AntiCollapseOperator:
     """
     Σ₀⁻¹ — prevents 42-states by persistent excitation along null modes.
@@ -1400,6 +1443,7 @@ class AntiCollapseOperator:
                               A: Tensor) -> Tensor:
         """Per-member collapse proximity; no batch averaging can hide one failing member."""
         d = self.detector
+        _assert_samplewise_independent(model, x, u, sigma)
         if A.dim() == 2:
             A = A.unsqueeze(0)
         if A.shape[0] == 1 and x.shape[0] > 1:
