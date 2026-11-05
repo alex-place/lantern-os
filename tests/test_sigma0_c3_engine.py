@@ -214,10 +214,10 @@ def test_gate_signals_do_not_depend_on_batch_size():
     m.graph.active = LinearDynamics(torch.eye(3), B=torch.eye(3)[:, :2], noise=0.0)
     x = torch.tensor([[0.2, 0.0, 0.0]])
     u = torch.tensor([[0.1, 0.0]])
-    single = (det._grad_norm(m, x, u), det._ctrl_sensitivity(m, x, u))
-    many = (det._grad_norm(m, x.repeat(8, 1), u.repeat(8, 1)),
-            det._ctrl_sensitivity(m, x.repeat(8, 1), u.repeat(8, 1)))
-    assert many == pytest.approx(single, rel=1e-5)
+    for signal in (det._grad_norm, det._ctrl_sensitivity):        # one value per sample now
+        single, many = signal(m, x, u), signal(m, x.repeat(8, 1), u.repeat(8, 1))
+        assert single.shape == (1,) and many.shape == (8,)
+        assert torch.allclose(many, single.expand(8), rtol=1e-5)
 
 
 def test_ctrl_signal_is_the_hamiltonian_gradient_not_just_stage_cost():
@@ -230,10 +230,10 @@ def test_ctrl_signal_is_the_hamiltonian_gradient_not_just_stage_cost():
     m.graph.active = LinearDynamics(torch.zeros(d, d), B=5.0 * torch.eye(d), noise=0.0)
     x = torch.tensor([[0.3, 0.4]])                              # ∇ₓL = 2x, ‖x‖ = 0.5
     u = torch.zeros(1, d)
-    assert det._ctrl_sensitivity(m, x, u) == pytest.approx(5.0, rel=1e-5)   # ‖Bᵀ·2x‖
+    assert float(det._ctrl_sensitivity(m, x, u)) == pytest.approx(5.0, rel=1e-5)   # ‖Bᵀ·2x‖
 
     m.graph.active = LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, d), noise=0.0)
-    assert det._ctrl_sensitivity(m, x, u) == pytest.approx(0.0, abs=1e-8)   # no leverage
+    assert float(det._ctrl_sensitivity(m, x, u)) == pytest.approx(0.0, abs=1e-8)   # no leverage
 
 
 # ── x* must be an equilibrium ────────────────────────────────────────────────────────────
