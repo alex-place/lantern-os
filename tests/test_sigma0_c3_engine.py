@@ -967,3 +967,17 @@ def test_common_quadratic_covariance_energy_bound():
     bound = covariance_energy_bound(P0, H, rho=0.8, q=0.02, steps=10)
     expected = 0.8 ** 20 * 2.0 + 0.02 * (1.0 - 0.8 ** 20) / (1.0 - 0.8 ** 2)
     assert bound == pytest.approx(expected)
+
+
+def test_switched_mode_diagnostics_reports_certificate_and_gramian():
+    from src.cio_sde.diagnostics import analyze_switched_modes
+    dtype = torch.float64
+    F = 0.8 * torch.eye(2, dtype=dtype)
+    M1 = torch.tensor([[0.1], [0.0]], dtype=dtype)
+    M2 = torch.tensor([[0.0], [0.1]], dtype=dtype)
+    report = analyze_switched_modes(
+        [F, F], torch.eye(2, dtype=dtype), rho=0.81, noise_maps=[M1, M2]
+    )
+    assert report["stability_certificate"]["valid"]
+    assert report["excitation_positive_definite"]
+    assert report["excitation_min_eigenvalue"] == pytest.approx(0.0064)
