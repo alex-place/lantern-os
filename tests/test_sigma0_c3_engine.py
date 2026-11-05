@@ -372,7 +372,7 @@ def test_s1_rejects_negative_diffusion_when_state_kick_is_enabled():
     x = torch.zeros(1, 2)
     sigma = torch.eye(2).unsqueeze(0)
     noise = torch.ones_like(x)
-    with pytest.raises(ValueError, match="S1 requires nonnegative diffusion gains"):
+    with pytest.raises(ValueError, match="S1 requires a finite nonnegative effective diffusion map"):
         m.forward_step(x, sigma, 0.25, noise, step=0)
 
 
@@ -397,3 +397,19 @@ def test_zero_strength_disables_s1_sign_restriction_but_keeps_covariance_leg():
     assert bool(torch.isfinite(x_next).all())
     assert bool(torch.isfinite(sigma_next).all())
     assert info["anti_collapse_p"] == 1.0
+
+
+
+def test_s1_rejects_negative_dilation_even_with_positive_diffusion_gain():
+    # The first input covariance is caller-supplied. A negative trace can make
+    # dilation negative before CovarianceField projects the next covariance.
+    m = _zero_policy(CIO_SDE(dim=2, ctrl_dim=2, hidden=4))
+    m.graph.active = LinearDynamics(
+        torch.zeros(2, 2), B=torch.zeros(2, 2), noise=0.5
+    )
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = _AlwaysTrigger(strength=0.5)
+    x = torch.zeros(1, 2)
+    sigma = -2.0 * torch.eye(2).unsqueeze(0)  # dilation = 1 + tr(sigma)/d = -1
+    with pytest.raises(ValueError, match="S1 requires a finite nonnegative effective diffusion map"):
+        m.forward_step(x, sigma, 0.25, torch.ones_like(x), step=0)

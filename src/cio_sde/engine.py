@@ -472,10 +472,17 @@ class CIO_SDE(nn.Module):
                     # and custom Dynamics implementations may return negative gains.
                     # A negative gain is valid for the base SDE, but invalidates the
                     # shared-noise S1 bound when the state kick is active.
-                    if self.anti_collapse_op.strength > 0.0 and bool((g < 0).any()):
-                        raise ValueError(
-                            "Sigma0 S1 requires nonnegative diffusion gains when the state kick is enabled"
-                        )
+                    effective_gain = g * dilation
+                    if self.anti_collapse_op.strength > 0.0:
+                        # This sign check establishes D >= 0. The probability bound
+                        # also assumes fresh iid standard-normal noise: rollout()
+                        # supplies it; direct forward_step() callers own that contract.
+                        if (not bool(torch.isfinite(effective_gain).all())
+                                or bool((effective_gain < 0).any())):
+                            raise ValueError(
+                                "Sigma0 S1 requires a finite nonnegative effective diffusion map "
+                                "(g * dilation) when the state kick is enabled"
+                            )
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
                         x, sigma_next, A, effective_proximity, noise)
                     x_next = x_next + dx_extra
