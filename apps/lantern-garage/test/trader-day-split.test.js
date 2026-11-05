@@ -151,7 +151,7 @@ test('what the server sends is text, never markup', () => {
   const html = tp._tpDaySplit(ACCT({ ...WED,
     realized: { total: null, journals: [journal('<img src=x onerror=alert(1)>', null, 0, 'missing')] },
     notes: ['"><script>alert(1)</script>'], close_source: '"><b>x</b>' }));
-  assert.doesNotMatch(html, /<img|<script|<b>/);
+  assert.doesNotMatch(html, /<img|<script|<b>/i);
   assert.match(html, /&lt;img src=x/);
 });
 
