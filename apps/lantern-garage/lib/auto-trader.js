@@ -147,6 +147,7 @@ function cfg() {
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
     maxLossPct: n('TRADER_MAX_LOSS_PCT', DEFAULTS.maxLossPct),           // hard max-loss backstop exit
+    maxLossRthOnly: process.env.TRADER_MAX_LOSS_RTH_ONLY === '1',        // the backstop decides in regular hours only; off unless '1' (manageHeldExits)
     maxDailyLossPct: n('TRADER_MAX_DAILY_LOSS_PCT', DEFAULTS.maxDailyLossPct), // circuit breaker
     minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
     exitReattemptMs: n('TRADER_EXIT_REATTEMPT_MIN', DEFAULTS.exitReattemptMin) * 60000, // anti-churn: min gap between exit attempts on the SAME symbol
@@ -989,7 +990,8 @@ function _nextTradingDates(dateStr, n) {
 // NOT DEFERRED: max_loss. That is the disaster brake, not gain protection, and a
 // position already at its loss cap should not be asked to wait. The broker's resting
 // stop stays underneath throughout, so a genuine overnight collapse is caught by the
-// venue rather than by us.
+// venue rather than by us. TRADER_MAX_LOSS_RTH_ONLY=1 is the other choice, and it is not
+// a deferral: the cap does not decide at all outside regular hours (manageHeldExits).
 //
 // The risk this accepts, plainly: on the minority of days that do NOT revert, the
 // deferred fill is worse. The measurement says that is the smaller half by a wide
@@ -998,6 +1000,17 @@ const _deferredExit = new Map();   // sym -> { reason, decidedAt, decidedPx }
 const DEFERRABLE = /^(trailing_stop|take_profit|peak_giveback|r2_trail|zone_)/i;
 function _extDeferEnabled() { return process.env.TRADER_EXT_DEFER_EXITS !== '0'; }
 function _isDeferrableExit(reason) { return DEFERRABLE.test(String(reason || '').trim()); }
+// One max_loss_held row per position per ET day, however many passes see it (a new entry
+// price is a new position). A restart can write one more row, which is harmless.
+const _maxLossHeldNoted = new Map();   // sym -> `${etDate}|${entry}`
+function _noteMaxLossHeld(sym, qty, entry, cur, lossPct, c, now, out) {
+  if (out) out.skipped.push({ symbol: sym, why: 'max_loss held: past the cap outside regular hours, TRADER_MAX_LOSS_RTH_ONLY lets it act in regular hours only' });
+  const k = `${_etDateStr(now)}|${entry}`;
+  if (_maxLossHeldNoted.get(sym) === k) return;
+  _maxLossHeldNoted.set(sym, k);
+  logTrade({ event: 'max_loss_held', symbol: sym, qty, entry, mark: cur, loss_pct: +lossPct.toFixed(2), cap_pct: c.maxLossPct,
+    why: 'past the cap outside regular hours: no order, the stop stays, and the first regular-hours pass reads the price of that moment (TRADER_MAX_LOSS_RTH_ONLY)' });
+}
 
 const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
@@ -1820,8 +1833,26 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     //    it the ONLY loss protection is the entry STP, so an unprotected position runs
     //    unbounded (the -17% case). Still honors the exit-reattempt debounce so a still-
     //    unfilled exit isn't re-fired every scan.
+    //
+    //    REGULAR HOURS ONLY (TRADER_MAX_LOSS_RTH_ONLY=1, off unless set; operator 2026-11-05). At 04:12 ET
+    //    that day this rule sold C's 60 SOXL at 60.14 against a 65.36 entry, -$313: on a 3x wrapper -8 % is a
+    //    2.67 % move in the 1x. The replay has no extended-hours sale, so no number the design was chosen on
+    //    includes one. Against the replay over 2016-2026, on the proxies' extended bars (ledger row
+    //    tier0-loss-cap-in-extended-hours-2016-2026, 17-20 touches, static, paper fills), that sale costs
+    //    $5.4k-9.4k, Sharpe 2.28-2.31 against 2.37, older worst week -1.80 to -1.81 against -1.77, and the
+    //    replay beats it on 94-95 % of touches.
+    //    With the switch on, outside regular hours the cap places nothing, leaves the stop alone and journals
+    //    a max_loss_held row. The first regular-hours pass reads the price of that moment, so a position back
+    //    above the cap stays held. This is NOT a deferral: deciding now and filling at the open was measured
+    //    for this rule and refused (older worst week -1.86). The rest of this pass runs as for any position.
+    //    The risk this accepts, plainly: nothing sells in the dark. The resting stop first fires on the opening
+    //    print (GAPPED STOP, in _runAutoTradeInner), so a real overnight collapse is met at the open. SOXL on
+    //    2020-03-12 is the case: -19.2 % through the stop against -11.7 % sold at 04:00, +$440, the one clear save.
     const _exitAtBackstop = _exitAt.get(sym) || 0;
-    if (c.maxLossPct > 0 && lossPct <= -c.maxLossPct && !(_exitAtBackstop && (now - _exitAtBackstop) < c.exitReattemptMs)) {
+    const _pastLossCap = c.maxLossPct > 0 && lossPct <= -c.maxLossPct;
+    if (_pastLossCap && extended && c.maxLossRthOnly) {
+      _noteMaxLossHeld(sym, qty, entry, cur, lossPct, c, now, out);
+    } else if (_pastLossCap && !(_exitAtBackstop && (now - _exitAtBackstop) < c.exitReattemptMs)) {
       await closeLong(bridge, userId, sym, qty, p, `max_loss (${lossPct.toFixed(1)}% ≤ -${c.maxLossPct}%)`, out, now, { extended, refPrice: cur });
       delete heldQty[sym]; continue;
     }
@@ -2044,7 +2075,8 @@ async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended =
  *     in the lab covers extended-hours entries.
  *   - Only PRICE-THRESHOLD exits: r2_trail, zone floors, peak_giveback,
  *     trailing_stop, targets, max_loss. Each protects a gain or caps a loss at a
- *     level decided during regular hours.
+ *     level decided during regular hours. (TRADER_MAX_LOSS_RTH_ONLY=1 takes max_loss
+ *     out of this list; off unless set.)
  *   - NO signal-derived exits (momentum_died, the bearish signal_exit): a read
  *     computed off three thin pre-market bars is noise, and acting on it would
  *     dump a six-figure position into a wide spread.
@@ -4074,6 +4106,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _ordersSeenWorking.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
+function _resetCooldowns() { _exitKeptOpen.clear(); _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _ordersSeenWorking.clear(); _lastOrderAt.clear(); _entryAt.clear(); _holdClockAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _stopOrders.clear(); _beStopAt.clear(); _gapAuction.clear(); _limitShadow.clear(); _absentStreak.clear(); _seenStreak.clear(); _trustedBook.clear(); _exitsHeldNoted.clear(); _maxLossHeldNoted.clear(); _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; _saveState(); }
 
 module.exports = { _noFridayEntry, _parseSymbolWindows, _symbolEntryBlocked, _symbolEntryBlockJournal, _sessionsHeld, _holdClockAt, _peak, _trough, _reconcileFills, _entryAtSet: (sym, ts) => _entryAt.set(sym, ts), _entryConfirmRead, _cadenceReentryExempt, _exitAtSet: (sym, ts) => _exitAt.set(sym, ts), _deferredExit, _isDeferrableExit, _extDeferEnabled, _closeLongForTest: closeLong, _sellAfterCancel, _isQtyReservedReject, _exitKeptOpen, _entryAtGet: (sym) => _entryAt.get(sym), _exitAtGet: (sym) => _exitAt.get(sym), _exitStatusGet: (sym) => _exitStatus.get(sym), _manageHeldExitsForTest: manageHeldExits, _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, snapshotForeignRows, manageHeldExits, _feedGuard: { absentStreak: _absentStreak, seenStreak: _seenStreak }, _stopOrders, _beStopAt, _entryHourBlocked, _parseEtWindows, _entryCadenceBlocked, _sessionMinutes, _markCadenceDecided, _cadenceForTest: { decided: () => ({ ..._cadenceDecided }), setPending: (p) => { _pendingCadence = { ...p }; }, forgetInMemory: () => { _cadenceDecided = { day: null, boundary: null }; _pendingCadence = { day: null, boundary: null }; } }, _signalIbs, _exitAuthorityConflicts, _orderEntries, _regimeFirst30Read, _stressMultiplier, _stressCfg, _vixPriorClose, _symbolSizeMult, _limitShadow: { map: _limitShadow, arm: _limitShadowArm, tick: _limitShadowTick, close: _limitShadowClose, depths: LIMIT_SHADOW_DEPTHS }, cancelRestingStops, _pendingFillBasis, _checkFillBasis, _firstLockCfg, requoteRead, _requoteShadow, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE, logTrade, tagEntry };
