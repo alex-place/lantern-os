@@ -317,6 +317,7 @@ class Trace:
     collapses: List[Dict[str, object]] = field(default_factory=list)
     interventions: List[InterventionReceipt] = field(default_factory=list)
     shape_traces: List[float] = field(default_factory=list)
+    final_shape_covariance: Optional[Tensor] = None
     running_cost: object = None      # differentiable ∫L dt when accumulate_cost
 
     def emit(self, step: int, **fields: float) -> None:
@@ -748,6 +749,8 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
             )
         x, sigma = x_next, sigma_next
 
+    if shape_sigma is not None:
+        trace.final_shape_covariance = shape_sigma.detach().clone()
     trace.running_cost = running
     return x, sigma, trace
 
