@@ -1528,6 +1528,21 @@ class AntiCollapseOperator:
         return max(self.strength * p, floor)
 
     @torch.no_grad()
+    def excitation_noise_map(self, A: Tensor, p: Tensor | float, batch_size: int,
+                             device: torch.device, dtype: torch.dtype) -> Tensor:
+        """Return M_kick=κP per member for covariance of the shared ξ used by excite()."""
+        p = torch.as_tensor(p, device=device, dtype=dtype)
+        if p.ndim == 0:
+            p = p.expand(batch_size)
+        if p.shape != (batch_size,):
+            raise ValueError("proximity must be scalar or one value per sample")
+        projector, _ = self._near_null_projector_per_sample(A, batch_size)
+        active = (p > 0).to(dtype=dtype)
+        projector = projector * active[:, None, None]
+        kappa = self._kick_scale(p) * active
+        return kappa[:, None, None] * projector
+
+    @torch.no_grad()
     def excite(self, x: Tensor, sigma: Tensor, A: Tensor, p: Tensor | float,
                noise: Tensor) -> tuple[Tensor, Tensor]:
         """Apply per-sample right-kernel excitation and covariance shape lift.

@@ -657,3 +657,33 @@ def test_riccati_process_noise_matches_the_state_diffusion_map():
         torch.eye(dim).unsqueeze(0) * expected,
         atol=1e-6,
     )
+
+
+def test_covariance_step_includes_shared_noise_cross_terms():
+    cov = CovarianceField(2)
+    sigma = torch.zeros(1, 2, 2, dtype=torch.float64)
+    A = torch.zeros(1, 2, 2, dtype=torch.float64)
+    q_diag = torch.zeros(1, 2, dtype=torch.float64)
+    # Base diffusion and kick are perfectly correlated: M = diag(1,0)+diag(1,0).
+    # Covariance is (2ξ)^2=4, not 1+1=2.
+    noise_map = torch.diag(torch.tensor([2.0, 0.0], dtype=torch.float64)).unsqueeze(0)
+    out = cov.step(sigma, A, q_diag, dt=0.25, noise_map=noise_map)
+    expected = torch.diag(torch.tensor([4.0, 0.0], dtype=torch.float64)).unsqueeze(0)
+    assert torch.allclose(out, expected, atol=1e-10)
+
+
+def test_excitation_noise_map_matches_the_state_kick_map():
+    op = AntiCollapseOperator(strength=0.5)
+    d = 4
+    A = torch.stack((
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+        torch.diag(torch.tensor([0.0, 1.0, 0.0, 0.0])),
+    ))
+    p = torch.tensor([0.0, 0.5])
+    M = op.excitation_noise_map(A, p, 2, torch.device("cpu"), torch.float32)
+    noise = torch.tensor([[1.0, 2.0, 3.0, 4.0],
+                          [4.0, 3.0, 2.0, 1.0]])
+    dx, _ = op.excite(torch.zeros_like(noise),
+                      torch.eye(d).expand(2, d, d).clone(), A, p, noise)
+    expected = torch.bmm(M, noise.unsqueeze(-1)).squeeze(-1)
+    assert torch.allclose(dx, expected, atol=1e-6)

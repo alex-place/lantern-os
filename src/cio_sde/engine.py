@@ -136,16 +136,21 @@ class CovarianceField:
         self.eps = eps
         self.sigma_max = sigma_max
 
-    def step(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float) -> Tensor:
+    def step(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float,
+             noise_map: Optional[Tensor] = None) -> Tensor:
         # AΣ + ΣAᵀ
         AS = A @ sigma
         term = AS + AS.transpose(-1, -2)
-        # + Q  (diagonal process noise from diffusion gain²)
-        Q = torch.diag_embed(q_diag)
         # − Σ R⁻¹ Σ   (C = I)
         riccati = self.r_inv * (sigma @ sigma)
-        dsigma = term + Q - riccati
-        sigma_next = sigma + dsigma * dt
+        sigma_next = sigma + (term - riccati) * dt
+        if noise_map is None:
+            # Continuous-time diagonal process-noise rate Q.
+            sigma_next = sigma_next + torch.diag_embed(q_diag) * dt
+        else:
+            # Exact per-step covariance of the executed shared-noise map M ξ.
+            # Includes cross terms when base diffusion and intervention share ξ.
+            sigma_next = sigma_next + noise_map @ noise_map.transpose(-1, -2)
         return self._project_psd(sigma_next)
 
     def project_preserving_shape(self, sigma: Tensor) -> Tensor:
@@ -400,6 +405,7 @@ class CIO_SDE(nn.Module):
         # Keep the Riccati process-noise term consistent with that executed map.
         effective_diffusion = g.detach() * dilation.detach()
         q_diag = effective_diffusion.square()
+        base_noise_map = torch.diag_embed(effective_diffusion * math.sqrt(dt))
         sigma_next = self.cov.step(sigma, A, q_diag, dt)
 
         info = {"u": u, "f": f, "g": g, "dilation": dilation.squeeze(-1),
@@ -509,6 +515,25 @@ class CIO_SDE(nn.Module):
                                 "the anti-collapse kick needs a finite non-negative diffusion gain after dilation"
                             )
                     excite_proximity = effective_per_sample if supports_per_sample else effective_proximity
+
+                    # If this operator's excite() and noise-map methods share the same
+                    # implementation owner, include the kick in the predicted covariance.
+                    # M_total ξ = [diag(g*dilation*sqrt(dt)) + κP] ξ; this captures
+                    # both κ²PPᵀ and the shared-noise cross terms.
+                    noise_map_method = getattr(self.anti_collapse_op, "excitation_noise_map", None)
+                    mro = type(self.anti_collapse_op).__mro__
+                    excite_owner = next((cls for cls in mro if "excite" in cls.__dict__), None)
+                    map_owner = next((cls for cls in mro
+                                      if "excitation_noise_map" in cls.__dict__), None)
+                    if callable(noise_map_method) and excite_owner is not None and excite_owner is map_owner:
+                        kick_noise_map = noise_map_method(
+                            A, excite_proximity, x.shape[0], x.device, x.dtype
+                        )
+                        sigma_next = self.cov.step(
+                            sigma, A, q_diag, dt,
+                            noise_map=base_noise_map + kick_noise_map,
+                        )
+
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
                         x, sigma_next, A, excite_proximity, noise)
                     x_next = x_next + dx_extra
