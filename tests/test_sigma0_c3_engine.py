@@ -455,3 +455,27 @@ def test_the_kick_subspace_comes_from_the_symmetric_part():
     basis = AntiCollapseOperator()._near_null_basis(A.unsqueeze(0))
     assert basis.shape[1] == 3
     assert float(torch.linalg.norm(A @ basis, ord=2)) == pytest.approx(2 ** -0.5, abs=1e-5)
+
+
+
+def test_armed_step_refuses_negative_effective_diffusion_from_initial_sigma():
+    """A positive g is insufficient if caller-supplied Sigma makes dilation negative."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.5))
+    x = torch.zeros(1, d)
+    sigma = -2.0 * torch.eye(d).unsqueeze(0)  # dilation = 1 + tr(Sigma)/d = -1
+    with pytest.raises(ValueError, match="non-negative diffusion gain after dilation"):
+        m.forward_step(x, sigma, 0.05, torch.randn_like(x), step=0)
+
+
+def test_zero_strength_state_leg_does_not_require_psd_effective_diffusion():
+    """The covariance shape-lift remains active, but the S1 state kick is disabled."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.5))
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.0)
+    x = torch.zeros(1, d)
+    sigma = -2.0 * torch.eye(d).unsqueeze(0)
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, torch.randn_like(x), step=0)
+    assert bool(torch.isfinite(x_next).all())
+    assert bool(torch.isfinite(sigma_next).all())
+    assert info["anti_collapse_p"] > 0.0

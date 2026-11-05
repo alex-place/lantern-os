@@ -469,10 +469,16 @@ class CIO_SDE(nn.Module):
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
-                    # dW and the kick share ξ, so their signs interact. Lemma S1 needs g ≥ 0: at
-                    # D = −κ/2 the escape probability falls to 0.40. A subclass can break this.
-                    if bool((g < 0).any()):
-                        raise ValueError("the anti-collapse kick needs a non-negative diffusion gain")
+                    # dW and the kick share ξ, so their signs interact. Lemma S1 needs
+                    # D = diag(g * dilation * sqrt(dt)) to be PSD, not merely g >= 0:
+                    # caller-supplied initial Sigma can make dilation negative before projection.
+                    if getattr(self.anti_collapse_op, "strength", 1.0) > 0.0:
+                        effective_gain = g * dilation
+                        if (not bool(torch.isfinite(effective_gain).all())
+                                or bool((effective_gain < 0).any())):
+                            raise ValueError(
+                                "the anti-collapse kick needs a finite non-negative diffusion gain after dilation"
+                            )
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
                         x, sigma_next, A, effective_proximity, noise)
                     x_next = x_next + dx_extra
