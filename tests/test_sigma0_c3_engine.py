@@ -347,3 +347,53 @@ def test_c3_does_not_promise_perpetual_motion():
         x = xn
     assert fired >= 1
     assert max(tail) < 1e-6                                      # the state has stopped
+
+
+
+# ── S1's PSD diffusion hypothesis must hold on the actual intervention path ───────────────
+
+class _AlwaysTrigger(AntiCollapseOperator):
+    def proximity(self, model, x, u, sigma, A):
+        return 1.0
+
+
+def _negative_diffusion_model(anti_collapse=True, strength=0.5):
+    m = _zero_policy(CIO_SDE(dim=2, ctrl_dim=2, hidden=4))
+    m.graph.active = LinearDynamics(
+        torch.zeros(2, 2), B=torch.zeros(2, 2), noise=-0.5
+    )
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = _AlwaysTrigger(strength=strength) if anti_collapse else None
+    return m
+
+
+def test_s1_rejects_negative_diffusion_when_state_kick_is_enabled():
+    m = _negative_diffusion_model(anti_collapse=True, strength=0.5)
+    x = torch.zeros(1, 2)
+    sigma = torch.eye(2).unsqueeze(0)
+    noise = torch.ones_like(x)
+    with pytest.raises(ValueError, match="S1 requires nonnegative diffusion gains"):
+        m.forward_step(x, sigma, 0.25, noise, step=0)
+
+
+def test_negative_diffusion_remains_valid_without_s1_intervention():
+    # A negative scalar diffusion coefficient is distributionally valid for the
+    # base SDE with symmetric Gaussian noise; only the shared-noise S1 theorem
+    # needs the nonnegative-sign restriction.
+    m = _negative_diffusion_model(anti_collapse=False)
+    x = torch.zeros(1, 2)
+    sigma = torch.eye(2).unsqueeze(0)
+    noise = torch.ones_like(x)
+    x_next, _, _ = m.forward_step(x, sigma, 0.25, noise, step=0)
+    assert bool(torch.isfinite(x_next).all())
+
+
+def test_zero_strength_disables_s1_sign_restriction_but_keeps_covariance_leg():
+    m = _negative_diffusion_model(anti_collapse=True, strength=0.0)
+    x = torch.zeros(1, 2)
+    sigma = torch.eye(2).unsqueeze(0)
+    noise = torch.ones_like(x)
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.25, noise, step=0)
+    assert bool(torch.isfinite(x_next).all())
+    assert bool(torch.isfinite(sigma_next).all())
+    assert info["anti_collapse_p"] == 1.0

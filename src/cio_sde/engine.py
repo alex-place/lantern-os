@@ -467,6 +467,15 @@ class CIO_SDE(nn.Module):
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
+                    # Lemma S1 assumes the base diffusion map D is PSD. Neural
+                    # Dynamics enforces this with softplus, but LinearDynamics
+                    # and custom Dynamics implementations may return negative gains.
+                    # A negative gain is valid for the base SDE, but invalidates the
+                    # shared-noise S1 bound when the state kick is active.
+                    if self.anti_collapse_op.strength > 0.0 and bool((g < 0).any()):
+                        raise ValueError(
+                            "Sigma0 S1 requires nonnegative diffusion gains when the state kick is enabled"
+                        )
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
                         x, sigma_next, A, effective_proximity, noise)
                     x_next = x_next + dx_extra
