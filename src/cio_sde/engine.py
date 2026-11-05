@@ -533,12 +533,17 @@ class CIO_SDE(nn.Module):
                 excited = hot & self._budget_open(bsz, dev)
                 idx = excited.nonzero().flatten()
                 if idx.numel():
-                    # dW and the kick share ξ, so their signs interact. Lemma S1 needs the gain on ξ,
-                    # D = g·dilation, ≥ 0 on every kicked row: at D = −κ/2 the escape probability falls to
-                    # 0.40. A subclass can break this, and so can a gain shared by all rows, shape (d,).
-                    gain = torch.broadcast_to(g * dilation, x.shape)
-                    if bool((gain[idx] < 0).any()):
-                        raise ValueError("the anti-collapse kick needs a non-negative diffusion gain")
+                    # dW and the kick share ξ, so their signs interact. Lemma S1 needs
+                    # D = diag(g·dilation·√dt) PSD on every kicked row, not merely g ≥ 0: at D = −κ/2 the
+                    # escape probability falls to 0.40, and a caller-supplied initial Σ can make dilation
+                    # negative before projection. A subclass can break this, and so can a gain shared by
+                    # all rows, shape (d,). With strength 0 there is no state kick to protect.
+                    if getattr(self.anti_collapse_op, "strength", 1.0) > 0.0:
+                        gain = torch.broadcast_to(g * dilation, x.shape)[idx]
+                        if not bool(torch.isfinite(gain).all()) or bool((gain < 0).any()):
+                            raise ValueError(
+                                "the anti-collapse kick needs a finite non-negative diffusion gain after dilation"
+                            )
                     # An operator with one proximity for the batch gets one number per call, so rows
                     # at different effective proximities (a spook lifts only its own row) get their own.
                     calls = ([(float(v), idx[effective[idx] == v]) for v in torch.unique(effective[idx])]

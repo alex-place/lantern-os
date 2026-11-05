@@ -98,7 +98,7 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 55 passed |
+| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 57 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
 | Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
@@ -958,9 +958,10 @@ stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_
 probability ≥ ½, for any drift and any `p`. That reads three hypotheses onto the engine. `ξ` must be standard normal, which
 `rollout` draws and a direct caller of `forward_step` must supply. `‖∇ₓL‖ = 2‖x − x_target‖` holds for the engine's quadratic
 stage cost, and another cost needs its own argument. And `D ⪰ 0` is required, not a convenience: `dW` and the kick share `ξ`, and at
-`D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise, and
-`forward_step` refuses to kick any row whose gain on `ξ`, `g·dilation`, is negative, from any dynamics and in any shape,
-including one gain shared by every row (found by `lantern-os-research` PR #14). The kick used to be `strength·p`, which vanishes at the gate boundary:
+`D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise (found
+by `lantern-os-research` PR #14), and `forward_step` refuses to kick any row whose gain on `ξ`, `g·dilation`, is negative or not
+finite, from any dynamics and in any shape. A caller-supplied `Σ` can make the dilation negative (#3811), and one gain can be
+shared by every row. With `strength = 0` there is no kick, so nothing is checked. The kick used to be `strength·p`, which vanishes at the gate boundary:
 the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. Like the gate, it is per trajectory.
 
 **What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the
