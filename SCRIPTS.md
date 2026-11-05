@@ -179,6 +179,7 @@ removal-wave candidates (#2538, founder sign-off pending), not registry members.
 
 | Command | Purpose |
 |---------|---------|
+| `src/cio_sde/stability.py` | Imported by `src/cio_sde/diagnostics.py`; finite switched-mode Lyapunov and retained-excitation Gramian verification primitives | `from cio_sde.diagnostics import analyze_switched_modes` |
 | `python -m pytest tests/ -q --tb=short` | Full Python suite (pythonpath = `apps src` via pytest.ini; `conftest.py` is the pytest anchor) |
 | `npm run test:api --prefix apps/lantern-garage` | Node API tests (server must be running) |
 | `npm run test:chat --prefix apps/lantern-garage` | Chat regression tests |
