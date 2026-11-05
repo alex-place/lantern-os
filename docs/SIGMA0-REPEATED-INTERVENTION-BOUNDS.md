@@ -179,3 +179,34 @@ Until these are established, the honest claim is narrower: the implementation
 has one-step C3 shape-lift logic, a per-sample gate with explicit independence
 checks, and an opt-in covariance split. It does not yet prove perpetual
 excitation, switched stability, or universal non-collapse.
+
+
+## 7. Executable finite-dimensional verifiers
+
+The runtime package now exposes `src.cio_sde.stability`:
+
+- `verify_common_quadratic(modes, H, rho)` checks positive definiteness of H
+  and every supplied matrix inequality. A pass is a valid certificate for
+  those matrices only. It does not prove that the list contains all reachable
+  nonlinear closed-loop Jacobians.
+- `finite_horizon_excitation_gramian(Fs, Ms)` computes the terminal Gramian
+  for the supplied finite sequence. It assumes the per-step noise vectors are
+  temporally independent (or that the maps have already been augmented to
+  represent their true joint covariance).
+- `covariance_energy_bound(P0, H, rho, q, n)` evaluates the analytical
+  common-quadratic upper bound.
+- `augmented_transition_jacobian(T, z)` differentiates a caller-supplied
+  complete continuous augmented transition. The caller must include every
+  continuous feedback state, such as x, vec(P), vec(S), and controller memory.
+  Discrete graph modes still require separate enumeration/certification.
+
+Tests include a contracting switched family, the alternating nilpotent
+counterexample, cyclic coordinate kicks with a positive terminal Gramian, an
+erased-kick example with zero terminal Gramian, and a toy augmented transition
+whose Jacobian contains covariance-to-state feedback.
+
+These are executable verification primitives and finite examples, not a
+search algorithm for arbitrary Lyapunov metrics and not an end-to-end proof
+for the deployed CIO_SDE controller. A candidate metric found by numerical
+optimization would still need to pass the verifier with a positive numerical
+margin and a justified enclosure of all reachable modes.
