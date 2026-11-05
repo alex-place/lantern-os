@@ -580,6 +580,16 @@ class CIO_SDE(nn.Module):
                             raise ValueError(
                                 "the anti-collapse kick needs a finite non-negative diffusion gain after dilation"
                             )
+                    # Theorem C3's hypothesis: the floor correction after a scale-down costs at most
+                    # ½√(d/(d−1))·ρ of anisotropy, which LIFT_MARGIN covers only while ρ ≤ RHO_MAX.
+                    rho_max = getattr(self.anti_collapse_op, "RHO_MAX", None)
+                    if rho_max is not None and d >= 2:
+                        rho = d * self.cov.eps / self.cov.sigma_max
+                        if rho > rho_max:
+                            raise ValueError(
+                                f"the covariance lift needs d*eps/sigma_max <= {rho_max:g} "
+                                f"(Theorem C3); got {rho:.3g}. Raise sigma_max or lower eps."
+                            )
                     excite_proximity = effective_per_sample if supports_per_sample else effective_proximity
 
                     # If this operator's excite() and noise-map methods share the same
