@@ -4,7 +4,7 @@ on:
   push:
     branches: ["master"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "fix/sigma0-validate-effective-diffusion-map"]
   workflow_dispatch:
 
 concurrency:
