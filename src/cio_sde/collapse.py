@@ -1209,6 +1209,12 @@ class AntiCollapseOperator:
                               A: Tensor) -> Tensor:
         """Per-member collapse proximity; no batch averaging can hide one failing member."""
         d = self.detector
+        if A.dim() == 2:
+            A = A.unsqueeze(0)
+        if A.shape[0] == 1 and x.shape[0] > 1:
+            A = A.expand(x.shape[0], -1, -1)
+        if A.shape[0] != x.shape[0]:
+            raise ValueError("Jacobian batch must match state batch")
         grad_norm = d._grad_norm_per_sample(model, x, u)
         eff_rank = d._effective_rank_per_sample(A)
         aniso = d._anisotropy_per_sample(sigma)
