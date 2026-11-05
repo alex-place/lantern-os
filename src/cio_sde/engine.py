@@ -139,21 +139,44 @@ class CovarianceField:
         self.eps = eps
         self.sigma_max = sigma_max
 
-    def step(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float,
-             noise_map: Optional[Tensor] = None) -> Tensor:
-        # AΣ + ΣAᵀ
+    def assimilate(self, x: Tensor, sigma: Tensor, observation: Tensor, H: Tensor, R: Tensor) -> tuple[Tensor, Tensor]:
+        """Linear-Gaussian measurement update in Joseph form; no observation, no contraction."""
+        b, d = x.shape
+        if H.dim() == 2: H = H.unsqueeze(0).expand(b, -1, -1)
+        if R.dim() == 2: R = R.unsqueeze(0).expand(b, -1, -1)
+        if observation.dim() == 1: observation = observation.unsqueeze(0).expand(b, -1)
+        if H.shape[0] != b or R.shape[0] != b or observation.shape[0] != b:
+            raise ValueError("measurement batch dimensions must match state batch")
+        m = H.shape[1]
+        if H.shape[-1] != d or R.shape[-2:] != (m, m) or observation.shape[-1] != m:
+            raise ValueError("incompatible measurement dimensions")
+        innovation = observation - torch.bmm(H, x.unsqueeze(-1)).squeeze(-1)
+        HP = H @ sigma
+        S = HP @ H.transpose(-1, -2) + R
+        K = torch.linalg.solve(S, HP).transpose(-1, -2)
+        x_post = x + torch.bmm(K, innovation.unsqueeze(-1)).squeeze(-1)
+        I = torch.eye(d, device=x.device, dtype=x.dtype).expand(b, -1, -1)
+        IKH = I - K @ H
+        P_post = IKH @ sigma @ IKH.transpose(-1, -2) + K @ R @ K.transpose(-1, -2)
+        return x_post, self._project_psd(P_post)
+
+    def predict(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float, noise_map: Optional[Tensor] = None) -> Tensor:
+        """Discrete covariance prediction under F=I+A·dt."""
+        d = sigma.shape[-1]
+        I = torch.eye(d, device=sigma.device, dtype=sigma.dtype).expand(sigma.shape[0], -1, -1)
+        F = I + A * dt
+        P = F @ sigma @ F.transpose(-1, -2)
+        P = P + (torch.diag_embed(q_diag) * dt if noise_map is None else noise_map @ noise_map.transpose(-1, -2))
+        return self._project_psd(P)
+
+    def step(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float, noise_map: Optional[Tensor] = None) -> Tensor:
+        """Legacy continuous-time Riccati surrogate; retained for unsplit callers."""
         AS = A @ sigma
         term = AS + AS.transpose(-1, -2)
-        # − Σ R⁻¹ Σ   (C = I)
         riccati = self.r_inv * (sigma @ sigma)
         sigma_next = sigma + (term - riccati) * dt
-        if noise_map is None:
-            # Continuous-time diagonal process-noise rate Q.
-            sigma_next = sigma_next + torch.diag_embed(q_diag) * dt
-        else:
-            # Exact per-step covariance of the executed shared-noise map M ξ.
-            # Includes cross terms when base diffusion and intervention share ξ.
-            sigma_next = sigma_next + noise_map @ noise_map.transpose(-1, -2)
+        if noise_map is None: sigma_next = sigma_next + torch.diag_embed(q_diag) * dt
+        else: sigma_next = sigma_next + noise_map @ noise_map.transpose(-1, -2)
         return self._project_psd(sigma_next)
 
     def transport_shape(self, shape: Tensor, A: Tensor, dt: float) -> Tensor:
@@ -190,12 +213,18 @@ class CovarianceField:
 
 
 def drift_jacobian(node: Dynamics, x: Tensor, u: Tensor) -> Tensor:
-    """A = ∂f/∂x, batched (B, d, d), via functional Jacobian per sample."""
+    """Open-loop A=∂f/∂x with u held fixed, batched (B,d,d)."""
     def f_single(xi: Tensor, ui: Tensor) -> Tensor:
         return node.drift(xi.unsqueeze(0), ui.unsqueeze(0)).squeeze(0)
+    return torch.func.vmap(torch.func.jacrev(f_single, argnums=0))(x, u)
 
-    jac = torch.func.vmap(torch.func.jacrev(f_single, argnums=0))(x, u)
-    return jac
+
+def closed_loop_drift_jacobian(node: Dynamics, policy: PCSFController, x: Tensor, sigma: Tensor) -> Tensor:
+    """Jacobian of f(x,π(x,Σ)) w.r.t. x, holding Σ fixed, per sample."""
+    def closed_loop_single(xi: Tensor, si: Tensor) -> Tensor:
+        ui = policy(xi.unsqueeze(0), si.unsqueeze(0))
+        return node.drift(xi.unsqueeze(0), ui).squeeze(0)
+    return torch.func.vmap(torch.func.jacrev(closed_loop_single, argnums=0))(x, sigma)
 
 
 # ── Hot-swap graph controller (σ: v₁ → v₂) ───────────────────────────────────
@@ -399,7 +428,8 @@ class CIO_SDE(nn.Module):
     def forward_step(self, x: Tensor, sigma: Tensor, dt: float,
                      noise: Tensor,
                      step: int = -1,
-                     shape_covariance: Optional[Tensor] = None) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
+                     shape_covariance: Optional[Tensor] = None,
+                     measurement: Optional[Tuple[Tensor, Tensor, Tensor]] = None) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
         """Advance one step with an optional separate shape regularizer.
 
         Omitting shape_covariance preserves the historical single-Sigma behavior.
@@ -409,6 +439,8 @@ class CIO_SDE(nn.Module):
         split_covariance = shape_covariance is not None
         shape_current = shape_covariance if split_covariance else sigma
         node = self.graph.active
+        if split_covariance and measurement is not None:
+            x, sigma = self.cov.assimilate(x, sigma, *measurement)
         u = self.pcsf(x, sigma)
         f = node.drift(x, u)
         g = node.diffusion(x)                       # (B, d) noise gain ≥ 0
@@ -427,13 +459,14 @@ class CIO_SDE(nn.Module):
         # Stability of A is certified off this path, by collapse.dichotomy_certificate and
         # stability_gates (matrix-measure contraction analysis: Lohmiller & Slotine 1998,
         # Automatica 34(6):683-696).
-        A = drift_jacobian(node, x.detach(), u.detach())
+        A = closed_loop_drift_jacobian(node, self.pcsf, x.detach(), sigma.detach())
         # The state receives diag(g * dilation) dW, not diag(g) dW.
         # Keep the Riccati process-noise term consistent with that executed map.
         effective_diffusion = g.detach() * dilation.detach()
         q_diag = effective_diffusion.square()
         base_noise_map = torch.diag_embed(effective_diffusion * math.sqrt(dt))
-        sigma_next = self.cov.step(sigma, A, q_diag, dt)
+        sigma_next = (self.cov.predict(sigma, A, q_diag, dt) if split_covariance
+                      else self.cov.step(sigma, A, q_diag, dt))
         shape_next = (
             self.cov.transport_shape(shape_current, A, dt)
             if split_covariance else sigma_next
@@ -560,9 +593,10 @@ class CIO_SDE(nn.Module):
                         kick_noise_map = noise_map_method(
                             A, excite_proximity, x.shape[0], x.device, x.dtype
                         )
-                        sigma_next = self.cov.step(
-                            sigma, A, q_diag, dt,
-                            noise_map=base_noise_map + kick_noise_map,
+                        sigma_next = (
+                            self.cov.predict(sigma, A, q_diag, dt, noise_map=base_noise_map + kick_noise_map)
+                            if split_covariance else self.cov.step(
+                                sigma, A, q_diag, dt, noise_map=base_noise_map + kick_noise_map)
                         )
 
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
