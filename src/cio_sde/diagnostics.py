@@ -12,7 +12,7 @@ Plus a Lyapunov proxy V = ‖x−x*‖² + tr(Σ): a stable run has V trending d
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass\n\nimport torch
 from typing import List
 
 from .engine import Trace\nfrom .stability import verify_common_quadratic, finite_horizon_excitation_gramian
@@ -112,7 +112,7 @@ def analyze_switched_modes(modes, metric, rho, noise_maps=None):
     result = {"stability_certificate": certificate}
     if noise_maps is not None:
         gramian = finite_horizon_excitation_gramian(modes, noise_maps)
-        eigs = __import__("torch").linalg.eigvalsh(gramian)
+        eigs = torch.linalg.eigvalsh(gramian)
         result["excitation_gramian"] = gramian
         result["excitation_min_eigenvalue"] = float(eigs.min())
         result["excitation_positive_definite"] = bool(eigs.min() > 0)
