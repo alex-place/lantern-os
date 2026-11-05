@@ -598,6 +598,7 @@ def test_legacy_scalar_proximity_override_keeps_scalar_excite_contract():
     assert torch.linalg.norm(x_next - x) > 0.0
 
 
+# Engine-level regression: a collapsed member must not freeze healthy batch peers.
 def test_engine_freeze_projects_only_the_collapsed_member():
     m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
     m.graph.active = _BatchConditionalDynamics()
