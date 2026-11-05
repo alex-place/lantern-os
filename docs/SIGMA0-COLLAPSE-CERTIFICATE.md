@@ -98,7 +98,9 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` on `null(A)`, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 34 passed |
+| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` on `null(A)`, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 56 passed |
+| C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, machine-checked (Lean 4 + Mathlib; standard axioms only; six false variants rejected) | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
+| The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing (all three projection branches) and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 27 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
 | Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
@@ -170,9 +172,12 @@ it — rests on the model-collapse literature (§7) and on this project's own me
 **How sure are we of each part?** Every claim below is labelled:
 - **PROVEN** — Theorem 1 for normal `A`; the spectral dichotomy for every `A` (standard linear
   algebra); **C3**, that when the operator acts, the four-signal gate cannot be true on two consecutive
-  steps, through the engine's own projection, for all `A` and every dimension `d ≥ 2`; and **S1**, that each
+  steps, through the engine's own projection, for all `A` and every dimension `d ≥ 2` while
+  `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (the engine refuses to fire otherwise); and **S1**, that each
   firing moves the state out of the near-target ball with probability ≥ ½. Tests are in the audit
-  table. "Proven" here means closed-form argument plus tests, not a formal proof.
+  table. "Proven" here means closed-form argument plus tests. C3 is in addition machine-checked in
+  Lean (`docs/formal/C3EngineLift.lean`), up to the spectral identities that connect the abstract
+  statement to the engine, which are tested, not formalized.
 - **MEASURED** — the operator against a placebo (§3): the gate never stays true for two steps, against
   runs of 60 for the placebo. The early-warning "canary" (§4).
 - **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational definition,
@@ -913,16 +918,18 @@ provable-by-construction: a collapse manifold exists ⟺ `A` is near-singular (e
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: C3 and S1 PROVEN in-regime, with engine-level tests (corrected 2026-11-05). The operator beats a
-placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists.**
+**Status: C3 PROVEN in-regime and machine-checked in Lean, with engine-level tests; S1 PROVEN in-regime
+(corrected 2026-11-05). The operator beats a placebo on the signals a placebo can fail (MEASURED). No
+state-level anti-collapse theorem exists.**
 
 Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it:
 
 $$dx = f\,dt + dW + \kappa\,P\xi, \qquad \Sigma^{+} = \Sigma_{\text{pred}} + b\,P,$$
 
-with `P` the orthogonal projector onto a banded near-null subspace of `A_s`, of rank `m`, `ξ` the same standard normal
-that drives `dW`, and `p ∈ [0,1]` the **collapse proximity**. `p > 0` holds exactly when all four §2
-conditions hold. (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`.)
+with `P` each sample's orthogonal projector onto its smallest right-singular directions of `A` (its right
+near-kernel, from the SVD), of rank `m`, `ξ` the same standard normal that drives `dW`, and `p ∈ [0,1]` each
+sample's **collapse proximity**. `p > 0` holds exactly when all four §2 conditions hold for that sample.
+(`AntiCollapseOperator.excite` and `_near_null_projector_per_sample`, `src/cio_sde/collapse.py`.)
 
 **Lemma L2′ (one-step lift, any projector).** Let `Σ ≻ 0` with eigenvalue mean `μ` and unbiased coefficient of
 variation `a`, and let `P` be any rank-`m` orthogonal projector, `1 ≤ m ≤ d−1`. Then `b ≥ Δ = (ε+a)μd / (√(m(d−m)) − εm)`,
@@ -940,7 +947,29 @@ fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ 
 whose sample standard deviation is at most `½√(d/(d−1))·eps` (Popoviciu), so `a(Σ_next) ≥ (a₊ − ½√(d/(d−1))·ρ)/(1+ρ)`. That is above
 `ε_a` under the hypothesis for every `d ≥ 2`: 0.0503 at the worst case, `d = 2` and `ρ = 9·10⁻⁴` (derived independently in
 `lantern-os-research` PR #14). `m ≤ d/(1+4ε²)` keeps the denominator
-positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects stood between the lemma and this statement:
+positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. The hypothesis on `ρ` is enforced: an armed step refuses to
+fire when `d·eps/σ_max > AntiCollapseOperator.RHO_MAX = 9·10⁻⁴`, as it refuses a negative diffusion gain.
+
+*Machine-checked.* `docs/formal/C3EngineLift.lean` proves this argument in an abstract real inner-product space with an
+element `I`, `⟪I, I⟫ = d`: L2′ for any projector-like `P`, in the exact form `_cov_floor` computes (`lift`);
+`a(cX) = a(X)` (`cv_smul`); the Popoviciu bound, from the single hypothesis `‖D‖² ≤ eps·tr D` on the floor
+correction (`popoviciu`, `clamp_keeps`); the shipped constants for every `d ≥ 2` (`shipped_constants`); rank
+feasibility (`rank_feasible`); and the composite with the gate off (`C3_engine`). No `sorry`, only Lean's standard
+axioms, and six false variants are rejected (half the floor, a tighter Popoviciu constant, a quarter-width clamp
+term, `ρ` up to `2·10⁻³`, a 1% margin, a weaker rank cap). What is **not** formalized is the bridge: that for
+symmetric matrices with the Frobenius inner product the engine's eigenvalue `std/mean` is that `cv`, its projector
+satisfies `⟪P,P⟫ = ⟪P,I⟫ = m`, and `project_preserving_shape` returns `X` or `c·X + D` with `tr(c·X) ≥ σ_max` and
+`‖D‖² ≤ eps·tr D`. Those are standard spectral identities, checked numerically in
+`tests/test_sigma0_c3_formal_bridge.py`, which also drives the real `forward_step` through all three projection
+branches of the lift (identity, scale, scale then clamp) and checks C3 on every firing, in both covariance modes.
+In the single-`Σ` mode 120 of 240 fuzzed configurations fired (84 identity, 17 scale, 19 clamp), with the smallest
+post-step anisotropy `1.09·ε_a`; in the split mode, where `shape_covariance` is supplied and the gate reads it, 120 of
+240 fired (68, 48, 4), smallest `1.25·ε_a`. The split mode's shape covariance is transported by
+`project_preserving_shape` and lifted the same way, so the theorem applies to it unchanged. Removing the 2% margin is
+caught only by the constants check, not by any fuzzed run: the margin is load-bearing for the proof's worst case,
+which random inputs do not reach.
+
+Four engine defects stood between the lemma and this statement:
 
 | Defect | Failure | Fix |
 |---|---|---|
@@ -964,12 +993,15 @@ the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. This is per 
 state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no
 grounding, the state rests at an equilibrium once the gate has cleared
 (`test_c3_does_not_promise_perpetual_motion`), and when `A` changes, the next regime can erase the kick outright
-(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. Two more limits, both pinned
-by tests. **The gate is one decision for the whole batch**, on mean signals and the mean Jacobian: one sample at 7·ε_g among eight
-can still fire it, and `e₁e₁ᵀ` and `e₂e₂ᵀ` at `d = 4` each trigger alone and not together, because their mean has rank 2. C3 is
-unaffected, since every sample is lifted, but the decision has no per-trajectory meaning. **The kick's subspace comes from `A_s`,
-not `null(A)`:** under `A = e₁e₂ᵀ` one of its three directions is active. L2′ and S1 allow any projector, so neither is affected,
-but the kick is not confined to the fixed points. A reference design for both is in `lantern-os-research` PR #14, not in this engine. "`P(permanent freeze) = 0`"
+(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. **Per trajectory, not per batch.**
+The runtime gate, the floor, the kick and the freeze are decided for each sample from its own signals and its own Jacobian,
+so a collapsed member is lifted without disturbing healthy batch peers
+(`test_forward_step_applies_anti_collapse_per_sample_not_to_healthy_members`, `test_engine_freeze_projects_only_the_collapsed_member`).
+The legacy scalar `evaluate()` still returns one batch summary for compatibility, and its known limit stays pinned: `e₁e₁ᵀ` and
+`e₂e₂ᵀ` at `d = 4` each trigger alone and not together, because their mean has rank 2
+(`test_legacy_scalar_evaluate_remains_batch_aggregate_for_compatibility`). **The kick's subspace is each sample's right
+near-kernel**, from the SVD, so it lies in the near-null directions of `A` itself even for non-normal `A`
+(`test_nonnormal_right_kernel_projector_is_in_actual_kernel`); the old `A_s` helper remains only for direct callers. "`P(permanent freeze) = 0`"
 in earlier versions meant only that the gate cannot latch, which is a narrower thing than its plain reading. Σ₀⁻¹ is
 observe-only by default in the live engine (#1138), and lives on this synthetic SDE, not a real model.
 
@@ -2286,6 +2318,8 @@ for produced results and Appendix A for the original design sketch.*
 |---|---|---|---|
 | 2026-11-05 | "900/900 forced-collapse runs prevented" | **retired**: the metric could not fail (the engine skips the overwrite whenever the operator fires) and a do-nothing placebo matched it; all collapse-prone trials were `ν=0`; the script no longer reproduces under the observe-only default. Replaced by a placebo-controlled measurement | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | C3: "PROVEN for all `A`", "`P(permanent freeze) = 0`" | the lemma holds; the engine violated it (σ_max cap, batch floor, clipped `a`, `d > 400`). Fixed, and restated as a gate statement. It does not mean the state keeps moving | [§3](#3-the-anti-collapse-operator-σ₀¹) |
+| 2026-11-05 | C3 "for every dimension `d ≥ 2`", unconditionally | it needs `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d ≤ 9000`); the hypothesis was stated but not enforced. The engine now refuses to fire outside it | [§3](#3-the-anti-collapse-operator-σ₀¹) |
+| 2026-11-05 | §3: "the gate is one decision for the whole batch"; "the kick's subspace comes from `A_s`" | stale after the per-sample engine: the runtime gate and floor are per sample, and `P` is each sample's right near-kernel. The legacy scalar `evaluate()` and the `A_s` helper remain, pinned | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | "no third fate"; `collapses=True` on any bounded slow block | rotation is a third outcome of the linear system; Jordan blocks on the boundary grow, against the T1 doc's own caveat. `marginal_kind` added, `collapses` corrected | [§1](#1-the-collapse-guarantee-theorem), [R1](#r1--the-collapse-guarantee--the-foundation-proven-machine-checked) |
 | 2026-11-05 | small-gain `α_bound` "a proven bound"; `guaranteed` built on it, rate ∞ on the all-null case | it bounds nothing here; a counterexample is pinned. `guaranteed` now requires commutation and a settling null block | [§1.1](#11-why-the-hypothesis-is-required-the-dropped-cross-term) |
 | 2026-11-05 | non-normality "shows up only as a bounded overshoot" `√cond(P)` | that is the active block's overshoot in oblique coordinates; `[[−1,1000],[0,0]]` reports 1 and peaks at 1000. `coupling_norm` and `full_transient_bound` added | `dichotomy_certificate` |
