@@ -12,10 +12,13 @@ Plus a Lyapunov proxy V = ‖x−x*‖² + tr(Σ): a stable run has V trending d
 
 from __future__ import annotations
 
-from dataclasses import dataclass\n\nimport torch
+from dataclasses import dataclass
+
+import torch
 from typing import List
 
-from .engine import Trace\nfrom .stability import verify_common_quadratic, finite_horizon_excitation_gramian
+from .engine import Trace
+from .stability import verify_common_quadratic, finite_horizon_excitation_gramian
 
 
 @dataclass
