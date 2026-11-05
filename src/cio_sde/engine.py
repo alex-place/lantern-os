@@ -116,17 +116,20 @@ class PCSFController(nn.Module):
 
 class CovarianceField:
     """
-    Bayesian uncertainty dynamics via the Kalman-Bucy Riccati equation:
+    Riccati-style covariance propagation under an explicit full-observation
+    assumption:
 
-        Σ̇ = AΣ + ΣAᵀ + Q − Σ Cᵀ R⁻¹ C Σ
+        Σ̇ = AΣ + ΣAᵀ + Q − Σ Cᵀ R⁻¹ C Σ,   C = I
 
-    with C = I (full observation). A is the drift Jacobian ∂f/∂x (the actual
-    local linearization, not a step-magnitude proxy), Q = diag(g(x)²) is the
-    process-noise covariance, R is measurement noise. Σ is kept symmetric PSD.
+    A is the drift Jacobian ∂f/∂x, Q is the executed process-noise covariance,
+    and R is the assumed measurement-noise covariance. The engine does not take
+    a sensor observation in this update; therefore this state is a model-based
+    covariance surrogate, not a calibrated posterior unless the caller's system
+    really supplies the assumed full-state observations and noise model.
 
-    This is the correction over an ad-hoc OU update: Σ tracks genuine posterior
-    uncertainty, so it shrinks when observations are informative and the
-    Riccati −ΣR⁻¹Σ term provides the contraction that bounds Σ.
+    In split mode this field is the belief/process covariance. The separate shape
+    covariance is transported without Q or the Riccati measurement contraction and
+    receives only explicit anti-collapse regularization.
     """
 
     def __init__(self, dim: int, r: float = 1.0, eps: float = 1e-4,
