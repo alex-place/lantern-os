@@ -74,6 +74,7 @@ class CollapseResult:
     outcome: CollapseOutcome
     x_star: Tensor
     metrics: Dict[str, float]
+    triggered_mask: Optional[Tensor] = None
 
     def summary(self) -> str:
         m = self.metrics
@@ -200,6 +201,74 @@ class SemanticCollapseOperator:
         # collapse. See issue #661.)
         x_star = x @ P.T
         return x_star, CollapseOutcome.ATTRACTOR
+
+    @torch.no_grad()
+    def _collapse_state_per_sample(self, x: Tensor, A: Tensor) -> Tensor:
+        """Project each member onto its own right near-kernel, never null(mean(A))."""
+        if A.dim() == 2:
+            A = A.unsqueeze(0)
+        if A.shape[0] == 1 and x.shape[0] > 1:
+            A = A.expand(x.shape[0], -1, -1)
+        if A.shape[0] != x.shape[0]:
+            raise ValueError("Jacobian batch must match state batch")
+        _, singular_values, vh = torch.linalg.svd(A, full_matrices=True)
+        d = A.shape[-1]
+        smax = singular_values.max(dim=-1, keepdim=True).values
+        null_dim = (singular_values <= self.eig_eps * smax).sum(dim=-1)
+        max_null = int(null_dim.max().item())
+        order = torch.argsort(singular_values, dim=-1)[:, :max_null]
+        basis = vh.transpose(-1, -2).gather(
+            2, order.unsqueeze(1).expand(-1, d, -1)
+        )
+        mask = (
+            torch.arange(max_null, device=A.device).unsqueeze(0)
+            < null_dim.unsqueeze(-1)
+        ).to(dtype=A.dtype)
+        projector = (basis * mask.unsqueeze(1)) @ basis.transpose(-1, -2)
+        return torch.bmm(projector, x.unsqueeze(-1)).squeeze(-1)
+
+    def evaluate_per_sample(self, model, x: Tensor, u: Tensor, sigma: Tensor,
+                            A: Tensor, exclude_mask: Optional[Tensor] = None) -> CollapseResult:
+        """Evaluate the freeze gate and invariant projection independently per member."""
+        if A.dim() == 2:
+            A = A.unsqueeze(0)
+        if A.shape[0] == 1 and x.shape[0] > 1:
+            A = A.expand(x.shape[0], -1, -1)
+        if A.shape[0] != x.shape[0]:
+            raise ValueError("Jacobian batch must match state batch")
+
+        grad_norm = self._grad_norm_per_sample(model, x, u)
+        eff_rank = self._effective_rank_per_sample(A)
+        anisotropy = self._anisotropy_per_sample(sigma)
+        ctrl_sens = self._ctrl_sensitivity_per_sample(model, x, u)
+        dim = float(x.shape[-1])
+        mask = (
+            (grad_norm < self.grad_eps)
+            & (eff_rank < self.rank_frac * dim)
+            & (anisotropy < self.anisotropy_eps)
+            & (ctrl_sens < self.ctrl_eps)
+        )
+        if exclude_mask is not None:
+            mask = mask & ~exclude_mask.to(device=mask.device, dtype=torch.bool)
+
+        projected = self._collapse_state_per_sample(x, A)
+        x_star = torch.where(mask.unsqueeze(-1), projected, x)
+        triggered = bool(mask.any())
+        selected = mask if triggered else torch.ones_like(mask)
+        metrics = {
+            "grad_norm": float(grad_norm[selected].max().item()),
+            "eff_rank": float(eff_rank[selected].min().item()),
+            "dim": dim,
+            "anisotropy": float(anisotropy[selected].min().item()),
+            "ctrl_sens": float(ctrl_sens[selected].max().item()),
+        }
+        return CollapseResult(
+            triggered=triggered,
+            outcome=CollapseOutcome.ATTRACTOR if triggered else CollapseOutcome.NONE,
+            x_star=x_star,
+            metrics=metrics,
+            triggered_mask=mask,
+        )
 
     def evaluate(self, model, x: Tensor, u: Tensor, sigma: Tensor,
                  A: Tensor) -> CollapseResult:

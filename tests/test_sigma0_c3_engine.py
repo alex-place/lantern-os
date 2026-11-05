@@ -596,3 +596,37 @@ def test_legacy_scalar_proximity_override_keeps_scalar_excite_contract():
     assert info["sigma0_proximity"] == pytest.approx(0.5)
     assert info["anti_collapse_p"] == pytest.approx(0.5)
     assert torch.linalg.norm(x_next - x) > 0.0
+
+
+def test_engine_freeze_projects_only_the_collapsed_member():
+    m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    m.graph.active = _BatchConditionalDynamics()
+    m.collapse_op = SemanticCollapseOperator()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    x = torch.tensor([[1e-3, 0.0, 0.0, 0.0],
+                      [-1e-3, 0.0, 0.0, 0.0]])
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, torch.zeros_like(x), step=0)
+    result = info["collapse"]
+    assert result is not None and result.triggered
+    assert result.triggered_mask.tolist() == [False, True]
+    # Healthy member follows the ordinary step; collapsed member projects to its own null(A).
+    assert torch.allclose(x_next[0], x[0] + 0.05 * x[0], atol=1e-6)
+    assert torch.allclose(x_next[1], torch.zeros(4), atol=1e-6)
+    # Only the frozen member reverts its covariance to the pre-step Sigma.
+    assert torch.allclose(sigma_next[1], sigma[1], atol=1e-6)
+    assert not torch.allclose(sigma_next[0], sigma[0])
+
+
+def test_semantic_evaluate_legacy_batch_summary_remains_available():
+    op = SemanticCollapseOperator()
+    model = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    A = torch.stack((torch.eye(4), torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0]))))
+    x = torch.zeros(2, 4)
+    u = torch.zeros(2, 2)
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    legacy = op.evaluate(model, x, u, sigma, A)
+    per_sample = op.evaluate_per_sample(model, x, u, sigma, A)
+    assert legacy.triggered is False
+    assert per_sample.triggered is True
+    assert per_sample.triggered_mask.tolist() == [False, True]

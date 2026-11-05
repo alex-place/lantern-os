@@ -407,6 +407,7 @@ class CIO_SDE(nn.Module):
         # imminent 42-state. When it fires it SUPPRESSES the Σ₀ freeze this step
         # (the whole point is to prevent collapse, not freeze into it).
         anti_active = False
+        anti_active_mask = torch.zeros(x.shape[0], device=x.device, dtype=torch.bool)
         sigma0_proximity = 0.0
         surprise_boost = torch.zeros(x.shape[0], device=x.device, dtype=x.dtype)
         
@@ -511,6 +512,7 @@ class CIO_SDE(nn.Module):
                     sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
                     anti_active = True
+                    anti_active_mask = effective_per_sample > 0
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
                         step=step, kind="excite", trigger_source=trigger_src,
@@ -535,18 +537,38 @@ class CIO_SDE(nn.Module):
                         policy_reason=reason,
                     )
 
-        # Σ₀ gating: dx = f dt + dW − Σ₀(x,Σ,G,u). When the system is
-        # underdetermined, freeze onto the minimal invariant attractor.
-        if self.collapse_op is not None and not anti_active:
-            res = self.collapse_op.evaluate(self, x, u, sigma, A)
-            if res.triggered:
+        # Σ₀ gating: freeze only the members that independently satisfy the gate.
+        if self.collapse_op is not None:
+            per_sample_eval = getattr(self.collapse_op, "evaluate_per_sample", None)
+            supports_per_sample = callable(per_sample_eval)
+            if supports_per_sample:
+                mro = type(self.collapse_op).__mro__
+                per_owner = next((cls for cls in mro if "evaluate_per_sample" in cls.__dict__), None)
+                scalar_owner = next((cls for cls in mro if "evaluate" in cls.__dict__), None)
+                if per_owner is not None and scalar_owner is not None:
+                    supports_per_sample = mro.index(per_owner) <= mro.index(scalar_owner)
+
+            if supports_per_sample:
+                res = per_sample_eval(self, x, u, sigma, A, exclude_mask=anti_active_mask)
+            elif not anti_active:
+                # Legacy custom collapse operators retain their batch-wide evaluate() contract.
+                res = self.collapse_op.evaluate(self, x, u, sigma, A)
+            else:
+                res = None
+
+            if res is not None and res.triggered:
                 budget_ok = (
                     not policy.observe_only
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
-                    x_next = res.x_star
-                    sigma_next = sigma
+                    if supports_per_sample and res.triggered_mask is not None:
+                        collapse_mask = res.triggered_mask
+                        x_next = torch.where(collapse_mask.unsqueeze(-1), res.x_star, x_next)
+                        sigma_next = torch.where(collapse_mask[:, None, None], sigma, sigma_next)
+                    else:
+                        x_next = res.x_star
+                        sigma_next = sigma
                     info["collapse"] = res
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
@@ -556,7 +578,7 @@ class CIO_SDE(nn.Module):
                         pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
                         pre_sigma_tr=pre_sigma_tr,
                         post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason="budget_ok: collapse projected to attractor",
+                        policy_reason="budget_ok: per-sample collapse projected to attractor",
                     )
                 else:
                     kind = "observe" if policy.observe_only else "blocked"
