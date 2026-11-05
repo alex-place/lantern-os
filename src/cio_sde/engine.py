@@ -455,14 +455,21 @@ class CIO_SDE(nn.Module):
         if self.anti_collapse_op is not None:
             per_sample_method = getattr(self.anti_collapse_op, "proximity_per_sample", None)
             supports_per_sample = callable(per_sample_method)
-            if isinstance(self.anti_collapse_op, AntiCollapseOperator):
-                # A subclass that overrides the legacy scalar proximity() but does
-                # not explicitly override proximity_per_sample() keeps its old contract.
-                supports_per_sample = (
-                    type(self.anti_collapse_op) is AntiCollapseOperator
-                    or type(self.anti_collapse_op).proximity_per_sample
-                    is not AntiCollapseOperator.proximity_per_sample
+            if supports_per_sample:
+                # Preserve legacy subclasses that override proximity() but inherit
+                # the base per-sample method. Opting into per-sample semantics requires
+                # defining proximity_per_sample at least as close in the MRO as proximity.
+                mro = type(self.anti_collapse_op).__mro__
+                per_owner = next(
+                    (cls for cls in mro if "proximity_per_sample" in cls.__dict__),
+                    None,
                 )
+                scalar_owner = next(
+                    (cls for cls in mro if "proximity" in cls.__dict__),
+                    None,
+                )
+                if per_owner is not None and scalar_owner is not None:
+                    supports_per_sample = mro.index(per_owner) <= mro.index(scalar_owner)
             if supports_per_sample:
                 proximity_per_sample = per_sample_method(self, x, u, sigma, A)
                 sigma0_proximity = float(proximity_per_sample.max().item())
