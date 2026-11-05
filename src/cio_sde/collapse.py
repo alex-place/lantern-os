@@ -1270,8 +1270,8 @@ class AntiCollapseOperator:
     """
 
     # Target a(Σ⁺) ≥ 1.02·ε_a, so that a(Σ_next) ≥ ε_a survives raising near-zero eigenvalues to
-    # the covariance floor. With ρ = d·eps/sigma_max, a(Σ_next) ≥ (a(Σ⁺) − √(d/(d−1))·ρ)/(1+ρ), which
-    # needs ρ ≤ 6e-4 for every d ≥ 2 (d up to 6000 at the defaults).
+    # the covariance floor. With ρ = d·eps/sigma_max, a(Σ_next) ≥ (a(Σ⁺) − ½√(d/(d−1))·ρ)/(1+ρ), which
+    # holds it whenever ρ ≤ 9e-4, for every d ≥ 2 (d up to 9000 at the defaults).
     LIFT_MARGIN = 1.02
 
     def __init__(self, detector: Optional[SemanticCollapseOperator] = None,

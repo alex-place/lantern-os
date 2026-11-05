@@ -60,6 +60,8 @@ class LinearDynamics(Dynamics):
 
     def __init__(self, A: Tensor, B: Optional[Tensor] = None,
                  noise: float = 0.05) -> None:
+        if noise < 0:
+            raise ValueError(f"noise is a gain and must be ≥ 0, got {noise}")
         dim = A.shape[0]
         ctrl_dim = B.shape[1] if B is not None else 1
         super().__init__(dim, ctrl_dim, hidden=1)
@@ -467,6 +469,10 @@ class CIO_SDE(nn.Module):
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
+                    # dW and the kick share ξ, so their signs interact. Lemma S1 needs g ≥ 0: at
+                    # D = −κ/2 the escape probability falls to 0.40. A subclass can break this.
+                    if bool((g < 0).any()):
+                        raise ValueError("the anti-collapse kick needs a non-negative diffusion gain")
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
                         x, sigma_next, A, effective_proximity, noise)
                     x_next = x_next + dx_extra

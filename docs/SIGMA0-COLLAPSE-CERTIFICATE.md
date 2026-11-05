@@ -98,7 +98,7 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 28 passed |
+| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 34 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 603 passed |
 | Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 111 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
@@ -906,7 +906,7 @@ Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it:
 
 $$dx = f\,dt + dW + \kappa\,P\xi, \qquad \Sigma^{+} = \Sigma_{\text{pred}} + b\,P,$$
 
-with `P` the orthogonal projector onto a banded near-null subspace of rank `m`, `ξ` the same standard normal
+with `P` the orthogonal projector onto a banded near-null subspace of `A_s`, of rank `m`, `ξ` the same standard normal
 that drives `dW`, and `p ∈ [0,1]` the **collapse proximity**. `p > 0` holds exactly when all four §2
 conditions hold. (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`.)
 
@@ -917,13 +917,15 @@ reverse triangle inequality in Frobenius norm gives the bound. No alignment and 
 re-derived twice (the audit in the research repo, and the 2026-11-05 review).
 
 **Theorem C3 (engine level).** Suppose the operator acts on a step (policy armed, budget left), and
-`ρ = d·eps/σ_max ≤ 6·10⁻⁴` (at the defaults, `d` up to 6000). Then `a(Σ_next) ≥ ε_a` for every sample, where
+`ρ = d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to 9000). Then `a(Σ_next) ≥ ε_a` for every sample, where
 `Σ_next` is what the next evaluation actually reads, so the four-signal gate is false on the next step. This holds
 for all `A` and every dimension `d ≥ 2`. (At `d = 1` there is no shape to restore: the covariance leg does nothing, and
 only S1 applies.) *Proof:* L2′ per sample, targeting `1.02·ε_a`, gives `a₊ = a(Σ_pred + bP) ≥ 1.02·ε_a`.
 `project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase it. Eigenvalues can
-fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ σ_max/d`. Raising them to `eps` then gives
-`a(Σ_next) ≥ (a₊ − √(d/(d−1))·ρ)/(1+ρ)`, which is at least `ε_a` under the hypothesis, for every `d ≥ 2`. `m ≤ d/(1+4ε²)` keeps the denominator
+fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ σ_max/d`. Raising them to `eps` adds `δᵢ ∈ [0, eps]`,
+whose sample standard deviation is at most `½√(d/(d−1))·eps` (Popoviciu), so `a(Σ_next) ≥ (a₊ − ½√(d/(d−1))·ρ)/(1+ρ)`. That is above
+`ε_a` under the hypothesis for every `d ≥ 2`: 0.0503 at the worst case, `d = 2` and `ρ = 9·10⁻⁴` (derived independently in
+`lantern-os-research` PR #14). `m ≤ d/(1+4ε²)` keeps the denominator
 positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects stood between the lemma and this statement:
 
 | Defect | Failure | Fix |
@@ -937,15 +939,23 @@ positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects st
 `κ ≥ r/median(χ₁)`. Then `P(‖x⁺‖ ≥ r) ≥ ½`. *Proof:* by Anderson's inequality `P(‖c+Mξ‖ < r) ≤ P(‖Mξ‖ < r)` for symmetric
 `M = D + κP`. By Weyl, `M ⪰ κP` gives `M` at least `m` eigenvalues `≥ κ`, so `‖Mξ‖ ≥ κ·χ_m` in distribution, and `χ_m` is
 stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_g/2`, each firing leaves `{‖∇ₓL‖ < ε_g}` with
-probability ≥ ½, for any drift and any `p`. The kick used to be `strength·p`, which vanishes at the gate boundary:
-the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. This is per trajectory. The gate itself
-averages `‖∇ₓL‖` over the batch, so one sample at 7·ε_g among eight can still fire it.
+probability ≥ ½, for any drift and any `p`. That reads three hypotheses onto the engine. `ξ` must be standard normal, which
+`rollout` draws and a direct caller of `forward_step` must supply. `‖∇ₓL‖ = 2‖x − x_target‖` holds for the engine's quadratic
+stage cost, and another cost needs its own argument. And `D ⪰ 0` is required, not a convenience: `dW` and the kick share `ξ`, and at
+`D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise, and
+`forward_step` refuses to fire on a negative gain from any dynamics (found by `lantern-os-research` PR #14). The kick used to be `strength·p`, which vanishes at the gate boundary:
+the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. This is per trajectory, and the gate is not: see below.
 
 **What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the
 state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no
 grounding, the state rests at an equilibrium once the gate has cleared
 (`test_c3_does_not_promise_perpetual_motion`), and when `A` changes, the next regime can erase the kick outright
-(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`"
+(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. Two more limits, both pinned
+by tests. **The gate is one decision for the whole batch**, on mean signals and the mean Jacobian: one sample at 7·ε_g among eight
+can still fire it, and `e₁e₁ᵀ` and `e₂e₂ᵀ` at `d = 4` each trigger alone and not together, because their mean has rank 2. C3 is
+unaffected, since every sample is lifted, but the decision has no per-trajectory meaning. **The kick's subspace comes from `A_s`,
+not `null(A)`:** under `A = e₁e₂ᵀ` one of its three directions is active. L2′ and S1 allow any projector, so neither is affected,
+but the kick is not confined to the fixed points. A reference design for both is in `lantern-os-research` PR #14, not in this engine. "`P(permanent freeze) = 0`"
 in earlier versions meant only that the gate cannot latch, which is a narrower thing than its plain reading. Σ₀⁻¹ is
 observe-only by default in the live engine (#1138), and lives on this synthetic SDE, not a real model.
 
@@ -2270,9 +2280,10 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-11-05 | `x* = Px` "a true fixed point when `A` is normal" | false for a rotation block. `x*` now targets `null(A)`, an equilibrium for any `A` | [§2](#2-the-collapse-trigger-σ₀) |
 | 2026-11-05 | trigger's `‖∂H/∂u‖`; thresholds `ε_g`, `ε_c` | it read the stage cost only, and both signals were divided by the batch size. Now the Hamiltonian gradient, per sample. The #1990 calibration needs a re-run | [§2](#2-the-collapse-trigger-σ₀) |
 | 2026-11-05 | certificates on a batched Jacobian | they averaged it, and the mean of two unstable maps can contract. Now every member must pass | `_batch_members` |
+| 2026-11-05 | S1: "probability ≥ ½, for any drift and any `p`" | it assumes `D ⪰ 0`, and `LinearDynamics` accepted negative noise, which gives 0.40 on the real engine (found by `lantern-os-research` PR #14). Now enforced, and the lemma's other hypotheses are stated | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | the first fix to the verdict: the last-step ratio, and "accepted at the trained depth, plateau past it" | an independent review of that fix broke it. One step accepted a period-2 map with `ρ > 1` and a residual that dipped and then grew 900×; non-finite iterates passed; growth starting under the noise floor read as converged. The statistic now reads the whole loop and its deepest half. On the same saved data it accepts depths 3–8, not 3–4 | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
 | 2026-11-05 | the first fix to the fates, `Re λ < −δ` | rounding counted rotations and Jordan blocks at `δ = 0` as active, which read COLLAPSE on 75 of 200 random bases of §1's own example. Scaling the boundary tolerance by `‖A‖` then blurred them next to any large mode. The cut now sits `tol` inside the boundary, and the boundary is read on the slow block | `dichotomy_certificate` |
-| 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Every rotation and unstable complex pair went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
+| 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Any rotation or unstable complex pair with `|Re λ| < 1` went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
 | 2026-11-05 | a batch "reports the worst member" | the bounds and gates came from one member, so a batch could read `proven_contracting` beside a diverging member, or quote one member's bound for another's 1000× transient, depending on order. Gates are now ANDed and each bound is the worst of any member's | `_worst_fate`, `_worst_collapse` |
 | 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence` stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied | `src/cio_sde/question.py` |
 | 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
