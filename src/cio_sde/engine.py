@@ -453,9 +453,18 @@ class CIO_SDE(nn.Module):
         receipt: Optional[InterventionReceipt] = None
 
         if self.anti_collapse_op is not None:
-            proximity_per_sample = self.anti_collapse_op.proximity_per_sample(
-                self, x, u, sigma, A)
-            sigma0_proximity = float(proximity_per_sample.max().item())
+            per_sample_method = getattr(self.anti_collapse_op, "proximity_per_sample", None)
+            supports_per_sample = callable(per_sample_method)
+            if supports_per_sample:
+                proximity_per_sample = per_sample_method(self, x, u, sigma, A)
+                sigma0_proximity = float(proximity_per_sample.max().item())
+            else:
+                # Backward-compatible protocol for custom operators that only expose
+                # scalar proximity(). They retain batch-wide semantics; the built-in
+                # AntiCollapseOperator uses the per-sample path above.
+                sigma0_proximity = float(self.anti_collapse_op.proximity(self, x, u, sigma, A))
+                proximity_per_sample = torch.full_like(surprise_boost, sigma0_proximity)
+
             effective_per_sample = torch.maximum(proximity_per_sample, surprise_boost)
             effective_proximity = float(effective_per_sample.max().item())
             surprise_any = bool((surprise_boost > 0).any())
@@ -475,8 +484,9 @@ class CIO_SDE(nn.Module):
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
+                    excite_proximity = effective_per_sample if supports_per_sample else effective_proximity
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
-                        x, sigma_next, A, effective_per_sample, noise)
+                        x, sigma_next, A, excite_proximity, noise)
                     x_next = x_next + dx_extra
                     sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
