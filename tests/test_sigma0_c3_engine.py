@@ -347,3 +347,30 @@ def test_c3_does_not_promise_perpetual_motion():
         x = xn
     assert fired >= 1
     assert max(tail) < 1e-6                                      # the state has stopped
+
+
+def test_a_switching_jacobian_can_erase_the_kick():
+    """The boundary of C3 and S1, on the engine itself: both are statements about one step under one
+    A, and they do not imply state retention when A changes (lantern-os-research PR #14). Here the
+    kick lands in null(A₁), the gate clears as C3 says, and the next regime's Euler map, also
+    non-expansive, removes exactly that subspace: F₂F₁ = 0. A retention theorem would need a lower
+    bound on the switched product restricted to the kicked subspace, which this rules out in general."""
+    d, dt = 4, 0.05
+    a1 = torch.diag(torch.tensor([0.0, 0.0, 0.0, -1.0 / dt]))
+    a2 = torch.diag(torch.tensor([-1.0 / dt, -1.0 / dt, -1.0 / dt, 0.0]))
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4)
+    for p in m.pcsf.parameters():
+        torch.nn.init.zeros_(p)
+    m.intervention_policy = InterventionPolicy(observe_only=False, max_interventions=10)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+
+    torch.manual_seed(0)
+    m.graph.active = LinearDynamics(a1, B=torch.zeros(d, 2), noise=0.0)
+    x1, sigma1, first = m.forward_step(torch.zeros(1, d), torch.eye(d).unsqueeze(0), dt,
+                                       torch.randn(1, d), step=0)
+    assert first["anti_collapse_p"] > 0.0 and float(x1.norm()) > 0.0   # the kick really moved the state
+
+    m.graph.active = LinearDynamics(a2, B=torch.zeros(d, 2), noise=0.0)
+    x2, _, second = m.forward_step(x1, sigma1, dt, torch.randn(1, d), step=1)
+    assert second["anti_collapse_p"] == 0.0                            # the gate cleared: no second kick
+    assert float(x2.norm()) < 1e-5 * float(x1.norm())                  # and the kick is gone

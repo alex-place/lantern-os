@@ -17,7 +17,8 @@ The thesis, made executable (SIGMA0-COLLAPSE-CERTIFICATE §7 — *grounding is t
 mechanism*):
     • OracleChannel (grounded reality) → ĝ → the TRUE goal; the plan reaches it.
     • MirrorChannel (the machine's own belief — a mirror) → ĝ never corrects; the plan
-      converges, internally coherent, onto the WRONG goal. The 42-state.
+      converges, internally coherent, onto the WRONG goal. The 42-state. Its answers carry no
+      confidence, so `next_step` does not read them as evidence.
     • A NAP-denied channel → that dimension is never asked → a permanent BLIND SPOT. Denials
       keep you safe and leave you blind; that trade is surfaced, not hidden.
 
@@ -33,7 +34,7 @@ control-leverage order.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import torch
 
@@ -52,7 +53,7 @@ class Observation:
     value: float
     source: str
     confidence: float = 1.0
-    agreement: str = "single-source"   # single-source | corroborated | divergent
+    agreement: str = "single-source"   # single-source | corroborated | divergent | self-reference
     n_sources: int = 1
 
 
@@ -113,7 +114,8 @@ class MirrorChannel(Channel):
         super().__init__(name)
 
     def resolve(self, dim: int, belief: Tensor) -> Observation:
-        return Observation(dim=dim, value=float(belief[0, dim]), source=self.name)
+        return Observation(dim=dim, value=float(belief[0, dim]), source=self.name,
+                           confidence=0.0, agreement="self-reference")
 
 
 class CorroboratedChannel(Channel):
@@ -128,9 +130,12 @@ class CorroboratedChannel(Channel):
       • all sources agree (spread ≤ tol) → "corroborated", confidence → 1.0
       • sources diverge                  → "divergent", confidence falls with the spread
       • one source                       → "single-source", confidence 0.5 (uncorroborated)
+      • none with external information   → "self-reference", confidence 0
 
-    The fused value is the precision-unweighted mean; a divergent result's LOW confidence is
-    the signal a loop should act on (re-ground, or escalate to a human), not the value.
+    A source with zero confidence is not evidence, however well it agrees: two mirrors matching
+    each other is the 42-state, not corroboration. The fused value is the precision-unweighted
+    mean; a divergent result's LOW confidence is the signal a loop should act on (re-ground, or
+    escalate to a human), not the value.
     """
 
     def __init__(self, name: str, channels, tol: float = 0.05) -> None:
@@ -139,7 +144,10 @@ class CorroboratedChannel(Channel):
         self.tol = tol
 
     def resolve(self, dim: int, belief: Tensor) -> Observation:
-        obs = [c.resolve(dim, belief) for c in self.channels]
+        obs = [o for o in (c.resolve(dim, belief) for c in self.channels) if o.confidence > 0.0]
+        if not obs:
+            return Observation(dim=dim, value=float(belief[0, dim]), source=self.name,
+                               confidence=0.0, agreement="self-reference", n_sources=0)
         vals = [o.value for o in obs]
         n = len(vals)
         mean = sum(vals) / n if n else 0.0
@@ -236,7 +244,7 @@ class LoopRecord:
     belief_after: float
     seam: float
     confidence: float = 1.0            # the channel's confidence in this observation
-    agreement: str = "single-source"   # single-source | corroborated | divergent
+    agreement: str = "single-source"   # single-source | corroborated | divergent | self-reference
     n_sources: int = 1
 
     def to_dict(self) -> Dict[str, object]:
@@ -255,10 +263,12 @@ class LoopResult:
     belief: Tensor                 # the grounded goal belief ĝ (→ true goal iff channels ground)
     x_T: Tensor                    # where the final plan actually lands
     final_seam: float              # internal coherence of the final plan (≈0 = consolidated)
-    grounded: List[int]            # goal dims that got grounded
-    blind: List[int]               # goal dims never grounded (e.g. NAP-denied channels)
+    grounded: List[int]            # goal dims answered with confidence ≥ min_confidence
+    blind: List[int]               # goal dims never answered (NAP-denied, or no channel to ask)
     history: List[LoopRecord] = field(default_factory=list)
-    next_step: Optional[Reconciliation] = None   # act, re-plan, revise the model or gather evidence
+    next_step: Optional[Reconciliation] = None   # see reconcile: what to do next, and why
+    weak: List[int] = field(default_factory=list)  # answered, below min_confidence: a mirror, or
+                                   # sources that disagree. Asked is not the same as grounded.
 
 
 class QuestionDrivenLoop:
@@ -274,7 +284,7 @@ class QuestionDrivenLoop:
         self.horizon = horizon
         self.belief = goal_belief.clone()
         self.us: List[Tensor] = [torch.zeros(1, model.ctrl_dim, dtype=x0.dtype) for _ in range(horizon)]
-        self.grounded: set = set()
+        self.asked: set = set()
         self.history: List[LoopRecord] = []
 
     def _terminal_grad(self) -> Callable[[Tensor], Tensor]:
@@ -289,17 +299,15 @@ class QuestionDrivenLoop:
         self.us = res.us
         n_candidates = len(res.grads) * self.model.ctrl_dim
         ranked = self.qm.ask(res, top_k=n_candidates)            # all ADMISSIBLE, seam-ranked
-        q = next((c for c in ranked if c.dim not in self.grounded), None)
+        # A dim with no registered channel cannot be asked, so it stays blind. It must not count as
+        # grounded, and it must not end the round for the dims that can be asked.
+        q = next((c for c in ranked if c.dim not in self.asked and c.channel in self.channels), None)
         if q is None:
             return None
-        channel = self.channels.get(q.channel)
-        if channel is None:
-            self.grounded.add(q.dim)                             # unresolvable — don't stall
-            return None
         before = float(self.belief[0, q.dim])
-        obs = channel.resolve(q.dim, self.belief)
+        obs = self.channels[q.channel].resolve(q.dim, self.belief)
         self.belief[0, q.dim] = obs.value                        # fold external evidence into ĝ
-        self.grounded.add(q.dim)
+        self.asked.add(q.dim)
         rec = LoopRecord(step=len(self.history), dim=q.dim, channel=q.channel,
                          observation=obs.value, belief_before=before,
                          belief_after=obs.value, seam=q.score,
@@ -310,9 +318,14 @@ class QuestionDrivenLoop:
 
     def run(self, max_steps: int = 12, consolidate_iters: int = 60,
             final_iters: int = 400, lr: float = 0.05,
-            observed_xs: Optional[Sequence[Tensor]] = None) -> LoopResult:
-        """`observed_xs` is a state trajectory measured under the final plan's controls. Without
-        one the loop has grounded its goal but never checked its dynamics, and `next_step` says so.
+            observed: Optional[Tuple[Sequence[Tensor], Sequence[Tensor]]] = None,
+            min_confidence: float = 0.5) -> LoopResult:
+        """`observed` is (states, controls): a trajectory measured in the world, with the controls
+        actually applied between its states. It tests the model, so it need not come from this plan,
+        and could not: the final pass below moves the plan. Without one the loop has grounded its
+        goal but never checked its dynamics, and `next_step` says so.
+        An answer below `min_confidence` is not evidence, so its dim stays unresolved. The default
+        admits one uncorroborated source; raise it above 0.5 to require corroboration.
         """
         for _ in range(max_steps):
             if self.step(consolidate_iters=consolidate_iters, lr=lr) is None:
@@ -323,10 +336,12 @@ class QuestionDrivenLoop:
                                     iterations=final_iters, lr=lr)
         self.us = final.us
         d = self.model.dim
-        blind = [j for j in range(d) if j not in self.grounded]
-        defects = (dynamics_defect(self.model, observed_xs, self.us, self.dt)
-                   if observed_xs is not None else None)
+        blind = [j for j in range(d) if j not in self.asked]
+        weak = sorted({r.dim for r in self.history if r.confidence < min_confidence})
+        defects = (dynamics_defect(self.model, observed[0], observed[1], self.dt)
+                   if observed is not None else None)
         return LoopResult(belief=self.belief.clone(), x_T=final.xs[-1],
-                          final_seam=final.max_score, grounded=sorted(self.grounded),
+                          final_seam=final.max_score, grounded=sorted(self.asked - set(weak)),
                           blind=blind, history=self.history,
-                          next_step=reconcile(final, defects, unresolved=len(blind)))
+                          next_step=reconcile(final, defects, unresolved=len(blind) + len(weak)),
+                          weak=weak)
