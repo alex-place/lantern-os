@@ -473,7 +473,7 @@ class CIO_SDE(nn.Module):
                     # A negative gain is valid for the base SDE, but invalidates the
                     # shared-noise S1 bound when the state kick is active.
                     effective_gain = g * dilation
-                    if self.anti_collapse_op.strength > 0.0:
+                    if getattr(self.anti_collapse_op, "strength", 0.0) > 0.0:
                         # This sign check establishes D >= 0. The probability bound
                         # also assumes fresh iid standard-normal noise: rollout()
                         # supplies it; direct forward_step() callers own that contract.
