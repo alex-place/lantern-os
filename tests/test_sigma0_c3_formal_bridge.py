@@ -53,7 +53,8 @@ class _RecordingCov(CovarianceField):
 
     def __init__(self, dim, **kw):
         super().__init__(dim, **kw)
-        self.branches = []
+        self.branches = []          # every call, including the split mode's shape transport
+        self.lift_branches = []     # only the projection that follows a C3 lift
 
     def project_preserving_shape(self, sigma):
         ev = torch.linalg.eigvalsh(0.5 * (sigma + sigma.transpose(-1, -2)))
@@ -204,16 +205,30 @@ def test_default_covariance_field_is_inside_the_hypothesis():
 
 # ── the conclusion, through the real engine ──────────────────────────────────────────────
 
-def _check_c3_once(m, x, sigma, dt, noise):
-    """Run one step; if the gate fired and the operator acted, C3 must hold for every sample."""
+def _check_c3_once(m, x, sigma, dt, noise, split=False):
+    """Run one step; if the gate fired and the operator acted, C3 must hold for every sample.
+
+    Unsplit, the gate reads Σ and the lift goes to Σ. Split (`shape_covariance` supplied), the gate
+    reads the shape covariance and the lift goes there; the theorem applies to it unchanged."""
     det = m.anti_collapse_op.detector
-    _, sigma_next, info = m.forward_step(x, sigma, dt, noise, step=0)
+    if split:
+        _, sigma_belief, info = m.forward_step(x, sigma, dt, noise, step=0,
+                                               shape_covariance=sigma.clone())
+        read_next = info["shape_covariance"]
+    else:
+        _, read_next, info = m.forward_step(x, sigma, dt, noise, step=0)
     if info["anti_collapse_p"] <= 0.0 or info["sigma0_proximity"] <= 0.0:
         return False
-    a_next = det._anisotropy_per_sample(sigma_next)
+    if isinstance(m.cov, _RecordingCov):
+        m.cov.lift_branches.append(m.cov.branches[-1])   # the lift's projection is the step's last call
+    a_next = det._anisotropy_per_sample(read_next)
     assert bool((a_next >= det.anisotropy_eps).all()), a_next
-    # the next evaluation reads exactly sigma_next; the gate must be off for every member
-    _, _, info2 = m.forward_step(x, sigma_next, dt, torch.zeros_like(x), step=1)
+    # the next evaluation reads exactly that covariance; the gate must be off for every member
+    if split:
+        _, _, info2 = m.forward_step(x, sigma_belief, dt, torch.zeros_like(x), step=1,
+                                     shape_covariance=read_next)
+    else:
+        _, _, info2 = m.forward_step(x, read_next, dt, torch.zeros_like(x), step=1)
     assert info2["sigma0_proximity"] == 0.0
     return True
 
@@ -233,23 +248,49 @@ def test_c3_holds_on_the_scale_down_and_clamp_branch():
         x = torch.zeros(1, d, dtype=dtype)
         sigma = 1000.0 * torch.eye(d, dtype=dtype).unsqueeze(0)
         assert _check_c3_once(m, x, sigma, 0.05, torch.zeros_like(x))
-        assert "clamp" in m.cov.branches, m.cov.branches
+        assert m.cov.lift_branches == ["clamp"], m.cov.lift_branches
 
 
-def test_c3_fuzz_through_forward_step():
+def test_c3_holds_on_the_clamp_branch_in_split_mode():
+    """Split mode: the gate reads the shape covariance, which has no process noise. F = I + A·dt
+    with A₁₁ = −1/dt sends e₁ to the floor while the null modes stay at σ_max, so the lift's
+    projection scales down and clamps e₁ again. C3 must hold on the shape covariance."""
+    d, dt = 4, 0.05
+    for dtype in (torch.float64, torch.float32):
+        m = _zero_policy(CIO_SDE(dim=d, ctrl_dim=2, hidden=4)).to(dtype)
+        A = torch.diag(torch.tensor([-1.0 / dt, 0.0, 0.0, 0.0], dtype=dtype))
+        m.graph.active = LinearDynamics(A, B=torch.zeros(d, 2, dtype=dtype), noise=0.0).to(dtype)
+        m.cov = _RecordingCov(d)
+        m.intervention_policy = InterventionPolicy(**ARMED)
+        m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+        x = torch.zeros(1, d, dtype=dtype)
+        sigma = 1000.0 * torch.eye(d, dtype=dtype).unsqueeze(0)
+        assert _check_c3_once(m, x, sigma, dt, torch.zeros_like(x), split=True)
+        assert m.cov.lift_branches == ["clamp"], m.cov.lift_branches
+
+
+@pytest.mark.parametrize("split", [False, True])
+def test_c3_fuzz_through_forward_step(split):
     """Random rank-deficient non-normal A, per-mode noise, flat Σ at every scale up to the cap,
-    random dt, float64 and float32. Every firing must satisfy C3; every branch must be visited."""
+    random dt, float64 and float32, with and without the split shape covariance. Every firing
+    must satisfy C3; every projection branch must be visited."""
     gen = torch.Generator().manual_seed(20261105)
     fired, branches = 0, set()
     for trial in range(240):
         dtype = torch.float64 if trial % 3 else torch.float32
         d = [2, 3, 4, 6, 8][trial % 5]
+        dt = [0.01, 0.05, 0.2][trial % 3]
         r = max(1, (d - 1) // 2)                         # eff_rank < d/2, so the rank gate can fire
         scale = float(10 ** (-1 + 3.5 * torch.rand(1, generator=gen)))
         A = _low_rank(d, r, gen, scale=scale)
         if trial % 4 == 0:
             A[0] = 0.0
             A[0, 0] = -float(10 ** (1 + 2 * torch.rand(1, generator=gen)))
+        elif trial % 4 == 2:
+            # F = I + A·dt sends e₁ to zero: the deterministic shape transport then has one
+            # eigenvalue at the floor beside others at full scale, the case that reaches the clamp.
+            A[0] = 0.0
+            A[0, 0] = -1.0 / dt
         gains = torch.rand(d, generator=gen, dtype=torch.float64) * float(10 ** (2 * torch.rand(1, generator=gen) - 1))
         m = _zero_policy(CIO_SDE(dim=d, ctrl_dim=2, hidden=4)).to(dtype)
         m.graph.active = _DiagonalNoise(A.to(dtype), gains.to(dtype)).to(dtype)
@@ -261,8 +302,7 @@ def test_c3_fuzz_through_forward_step():
         sigma = torch.diag(s * wobble).unsqueeze(0).to(dtype)
         x = (1e-4 * torch.randn(1, d, generator=gen, dtype=torch.float64)).to(dtype)
         noise = torch.randn(1, d, generator=gen, dtype=torch.float64).to(dtype)
-        dt = [0.01, 0.05, 0.2][trial % 3]
-        fired += int(_check_c3_once(m, x, sigma, dt, noise))
-        branches.update(m.cov.branches)
+        fired += int(_check_c3_once(m, x, sigma, dt, noise, split=split))
+        branches.update(m.cov.lift_branches)
     assert fired >= 100, fired
     assert {"identity", "scale", "clamp"} <= branches, branches

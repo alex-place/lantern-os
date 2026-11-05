@@ -98,9 +98,9 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` on `null(A)`, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 49 passed |
+| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` on `null(A)`, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 56 passed |
 | C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, machine-checked (Lean 4 + Mathlib; standard axioms only; six false variants rejected) | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
-| The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing (all three projection branches) and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 25 passed |
+| The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing (all three projection branches) and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 27 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
 | Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
@@ -961,9 +961,13 @@ symmetric matrices with the Frobenius inner product the engine's eigenvalue `std
 satisfies `⟪P,P⟫ = ⟪P,I⟫ = m`, and `project_preserving_shape` returns `X` or `c·X + D` with `tr(c·X) ≥ σ_max` and
 `‖D‖² ≤ eps·tr D`. Those are standard spectral identities, checked numerically in
 `tests/test_sigma0_c3_formal_bridge.py`, which also drives the real `forward_step` through all three projection
-branches (identity, scale, scale then clamp) and checks C3 on every firing: 160 of 240 fuzzed configurations
-fired, and the smallest post-step anisotropy was `1.09·ε_a`. Removing the 2% margin is caught only by the constants
-check, not by any fuzzed run: the margin is load-bearing for the proof's worst case, which random inputs do not reach.
+branches of the lift (identity, scale, scale then clamp) and checks C3 on every firing, in both covariance modes.
+In the single-`Σ` mode 120 of 240 fuzzed configurations fired (84 identity, 17 scale, 19 clamp), with the smallest
+post-step anisotropy `1.09·ε_a`; in the split mode, where `shape_covariance` is supplied and the gate reads it, 120 of
+240 fired (68, 48, 4), smallest `1.25·ε_a`. The split mode's shape covariance is transported by
+`project_preserving_shape` and lifted the same way, so the theorem applies to it unchanged. Removing the 2% margin is
+caught only by the constants check, not by any fuzzed run: the margin is load-bearing for the proof's worst case,
+which random inputs do not reach.
 
 Four engine defects stood between the lemma and this statement:
 
