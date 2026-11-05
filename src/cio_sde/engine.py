@@ -512,7 +512,10 @@ class CIO_SDE(nn.Module):
                     sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
                     anti_active = True
-                    anti_active_mask = effective_per_sample > 0
+                    anti_active_mask = (
+                        effective_per_sample > 0 if supports_per_sample
+                        else torch.full_like(effective_per_sample, True, dtype=torch.bool)
+                    )
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
                         step=step, kind="excite", trigger_source=trigger_src,
