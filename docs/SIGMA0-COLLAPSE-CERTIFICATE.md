@@ -104,7 +104,7 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
-| Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
+| Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED on the batch gate, before the 2026-11-05 changes; needs a re-run | research repo: `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py`, once it scores each row (§2) |
 | Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
 | Phase 0.5 prospective shot-call on the trained reservoir: sliver call held; anchor/ceiling ratio 1.4·10⁴ (§3.1, [#2690]) | MEASURED (real learned system) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
@@ -891,9 +891,9 @@ Machine terminal anchor) reaches the gate through `x_target`. Both this signal a
 divided by the batch size, which made `ε_g` and `ε_c` 8× looser at `B = 8` than they claim. They are now per
 sample.
 
-**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04; predates the two corrections above, so it needs a re-run to be current).** The four-signal
-AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` calls the
-real operator over **960 samples** spanning the collapse regime and its complements and
+**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04; predates the two corrections above and the per-trajectory gate of §3, so it needs a re-run to be current).** The four-signal
+AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` (research repo) calls the
+real operator over **960 samples**, each a batch of 8 rows judged as one decision, spanning the collapse regime and its complements and
 scores it against the *spectral* ground truth (does `A_s` actually carry a null manifold
 plus stable active modes, computed independently by `eigh`). Result
 (`data/sigma0/trigger_calibration_report.json`): **precision 1.0 — 0 false-fires over 720
@@ -908,7 +908,9 @@ non-normality `ν>0` shifts the exact zero eigenvalue of `A_s` (so the clean col
 the `ν=0` case). **This upgrades §2 from bare HEURISTIC to a MEASURED soundness profile — it
 does *not* make `trigger ⇒ α<0` a theorem.** The one clean sub-statement *is*
 provable-by-construction: a collapse manifold exists ⟺ `A` is near-singular (else
-`_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch).
+`_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch). **To re-run it**, the script has to score each row
+first. It reads one decision and one value per signal for each batch, and on the per-trajectory gate it stops with a
+`ValueError` at `int(conds[c])` (checked against this revision on 2026-11-05).
 
 ---
 
@@ -1001,7 +1003,7 @@ step's `A` can differ, which is how `test_a_switching_jacobian_can_erase_the_kic
 state retains the kick. Each trajectory is changed at most `max_interventions` times per rollout, as each row was under
 the batch gate, but the rows no longer change on the same steps. The gate now costs one SVD per sample per step rather
 than one per batch. And the §2 trigger calibration ([#1990]) measured the batch gate, so its precision and recall need a
-re-run before they describe this one.
+re-run before they describe this one. Its script is in the research repo and has to score each row first (§2).
 
 **Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite on every row the operator fired on, and
 `proximity > 0` is exactly that row's trigger condition, so an attached operator records zero overwrites by construction. The
