@@ -819,7 +819,7 @@ def test_t1_nonnormal_active_decays():
 
 
 def test_t1_nonnormal_dichotomy():
-    """(c) The fate is decided purely by the slow block's abscissa β — no third fate.
+    """(c) Away from the boundary, the fate is decided by the slow block's abscissa β.
     All-stable ⇒ COLLAPSE; one RHP mode in the slow block ⇒ DIVERGE; in the diverge
     case the active part STILL contracts (the whole point). The shipped small-gain
     certificate over-rejects both — it cannot certify either as contracting."""

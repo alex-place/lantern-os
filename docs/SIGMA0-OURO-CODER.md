@@ -241,8 +241,8 @@ dose-response curves for distilling verified traces into small models (small agg
 the anti-collapse operator clearing the freeze gate where a placebo stays latched (synthetic
 regime; PROVEN gate theorem in-regime, which is not a claim that the state keeps moving; the
 earlier "100% over 900 runs" was retired 2026-11-05 because a placebo matched it); and a
-measured loop-contraction acceptance verdict, tested on synthetic trajectories and not yet run
-on real Ouro. The verified-cascade harness itself is retained — **not as the
+measured loop-contraction acceptance verdict, tested on synthetic trajectories and saved Ouro
+residuals, and not yet run on a live model. The verified-cascade harness itself is retained — **not as the
 product, but as the teacher-and-examiner infrastructure** that generates Σ₀'s hardest
 training data and grades its checkpoints.
 

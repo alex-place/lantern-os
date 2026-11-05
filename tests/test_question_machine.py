@@ -158,12 +158,12 @@ class _DenyChannel:
         return type("R", (), {"denied": action_type == self.channel, "reason": "test"})()
 
 
-def _plan(qm, iterations=200, u0=None, goal=(1.0, 1.0), m=None):
+def _plan(qm, iterations=100, u0=None, goal=(1.0, 1.0), m=None):
     m = m or _linear_model(torch.zeros(2, 2))
     x0 = torch.zeros(1, 2)
     target = torch.tensor([list(goal)])
     us = [(u0 if u0 is not None else torch.zeros(1, 2)).clone() for _ in range(10)]
-    return m, x0, target, qm.consolidate(m, x0, us, 0.1, iterations=iterations, lr=0.5,
+    return m, x0, target, qm.consolidate(m, x0, us, 0.1, iterations=iterations, lr=3.0,
                                          terminal_grad=lambda xT: 2 * (xT - target))
 
 
@@ -185,7 +185,7 @@ def test_a_denial_is_not_disagreement():
     """The seam converges on what is allowed. The pull toward the denied action is real, and is
     reported as pressure, not as a question to go and resolve."""
     qm = QuestionMachine(authority_gate=_DenyChannel("forbidden"), channels={0: "ok", 1: "forbidden"})
-    _, _, _, res = _plan(qm, iterations=400)
+    _, _, _, res = _plan(qm)
     assert res.max_score < 1e-3
     assert max(res.blocked_pressure) > 0.05
     assert all(q.dim == 0 for q in qm.ask(res, top_k=3))
@@ -217,7 +217,7 @@ def test_ask_follows_the_uncertainty_weighted_score():
 
 # ── 8. convergence means contact with reality ──
 def test_the_seam_cannot_see_a_wrong_model_but_the_defect_can():
-    m, x0, goal, res = _plan(QuestionMachine(), iterations=400)
+    m, x0, goal, res = _plan(QuestionMachine())
     assert res.max_score < 1e-3                                 # internally: nothing left to ask
     # reality: the control acts with the opposite sign
     real = [x0]
@@ -233,8 +233,124 @@ def test_the_seam_cannot_see_a_wrong_model_but_the_defect_can():
     assert reconcile(res, dynamics_defect(m, honest, res.us, 0.1)).action == "act"
 
 
+def test_the_verdict_does_not_depend_on_the_step_size():
+    """g_t carries a factor of dt, so at dt=1e-3 a plan 4 away from its goal read as stationary."""
+    goal = torch.tensor([[4.0, 0.0]])
+    for dt in (0.1, 0.01, 0.001):
+        m = _linear_model(torch.zeros(2, 2))
+        res = QuestionMachine().consolidate(m, torch.zeros(1, 2), [torch.zeros(1, 2) for _ in range(8)],
+                                            dt, terminal_grad=lambda xT: 2 * (xT - goal))
+        verdict = reconcile(res, [0.0])
+        assert verdict.action == "replan", dt
+        assert verdict.seam == pytest.approx(8.0)                # ‖∂H/∂u‖ = 2·gap, whatever the dt
+
+
+def test_a_wrong_model_is_caught_at_small_steps():
+    """The defect shrinks with dt as well: a drift wrong by 5·x read as no defect at dt=1e-3."""
+    A = -0.2 * torch.eye(4)
+    us = [torch.zeros(1, 4) for _ in range(20)]
+    for dt in (0.1, 0.001, 0.0001):
+        m = _linear_model(A, B=torch.eye(4), dim=4, ctrl=4)
+        real = [torch.ones(1, 4)]
+        for u in us:
+            real.append(real[-1] + (real[-1] @ (A + 5.0 * torch.eye(4)).T) * dt)
+        res = QuestionMachine().consolidate(m, real[0], us, dt)
+        assert reconcile(res, dynamics_defect(m, real, us, dt)).action == "revise_model", dt
+
+
+def test_one_bad_sample_is_a_model_failure():
+    """Averaging over the batch read a 0.7-per-unit-time miss on one sample in eight as fine."""
+    m = _linear_model(torch.zeros(2, 2))
+    xs = [torch.zeros(8, 2), torch.zeros(8, 2)]
+    xs[1][0, 0] = 0.07
+    us = [torch.zeros(8, 2)]
+    assert dynamics_defect(m, xs, us, 0.1) == [pytest.approx(0.07)]
+    assert reconcile(QuestionMachine().consolidate(m, xs[0], us, 0.1),
+                     dynamics_defect(m, xs, us, 0.1)).action == "revise_model"
+
+
+def test_thin_evidence_is_not_a_reason_to_replan():
+    """The question score is weighted by 1+tr Σ, to rank questions. Used as the seam, it turned a
+    stationary plan with high uncertainty into "replan" when it needs evidence."""
+    m = _linear_model(torch.zeros(2, 2))
+    goal = torch.tensor([[1.0, 0.0]])
+    sigmas = [2500.0 * torch.eye(2).unsqueeze(0) for _ in range(8)]
+    res = QuestionMachine().consolidate(m, torch.zeros(1, 2), [torch.zeros(1, 2) for _ in range(8)], 0.1,
+                                        terminal_grad=lambda xT: 2 * (xT - goal),
+                                        iterations=100, lr=3.0, sigmas=sigmas)
+    assert res.max_score > res.max_score_history[-1]             # the weight is really there
+    assert reconcile(res, [0.0]).action == "gather_evidence"
+
+
+def test_a_plan_never_exceeds_the_engines_clamp():
+    """The engine clamps u at pcsf.u_max. A plan past it describes something that cannot happen."""
+    m = _linear_model(torch.zeros(2, 2))
+    assert m.pcsf.u_max == 5.0
+    goal = torch.tensor([[100.0, 0.0]])
+    res = QuestionMachine().consolidate(m, torch.zeros(1, 2), [torch.tensor([[50.0, 0.0]]) for _ in range(8)],
+                                        0.1, terminal_grad=lambda xT: 2 * (xT - goal),
+                                        iterations=20, lr=0.2)
+    assert max(float(u.abs().max()) for u in res.us) == pytest.approx(5.0)
+    assert float(res.xs[-1][0, 0]) == pytest.approx(4.0)         # the most that 8 × 0.1 × 5 can reach
+    assert res.max_score_history[-1] < 1e-3                      # nothing left the plan is free to do
+    verdict = reconcile(res, [0.0])
+    assert verdict.action == "blocked" and verdict.blocked > 1.0
+
+
+def test_a_control_at_the_clamp_can_still_come_back():
+    """A dim is blocked only while the descent pushes it outward. Pointing inward, it is free."""
+    m = _linear_model(torch.zeros(2, 2))
+    goal = torch.tensor([[0.0, 0.0]])
+    res = QuestionMachine().consolidate(m, torch.zeros(1, 2), [torch.full((1, 2), 5.0) for _ in range(8)],
+                                        0.1, terminal_grad=lambda xT: 2 * (xT - goal),
+                                        iterations=100, lr=3.0)
+    assert max(float(u.abs().max()) for u in res.us) < 0.05
+    assert max(res.blocked_pressure) == 0.0
+
+
+def test_a_fully_denied_plan_is_not_a_reason_to_act():
+    """Every control denied: the plan cannot move, the seam reads 0, and this said "act"."""
+    qm = QuestionMachine(authority_gate=_DenyChannel("probe"))
+    m, x0, goal, res = _plan(qm, iterations=50)
+    assert res.max_score == 0.0 and float(res.xs[-1].abs().max()) == 0.0
+    verdict = reconcile(res, [0.0])
+    assert verdict.action == "blocked"
+    assert verdict.seam == 0.0 and verdict.blocked > 1.0
+
+
+def test_a_partial_denial_that_costs_nothing_can_still_act():
+    """Denied, but nothing pulls on that dim: the constraint is not in the way."""
+    qm = QuestionMachine(authority_gate=_DenyChannel("forbidden"), channels={0: "ok", 1: "forbidden"})
+    _, _, _, res = _plan(qm, goal=(1.0, 0.0))
+    assert reconcile(res, [0.0]).action == "act"
+
+
+def test_a_nan_signal_never_reads_as_fine():
+    _, _, _, settled = _plan(QuestionMachine())
+    assert reconcile(settled, [0.0, float("nan")]).action == "revise_model"
+    assert reconcile(settled, [float("nan"), 0.0]).action == "revise_model"
+    settled.uncertainty = [float("nan")]
+    assert reconcile(settled, [0.0]).action == "gather_evidence"    # was the one check written as >
+
+
+def test_evidence_that_did_not_run_this_plan_is_not_enough_to_act():
+    _, _, _, settled = _plan(QuestionMachine())
+    assert reconcile(settled, [0.0]).action == "act"
+    verdict = reconcile(settled, [0.0], covers_plan=False)
+    assert verdict.action == "gather_evidence" and "this plan" in verdict.reason
+    assert reconcile(settled, [1.0], covers_plan=False).action == "revise_model"   # a failed model still says so
+
+
+@pytest.mark.parametrize("states", [1, 2, 4])
+def test_a_trajectory_that_does_not_match_its_controls_is_refused(states):
+    """Two controls need three states. Anything else means the evidence is not what it claims."""
+    m = _linear_model(torch.zeros(2, 2))
+    with pytest.raises(ValueError, match="observed states"):
+        dynamics_defect(m, [torch.zeros(1, 2)] * states, [torch.zeros(1, 2)] * 2, 0.1)
+
+
 def test_reconcile_routes_each_case():
-    _, _, _, settled = _plan(QuestionMachine(), iterations=400)
+    _, _, _, settled = _plan(QuestionMachine())
     _, _, _, unsettled = _plan(QuestionMachine(), iterations=0)
     assert unsettled.max_score > 0.01
     ok = [0.0]

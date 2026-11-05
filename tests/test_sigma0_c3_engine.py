@@ -347,3 +347,111 @@ def test_c3_does_not_promise_perpetual_motion():
         x = xn
     assert fired >= 1
     assert max(tail) < 1e-6                                      # the state has stopped
+
+
+def test_a_switching_jacobian_can_erase_the_kick():
+    """The boundary of C3 and S1, on the engine itself: both are statements about one step under one
+    A, and they do not imply state retention when A changes (lantern-os-research PR #14). Here the
+    kick lands in null(A₁), the gate clears as C3 says, and the next regime's Euler map, also
+    non-expansive, removes exactly that subspace: F₂F₁ = 0. A retention theorem would need a lower
+    bound on the switched product restricted to the kicked subspace, which this rules out in general."""
+    d, dt = 4, 0.05
+    a1 = torch.diag(torch.tensor([0.0, 0.0, 0.0, -1.0 / dt]))
+    a2 = torch.diag(torch.tensor([-1.0 / dt, -1.0 / dt, -1.0 / dt, 0.0]))
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4)
+    for p in m.pcsf.parameters():
+        torch.nn.init.zeros_(p)
+    m.intervention_policy = InterventionPolicy(observe_only=False, max_interventions=10)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+
+    torch.manual_seed(0)
+    m.graph.active = LinearDynamics(a1, B=torch.zeros(d, 2), noise=0.0)
+    x1, sigma1, first = m.forward_step(torch.zeros(1, d), torch.eye(d).unsqueeze(0), dt,
+                                       torch.randn(1, d), step=0)
+    assert first["anti_collapse_p"] > 0.0 and float(x1.norm()) > 0.0   # the kick really moved the state
+
+    m.graph.active = LinearDynamics(a2, B=torch.zeros(d, 2), noise=0.0)
+    x2, _, second = m.forward_step(x1, sigma1, dt, torch.randn(1, d), step=1)
+    assert second["anti_collapse_p"] == 0.0                            # the gate cleared: no second kick
+    assert float(x2.norm()) < 1e-5 * float(x1.norm())                  # and the kick is gone
+
+
+# ── S1's hypothesis, enforced (lantern-os-research PR #14) ───────────────────────────────────────
+
+def test_s1_fails_without_its_hypothesis():
+    """dW and the kick share ξ. With D = −(κ/2)·I and a rank-1 kick, D + κP = diag(κ/2, −κ/2), so the
+    escape probability is P(χ₂ ≥ 2·median χ₁) = exp(−2·median²) ≈ 0.40, not the ½ that S1 gives for D ⪰ 0."""
+    median = 0.6744897501960817
+    xi = torch.randn(400000, 2, generator=torch.Generator().manual_seed(0))
+    escape = lambda gains: float(((xi * torch.tensor(gains)).norm(dim=-1) >= median).float().mean())
+    assert escape([0.5, -0.5]) == pytest.approx(math.exp(-2 * median ** 2), abs=0.005)
+    assert escape([0.5, -0.5]) < 0.45
+    assert escape([1.0, 0.0]) == pytest.approx(0.5, abs=0.005)    # D = 0, the lemma's tight case
+    assert escape([1.5, 0.5]) > 0.5                               # D = +(κ/2)·I
+
+
+def test_negative_noise_is_rejected_at_construction():
+    with pytest.raises(ValueError, match="noise"):
+        LinearDynamics(torch.zeros(2, 2), noise=-0.01)
+    assert LinearDynamics(torch.zeros(2, 2), noise=0.0).diffusion(torch.zeros(1, 2)).sum() == 0.0
+
+
+class _NegativeGain(LinearDynamics):
+    """A subclass the constructor check cannot see."""
+
+    def diffusion(self, x):
+        return torch.full_like(x, -0.01)
+
+
+def _armed_on(node, d=4):
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4)
+    _zero_policy(m)
+    m.graph.active = node
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    return m
+
+
+def test_an_armed_step_refuses_a_negative_gain_from_any_dynamics():
+    d = 4
+    m = _armed_on(_NegativeGain(torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])), B=torch.zeros(d, 2), noise=0.0))
+    with pytest.raises(ValueError, match="non-negative diffusion gain"):
+        m.forward_step(torch.zeros(1, d), torch.eye(d).unsqueeze(0), 0.05, torch.randn(1, d), step=0)
+
+
+def test_a_negative_gain_is_only_refused_when_the_kick_would_use_it():
+    """Away from the gate the sign does nothing: the noise is symmetric and nothing shares it."""
+    d = 4
+    m = _armed_on(_NegativeGain(-torch.eye(d), B=torch.zeros(d, 2), noise=0.0))
+    _, _, info = m.forward_step(torch.ones(1, d), torch.eye(d).unsqueeze(0), 0.05, torch.randn(1, d), step=0)
+    assert info["anti_collapse_p"] == 0.0
+
+
+# ── two documented limits, pinned so that lifting them is a decision ────────────────────────────
+
+def test_the_gate_is_one_decision_for_the_batch():
+    """Each member alone triggers. Together they do not, because the mean of two rank-1 Jacobians has
+    rank 2. A per-trajectory gate would change this, and this test should change with it."""
+    d = 4
+    e = torch.eye(d)
+    a1, a2 = torch.outer(e[0], e[0]), torch.outer(e[1], e[1])
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    gate = SemanticCollapseOperator()
+
+    def fires(As):
+        n = As.shape[0]
+        return gate.evaluate(m, torch.zeros(n, d), torch.zeros(n, 2),
+                             torch.eye(d).expand(n, d, d).clone(), As).triggered
+
+    assert fires(a1.unsqueeze(0)) and fires(a2.unsqueeze(0))
+    assert not fires(torch.stack([a1, a2]))
+
+
+def test_the_kick_subspace_comes_from_the_symmetric_part():
+    """For non-normal A the kick is not confined to null(A). L2′ and S1 allow any projector, so neither
+    theorem depends on this, but "near-null" here means near-null for A_s."""
+    A = torch.zeros(4, 4)
+    A[0, 1] = 1.0
+    basis = AntiCollapseOperator()._near_null_basis(A.unsqueeze(0))
+    assert basis.shape[1] == 3
+    assert float(torch.linalg.norm(A @ basis, ord=2)) == pytest.approx(2 ** -0.5, abs=1e-5)

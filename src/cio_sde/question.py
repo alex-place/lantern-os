@@ -31,7 +31,8 @@ externally verified, never an answer.
 An external TERMINAL condition grounds the goal, not the model: the whole backward pass runs
 through the system's own f, so the seam reaches 0 on a wrong model just as readily. That is what
 `dynamics_defect` checks, against observed transitions, and `reconcile` turns the signals into
-the next step: revise the model, re-plan, gather evidence, or act.
+the next step: revise the model, re-plan, report that the way forward is blocked, gather evidence,
+or act.
 """
 
 from __future__ import annotations
@@ -115,16 +116,22 @@ def backward_costate(model: CIO_SDE, xs: Sequence[Tensor], us: Sequence[Tensor],
 
 def dynamics_defect(model: CIO_SDE, observed_xs: Sequence[Tensor], us: Sequence[Tensor],
                     dt: float) -> List[float]:
-    """‖x_obs[t+1] − (x_obs[t] + f(x_obs[t],u_t)·dt)‖ per step, mean over batch.
+    """‖x_obs[t+1] − (x_obs[t] + f(x_obs[t],u_t)·dt)‖ per step, worst sample in the batch.
 
     How wrong the model was about what actually happened. The one signal here that contacts
-    reality: the seam cannot see it, because both of its passes use the same f."""
+    reality: the seam cannot see it, because both of its passes use the same f. Worst sample, not
+    mean: a model that misses one sample in eight has still failed against reality.
+
+    `us` must be the controls actually applied between those states. Scoring them against any other
+    plan reports the difference between the plans as a model failure."""
+    if len(observed_xs) != len(us) + 1:
+        raise ValueError(f"{len(us)} controls need {len(us) + 1} observed states, got {len(observed_xs)}")
     node = model.graph.active
     defects: List[float] = []
     with torch.no_grad():
         for t, u in enumerate(us):
             predicted = observed_xs[t] + node.drift(observed_xs[t], u) * dt
-            defects.append(float((observed_xs[t + 1] - predicted).norm(dim=-1).mean().item()))
+            defects.append(float((observed_xs[t + 1] - predicted).norm(dim=-1).max().item()))
     return defects
 
 
@@ -167,10 +174,13 @@ class ConsolidationResult:
     grads: List[Tensor]                 # g_t = ∂H/∂u_t per step
     scores: List[float]                 # ‖g_t‖ on ADMISSIBLE dims, per step — question scores
     iterations: int = 0
-    max_score_history: List[float] = field(default_factory=list)
-    blocked_pressure: List[float] = field(default_factory=list)  # ‖g_t‖ on CAP/NAP-blocked dims:
-                                        # what a denied action would be worth. Never a question.
+    max_score_history: List[float] = field(default_factory=list)  # max_t ‖g_t‖ on free dims, worst
+                                        # sample, each iteration. Raw: no uncertainty weight.
+    blocked_pressure: List[float] = field(default_factory=list)  # ‖g_t‖ on dims the plan may not move,
+                                        # worst sample: CAP/NAP-blocked, or pressed against u_max.
+                                        # What a denied action would be worth. Never a question.
     uncertainty: List[float] = field(default_factory=list)       # tr(Σ_t) per step, when supplied
+    dt: float = 1.0                     # the step g_t was computed at: g_t = ∂H/∂u_t · dt
 
     @property
     def max_score(self) -> float:
@@ -180,16 +190,23 @@ class ConsolidationResult:
 @dataclass
 class Reconciliation:
     """What to do next, and why. The reconcile step of the convergence loop."""
-    action: str                  # revise_model | replan | gather_evidence | act
+    action: str                  # revise_model | replan | blocked | gather_evidence | act
     reason: str
-    seam: float
+    seam: float                  # per unit time, like defect and blocked
     defect: Optional[float] = None
     uncertainty: Optional[float] = None
+    blocked: Optional[float] = None
+
+
+def _worst(values: Sequence[float]) -> float:
+    """The largest value, or NaN if any is NaN: max() alone answers by argument order."""
+    vals = list(values)                 # may be a generator
+    return float("nan") if any(v != v for v in vals) else max(vals, default=0.0)
 
 
 def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = None,
               unresolved: int = 0, seam_tol: float = 1e-2, defect_tol: float = 1e-2,
-              uncertainty_tol: float = 1.0) -> Reconciliation:
+              uncertainty_tol: float = 1.0, covers_plan: bool = True) -> Reconciliation:
     """Turn the signals into one next step. Checked in this order because each later signal is
     only as good as the earlier ones: the seam is computed through the model, so a failed model
     makes it meaningless, and a clean plan on thin evidence is still thin.
@@ -197,31 +214,54 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
         no observed transitions   gather_evidence   the model has never been checked
         defect > defect_tol       revise_model      the model failed against reality
         seam > seam_tol           replan            a better admissible action exists
+        blocked > seam_tol        blocked           stationary only because the way on is denied
+        not covers_plan           gather_evidence   the observations did not run this plan
         unresolved > 0            gather_evidence   named unknowns remain (e.g. blind dims)
         uncertainty > tol         gather_evidence   model and plan agree, on thin evidence
         otherwise                 act
 
+    The seam, the blocked pressure and the defect are read per unit time, so the answer does not
+    depend on dt: the raw g_t carries a factor of dt, and at dt=1e-3 a plan 4 away from its goal
+    read as stationary. The seam is the unweighted one. `scores` multiply by 1+tr Σ to rank
+    questions, and that would turn thin evidence into a false "replan".
+
+    A NAP denial or the u_max clamp is a constraint, not a disagreement, so it stays out of the
+    seam. It is still not "act": the plan is the best one allowed, and whoever holds the authority
+    decides whether that is good enough.
+
+    "act" means that none of these checks objects, which is less than it sounds. Nothing here
+    checks that the plan reaches the goal: a goal dimension that no allowed control moves (zero
+    control authority there) reads "act" with the gap unclosed. The defect is absolute, so a model
+    tested only at small amplitude passes.
+
     The tolerances are the caller's: there is no calibrated default, and they should tighten
-    for actions that are hard to reverse. Blocked dims do not count toward the seam: a NAP denial
-    is a constraint, not a disagreement to resolve."""
-    seam = result.max_score
-    defect = max(defects) if defects else None
-    spread = max(result.uncertainty) if result.uncertainty else None
+    for actions that are hard to reverse. defect_tol has to sit above measurement noise: a correct
+    model with noise σ misses by about σ·√(d/dt) per unit time, and that reads as revise_model."""
+    raw_seam = result.max_score_history[-1] if result.max_score_history else result.max_score
+    seam = raw_seam / result.dt
+    defect = _worst(defects) / result.dt if defects else None
+    blocked = _worst(result.blocked_pressure) / result.dt
+    spread = _worst(result.uncertainty) if result.uncertainty else None
 
     def out(action: str, reason: str) -> Reconciliation:
-        return Reconciliation(action, reason, seam, defect, spread)
+        return Reconciliation(action, reason, seam, defect, spread, blocked)
 
     if defect is None:
         return out("gather_evidence", "dynamics never checked against an observed transition")
-    if defect > defect_tol:
-        return out("revise_model", f"model missed an observed transition by {defect:.4g}")
-    if seam > seam_tol:
+    if not defect <= defect_tol:
+        return out("revise_model", f"model missed an observed transition by {defect:.4g} per unit time")
+    if not seam <= seam_tol:
         return out("replan", f"plan is not stationary: seam {seam:.4g}")
+    if not blocked <= seam_tol:
+        return out("blocked", f"plan is stationary only under a constraint: pressure {blocked:.4g}")
+    if not covers_plan:
+        return out("gather_evidence", "the observations were not taken under this plan")
     if unresolved > 0:
         return out("gather_evidence", f"{unresolved} unresolved unknowns")
-    if spread is not None and spread > uncertainty_tol:
+    if spread is not None and not spread <= uncertainty_tol:
         return out("gather_evidence", f"model and plan agree, but tr(Σ) reaches {spread:.4g}")
-    return out("act", "model matches observation, plan is stationary, evidence is sufficient")
+    return out("act", "no check here objects: the model matched what it was tested on, the plan "
+                      "is stationary, and nothing is unresolved")
 
 
 # ── the machine ──────────────────────────────────────────────────────────────
@@ -281,10 +321,13 @@ class QuestionMachine:
 
         CAP and NAP bind the plan as well as the questions: blocked control dims are held at
         zero and never descended on, so x_T and the seam describe a plan the system may actually
-        carry out. Their gradient stays nonzero at the constrained optimum, which is not
+        carry out. So does the engine's hard clamp `pcsf.u_max` (Invariant 1): no plan exceeds it,
+        and a dim pressed against it is blocked for as long as the descent pushes it outward. The
+        gradient on a blocked dim stays nonzero at the constrained optimum, which is not
         disagreement, so `scores` exclude it and `blocked_pressure` reports it."""
         mask = self._admissible_mask(us[0], tier) if us else torch.ones(1)
-        us = [u.detach().clone() * mask for u in us]
+        u_max = getattr(getattr(model, "pcsf", None), "u_max", None)
+        us = [self._clamp(u.detach().clone() * mask, u_max) for u in us]
         history: List[float] = []
         xs: List[Tensor] = []
         lams: List[Tensor] = []
@@ -294,21 +337,34 @@ class QuestionMachine:
             xs = forward_states(model, x0, us, dt)
             term = terminal_grad(xs[-1]) if terminal_grad is not None else None
             lams, grads = backward_costate(model, xs, us, dt, terminal_lambda=term)
-            allowed = [g * mask for g in grads]
-            history.append(max(float(g.norm(dim=-1).mean().item()) for g in allowed))
+            free = [self._free_mask(u, g, mask, u_max) for u, g in zip(us, grads)]
+            allowed = [g * f for g, f in zip(grads, free)]
+            history.append(_worst(float(g.norm(dim=-1).max().item()) for g in allowed))
             if iterations <= 0:
                 break
             iterations_left = len(history) <= iterations
             if iterations_left:
-                us = [u - lr * g for u, g in zip(us, allowed)]
+                us = [self._clamp(u - lr * g, u_max) for u, g in zip(us, allowed)]
 
         scores = self._scores(allowed, sigmas)
         return ConsolidationResult(us=us, xs=xs, lams=lams, grads=grads, scores=scores,
                                    iterations=max(len(history) - 1, 0),
                                    max_score_history=history,
-                                   blocked_pressure=[float((g * (1.0 - mask)).norm(dim=-1).mean().item())
-                                                     for g in grads],
-                                   uncertainty=self._uncertainty(sigmas))
+                                   blocked_pressure=[float((g * (1.0 - f)).norm(dim=-1).max().item())
+                                                     for g, f in zip(grads, free)],
+                                   uncertainty=self._uncertainty(sigmas), dt=dt)
+
+    @staticmethod
+    def _clamp(u: Tensor, u_max: Optional[float]) -> Tensor:
+        return u if u_max is None else torch.clamp(u, -u_max, u_max)
+
+    @staticmethod
+    def _free_mask(u: Tensor, g: Tensor, mask: Tensor, u_max: Optional[float]) -> Tensor:
+        """1 on dims the descent may still move: admissible, and not pushed out through u_max."""
+        if u_max is None:
+            return mask
+        outward = ((u >= u_max) & (g < 0)) | ((u <= -u_max) & (g > 0))
+        return mask * (~outward).to(mask.dtype)
 
     @staticmethod
     def _uncertainty(sigmas: Optional[Sequence[Tensor]]) -> List[float]:

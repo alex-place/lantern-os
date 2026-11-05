@@ -54,6 +54,9 @@ def _finite(x):
 # per-token loop contraction (depth_contraction_stats).
 _JAC_TOKEN_WINDOW = int(os.environ.get("SIGMA0_JAC_TOKEN_WINDOW", "256") or 256)
 _CONT_GATE_MAX_DIM = int(os.environ.get("SIGMA0_CONT_GATE_MAX_DIM", "512") or 512)
+# The discrete dichotomy's Kreiss sweep takes 144 inversions and SVDs. Measured on the dev box: 0.14s
+# at d=64, 5s at d=128, 80s at d=512. That is far too much for a diagnostic on the serve path.
+_DICHOTOMY_MAX_DIM = int(os.environ.get("SIGMA0_DICHOTOMY_MAX_DIM", "64") or 64)
 
 
 def _depth_stats(hidden_states_list):
@@ -130,6 +133,7 @@ def _stability_gates(A_tensor, jsrr_matrix=None, depth_stats=None):
             out["loop_contraction"] = {
                 "factor": _finite(lc.factor),
                 "worst_factor": _finite(lc.worst_factor),
+                "net_factor": _finite(lc.net_factor),
                 "transient": _finite(lc.transient),
                 "n_tokens": lc.n_tokens,
                 "margin": _finite(lc.margin),
@@ -177,6 +181,8 @@ def _stability_gates(A_tensor, jsrr_matrix=None, depth_stats=None):
             "kreiss_bound": _finite(g.kreiss_bound),
         })
         # Fate of the token-transition map under the discrete dichotomy. Purely diagnostic.
+        if int(A_tensor.shape[0]) > _DICHOTOMY_MAX_DIM:
+            return out
         try:
             dc = discrete_dichotomy_certificate(A_tensor, delta=0.0)
             out["dichotomy"] = {
@@ -287,7 +293,9 @@ def assemble_reason_verdict(out):
     elif stable == "diverge":
         reason = "divergence"        # latent dynamics running away
     elif stable == "spiral":
-        reason = "collapse"          # latent collapse onto the slow manifold / metastable
+        # Latent collapse onto the slow manifold / metastable. But a plateau ran out of depth without
+        # settling, and a transient amplified and came back: neither froze.
+        reason = {"plateau": "max_depth", "transient": "divergence"}.get(regime, "collapse")
     elif out.get("exit_reason") == "convergence_exit":
         reason = "fixed_point"
     else:  # "adaptive_qexit" and any other mode-level label
@@ -346,10 +354,11 @@ def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None, exper
 
     if not loop_certified:
         # loop collapsed / diverged / too-few-tokens-to-certify → NOT grounded; escalate & retry
-        klass = {"diverge": "diverged", "spiral": "collapsed"}.get(stable, "uncertified")
+        spiral = "collapsed" if rv.get("reason", "collapse") == "collapse" else "unsettled"
+        klass = {"diverge": "diverged", "spiral": spiral}.get(stable, "uncertified")
         return {"grounded": False, "stable": stable, "loop_certified": False,
                 "external_grounded": external_grounded, "klass": klass, "next_action": "escalate",
-                "why": "reasoning loop did not contract (ρ≥1 / collapse / uncertifiable) — not grounded"}
+                "why": "reasoning loop did not contract (ρ≥1 / collapse / plateau / uncertifiable) — not grounded"}
 
     # loop is stable; grounding now hinges ENTIRELY on the external check
     if external_grounded is True:
@@ -740,6 +749,7 @@ class Sigma0LoopLM:
 
         # Stability certificate: measured loop contraction (verdict) + token-transition telemetry.
         stability_cert = None
+        full, reduced = None, None
         if len(exit_hiddens) >= 2:
             try:
                 torch, *_ = _lazy()
@@ -754,10 +764,13 @@ class Sigma0LoopLM:
                 if H.shape[0] > _JAC_TOKEN_WINDOW + 1:
                     H = H[-(_JAC_TOKEN_WINDOW + 1):]
                 full, reduced = _empirical_transition(H)
-                stability_cert = _stability_gates(full, jsrr_matrix=reduced,
-                                                  depth_stats=depth_stats[-_JAC_TOKEN_WINDOW:])
             except Exception:
-                pass
+                pass   # the SVD refuses a non-finite H, which must not erase the verdict below
+        try:
+            stability_cert = _stability_gates(full, jsrr_matrix=reduced,
+                                              depth_stats=depth_stats[-_JAC_TOKEN_WINDOW:])
+        except Exception:
+            pass
 
         out = {
             "text": text,
