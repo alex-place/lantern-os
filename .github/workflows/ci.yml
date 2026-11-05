@@ -106,6 +106,44 @@ jobs:
           path: pytest-results.xml
           retention-days: 30
 
+  test-sigma0-runtime:
+    name: Sigma0 runtime tests (CPU PyTorch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install CPU-only numerical test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest numpy scipy
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run PyTorch-backed Sigma0 and CIO-SDE suites
+        run: |
+          python -m pytest -q --tb=short \
+            tests/test_quantized_cache.py \
+            tests/test_sigma0_kernel_e2e.py \
+            tests/test_loop_exit.py \
+            tests/test_sigma0_L2_anisotropy_lift.py \
+            tests/test_sigma0_jsrr_reduction.py \
+            tests/test_cio_reconstruction.py \
+            tests/test_question_loop.py \
+            tests/test_sigma0_jsrr_gate.py \
+            tests/test_decode_canary.py \
+            tests/test_cio_sde.py \
+            tests/test_stability_gates.py \
+            tests/test_question_machine.py \
+            tests/test_sigma0_calibration.py \
+            tests/test_cio_sde_observe_only.py \
+            tests/test_sigma0_c3_engine.py \
+            tests/test_sigma0_loop_contraction.py \
+            tests/test_sigma0_certificate_fates.py
+
   test-node:
     name: Node tests (API, etc)
     runs-on: ubuntu-latest
