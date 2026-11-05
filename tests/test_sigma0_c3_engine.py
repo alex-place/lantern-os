@@ -770,8 +770,9 @@ def test_split_covariance_keeps_c3_shape_lift_out_of_belief():
         B=torch.zeros(d, 2, dtype=torch.float64), noise=0.1,
     ).double()
     _zero_policy(model)
+    model.cov.r_inv = 0.0  # isolate process-noise propagation from the Riccati measurement term
     model.intervention_policy = InterventionPolicy(**ARMED)
-    model.anti_collapse_op = _ShapeOnlyLift().double()
+    model.anti_collapse_op = _ShapeOnlyLift()
 
     x = torch.zeros(1, d, dtype=torch.float64)
     belief = torch.eye(d, dtype=torch.float64).unsqueeze(0)
@@ -800,6 +801,7 @@ def test_split_covariance_rollout_returns_both_states_without_legacy_change():
         B=torch.zeros(d, 2, dtype=torch.float64), noise=0.1,
     ).double()
     _zero_policy(model)
+    model.cov.r_inv = 0.0  # isolate process-noise propagation from the Riccati measurement term
     x = torch.zeros(2, d, dtype=torch.float64)
     belief = torch.eye(d, dtype=torch.float64).expand(2, -1, -1).clone()
     shape = 2.0 * belief
