@@ -1085,7 +1085,7 @@ class LoopContractionCertificate:
     margin: float           # stable demands factor < 1 − margin
     transient_max: float    # stable demands transient ≤ this
     stable: bool
-    regime: str             # contraction | critical | transient | divergent
+    regime: str             # contraction | critical | transient | plateau | divergent
 
     def summary(self) -> str:
         return (f"loop contraction: factor={self.factor:.4f} (worst {self.worst_factor:.4f}) "
@@ -1106,7 +1106,10 @@ def loop_contraction_certificate(stats, margin: float = 0.0, transient_max: floa
     factor = float(np.quantile(ratios, quantile))
     transient = float(np.quantile(amps, quantile))
     if factor >= 1.0:
-        regime = "divergent"
+        # Stopped shrinking. Past its starting size that is growth; below it, the loop has settled
+        # on a non-zero plateau, which is what real Ouro does past its trained depth (residuals fall
+        # from ~30 to ~3 and stay there): bounded, moving, and neither frozen nor diverging.
+        regime = "divergent" if transient >= 1.25 else "plateau"
     elif transient > transient_max:
         regime = "transient"
     elif factor >= 1.0 - margin:

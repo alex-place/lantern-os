@@ -79,6 +79,46 @@ def test_residual_still_growing_at_exit_is_not_contraction():
     assert cert.factor > 1.0 and cert.regime == "divergent" and cert.stable is False
 
 
+# Residual norms from a real run, last token of 8 prompts, Ouro-1.4B-Thinking, trained depth 4,
+# probed to depth 12 (lantern-os-research: data/sigma0/loop_jacobian_report.json).
+REAL_OURO_RESIDUALS = [
+    [27.823, 17.894, 9.792, 6.124, 5.216, 2.711, 2.648, 2.302, 2.211, 2.35, 2.066],
+    [27.177, 14.189, 8.239, 4.626, 2.943, 2.667, 3.198, 5.647, 4.682, 2.26, 2.652],
+    [27.313, 17.074, 11.223, 8.575, 6.451, 5.493, 5.492, 5.511, 5.644, 5.47, 5.799],
+    [53.169, 21.275, 9.216, 5.907, 6.348, 5.536, 5.068, 10.048, 9.061, 5.486, 3.237],
+    [21.093, 12.331, 6.68, 6.472, 6.264, 4.921, 4.118, 8.311, 7.538, 3.828, 3.272],
+    [16.472, 23.204, 7.481, 4.566, 4.807, 3.205, 2.799, 2.871, 2.275, 2.482, 2.171],
+    [21.146, 9.929, 6.938, 6.686, 5.922, 5.939, 5.053, 11.818, 10.016, 11.511, 11.144],
+    [32.977, 9.933, 4.844, 3.763, 3.359, 3.279, 2.911, 2.617, 2.432, 2.731, 1.999],
+]
+
+
+def _real_ouro_at_depth(depth):
+    rows = [(e[depth - 2] / e[depth - 3], max(e[:depth - 1]) / e[0]) for e in REAL_OURO_RESIDUALS]
+    return loop_contraction_certificate(rows)
+
+
+def test_real_ouro_contracts_at_its_trained_depth():
+    """An accept here sits next to a true rho(J) of 8-11 at the same operating points, so it means
+    the residual shrank on this generation. It does not mean the loop is locally stable."""
+    cert = _real_ouro_at_depth(4)
+    assert cert.factor == pytest.approx(0.67, abs=0.01)
+    assert cert.stable is True and cert.regime == "contraction"
+
+
+@pytest.mark.parametrize("depth", [6, 8, 12])
+def test_real_ouro_plateaus_past_its_trained_depth_rather_than_diverging(depth):
+    cert = _real_ouro_at_depth(depth)
+    assert cert.factor > 1.0 and cert.transient < 1.25
+    assert cert.regime == "plateau" and cert.stable is False
+
+
+def test_plateau_reads_as_spiral_not_divergence():
+    cert = _stability_gates(torch.eye(2, dtype=torch.float64) * 0.5, depth_stats=[(1.05, 1.0)] * 4)
+    assert cert["loop_contraction"]["regime"] == "plateau"
+    assert assemble_reason_verdict({"stability_gates": cert})["stable"] == "spiral"
+
+
 def test_converged_token_counts_as_contracting():
     h = [torch.tensor([1.0, 2.0]) for _ in range(4)]
     ratio, amp = depth_contraction_stats(h)

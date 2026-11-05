@@ -100,7 +100,7 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
 | C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` an equilibrium, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 27 passed |
 | Certificate boundary cases checked against the actual flow: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 20 passed |
-| Loop-contraction verdict on trajectories of known contraction; scale invariance; non-normal growth (§1.2.3) | MEASURED signal, synthetic trajectories | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 33 passed |
+| Loop-contraction verdict on trajectories of known contraction; scale invariance; non-normal growth (§1.2.3) | MEASURED signal, synthetic trajectories | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 38 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py` |
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
@@ -193,6 +193,12 @@ it sounds, because three things they do not cover are the ones that matter next:
 3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves
    once. A lower bound on what the state retains (for example σ_min of the transition product) would be
    the real theorem. It does not exist yet.
+4. **Whether Part I describes a real looped model at all.** Its fates are statements about `t → ∞` for one
+   fixed `A`. Real loops stop at 2–4 steps, and their Jacobians vary widely from step to step. Saved Ouro runs
+   read `ρ(J) ≈ 8–11` while the residual shrinks and then plateaus (§1.2.3). Mixture-of-Recursions
+   (arXiv:2507.10524, read 2026-11-05) reports hidden-state norms rising with depth while likelihood improves
+   (its Figures 7a and 5c). At this depth the relevant object is finite-horizon amplification and whether another
+   step helps, which Part I does not address.
 
 **Part II in one line.** For the *slow* timescale — deciding whether a retrained model may replace
 the current one — the measured version of the same principle is: **a system's self-checks can spot
@@ -684,12 +690,30 @@ ignores the scale of `h`, and is a norm, so it sees non-normal growth. A generat
 than 10× inside the loop (`SIGMA0_LOOP_TRANSIENT_MAX`, a design default, **not calibrated**).
 
 **Honest scope.** MEASURED on the residuals the loop actually produced: it does not cover every
-direction, and it is not a statement about truth. Tested on synthetic trajectories of known contraction;
-**not yet run on a real Ouro generation**, so the acceptance rate on real models is unknown. Expect it to be
-low on today's Ouro: ADR-0024 records a true `ρ(J) ≈ 8–11` (expansive) from the autograd JVP (#2029), against
-which the old proxy's accepts meant nothing. Reported, not enforced: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a
+direction, and it is not a statement about truth. **Not yet run through `generate()` on a live model**, so the
+wiring and the acceptance rate on real generations are unverified. Reported, not enforced: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a
 `next_action`. JSRR remains as telemetry and fallback, now on a scale-invariant least-squares
 token-transition operator (exact DMD), whose radius is a Ritz estimate that tends to read low when `T < d`.
+
+**First reading on real Ouro (2026-11-05, from saved runs, no live model).** The statistic applied to the residual
+norms in `data/sigma0/loop_jacobian_report.json` (research repo; Ouro-1.4B-Thinking, trained depth 4, 8 prompts, last
+token only, so a small sample):
+
+| Depth | Factor (90th percentile) | Regime | Accepted |
+|---|---|---|---|
+| 3 | 0.87 | contraction | yes |
+| **4 (trained)** | **0.67** | contraction | yes |
+| 6 | 1.06 | plateau | no |
+| 8 | 1.06 | plateau | no |
+| 12 | 1.09 | plateau | no |
+
+At the same model's operating points, autograd measures a true `ρ(J)` of about 8–11, and up to 28, with `‖J‖₂ ≈ 127`
+(`data/sigma0/true_jacobian_report.json`, ADR-0024). Taken at face value, the local-linear theory says DIVERGE. In fact the
+residual shrinks 2–7× over 4 steps and then settles on a non-zero plateau with occasional spikes. It never reaches
+a fixed point. So **an accept means the residual shrank on this generation; it does not mean the loop is locally
+stable**, and the two measurements disagree by an order of magnitude. The residual is evidently not along the
+dominant direction, or the linearization does not hold at this amplitude. The saved data cannot say which.
+
 The rest of this section is the original adoption record.
 
 **Status: ADOPTED external method; the gate's verdict is MACHINE-CHECKED, not a new theorem.**
