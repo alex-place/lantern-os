@@ -68,24 +68,51 @@ class CollapseOutcome(str, Enum):
     NULL      = "null"        # ⊥ₛ — semantic null state
 
 
+def _numerical_rank(s: Tensor, eig_eps: float) -> Tensor:
+    """Numerical rank of each matrix from its singular values s (..., d): the count above eig_eps·σ_max.
+    The gate's rank signal and the kick basis both use this one definition."""
+    return (s > eig_eps * s.max(dim=-1, keepdim=True).values).sum(dim=-1)
+
+
 @dataclass
 class CollapseResult:
+    """One evaluation of the gate over a batch. Each trajectory is decided on its own signals.
+
+    triggered  some trajectory in the batch triggered
+    mask       (B,) which ones did
+    x_star     the triggered rows projected onto their own null(A); every other row unchanged
+    metrics    the four signals, one value per sample, and `dim`
+    """
     triggered: bool
     outcome: CollapseOutcome
     x_star: Tensor
-    metrics: Dict[str, float]
+    metrics: Dict[str, object]
+    mask: Optional[Tensor] = None
 
     def summary(self) -> str:
         m = self.metrics
+
+        def per_sample(v) -> str:
+            v = torch.as_tensor(v).reshape(-1)
+            cells = ", ".join(f"{float(e):.4g}" for e in v[:4])
+            return f"[{cells}{', …' if v.numel() > 4 else ''}]"
+
+        n = "" if self.mask is None else f" {int(self.mask.sum())}/{self.mask.numel()} triggered"
         return (
-            f"Σ₀[{self.outcome.value}] "
-            f"∇L={m['grad_norm']:.4f} rank={m['eff_rank']:.1f}/{m['dim']:.0f} "
-            f"aniso={m['anisotropy']:.4f} ∂H/∂u={m['ctrl_sens']:.4f}"
+            f"Σ₀[{self.outcome.value}]{n} "
+            f"∇L={per_sample(m['grad_norm'])} rank={per_sample(m['eff_rank'])}/{m['dim']:.0f} "
+            f"aniso={per_sample(m['anisotropy'])} ∂H/∂u={per_sample(m['ctrl_sens'])}"
         )
 
 
 class SemanticCollapseOperator:
-    """Σ₀ — detects the underdetermined regime and collapses the state."""
+    """Σ₀ — detects the underdetermined regime and collapses the state.
+
+    The gate decides each trajectory on its own: the four signals are computed per sample, from that
+    sample's state, covariance and Jacobian, and a sample triggers when its own four conditions hold.
+    Nothing is averaged over the batch first. A batch-wide decision on mean signals let a collapsed
+    member hide among healthy ones, and the mean of two rank-1 Jacobians has rank 2.
+    """
 
     def __init__(self,
                  grad_eps: float = 1e-2,
@@ -100,13 +127,10 @@ class SemanticCollapseOperator:
         self.eig_eps = eig_eps            # |λ| below this ⇒ null eigenmode
 
     @torch.no_grad()
-    def _effective_rank(self, A: Tensor) -> float:
-        # mean Jacobian over the batch; effective numerical rank via singular values
-        Abar = A.mean(0)
-        s = torch.linalg.svdvals(Abar)
-        if s.numel() == 0 or s.max() <= 0:
-            return 0.0
-        return float((s > self.eig_eps * s.max()).sum().item())
+    def _effective_rank(self, A: Tensor) -> Tensor:
+        """Numerical rank of each sample's own Jacobian, (B,), from its singular values."""
+        A = A if A.dim() == 3 else A.unsqueeze(0)
+        return _numerical_rank(torch.linalg.svdvals(A), self.eig_eps).to(A.dtype)
 
     @torch.no_grad()
     def _anisotropy_per_sample(self, sigma: Tensor) -> Tensor:
@@ -120,18 +144,20 @@ class SemanticCollapseOperator:
 
     @torch.no_grad()
     def _anisotropy(self, sigma: Tensor) -> float:
+        """Batch mean of a(Σ), for telemetry and tests. The gate reads _anisotropy_per_sample."""
         return float(self._anisotropy_per_sample(sigma).mean().item())
 
-    def _grad_norm(self, model, x: Tensor, u: Tensor) -> float:
+    def _grad_norm(self, model, x: Tensor, u: Tensor) -> Tensor:
+        """‖∇ₓL‖ for each sample, (B,)."""
         xr = x.detach().clone().requires_grad_(True)
         # .sum(), not .mean(): each sample's gradient must stay that sample's gradient. A mean
         # divides it by the batch size, which silently made ε_g depend on B.
         L = model.stage_cost(xr, u.detach()).sum()
         (g,) = torch.autograd.grad(L, xr)
-        return float(g.norm(dim=-1).mean().item())
+        return g.norm(dim=-1).detach()
 
-    def _ctrl_sensitivity(self, model, x: Tensor, u: Tensor) -> float:
-        """‖∂H/∂u‖ with H = L + λᵀf and λ = ∇ₓL, the instantaneous adjoint.
+    def _ctrl_sensitivity(self, model, x: Tensor, u: Tensor) -> Tensor:
+        """‖∂H/∂u‖ for each sample, (B,), with H = L + λᵀf and λ = ∇ₓL, the instantaneous adjoint.
 
         The stage cost alone reads 0 at u=0 however much leverage the control has, which is
         not "control cannot distinguish actions". This sees only the model's own cost: a goal
@@ -145,59 +171,65 @@ class SemanticCollapseOperator:
         if active is not None:
             H = H + (lam.detach() * active.drift(x.detach(), ur)).sum(-1)
         (g,) = torch.autograd.grad(H.sum(), ur)
-        return float(g.norm(dim=-1).mean().item())
+        return g.norm(dim=-1).detach()
+
+    def _signals(self, model, x: Tensor, u: Tensor, sigma: Tensor,
+                 A: Tensor) -> Dict[str, Tensor]:
+        """The four gate signals, one value per sample, in x's dtype. A Σ or Jacobian given once for
+        the batch (leading dimension 1) is read as every sample's."""
+        grad, rank, aniso, ctrl = torch.broadcast_tensors(*(
+            t.to(x.dtype) for t in (self._grad_norm(model, x, u), self._effective_rank(A),
+                                    self._anisotropy_per_sample(sigma),
+                                    self._ctrl_sensitivity(model, x, u))))
+        return {"grad_norm": grad, "eff_rank": rank, "anisotropy": aniso, "ctrl_sens": ctrl}
+
+    def _fires(self, s: Dict[str, Tensor], dim: float) -> Tensor:
+        """Each sample's own AND of the four conditions, (B,). Compared in float64, against the
+        thresholds as given: a float32 comparison rounds ε_g = 0.01 to float32 first, and a signal
+        equal to float32(0.01) then reads as not below it."""
+        s = {k: v.double() for k, v in s.items()}
+        return ((s["grad_norm"] < self.grad_eps) & (s["eff_rank"] < self.rank_frac * dim)
+                & (s["anisotropy"] < self.anisotropy_eps) & (s["ctrl_sens"] < self.ctrl_eps))
 
     @torch.no_grad()
-    def _collapse_state(self, x: Tensor, A: Tensor) -> tuple[Tensor, CollapseOutcome]:
-        # Project onto null(A), the actual fixed points of the linearised flow, so that
-        # ‖Ax*‖ ≤ eig_eps·‖A‖₂·‖x*‖ for ANY A. That is a statement about the linear part: an affine
-        # or nonlinear drift can still move at x*. The null space of A_s is a different set: a
-        # rotation block has A_s=0 and keeps moving, so projecting there left ‖Ax*‖ large even for
-        # normal A. Uses the same relative singular-value cutoff as _effective_rank, so cond_rank
-        # firing implies k ≥ d/2.
-        Abar = A.mean(0) if A.dim() == 3 else A
-        _, s, Vh = torch.linalg.svd(Abar)
-        null_mask = s <= self.eig_eps * s.max()
-        k = int(null_mask.sum().item())
-        if k == 0:
-            # no invariant directions at all → semantic null ⊥ₛ
-            return torch.zeros_like(x), CollapseOutcome.NULL
-        V = Vh.T[:, null_mask]                  # (d, k) basis of null(A)
-        P = V @ V.T                             # projector onto the fixed points
+    def _collapse_state(self, x: Tensor, A: Tensor,
+                        mask: Optional[Tensor] = None) -> tuple[Tensor, CollapseOutcome]:
+        """Project each sample onto the null space of its OWN Jacobian; rows outside `mask` stay as they are.
 
-        # Collapse is the orthogonal projection onto the invariant null manifold.
-        # P = V Vᵀ is idempotent and symmetric, so it is non-expansive:
-        # ‖P x‖ ≤ ‖x‖ for all x — the projection is already a contraction toward
-        # the manifold and there is no boundary to enforce. (The former
-        # "log-barrier" multiplicative shrink was misnamed and, for strengths
-        # above 1/ln(100) ≈ 0.217, flipped sign and grew ‖x*‖ — the opposite of
-        # collapse. See issue #661.)
-        x_star = x @ P.T
-        return x_star, CollapseOutcome.ATTRACTOR
+        null(A) holds the actual fixed points of the linearised flow, so ‖Ax*‖ ≤ eig_eps·‖A‖₂·‖x*‖ for
+        ANY A. That is a statement about the linear part: an affine or nonlinear drift can still move
+        at x*. The null space of A_s is a different set: a rotation block has A_s=0 and keeps moving,
+        so projecting there left ‖Ax*‖ large even for normal A. Uses the same relative singular-value
+        cutoff as _effective_rank, so a sample whose cond_rank fires has k ≥ d/2 null directions. A row
+        with none (k = 0, which the gate never passes here) goes to the semantic null ⊥ₛ, and the
+        outcome reads NULL if any projected row did.
+
+        P = V Vᵀ is idempotent and symmetric, so it is non-expansive: ‖P x‖ ≤ ‖x‖, and there is no
+        boundary to enforce. (The former "log-barrier" multiplicative shrink was misnamed and, for
+        strengths above 1/ln(100) ≈ 0.217, flipped sign and grew ‖x*‖. See issue #661.)
+        """
+        A = A if A.dim() == 3 else A.unsqueeze(0)
+        _, s, Vh = torch.linalg.svd(A)
+        null = (s <= self.eig_eps * s.max(dim=-1, keepdim=True).values).to(A.dtype)   # (B, d)
+        P = Vh.transpose(-1, -2) @ (null.unsqueeze(-1) * Vh)    # (B, d, d) projector onto each null(A)
+        x_star = (x.unsqueeze(-2) @ P.transpose(-1, -2)).squeeze(-2)
+        rows = torch.ones(x_star.shape[:-1], dtype=torch.bool, device=x.device) if mask is None else mask
+        if mask is not None:
+            x_star = torch.where(mask.unsqueeze(-1), x_star, x)
+        empty = torch.broadcast_to(null.sum(-1) == 0, rows.shape) & rows
+        return x_star, CollapseOutcome.NULL if bool(empty.any()) else CollapseOutcome.ATTRACTOR
 
     def evaluate(self, model, x: Tensor, u: Tensor, sigma: Tensor,
                  A: Tensor) -> CollapseResult:
+        """Decide each sample on its own signals, and collapse only the samples that triggered."""
         dim = float(x.shape[-1])
-        grad_norm = self._grad_norm(model, x, u)
-        eff_rank = self._effective_rank(A)
-        anisotropy = self._anisotropy(sigma)
-        ctrl_sens = self._ctrl_sensitivity(model, x, u)
-
-        cond_grad = grad_norm < self.grad_eps
-        cond_rank = eff_rank < self.rank_frac * dim
-        cond_flat = anisotropy < self.anisotropy_eps
-        cond_ctrl = ctrl_sens < self.ctrl_eps
-        triggered = cond_grad and cond_rank and cond_flat and cond_ctrl
-
-        metrics = {
-            "grad_norm": grad_norm, "eff_rank": eff_rank, "dim": dim,
-            "anisotropy": anisotropy, "ctrl_sens": ctrl_sens,
-        }
-        if not triggered:
-            return CollapseResult(False, CollapseOutcome.NONE, x, metrics)
-
-        x_star, outcome = self._collapse_state(x, A)
-        return CollapseResult(True, outcome, x_star, metrics)
+        signals = self._signals(model, x, u, sigma, A)
+        mask = self._fires(signals, dim)
+        metrics = {**signals, "dim": dim}
+        if not bool(mask.any()):
+            return CollapseResult(False, CollapseOutcome.NONE, x, metrics, mask)
+        x_star, outcome = self._collapse_state(x, A, mask)
+        return CollapseResult(True, outcome, x_star, metrics, mask)
 
 
 # ── Lyapunov collapse-guarantee theorem ──────────────────────────────────────
@@ -1274,18 +1306,23 @@ class AntiCollapseOperator:
     perturbation in exactly the directions that have gone flat — the
     persistent-excitation principle from adaptive control.
 
-        dx = f dt + dW + Σ₀⁻¹,   Σ₀⁻¹ = strength · p · (V_null · ξ)
+        dx = f dt + dW + Σ₀⁻¹,   Σ₀⁻¹ = κ · P ξ,   P = V_null V_nullᵀ
 
-    `p ∈ [0,1]` is collapse proximity: 0 when far from the boundary (no-op),
-    rising to 1 as ∇L, Jacobian rank, Σ anisotropy and control sensitivity all
-    approach their collapse thresholds. The excitation is gated by p so it costs
-    nothing in healthy regimes and only fires near a 42-state.
+    Everything is per trajectory. `p ∈ [0,1]` is each sample's collapse proximity: 0 when far from
+    the boundary (no-op), rising to 1 as its ∇L, Jacobian rank, Σ anisotropy and control sensitivity
+    all approach their collapse thresholds. V_null is that sample's own kick basis: the right
+    singular vectors of its Jacobian for its smallest singular values, so when the gate fires the
+    kick and the bump lie on (near-)fixed points of the linearised flow, ‖A·P‖₂ ≤ eig_eps·max(1, ‖A‖₂)
+    at the default thresholds (any rank_frac ≤ 1), and not in a direction that the drift moves (see
+    _kick_basis).
 
-    What is proven about the two legs (docs/SIGMA0-COLLAPSE-CERTIFICATE.md §3):
-      • covariance leg (C3): after the engine's own projection, a(Σ_next) ≥ ε_a, so the gate
-        cannot be true on consecutive evaluations.
+    What is proven about the two legs (docs/SIGMA0-COLLAPSE-CERTIFICATE.md §3), for each sample
+    the operator acts on:
+      • covariance leg (C3): after the engine's own projection, a(Σ_next) ≥ ε_a, so that sample's
+        gate cannot be true on consecutive evaluations.
       • state leg (S1): each firing leaves the ball {‖∇ₓL‖ < ε_g} with probability ≥ ½, for any
         drift and any p.
+    Both hold for any rank-m projector, so neither depends on which subspace is chosen.
     Neither promises perpetual motion. A system with no drift, no noise and no grounding rests
     at an equilibrium once the gate has cleared.
     """
@@ -1302,32 +1339,43 @@ class AntiCollapseOperator:
         self.eig_eps = eig_eps
 
     def proximity(self, model, x: Tensor, u: Tensor, sigma: Tensor,
-                  A: Tensor) -> float:
-        """How close the state is to a collapse (0 = safe, 1 = collapsing)."""
+                  A: Tensor) -> Tensor:
+        """How close each sample is to a collapse, (B,): 0 = safe, 1 = collapsing.
+
+        A sample's value is above 0 exactly when its own four-signal gate is true, so the engine
+        excites exactly the samples that the gate would freeze."""
         d = self.detector
-        grad_norm = d._grad_norm(model, x, u)
-        eff_rank = d._effective_rank(A)
-        aniso = d._anisotropy(sigma)
-        ctrl = d._ctrl_sensitivity(model, x, u)
         dim = float(x.shape[-1])
-        # each term → 1 as it sinks below its trigger threshold
-        p_grad = _below(grad_norm, d.grad_eps)
-        p_rank = _below(eff_rank, d.rank_frac * dim)
-        p_flat = _below(aniso, d.anisotropy_eps)
-        p_ctrl = _below(ctrl, d.ctrl_eps)
-        return min(p_grad, p_rank, p_flat, p_ctrl)   # all must be near to act
+        s = d._signals(model, x, u, sigma, A)
+        # each term → 1 as it sinks below its trigger threshold; all must be near to act
+        p = torch.stack([_below(s["grad_norm"], d.grad_eps),
+                         _below(s["eff_rank"], d.rank_frac * dim),
+                         _below(s["anisotropy"], d.anisotropy_eps),
+                         _below(s["ctrl_sens"], d.ctrl_eps)]).amin(dim=0)
+        # 1 − v/t rounds to 0 for v within an ulp of t, so tie p > 0 to the gate itself.
+        return torch.where(d._fires(s, dim), p.clamp_min(torch.finfo(p.dtype).tiny),
+                           torch.zeros_like(p))
 
     @torch.no_grad()
-    def _near_null_basis(self, A: Tensor) -> Tensor:
-        """The m smallest-|λ(A_s)| eigenvectors — the banded near-null subspace (Fix B).
+    def _kick_basis(self, A: Tensor) -> Tuple[Tensor, Tensor]:
+        """(V, m) for each sample's own Jacobian: V (B, d, d) holds its right singular vectors in order
+        of increasing singular value, and its kick basis is the first m (B,) columns.
 
-        m = clamp(max(hard_null_count, d − round(eff_rank)), 1, d−1).
+            m = clamp(max(#{σᵢ < eig_eps}, d − rank(A)), 1, _max_lift_rank(d))
 
-        Two corrections over the old hard `|λ| < eig_eps` cutoff (see
-        docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md §2.2):
+        with rank(A) the gate's own numerical rank. The right singular vectors for the small singular
+        values span (near-)null(A): every one of the m counted singular values is at most
+        max(eig_eps, detector.eig_eps·‖A‖₂), and so is ‖A·V_m‖₂, whenever the gate fires and
+        rank_frac ≤ 1 (the default is ½). Only a numerically full-rank A takes the m = 1 floor above
+        both, and with rank_frac ≤ 1 such an A never passes cond_rank. They
+        come from an SVD of A itself: an eigendecomposition of AᵀA would square the condition number,
+        and the eigenvectors of A_s are a different subspace once A is non-normal (under A = e₁e₂ᵀ one
+        of the three smallest-|λ(A_s)| directions has ‖Av‖ = 1/√2).
+
+        The count and the clamps carry over from the banded near-null fix (Fix B,
+        SIGMA0-C3-NONCOLLAPSE-NORMAL.md §2.2 in lantern-os-research):
           • G13 — modes parked just above eig_eps no longer yield a rank-0 (blank)
-            bump: the rank deficit `d − eff_rank` guarantees `m ≥ 1` whenever
-            `cond_rank` fires.
+            bump: the rank deficit `d − rank` guarantees `m ≥ 1` whenever `cond_rank` fires.
           • k=d clamp — `m ≤ d−1` always leaves ≥1 mode unbumped, so the covariance
             bump creates genuine anisotropy. Bumping ALL d modes is `Σ + b·I`, a
             uniform shift that LOWERS anisotropy (std unchanged, mean up) — the
@@ -1337,16 +1385,29 @@ class AntiCollapseOperator:
             a rank-m bump tops out at a(Σ⁺) ≈ √((d−m)/m) and d−1 modes cannot reach ε_a at all
             once d > 401. L2′ allows any projector, so bumping fewer modes loses nothing.
         """
-        Abar = 0.5 * (A.mean(0) + A.mean(0).T) if A.dim() == 3 else 0.5 * (A + A.T)
-        d = Abar.shape[-1]
-        evals, evecs = torch.linalg.eigh(Abar)
-        absval = evals.abs()
-        hard_null = int((absval < self.eig_eps).sum().item())
-        eff_rank = self.detector._effective_rank(A if A.dim() == 3 else A.unsqueeze(0))
-        m = max(hard_null, d - int(round(eff_rank)))
-        m = max(1, min(m, self._max_lift_rank(d)))         # proper AND feasible subspace
-        idx = torch.argsort(absval)[:m]                    # m smallest |λ| modes
-        return evecs[:, idx]                               # (d, m)
+        A = A if A.dim() == 3 else A.unsqueeze(0)
+        d = A.shape[-1]
+        _, s, Vh = torch.linalg.svd(A)                     # s in decreasing order
+        V = Vh.flip(-2).transpose(-1, -2)                  # columns by increasing singular value
+        hard_null = (s < self.eig_eps).sum(dim=-1)
+        rank_deficit = d - _numerical_rank(s, self.detector.eig_eps)
+        m = torch.maximum(hard_null, rank_deficit).clamp(1, self._max_lift_rank(d))
+        return V, m                                        # proper AND feasible subspace
+
+    @torch.no_grad()
+    def _near_null_basis(self, A: Tensor) -> Tensor:
+        """The kick basis of ONE Jacobian (2-D, or a batch of one), (d, m). See _kick_basis."""
+        if A.dim() == 3 and A.shape[0] != 1:
+            raise ValueError("a batch has one kick basis per sample: use _kick_projector")
+        V, m = self._kick_basis(A)
+        return V[0, :, :int(m[0])]
+
+    @torch.no_grad()
+    def _kick_projector(self, A: Tensor) -> Tuple[Tensor, Tensor]:
+        """(P, m): each sample's orthogonal projector (B, d, d) onto its own kick basis, and its rank (B,)."""
+        V, m = self._kick_basis(A)
+        keep = (torch.arange(V.shape[-1], device=V.device) < m.unsqueeze(-1)).to(V.dtype)
+        return (V * keep.unsqueeze(-2)) @ V.transpose(-1, -2), m
 
     def _max_lift_rank(self, d: int) -> int:
         """Largest m with ε·m ≤ ½√(m(d−m)), i.e. m ≤ d/(1+4ε²), clamped to [1, d−1]. Keeping the
@@ -1357,71 +1418,79 @@ class AntiCollapseOperator:
         return max(1, min(d - 1, int(d / (1.0 + 4.0 * eps * eps))))
 
     @torch.no_grad()
-    def _cov_floor(self, sigma: Tensor, d: int, m: int) -> Tensor:
+    def _cov_floor(self, sigma: Tensor, d: int, m) -> Tensor:
         """L2′'s per-step bump threshold Δ(a, μ, d, m), for each sample: the μ-aware floor.
 
             Δ = (ε + a)·μ·d / (√(m(d−m)) − ε·m),   a = a(Σ), μ = mean λ(Σ), ε = LIFT_MARGIN·ε_a
 
         Holds for any rank-m orthogonal projector (reverse triangle inequality in Frobenius norm;
         no alignment and no normality). Each sample gets its own: one batch-wide μ leaves a
-        high-scale sample flat. `a` is not clipped at ε_a: `excite` reads the Riccati-propagated Σ,
-        which can already be anisotropic, and a clipped floor lets a bump flatten it.
+        high-scale sample flat. `m` is one rank for the batch or one per sample. `a` is not clipped
+        at ε_a: `excite` reads the Riccati-propagated Σ, which can already be anisotropic, and a
+        clipped floor lets a bump flatten it.
         Raises on an infeasible rank, where no finite bump can reach ε (excite never asks for one).
         """
         eps = self.detector.anisotropy_eps * self.LIFT_MARGIN
-        denom = (m * (d - m)) ** 0.5 - eps * m
-        if denom <= 0:
-            raise ValueError(f"no finite bump of rank {m} lifts a(Σ) to {eps:g} in dimension {d}")
+        m = torch.as_tensor(m, dtype=sigma.dtype, device=sigma.device)
+        denom = (m * (d - m)).sqrt() - eps * m
+        if bool((denom <= 0).any()):
+            raise ValueError(f"no finite bump of rank {m.long().tolist()} lifts a(Σ) to {eps:g} "
+                             f"in dimension {d}")
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
         ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
         mu = ev.mean(dim=-1)
         a = ev.std(dim=-1) / mu
         return (eps + a) * mu * d / denom
 
-    def _kick_scale(self, p: float) -> float:
-        """State-kick magnitude κ. Lemma S1: for x⁺ = c + (D + κP)ξ with D ⪰ 0 and any c,
-        P(‖x⁺‖ ≥ r) ≥ P(χ_m ≥ r/κ), by Anderson's inequality and Weyl's. With r = ε_g/2 (where
-        ‖∇ₓL‖ = 2‖x−x_target‖ crosses ε_g) this floor makes that at least ½. Without it the kick
-        was strength·p, which vanishes at the gate boundary exactly where it is needed.
+    def _kick_scale(self, p):
+        """State-kick magnitude κ, one per sample when p is. Lemma S1: for x⁺ = c + (D + κP)ξ with
+        D ⪰ 0 and any c, P(‖x⁺‖ ≥ r) ≥ P(χ_m ≥ r/κ), by Anderson's inequality and Weyl's. With
+        r = ε_g/2 (where ‖∇ₓL‖ = 2‖x−x_target‖ crosses ε_g) this floor makes that at least ½. Without
+        it the kick was strength·p, which vanishes at the gate boundary exactly where it is needed.
         strength=0 still disables the state leg."""
         if self.strength <= 0.0:
-            return 0.0
+            return torch.zeros_like(p) if isinstance(p, Tensor) else 0.0
         floor = self.detector.grad_eps / (2.0 * _MEDIAN_CHI_1)
+        if isinstance(p, Tensor):
+            return (self.strength * p).clamp_min(floor)
         return max(self.strength * p, floor)
 
     @torch.no_grad()
-    def excite(self, x: Tensor, sigma: Tensor, A: Tensor, p: float,
+    def excite(self, x: Tensor, sigma: Tensor, A: Tensor, p,
                noise: Tensor) -> tuple[Tensor, Tensor]:
-        """Return (dx_extra, sigma_extra) injected along the banded near-null subspace.
+        """Return (dx_extra, sigma_extra), each sample's along its own kick subspace (_kick_basis).
 
-        Two decoupled legs (docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md §2.2):
-          • covariance leg — the bump `b_cov · P_N` that breaks `cond_flat`, floored per sample to
-            L2′'s threshold Δ, so one bump provably lifts anisotropy above ε_a (Theorem C3). The
-            engine must apply it with CovarianceField.project_preserving_shape, or the σ_max cap
-            can erase it.
-          • state-kick leg — the random `dx_extra`, floored by _kick_scale (Lemma S1), so the state
-            itself leaves the gradient ball with probability ≥ ½ however small p is. This is the
-            only leg that moves x.
+        Every row passed is excited: the engine passes only the rows whose gate fired. `p` is one
+        proximity for all of them, or one per row. Two decoupled legs:
+          • covariance leg — the bump `b_cov · P` that breaks `cond_flat`, floored per sample to
+            L2′'s threshold Δ at that sample's own rank m, so one bump provably lifts anisotropy
+            above ε_a (Theorem C3). The engine must apply it with
+            CovarianceField.project_preserving_shape, or the σ_max cap can erase it.
+          • state-kick leg — the random `dx_extra = κ·Pξ`, floored by _kick_scale (Lemma S1), so the
+            state itself leaves the gradient ball with probability ≥ ½ however small p is. This is
+            the only leg that moves x.
         """
-        null = self._near_null_basis(A)                   # (d, m), feasible 1 ≤ m ≤ d−1
-        m = null.shape[1]
-        d = null.shape[0]
-
-        coeff = noise @ null                              # (B, m) random in null
-        dx_extra = self._kick_scale(p) * (coeff @ null.T)  # back to state space
+        P, m = self._kick_projector(A)                    # (B, d, d), feasible 1 ≤ m ≤ d−1 each
+        d = P.shape[-1]
+        kappa = self._kick_scale(p)
+        if isinstance(kappa, Tensor):
+            kappa = kappa.unsqueeze(-1)
+        dx_extra = kappa * (noise.unsqueeze(-2) @ P).squeeze(-2)   # κ·Pξ, P symmetric
         if d < 2:                       # one eigenvalue has no shape to restore: C3 needs d ≥ 2, S1 does not
             return dx_extra, torch.zeros_like(sigma)
 
-        b_cov = self._cov_floor(sigma, d, m).clamp_min(self.strength * p)  # each sample ≥ its Δ
-        sigma_extra = b_cov.unsqueeze(-1).unsqueeze(-1) * (null @ null.T)  # (B, d, d), rank m
+        b_cov = self._cov_floor(sigma, d, m)
+        b_cov = torch.maximum(b_cov, torch.as_tensor(self.strength * p, dtype=b_cov.dtype,
+                                                     device=b_cov.device))   # each sample ≥ its Δ
+        sigma_extra = b_cov.unsqueeze(-1).unsqueeze(-1) * P    # (B, d, d), rank m per sample
         return dx_extra, sigma_extra
 
 
-def _below(value: float, threshold: float) -> float:
-    """Soft indicator → 1 when value ≪ threshold, 0 when value ≥ threshold."""
+def _below(value: Tensor, threshold: float) -> Tensor:
+    """Soft indicator, elementwise → 1 when value ≪ threshold, 0 when value ≥ threshold."""
     if threshold <= 0:
-        return 0.0
-    return max(0.0, min(1.0, 1.0 - value / threshold))
+        return torch.zeros_like(value)
+    return (1.0 - value / threshold).clamp(0.0, 1.0)
 
 
 # ── Σ₀ᴿ Reconstruction Operator ───────────────────────────────────────────────

@@ -394,7 +394,7 @@ def test_anti_collapse_dormant_when_safe():
     p = m.anti_collapse_op.proximity(
         m, x0, m.pcsf(x0, s0),
         s0, torch.eye(4).expand(8, 4, 4).clone())
-    assert p == 0.0
+    assert p.shape == (8,) and bool((p == 0.0).all())   # one proximity per trajectory, all 0
 
 
 # ── Surprise Monitor Integration ───────────────────────────────────────────────
@@ -740,7 +740,9 @@ def test_c3_nonnormal_covariance_lift():
 
         # adversarial worst case: build Σ so its m SMALLEST eigendirections ARE the bump
         # basis (eig(A_s)), i.e. minimal tr(ΣP) — the hardest alignment for the lift.
-        P_basis = op._near_null_basis(A)                        # (d, m), from A_s
+        # (d, m): the operator's own kick basis, from the SVD of A. This A is full rank, so m = 1;
+        # the rank-deficient (gate-regime) case is test_each_sample_kick_lies_in_its_own_null_A.
+        P_basis = op._near_null_basis(A)
         m_rank = P_basis.shape[1]
         full = torch.randn(d, d, generator=g)
         full[:, :m_rank] = P_basis
