@@ -887,3 +887,77 @@ def test_zero_strength_state_leg_does_not_require_psd_effective_diffusion():
     assert bool(torch.isfinite(x_next).all())
     assert bool(torch.isfinite(sigma_next).all())
     assert info["anti_collapse_p"] > 0.0
+
+
+# ── switched stability and retained-excitation verification ─────────────────────────────
+
+def test_common_quadratic_verifier_checks_every_mode():
+    from src.cio_sde.stability import verify_common_quadratic
+    dtype = torch.float64
+    H = torch.eye(2, dtype=dtype)
+    F1 = 0.8 * torch.eye(2, dtype=dtype)
+    F2 = torch.tensor([[0.0, -0.6], [0.6, 0.0]], dtype=dtype)
+    result = verify_common_quadratic([F1, F2], H, rho=0.81)
+    assert result["valid"]
+    assert result["minimum_lyapunov_margin"] > 0.0
+    N1 = torch.tensor([[0.0, 2.0], [0.0, 0.0]], dtype=dtype)
+    N2 = torch.tensor([[0.0, 0.0], [2.0, 0.0]], dtype=dtype)
+    failed = verify_common_quadratic([N1, N2], H, rho=0.99)
+    assert not failed["valid"]
+    assert torch.linalg.matrix_norm(N2 @ N1, ord=2).item() == pytest.approx(4.0)
+
+
+def test_finite_horizon_gramian_proves_cyclic_kicks_are_retained():
+    from src.cio_sde.stability import finite_horizon_excitation_gramian
+    dtype = torch.float64
+    F = 0.8 * torch.eye(2, dtype=dtype)
+    e1 = torch.tensor([[1.0], [0.0]], dtype=dtype)
+    e2 = torch.tensor([[0.0], [1.0]], dtype=dtype)
+    W = finite_horizon_excitation_gramian([F, F], [0.1 * e1, 0.1 * e2])
+    assert torch.allclose(W, torch.diag(torch.tensor([0.0064, 0.01], dtype=dtype)))
+    assert torch.linalg.eigvalsh(W).min().item() >= 0.0064 - 1e-12
+
+
+def test_finite_horizon_gramian_detects_erased_kick():
+    from src.cio_sde.stability import finite_horizon_excitation_gramian
+    dtype = torch.float64
+    erase_first = torch.tensor([[0.0, 0.0], [0.0, 1.0]], dtype=dtype)
+    M = torch.tensor([[0.1], [0.0]], dtype=dtype)
+    zero = torch.zeros((2, 1), dtype=dtype)
+    W = finite_horizon_excitation_gramian([torch.eye(2, dtype=dtype), erase_first], [M, zero])
+    assert torch.allclose(W, torch.zeros((2, 2), dtype=dtype))
+
+
+def test_augmented_jacobian_includes_covariance_feedback():
+    from src.cio_sde.stability import augmented_transition_jacobian
+    z = torch.tensor([2.0, 0.4], dtype=torch.float64)
+    def transition(state):
+        x, p = state.unbind()
+        return torch.stack((x + p, 0.5 * p))
+    J = augmented_transition_jacobian(transition, z)
+    expected = torch.tensor([[1.0, 1.0], [0.0, 0.5]], dtype=torch.float64)
+    assert torch.allclose(J, expected)
+
+
+def test_common_quadratic_covariance_energy_bound():
+    from src.cio_sde.stability import covariance_energy_bound
+    dtype = torch.float64
+    P0 = torch.eye(2, dtype=dtype)
+    H = torch.eye(2, dtype=dtype)
+    bound = covariance_energy_bound(P0, H, rho=0.8, q=0.02, steps=10)
+    expected = 0.8 ** 20 * 2.0 + 0.02 * (1.0 - 0.8 ** 20) / (1.0 - 0.8 ** 2)
+    assert bound == pytest.approx(expected)
+
+
+def test_switched_mode_diagnostics_reports_certificate_and_gramian():
+    from src.cio_sde.diagnostics import analyze_switched_modes
+    dtype = torch.float64
+    F = 0.8 * torch.eye(2, dtype=dtype)
+    M1 = torch.tensor([[0.1], [0.0]], dtype=dtype)
+    M2 = torch.tensor([[0.0], [0.1]], dtype=dtype)
+    report = analyze_switched_modes(
+        [F, F], torch.eye(2, dtype=dtype), rho=0.81, noise_maps=[M1, M2]
+    )
+    assert report["stability_certificate"]["valid"]
+    assert report["excitation_positive_definite"]
+    assert report["excitation_min_eigenvalue"] == pytest.approx(0.0064)
