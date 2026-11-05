@@ -525,6 +525,40 @@ class Sigma0LoopLM:
                 run = 0
         return None, "no_break"
 
+    # ── sound depth-collapse alarm (docs/formal/TokenRouting.lean, A2 + A3) ──────
+    # If the loop map is κ-Lipschitz, every ABSOLUTE step is at most κ times the step before
+    # it (`step_ratio_alarm_sound`). So a ratio ‖Δₖ₊₁‖/‖Δₖ‖ > κ PROVES the map is not κ-contracting
+    # on this very trajectory (`alarm_refutes_receipt`): no false alarms on a receipted loop, no
+    # Jacobian, no ground truth. It matters because looking fine at trained depths certifies
+    # nothing about deeper ones, even for a non-expansive loop (`trained_depths_certify_nothing`).
+    # Unlike converge_step it uses absolute steps: under norm growth (DVLT's collapse mode)
+    # relative steps can shrink while absolute steps grow. Pure decision core, not wired into
+    # generate(); kappa=1.0 asks only "is the loop expanding here?", which needs no known κ.
+    # Limitation (also proven): at kappa=1.0 it cannot catch a merely non-expansive drift.
+    @staticmethod
+    def step_ratio_alarm(hidden_per_step, kappa: float = 1.0, patience: int = 1):
+        """hidden_per_step: list of hidden vectors (tensors), one per UT step.
+
+        Returns (alarm_step_1indexed, ratio_at_alarm, reason, ratios). `ratios[r]` is
+        ‖h[r+2] − h[r+1]‖ / ‖h[r+1] − h[r]‖, observed when h[r+2] arrives; the alarm step is
+        that state's 1-indexed UT step. A zero step followed by a nonzero one is ratio inf:
+        a Lipschitz map cannot move off a point it left fixed. Fires after `patience`
+        consecutive ratios above `kappa`; (None, last_ratio, "no_alarm", ratios) otherwise."""
+        steps = [float((hidden_per_step[t] - hidden_per_step[t - 1]).norm())
+                 for t in range(1, len(hidden_per_step))]
+        ratios, run = [], 0
+        for r in range(1, len(steps)):
+            prev, cur = steps[r - 1], steps[r]
+            ratio = cur / prev if prev > 0 else (float("inf") if cur > 0 else 0.0)
+            ratios.append(ratio)
+            if ratio > kappa:
+                run += 1
+                if run >= patience:
+                    return r + 2, ratio, "receipt_violated", ratios
+            else:
+                run = 0
+        return None, (ratios[-1] if ratios else 0.0), "no_alarm", ratios
+
     # ── generation with per-token adaptive depth ─────────────────────────────
     def generate(self, prompt: str, q: float = 0.5, max_new_tokens: int = 200, messages=None,
                  rep_penalty: float = 1.3, mode: str = "qexit", eps: float = 0.05,
