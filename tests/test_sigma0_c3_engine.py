@@ -429,7 +429,7 @@ def test_a_negative_gain_is_only_refused_when_the_kick_would_use_it():
 
 # ── two documented limits, pinned so that lifting them is a decision ────────────────────────────
 
-def test_semantic_freeze_gate_remains_one_decision_for_the_batch():
+def test_legacy_scalar_evaluate_remains_batch_aggregate_for_compatibility():
     """Each member alone triggers. Together they do not, because the mean of two rank-1 Jacobians has
     rank 2. A per-trajectory gate would change this, and this test should change with it."""
     d = 4
