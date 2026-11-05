@@ -125,7 +125,7 @@ jobs:
 
       - name: Run PyTorch-backed Sigma0 and CIO-SDE suites
         run: |
-          python -m pytest -q --tb=short \
+          PYTHONPATH=src:. python -m pytest -q --tb=short \
             tests/test_quantized_cache.py \
             tests/test_sigma0_kernel_e2e.py \
             tests/test_loop_exit.py \
