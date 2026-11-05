@@ -153,6 +153,19 @@ class CovarianceField:
             sigma_next = sigma_next + noise_map @ noise_map.transpose(-1, -2)
         return self._project_psd(sigma_next)
 
+    def transport_shape(self, shape: Tensor, A: Tensor, dt: float) -> Tensor:
+        """Transport a shape metric through the deterministic linearized step.
+
+        Unlike belief covariance, this object receives no process-noise or measurement
+        update. It follows S+ = F S F^T, F = I + A*dt; anti-collapse may then add a
+        deliberate anisotropy lift. It is a regularizer, not a posterior covariance.
+        """
+        d = shape.shape[-1]
+        eye = torch.eye(d, device=shape.device, dtype=shape.dtype).expand(shape.shape[0], -1, -1)
+        F = eye + A * dt
+        transported = F @ shape @ F.transpose(-1, -2)
+        return self.project_preserving_shape(transported)
+
     def project_preserving_shape(self, sigma: Tensor) -> Tensor:
         """PSD projection that keeps the eigenvalue RATIOS, for the Σ₀⁻¹ bump.
 
@@ -303,6 +316,7 @@ class Trace:
     swaps: List[SwapRecord] = field(default_factory=list)
     collapses: List[Dict[str, object]] = field(default_factory=list)
     interventions: List[InterventionReceipt] = field(default_factory=list)
+    shape_traces: List[float] = field(default_factory=list)
     running_cost: object = None      # differentiable ∫L dt when accumulate_cost
 
     def emit(self, step: int, **fields: float) -> None:
@@ -380,7 +394,16 @@ class CIO_SDE(nn.Module):
 
     def forward_step(self, x: Tensor, sigma: Tensor, dt: float,
                      noise: Tensor,
-                     step: int = -1) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
+                     step: int = -1,
+                     shape_covariance: Optional[Tensor] = None) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
+        """Advance one step with an optional separate shape regularizer.
+
+        Omitting shape_covariance preserves the historical single-Sigma behavior.
+        Supplying it activates the split: sigma is belief covariance; shape covariance
+        is transported deterministically and receives C3 regularization separately.
+        """
+        split_covariance = shape_covariance is not None
+        shape_current = shape_covariance if split_covariance else sigma
         node = self.graph.active
         u = self.pcsf(x, sigma)
         f = node.drift(x, u)
@@ -407,6 +430,10 @@ class CIO_SDE(nn.Module):
         q_diag = effective_diffusion.square()
         base_noise_map = torch.diag_embed(effective_diffusion * math.sqrt(dt))
         sigma_next = self.cov.step(sigma, A, q_diag, dt)
+        shape_next = (
+            self.cov.transport_shape(shape_current, A, dt)
+            if split_covariance else sigma_next
+        )
 
         info = {"u": u, "f": f, "g": g, "dilation": dilation.squeeze(-1),
                 "collapse": None, "anti_collapse_p": 0.0, "sigma0_proximity": 0.0,
@@ -480,10 +507,10 @@ class CIO_SDE(nn.Module):
                     )
 
             if supports_per_sample:
-                proximity_per_sample = per_sample_method(self, x, u, sigma, A)
+                proximity_per_sample = per_sample_method(self, x, u, shape_current, A)
                 sigma0_proximity = float(proximity_per_sample.max().item())
             else:
-                sigma0_proximity = float(self.anti_collapse_op.proximity(self, x, u, sigma, A))
+                sigma0_proximity = float(self.anti_collapse_op.proximity(self, x, u, shape_current, A))
                 proximity_per_sample = torch.full_like(surprise_boost, sigma0_proximity)
 
             effective_per_sample = torch.maximum(proximity_per_sample, surprise_boost)
@@ -535,9 +562,13 @@ class CIO_SDE(nn.Module):
                         )
 
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
-                        x, sigma_next, A, excite_proximity, noise)
+                        x, shape_next if split_covariance else sigma_next,
+                        A, excite_proximity, noise)
                     x_next = x_next + dx_extra
-                    sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
+                    if split_covariance:
+                        shape_next = self.cov.project_preserving_shape(shape_next + sig_extra)
+                    else:
+                        sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
                     anti_active = True
                     anti_active_mask = (
@@ -580,10 +611,10 @@ class CIO_SDE(nn.Module):
                     supports_per_sample = mro.index(per_owner) <= mro.index(scalar_owner)
 
             if supports_per_sample:
-                res = per_sample_eval(self, x, u, sigma, A, exclude_mask=anti_active_mask)
+                res = per_sample_eval(self, x, u, shape_current, A, exclude_mask=anti_active_mask)
             elif not anti_active:
                 # Legacy custom collapse operators retain their batch-wide evaluate() contract.
-                res = self.collapse_op.evaluate(self, x, u, sigma, A)
+                res = self.collapse_op.evaluate(self, x, u, shape_current, A)
             else:
                 res = None
 
@@ -597,9 +628,13 @@ class CIO_SDE(nn.Module):
                         collapse_mask = res.triggered_mask
                         x_next = torch.where(collapse_mask.unsqueeze(-1), res.x_star, x_next)
                         sigma_next = torch.where(collapse_mask[:, None, None], sigma, sigma_next)
+                        if split_covariance:
+                            shape_next = torch.where(collapse_mask[:, None, None], shape_current, shape_next)
                     else:
                         x_next = res.x_star
                         sigma_next = sigma
+                        if split_covariance:
+                            shape_next = shape_current
                     info["collapse"] = res
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
@@ -628,6 +663,8 @@ class CIO_SDE(nn.Module):
                     )
 
         info["intervention_receipt"] = receipt
+        if split_covariance:
+            info["shape_covariance"] = shape_next
         return x_next, sigma_next, info
 
     def costate(self, x: Tensor, u: Tensor, sigma: Tensor) -> Tensor:
@@ -642,7 +679,8 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
             dt: float = 0.05, base_seed: int = 0,
             swap_schedule: Optional[Dict[int, Dynamics]] = None,
             record: bool = True,
-            accumulate_cost: bool = False
+            accumulate_cost: bool = False,
+            shape_sigma0: Optional[Tensor] = None
             ) -> Tuple[Tensor, Tensor, Trace]:
     """
     Deterministic, replayable rollout.
@@ -656,6 +694,7 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
     objective ∫L dt used for training.
     """
     x, sigma = x0, sigma0
+    shape_sigma = shape_sigma0
     trace = Trace(base_seed=base_seed, dt=dt)
     swap_schedule = swap_schedule or {}
     device = x0.device
@@ -673,7 +712,11 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
             rec = model.graph.hot_swap(swap_schedule[t], x.detach(), u_probe, t)
             trace.swaps.append(rec)
 
-        x_next, sigma_next, info = model.forward_step(x, sigma, dt, noise, step=t)
+        x_next, sigma_next, info = model.forward_step(
+            x, sigma, dt, noise, step=t, shape_covariance=shape_sigma
+        )
+        if shape_sigma is not None:
+            shape_sigma = info["shape_covariance"]
 
         if info.get("collapse") is not None:
             trace.collapses.append({"step": t, "result": info["collapse"]})
@@ -683,6 +726,11 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
 
         if accumulate_cost:
             running = running + model.stage_cost(x, info["u"]).mean() * dt
+
+        if shape_sigma is not None:
+            trace.shape_traces.append(
+                torch.diagonal(shape_sigma, dim1=-2, dim2=-1).sum(-1).mean().item()
+            )
 
         if record:
             xdot = (x_next - x) / dt
