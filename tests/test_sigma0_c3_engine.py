@@ -821,3 +821,55 @@ def test_split_covariance_rollout_returns_both_states_without_legacy_change():
     assert legacy_trace.final_shape_covariance is None
     assert legacy_trace.shape_traces == []
     assert legacy_sigma.shape == belief.shape
+
+
+
+# ── closed-loop linearization, real observations, and batch independence ────────────────
+
+def test_closed_loop_jacobian_includes_policy_feedback():
+    from src.cio_sde.engine import closed_loop_drift_jacobian
+
+    class IdentityPolicy:
+        def __call__(self, x, sigma):
+            return x
+
+    node = LinearDynamics(torch.zeros(2, 2, dtype=torch.float64),
+                          B=torch.eye(2, dtype=torch.float64), noise=0.0).double()
+    x = torch.tensor([[0.2, -0.4]], dtype=torch.float64)
+    sigma = torch.eye(2, dtype=torch.float64).unsqueeze(0)
+    J = closed_loop_drift_jacobian(node, IdentityPolicy(), x, sigma)
+    assert torch.allclose(J, torch.eye(2, dtype=torch.float64).unsqueeze(0))
+
+
+def test_split_belief_covariance_only_contracts_on_an_actual_measurement():
+    cov = CovarianceField(2, r=1.0)
+    x = torch.zeros(1, 2, dtype=torch.float64)
+    P = torch.eye(2, dtype=torch.float64).unsqueeze(0)
+    y = torch.tensor([[2.0]], dtype=torch.float64)
+    H = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    R = torch.tensor([[1.0]], dtype=torch.float64)
+    x_post, P_post = cov.assimilate(x, P, y, H, R)
+    assert torch.allclose(x_post, torch.tensor([[1.0, 0.0]], dtype=torch.float64))
+    assert torch.allclose(P_post, torch.diag(torch.tensor([0.5, 1.0], dtype=torch.float64)).unsqueeze(0))
+    P_pred = cov.predict(P, torch.zeros(1, 2, 2, dtype=torch.float64),
+                         torch.zeros(1, 2, dtype=torch.float64), 0.1)
+    assert torch.allclose(P_pred, P)
+
+
+def test_per_sample_gate_refuses_cross_sample_stage_cost_coupling():
+    class CoupledCostModel:
+        def __init__(self):
+            self.graph = type("Graph", (), {})()
+            self.graph.active = LinearDynamics(torch.zeros(2, 2), B=torch.zeros(2, 1), noise=0.0)
+        def stage_cost(self, x, u):
+            shared = x.sum(dim=0).square().sum()
+            return shared.expand(x.shape[0])
+
+    model = CoupledCostModel()
+    op = AntiCollapseOperator()
+    x = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+    u = torch.zeros(2, 1)
+    sigma = torch.eye(2).expand(2, -1, -1).clone()
+    A = torch.zeros(2, 2, 2)
+    with pytest.raises(RuntimeError, match="stage_cost couples batch members"):
+        op.proximity_per_sample(model, x, u, sigma, A)
