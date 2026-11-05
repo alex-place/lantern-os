@@ -60,7 +60,9 @@ def _cap_fixed_point_model():
     """A=diag(500,0,0,0), Σ=1000·I, Q=diag(0,1e6,1e6,1e6): an exact Riccati fixed point
     sitting on the σ_max cap, so Σ_pred = σ_max·I and the bump has no headroom."""
     A = torch.diag(torch.tensor([500.0, 0.0, 0.0, 0.0], dtype=torch.float64))
-    gain = torch.tensor([0.0, 1000.0, 1000.0, 1000.0], dtype=torch.float64)
+    # The engine's actual diffusion gain is g*dilation, with dilation=1001 here.
+    gain = torch.tensor([0.0, 1000.0 / 1001.0, 1000.0 / 1001.0,
+                         1000.0 / 1001.0], dtype=torch.float64)
     m = CIO_SDE(dim=4, ctrl_dim=2, hidden=8).double()
     m.graph.active = _DiagonalNoise(A, gain).double()
     _zero_policy(m)
@@ -429,7 +431,7 @@ def test_a_negative_gain_is_only_refused_when_the_kick_would_use_it():
 
 # ── two documented limits, pinned so that lifting them is a decision ────────────────────────────
 
-def test_the_gate_is_one_decision_for_the_batch():
+def test_legacy_scalar_evaluate_remains_batch_aggregate_for_compatibility():
     """Each member alone triggers. Together they do not, because the mean of two rank-1 Jacobians has
     rank 2. A per-trajectory gate would change this, and this test should change with it."""
     d = 4
@@ -447,9 +449,9 @@ def test_the_gate_is_one_decision_for_the_batch():
     assert not fires(torch.stack([a1, a2]))
 
 
-def test_the_kick_subspace_comes_from_the_symmetric_part():
-    """For non-normal A the kick is not confined to null(A). L2′ and S1 allow any projector, so neither
-    theorem depends on this, but "near-null" here means near-null for A_s."""
+def test_legacy_near_null_basis_helper_still_uses_the_symmetric_part():
+    """Compatibility helper only: the runtime excite() path now uses the per-sample right-kernel SVD.
+    This old helper still reports the historical A_s basis for callers that use it directly."""
     A = torch.zeros(4, 4)
     A[0, 1] = 1.0
     basis = AntiCollapseOperator()._near_null_basis(A.unsqueeze(0))
@@ -479,3 +481,269 @@ def test_zero_strength_state_leg_does_not_require_psd_effective_diffusion():
     assert bool(torch.isfinite(x_next).all())
     assert bool(torch.isfinite(sigma_next).all())
     assert info["anti_collapse_p"] > 0.0
+
+
+# ── per-sample decisions and true right-kernel projectors ─────────────────────────────────
+
+def test_per_sample_proximity_does_not_hide_one_collapsed_member():
+    op = AntiCollapseOperator()
+    d = 4
+    A = torch.stack((
+        torch.eye(d),
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+    ))
+    x = torch.zeros(2, d)
+    u = torch.zeros(2, 2)
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    model = _zero_policy(CIO_SDE(dim=d, ctrl_dim=2, hidden=4))
+    proximity = op.proximity_per_sample(model, x, u, sigma, A)
+    assert proximity.shape == (2,)
+    assert proximity[0].item() == pytest.approx(0.0)
+    assert proximity[1].item() > 0.0
+    assert op.proximity(model, x, u, sigma, A) == pytest.approx(float(proximity.max()))
+
+
+def test_per_sample_projectors_follow_each_members_actual_right_kernel():
+    op = AntiCollapseOperator()
+    d = 4
+    A = torch.stack((
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+        torch.diag(torch.tensor([0.0, 1.0, 0.0, 0.0])),
+    ))
+    projectors, ranks = op._near_null_projector_per_sample(A, batch_size=2)
+    assert ranks.tolist() == [3, 3]
+    assert torch.linalg.norm(A @ projectors) < 1e-5
+    assert not torch.allclose(projectors[0], projectors[1])
+    assert torch.allclose(projectors, projectors.transpose(-1, -2), atol=1e-6)
+    assert torch.allclose(projectors @ projectors, projectors, atol=1e-5)
+
+
+def test_nonnormal_right_kernel_projector_is_in_actual_kernel():
+    op = AntiCollapseOperator()
+    A = torch.zeros(1, 4, 4)
+    A[0, 0, 1] = 1.0
+    projectors, ranks = op._near_null_projector_per_sample(A, batch_size=1)
+    assert ranks.item() == 3
+    assert torch.linalg.norm(A @ projectors) < 1e-6
+
+
+def test_excite_only_kicks_and_lifts_the_samples_that_trigger():
+    op = AntiCollapseOperator(strength=0.5)
+    d = 4
+    A = torch.stack((
+        torch.eye(d),
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+    ))
+    x = torch.zeros(2, d)
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    noise = torch.ones(2, d)
+    p = torch.tensor([0.0, 0.5])
+    dx, dsigma = op.excite(x, sigma, A, p, noise)
+    assert torch.allclose(dx[0], torch.zeros(d))
+    assert torch.allclose(dsigma[0], torch.zeros(d, d))
+    assert torch.linalg.norm(dx[1]) > 0.0
+    assert torch.linalg.norm(dsigma[1]) > 0.0
+
+
+class _BatchConditionalDynamics(Dynamics):
+    """Different local Jacobians for members of the same batch."""
+
+    def __init__(self, dim=4):
+        super().__init__(dim, ctrl_dim=2, hidden=4)
+
+    def drift(self, x, u):
+        eye = torch.eye(self.dim, device=x.device, dtype=x.dtype).expand(x.shape[0], -1, -1)
+        collapsed = torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0],
+                                            device=x.device, dtype=x.dtype))
+        A = torch.where((x[:, :1] > 0).unsqueeze(-1), eye,
+                        collapsed.expand(x.shape[0], -1, -1))
+        return torch.bmm(A, x.unsqueeze(-1)).squeeze(-1)
+
+    def diffusion(self, x):
+        return torch.zeros_like(x)
+
+
+def test_forward_step_applies_anti_collapse_per_sample_not_to_healthy_members():
+    m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    m.graph.active = _BatchConditionalDynamics()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    x = torch.tensor([[1e-3, 0.0, 0.0, 0.0],
+                      [-1e-3, 0.0, 0.0, 0.0]])
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    noise = torch.ones_like(x)
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+    assert info["sigma0_proximity"] > 0.0
+    assert torch.allclose(sigma_next[0], torch.eye(4) * 1.05, atol=1e-5)
+    assert torch.allclose(x_next[0], x[0] + 0.05 * x[0], atol=1e-5)
+    assert torch.linalg.norm(sigma_next[1] - torch.eye(4)) > 0.0
+    assert torch.linalg.norm(x_next[1] - (x[1] + 0.05 * x[1])) > 0.0
+
+
+class _LegacyScalarProximityOverride(AntiCollapseOperator):
+    def proximity(self, model, x, u, sigma, A):
+        return 0.5
+
+
+def test_legacy_scalar_proximity_override_keeps_scalar_excite_contract():
+    m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    m.graph.active = LinearDynamics(
+        torch.zeros(4, 4), B=torch.zeros(4, 2), noise=0.0
+    )
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = _LegacyScalarProximityOverride(strength=0.5)
+    x = torch.zeros(2, 4)
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.ones_like(x), step=0)
+    assert info["sigma0_proximity"] == pytest.approx(0.5)
+    assert info["anti_collapse_p"] == pytest.approx(0.5)
+    assert torch.linalg.norm(x_next - x) > 0.0
+
+
+# Engine-level regression: a collapsed member must not freeze healthy batch peers.
+def test_engine_freeze_projects_only_the_collapsed_member():
+    m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    m.graph.active = _BatchConditionalDynamics()
+    m.collapse_op = SemanticCollapseOperator()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    x = torch.tensor([[1e-3, 0.0, 0.0, 0.0],
+                      [-1e-3, 0.0, 0.0, 0.0]])
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, torch.zeros_like(x), step=0)
+    result = info["collapse"]
+    assert result is not None and result.triggered
+    assert result.triggered_mask.tolist() == [False, True]
+    # Healthy member follows the ordinary step; collapsed member projects to its own null(A).
+    assert torch.allclose(x_next[0], x[0] + 0.05 * x[0], atol=1e-6)
+    assert torch.allclose(x_next[1], torch.zeros(4), atol=1e-6)
+    # Only the frozen member reverts its covariance to the pre-step Sigma.
+    assert torch.allclose(sigma_next[1], sigma[1], atol=1e-6)
+    assert not torch.allclose(sigma_next[0], sigma[0])
+
+
+def test_semantic_evaluate_legacy_batch_summary_remains_available():
+    op = SemanticCollapseOperator()
+    model = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    A = torch.stack((torch.eye(4), torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0]))))
+    x = torch.zeros(2, 4)
+    u = torch.zeros(2, 2)
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    legacy = op.evaluate(model, x, u, sigma, A)
+    per_sample = op.evaluate_per_sample(model, x, u, sigma, A)
+    assert legacy.triggered is False
+    assert per_sample.triggered is True
+    assert per_sample.triggered_mask.tolist() == [False, True]
+
+
+def test_riccati_process_noise_matches_the_state_diffusion_map():
+    """With A=0 and Sigma=0, one Euler step must add (g*dilation)^2*dt."""
+    dim = 3
+    m = CIO_SDE(dim=dim, ctrl_dim=2, hidden=4)
+    m.graph.active = LinearDynamics(
+        torch.zeros(dim, dim),
+        B=torch.zeros(dim, 2),
+        noise=2.0,
+    )
+    _zero_policy(m)
+    x = torch.zeros(1, dim)
+    sigma = torch.zeros(1, dim, dim)
+    dt = 0.2
+    _, sigma_next, _ = m.forward_step(
+        x, sigma, dt, torch.ones_like(x), step=0
+    )
+    expected = (2.0 ** 2) * dt
+    assert torch.allclose(
+        sigma_next,
+        torch.eye(dim).unsqueeze(0) * expected,
+        atol=1e-6,
+    )
+
+
+def test_covariance_step_includes_shared_noise_cross_terms():
+    cov = CovarianceField(2)
+    sigma = torch.zeros(1, 2, 2, dtype=torch.float64)
+    A = torch.zeros(1, 2, 2, dtype=torch.float64)
+    q_diag = torch.zeros(1, 2, dtype=torch.float64)
+    # Base diffusion and kick are perfectly correlated: M = diag(1,0)+diag(1,0).
+    # Covariance is (2ξ)^2=4, not 1+1=2.
+    noise_map = torch.diag(torch.tensor([2.0, 0.0], dtype=torch.float64)).unsqueeze(0)
+    out = cov.step(sigma, A, q_diag, dt=0.25, noise_map=noise_map)
+    expected = torch.diag(torch.tensor([4.0, cov.eps], dtype=torch.float64)).unsqueeze(0)
+    assert torch.allclose(out, expected, atol=1e-10)
+
+
+def test_excitation_noise_map_matches_the_state_kick_map():
+    op = AntiCollapseOperator(strength=0.5)
+    d = 4
+    A = torch.stack((
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+        torch.diag(torch.tensor([0.0, 1.0, 0.0, 0.0])),
+    ))
+    p = torch.tensor([0.0, 0.5])
+    M = op.excitation_noise_map(A, p, 2, torch.device("cpu"), torch.float32)
+    noise = torch.tensor([[1.0, 2.0, 3.0, 4.0],
+                          [4.0, 3.0, 2.0, 1.0]])
+    dx, _ = op.excite(torch.zeros_like(noise),
+                      torch.eye(d).expand(2, d, d).clone(), A, p, noise)
+    expected = torch.bmm(M, noise.unsqueeze(-1)).squeeze(-1)
+    assert torch.allclose(dx, expected, atol=1e-6)
+
+
+def test_riccati_process_noise_scales_with_covariance_dilation():
+    dim = 3
+    m = CIO_SDE(dim=dim, ctrl_dim=2, hidden=4)
+    m.graph.active = LinearDynamics(
+        torch.zeros(dim, dim),
+        B=torch.zeros(dim, 2),
+        noise=2.0,
+    )
+    _zero_policy(m)
+    sigma = 3.0 * torch.eye(dim).unsqueeze(0)
+    x = torch.zeros(1, dim)
+    dt = 0.2
+    _, sigma_next, info = m.forward_step(
+        x, sigma, dt, torch.zeros_like(x), step=0
+    )
+    # dilation = 1 + tr(Sigma)/d = 4; Q = (2*4)^2 I.
+    # Riccati term is -Sigma^2, so Sigma+ = 3I + (-9I + 64I)*0.2 = 14I.
+    assert torch.allclose(info["dilation"], torch.tensor([4.0]), atol=1e-6)
+    assert torch.allclose(sigma_next, 14.0 * torch.eye(dim).unsqueeze(0), atol=1e-5)
+
+
+class _CorrelatedKickOnly(AntiCollapseOperator):
+    """Test operator with an explicit kick map and no artificial shape bump."""
+
+    def proximity(self, model, x, u, sigma, A):
+        return 0.5
+
+    def excitation_noise_map(self, A, p, batch_size, device, dtype):
+        return torch.diag(torch.tensor([1.0, 0.0], device=device, dtype=dtype)).expand(
+            batch_size, -1, -1
+        )
+
+    def excite(self, x, sigma, A, p, noise):
+        M = self.excitation_noise_map(A, p, x.shape[0], x.device, x.dtype)
+        dx = torch.bmm(M, noise.unsqueeze(-1)).squeeze(-1)
+        return dx, torch.zeros_like(sigma)
+
+
+def test_engine_covariance_includes_the_actual_intervention_noise_map():
+    dim = 2
+    m = _zero_policy(CIO_SDE(dim=dim, ctrl_dim=2, hidden=4))
+    m.graph.active = LinearDynamics(
+        torch.zeros(dim, dim),
+        B=torch.zeros(dim, 2),
+        noise=0.0,
+    )
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = _CorrelatedKickOnly(strength=0.0)
+    x = torch.zeros(1, dim)
+    sigma = torch.zeros(1, dim, dim)
+    x_next, sigma_next, info = m.forward_step(
+        x, sigma, 0.25, torch.ones_like(x), step=0
+    )
+    assert info["anti_collapse_p"] == pytest.approx(0.5)
+    assert torch.allclose(x_next, torch.tensor([[1.0, 0.0]]), atol=1e-6)
+    # The same xi drives the unit kick in e1, so predicted covariance gains e1e1^T.
+    assert sigma_next[0, 0, 0].item() == pytest.approx(1.0, abs=1e-5)
+    assert sigma_next[0, 1, 1].item() == pytest.approx(m.cov.eps, abs=1e-6)

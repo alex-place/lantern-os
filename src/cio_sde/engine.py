@@ -136,16 +136,21 @@ class CovarianceField:
         self.eps = eps
         self.sigma_max = sigma_max
 
-    def step(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float) -> Tensor:
+    def step(self, sigma: Tensor, A: Tensor, q_diag: Tensor, dt: float,
+             noise_map: Optional[Tensor] = None) -> Tensor:
         # AΣ + ΣAᵀ
         AS = A @ sigma
         term = AS + AS.transpose(-1, -2)
-        # + Q  (diagonal process noise from diffusion gain²)
-        Q = torch.diag_embed(q_diag)
         # − Σ R⁻¹ Σ   (C = I)
         riccati = self.r_inv * (sigma @ sigma)
-        dsigma = term + Q - riccati
-        sigma_next = sigma + dsigma * dt
+        sigma_next = sigma + (term - riccati) * dt
+        if noise_map is None:
+            # Continuous-time diagonal process-noise rate Q.
+            sigma_next = sigma_next + torch.diag_embed(q_diag) * dt
+        else:
+            # Exact per-step covariance of the executed shared-noise map M ξ.
+            # Includes cross terms when base diffusion and intervention share ξ.
+            sigma_next = sigma_next + noise_map @ noise_map.transpose(-1, -2)
         return self._project_psd(sigma_next)
 
     def project_preserving_shape(self, sigma: Tensor) -> Tensor:
@@ -396,7 +401,11 @@ class CIO_SDE(nn.Module):
         # stability_gates (matrix-measure contraction analysis: Lohmiller & Slotine 1998,
         # Automatica 34(6):683-696).
         A = drift_jacobian(node, x.detach(), u.detach())
-        q_diag = (g.detach() ** 2)
+        # The state receives diag(g * dilation) dW, not diag(g) dW.
+        # Keep the Riccati process-noise term consistent with that executed map.
+        effective_diffusion = g.detach() * dilation.detach()
+        q_diag = effective_diffusion.square()
+        base_noise_map = torch.diag_embed(effective_diffusion * math.sqrt(dt))
         sigma_next = self.cov.step(sigma, A, q_diag, dt)
 
         info = {"u": u, "f": f, "g": g, "dilation": dilation.squeeze(-1),
@@ -407,8 +416,9 @@ class CIO_SDE(nn.Module):
         # imminent 42-state. When it fires it SUPPRESSES the Σ₀ freeze this step
         # (the whole point is to prevent collapse, not freeze into it).
         anti_active = False
+        anti_active_mask = torch.zeros(x.shape[0], device=x.device, dtype=torch.bool)
         sigma0_proximity = 0.0
-        surprise_boost = 0.0
+        surprise_boost = torch.zeros(x.shape[0], device=x.device, dtype=x.dtype)
         
         # Surprise monitor — NIS-based collapse detection (#506/#657).
         # The engine no longer self-observes (y=x gave innovation ν≡0, so the canary
@@ -431,7 +441,7 @@ class CIO_SDE(nn.Module):
                 info["surprise_nis"] = float(surprise_result["nis"].mean().item())
                 if info["surprise_spook"] and self.surprise_monitor.anti_collapse_trigger:
                     # Spook → boost anti-collapse proximity to 1.0 (detect → excite).
-                    surprise_boost = 1.0
+                    surprise_boost = surprise_result["spook"].to(dtype=x.dtype)
                 # Measurement update: fuse x to get the posterior belief.
                 x_post, P_post = self.surprise_monitor.update(
                     self._surprise_pred_mean, self._surprise_pred_cov, x, C, R)
@@ -455,44 +465,93 @@ class CIO_SDE(nn.Module):
         receipt: Optional[InterventionReceipt] = None
 
         if self.anti_collapse_op is not None:
-            sigma0_proximity = self.anti_collapse_op.proximity(self, x, u, sigma, A)
-            effective_proximity = max(sigma0_proximity, surprise_boost)
+            per_sample_method = getattr(self.anti_collapse_op, "proximity_per_sample", None)
+            supports_per_sample = callable(per_sample_method)
+            if supports_per_sample:
+                mro = type(self.anti_collapse_op).__mro__
+                per_owner = next((cls for cls in mro if "proximity_per_sample" in cls.__dict__), None)
+                scalar_owner = next((cls for cls in mro if "proximity" in cls.__dict__), None)
+                excite_owner = next((cls for cls in mro if "excite" in cls.__dict__), None)
+                if per_owner is not None and scalar_owner is not None and excite_owner is not None:
+                    per_depth = mro.index(per_owner)
+                    supports_per_sample = (
+                        per_depth <= mro.index(scalar_owner)
+                        and per_depth <= mro.index(excite_owner)
+                    )
+
+            if supports_per_sample:
+                proximity_per_sample = per_sample_method(self, x, u, sigma, A)
+                sigma0_proximity = float(proximity_per_sample.max().item())
+            else:
+                sigma0_proximity = float(self.anti_collapse_op.proximity(self, x, u, sigma, A))
+                proximity_per_sample = torch.full_like(surprise_boost, sigma0_proximity)
+
+            effective_per_sample = torch.maximum(proximity_per_sample, surprise_boost)
+            effective_proximity = float(effective_per_sample.max().item())
+            surprise_any = bool((surprise_boost > 0).any())
+            structural_any = sigma0_proximity > 0.0
             info["sigma0_proximity"] = sigma0_proximity
 
             if effective_proximity > 0.0:
-                trigger_src = "surprise" if surprise_boost >= sigma0_proximity else "structural"
-                if surprise_boost > 0.0 and sigma0_proximity > 0.0:
+                if surprise_any and structural_any:
                     trigger_src = "both"
+                elif surprise_any:
+                    trigger_src = "surprise"
+                else:
+                    trigger_src = "structural"
 
                 budget_ok = (
                     not policy.observe_only
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
-                    # dW and the kick share ξ, so their signs interact. Lemma S1 needs
-                    # D = diag(g * dilation * sqrt(dt)) to be PSD, not merely g >= 0:
-                    # caller-supplied initial Sigma can make dilation negative before projection.
+                    # Validate only members that actually receive the built-in S1 state kick.
                     if getattr(self.anti_collapse_op, "strength", 1.0) > 0.0:
                         effective_gain = g * dilation
-                        if (not bool(torch.isfinite(effective_gain).all())
-                                or bool((effective_gain < 0).any())):
+                        active = effective_per_sample > 0
+                        bad_gain = (~torch.isfinite(effective_gain) | (effective_gain < 0)).any(dim=-1)
+                        if bool((bad_gain & active).any()):
                             raise ValueError(
                                 "the anti-collapse kick needs a finite non-negative diffusion gain after dilation"
                             )
+                    excite_proximity = effective_per_sample if supports_per_sample else effective_proximity
+
+                    # If this operator's excite() and noise-map methods share the same
+                    # implementation owner, include the kick in the predicted covariance.
+                    # M_total ξ = [diag(g*dilation*sqrt(dt)) + κP] ξ; this captures
+                    # both κ²PPᵀ and the shared-noise cross terms.
+                    noise_map_method = getattr(self.anti_collapse_op, "excitation_noise_map", None)
+                    mro = type(self.anti_collapse_op).__mro__
+                    excite_owner = next((cls for cls in mro if "excite" in cls.__dict__), None)
+                    map_owner = next((cls for cls in mro
+                                      if "excitation_noise_map" in cls.__dict__), None)
+                    if callable(noise_map_method) and excite_owner is not None and excite_owner is map_owner:
+                        kick_noise_map = noise_map_method(
+                            A, excite_proximity, x.shape[0], x.device, x.dtype
+                        )
+                        sigma_next = self.cov.step(
+                            sigma, A, q_diag, dt,
+                            noise_map=base_noise_map + kick_noise_map,
+                        )
+
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
-                        x, sigma_next, A, effective_proximity, noise)
+                        x, sigma_next, A, excite_proximity, noise)
                     x_next = x_next + dx_extra
                     sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
                     anti_active = True
+                    anti_active_mask = (
+                        effective_per_sample > 0 if supports_per_sample
+                        else torch.full_like(effective_per_sample, True, dtype=torch.bool)
+                    )
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
                         step=step, kind="excite", trigger_source=trigger_src,
-                        sigma0_proximity=sigma0_proximity, surprise_spook=bool(surprise_boost > 0.0),
+                        sigma0_proximity=sigma0_proximity, surprise_spook=surprise_any,
                         pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
                         pre_sigma_tr=pre_sigma_tr,
                         post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason="budget_ok: anti-collapse excite fired",
+                        policy_reason="budget_ok: per-sample anti-collapse excite fired",
                     )
                 else:
                     kind = "observe" if policy.observe_only else "blocked"
@@ -502,25 +561,45 @@ class CIO_SDE(nn.Module):
                     )
                     receipt = InterventionReceipt(
                         step=step, kind=kind, trigger_source=trigger_src,
-                        sigma0_proximity=sigma0_proximity, surprise_spook=bool(surprise_boost > 0.0),
+                        sigma0_proximity=sigma0_proximity, surprise_spook=surprise_any,
                         pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
                         pre_sigma_tr=pre_sigma_tr,
                         post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
                         policy_reason=reason,
                     )
 
-        # Σ₀ gating: dx = f dt + dW − Σ₀(x,Σ,G,u). When the system is
-        # underdetermined, freeze onto the minimal invariant attractor.
-        if self.collapse_op is not None and not anti_active:
-            res = self.collapse_op.evaluate(self, x, u, sigma, A)
-            if res.triggered:
+        # Σ₀ gating: freeze only the members that independently satisfy the gate.
+        if self.collapse_op is not None:
+            per_sample_eval = getattr(self.collapse_op, "evaluate_per_sample", None)
+            supports_per_sample = callable(per_sample_eval)
+            if supports_per_sample:
+                mro = type(self.collapse_op).__mro__
+                per_owner = next((cls for cls in mro if "evaluate_per_sample" in cls.__dict__), None)
+                scalar_owner = next((cls for cls in mro if "evaluate" in cls.__dict__), None)
+                if per_owner is not None and scalar_owner is not None:
+                    supports_per_sample = mro.index(per_owner) <= mro.index(scalar_owner)
+
+            if supports_per_sample:
+                res = per_sample_eval(self, x, u, sigma, A, exclude_mask=anti_active_mask)
+            elif not anti_active:
+                # Legacy custom collapse operators retain their batch-wide evaluate() contract.
+                res = self.collapse_op.evaluate(self, x, u, sigma, A)
+            else:
+                res = None
+
+            if res is not None and res.triggered:
                 budget_ok = (
                     not policy.observe_only
                     and self._intervention_count < policy.max_interventions
                 )
                 if budget_ok:
-                    x_next = res.x_star
-                    sigma_next = sigma
+                    if supports_per_sample and res.triggered_mask is not None:
+                        collapse_mask = res.triggered_mask
+                        x_next = torch.where(collapse_mask.unsqueeze(-1), res.x_star, x_next)
+                        sigma_next = torch.where(collapse_mask[:, None, None], sigma, sigma_next)
+                    else:
+                        x_next = res.x_star
+                        sigma_next = sigma
                     info["collapse"] = res
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
@@ -530,7 +609,7 @@ class CIO_SDE(nn.Module):
                         pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
                         pre_sigma_tr=pre_sigma_tr,
                         post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason="budget_ok: collapse projected to attractor",
+                        policy_reason="budget_ok: per-sample collapse projected to attractor",
                     )
                 else:
                     kind = "observe" if policy.observe_only else "blocked"
