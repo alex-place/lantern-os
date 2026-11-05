@@ -115,21 +115,14 @@ class PCSFController(nn.Module):
 # ── Covariance field (Kalman-Bucy Riccati) ───────────────────────────────────
 
 class CovarianceField:
-    """
-    Riccati-style covariance propagation under an explicit full-observation
-    assumption:
+    """Covariance prediction and optional linear-Gaussian observation assimilation.
 
-        Σ̇ = AΣ + ΣAᵀ + Q − Σ Cᵀ R⁻¹ C Σ,   C = I
-
-    A is the drift Jacobian ∂f/∂x, Q is the executed process-noise covariance,
-    and R is the assumed measurement-noise covariance. The engine does not take
-    a sensor observation in this update; therefore this state is a model-based
-    covariance surrogate, not a calibrated posterior unless the caller's system
-    really supplies the assumed full-state observations and noise model.
-
-    In split mode this field is the belief/process covariance. The separate shape
-    covariance is transported without Q or the Riccati measurement contraction and
-    receives only explicit anti-collapse regularization.
+    Split mode uses the discrete prediction P- = F P F^T + Q with F=I+A*dt,
+    followed only by an explicitly supplied observation update. assimilate()
+    implements the Joseph-form update for y=Hx+v. The legacy step() method
+    retains the historical continuous-time Riccati surrogate for old callers;
+    it assumes C=I and an always-present measurement channel and is not a
+    calibrated posterior update unless that observation model is actually true.
     """
 
     def __init__(self, dim: int, r: float = 1.0, eps: float = 1e-4,
