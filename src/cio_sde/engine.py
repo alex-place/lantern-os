@@ -146,6 +146,19 @@ class CovarianceField:
         sigma_next = sigma + dsigma * dt
         return self._project_psd(sigma_next)
 
+    def project_preserving_shape(self, sigma: Tensor) -> Tensor:
+        """PSD projection that keeps the eigenvalue RATIOS, for the Σ₀⁻¹ bump.
+
+        _project_psd clips: at Σ_pred = σ_max·I a bump on any subspace clips straight back to
+        σ_max·I, erasing the contrast it was there to create. Scaling instead keeps a(Σ) exact,
+        since a(cΣ) = a(Σ): headroom comes from lowering the other directions. Per sample. Only
+        eigenvalues pushed below eps are clipped, which needs cond(Σ) > σ_max/eps."""
+        sym = 0.5 * (sigma + sigma.transpose(-1, -2))
+        evals, evecs = torch.linalg.eigh(sym)
+        top = evals.max(dim=-1, keepdim=True).values.clamp_min(self.eps)
+        evals = torch.clamp(evals * (self.sigma_max / top).clamp_max(1.0), self.eps, self.sigma_max)
+        return (evecs * evals.unsqueeze(-2)) @ evecs.transpose(-1, -2)
+
     def _project_psd(self, sigma: Tensor) -> Tensor:
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
         evals, evecs = torch.linalg.eigh(sym)
@@ -377,9 +390,9 @@ class CIO_SDE(nn.Module):
 
         # covariance: Σ̇ = AΣ+ΣAᵀ+Q−ΣR⁻¹Σ
         # Lyapunov contraction: A is the linearization of dx=f(x,u)dt+g(x)dW.
-        # For stability we track α(A) = max Re(λ_i(A_s)) + ‖A−A_s‖₂
-        # (matrix-measure contraction analysis: Lohmiller & Slotine 1998,
-        # Automatica 34(6):683-696; small-gain composition is classical, Zames 1966).
+        # Stability of A is certified off this path, by collapse.dichotomy_certificate and
+        # stability_gates (matrix-measure contraction analysis: Lohmiller & Slotine 1998,
+        # Automatica 34(6):683-696).
         A = drift_jacobian(node, x.detach(), u.detach())
         q_diag = (g.detach() ** 2)
         sigma_next = self.cov.step(sigma, A, q_diag, dt)
@@ -457,7 +470,7 @@ class CIO_SDE(nn.Module):
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
                         x, sigma_next, A, effective_proximity, noise)
                     x_next = x_next + dx_extra
-                    sigma_next = self.cov._project_psd(sigma_next + sig_extra)
+                    sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
                     anti_active = True
                     self._intervention_count += 1
