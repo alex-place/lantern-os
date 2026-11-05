@@ -291,15 +291,17 @@ dx = f\,dt + dW + \Sigma_0^{-1}, \qquad
 \Sigma_0^{-1} = \kappa\,(V_{\mathrm{null}}V_{\mathrm{null}}^\top\xi),
 \end{equation}
 with $\xi$ standard normal, $\kappa=\max(s\,p,\ \varepsilon_g/(2\cdot0.6745))$, $s$ the strength,
-$p\in[0,1]$ the collapse proximity.
+$p\in[0,1]$ the collapse proximity. Everything is per trajectory: $p$ is each sample's own, only the samples whose
+own gate fires are kicked and bumped, and $V_{\mathrm{null}}$ is each sample's right singular vectors of its own $A$
+for its small singular values, so the kick lies in (near-)$\ker A$.
 The implementation injects noise in the null subspace and re-anisotropizes $\Sigma$;
 the proximity gate $p$ is the soft-AND of the four \S\ref{sec:sigma0} signals, so far
 from the boundary it is a no-op. Three results back it. \textbf{(i)~Lemma L2$'$:} for any
 rank-$k$ orthogonal projector, $b\ge\Delta=(\varepsilon+a)\mu d/(\sqrt{k(d-k)}-\varepsilon k)$ lifts the
 eigenvalue coefficient-of-variation above $\varepsilon$ (reverse triangle inequality in Frobenius norm; no
-alignment, no normality). \textbf{(ii)~Theorem C3:} when the operator acts and
-$d\,\epsilon_{\rm cov}/\sigma_{\max}\le 9\cdot10^{-4}$, the covariance the next step reads has
-$a\ge\varepsilon_a$ for every sample, so the trigger is false on the next step, for all $A$ and every $d\ge2$. This
+alignment, no normality). \textbf{(ii)~Theorem C3:} when the operator acts on a trajectory and
+$d\,\epsilon_{\rm cov}/\sigma_{\max}\le 9\cdot10^{-4}$, the covariance that trajectory's next step reads has
+$a\ge\varepsilon_a$, so its trigger is false on the next step, for all $A$ and every $d\ge2$. This
 needed four engine fixes: scale rather than clip at $\sigma_{\max}$, floor per sample, use the actual $a$, and cap the
 rank. \textbf{(iii)~Lemma S1:} each firing moves the state out of $\{\norm{\nabla_x L}<\varepsilon_g\}$ with
 probability $\ge\tfrac12$, by Anderson's and Weyl's inequalities. None of these says the state keeps moving: with no
@@ -312,7 +314,8 @@ result (Anderson 1977) concerns estimator convergence; here there is no estimato
 \texttt{forward\_step}. The earlier $900$-run figure is retired: the engine skips the overwrite whenever the operator
 fires, so its metric could not fail, and a do-nothing placebo scored the same. The placebo-controlled measurement
 (\texttt{experiments/\allowbreak sigma0\_placebo\_control.py}, $180$ trials per arm, synthetic SDE) gives a longest
-trigger-true run of $1$ for the operator against $60$ for the placebo, and state displacement of $0.59$ against $0.023$.
+trigger-true run of one trajectory of $1$ for the operator against $60$ for the placebo, and state displacement of $0.39$
+against $0.023$.
 \end{verifybox}
 
 \begin{remark}

@@ -6,9 +6,16 @@ whenever the operator fired, and diffusion alone delivers the second, so an oper
 nothing scored the same. Every operator-attached arm below records zero overwrites by construction,
 so that column is reported only to show it. The signals a placebo can actually fail:
 
-  gate_frac   fraction of steps with the four-signal gate true
-  max_run     longest run of consecutive gate-true steps (Theorem C3 says at most 1 when acting)
+  gate_frac   fraction of (trajectory, step) pairs with that trajectory's four-signal gate true
+  max_run     longest run of consecutive gate-true steps of one trajectory (Theorem C3 says at most
+              1 when acting)
+  any_run     longest run of consecutive steps on which SOME trajectory's gate was true. The gate
+              decides per trajectory, so two rows can be in it on consecutive steps; C3 does not
+              speak to that, and this column is here so the aggregate is not hidden either
   moved       ‖x_T − x_0‖ mean over the batch
+
+Every row whose gate is true on a step leaves a receipt for it (an excite from an attached operator,
+otherwise the collapse overwrite), so the gate is read from the receipts, row by row.
 
 Grid: rank-1 A, both normal (ν=0) and non-normal (ν>0), so every cell can enter the gate. The old
 sweep's ν>0 cells were full-rank, so they never did.
@@ -75,19 +82,24 @@ def _trial(alpha, nu, noise, arm, seed):
     s0 = torch.eye(DIM).expand(BATCH, DIM, DIM).clone()
     m = _model(alpha, nu, noise, arm)
     xf, _, tr = rollout(m, x0.clone(), s0, steps=STEPS, dt=DT, base_seed=seed)
-    if arm is None:
-        # no operator is attached, so read the gate directly: an overwrite is a gate-true step.
-        gate = [any(c["step"] == s["step"] for c in tr.collapses) for s in tr.steps]
-    else:
-        gate = [s.get("sigma0_proximity", 0.0) > 0.0 for s in tr.steps]
-    run = best = 0
-    for g in gate:
-        run = run + 1 if g else 0
-        best = max(best, run)
+    # gate[t][i]: trajectory i's gate was true at step t. With no operator attached its receipt is
+    # the collapse overwrite; with one, the excite (the budget never runs out here).
+    gate = [[False] * BATCH for _ in range(STEPS)]
+    for r in tr.interventions:
+        gate[r.step][r.sample] = True
+
+    def longest(flags):
+        run = best = 0
+        for f in flags:
+            run = run + 1 if f else 0
+            best = max(best, run)
+        return best
+
     return {
         "overwrites": len(tr.collapses),
-        "gate_frac": sum(gate) / len(gate),
-        "max_run": best,
+        "gate_frac": sum(map(sum, gate)) / (STEPS * BATCH),
+        "max_run": max(longest(row[i] for row in gate) for i in range(BATCH)),
+        "any_run": longest(any(row) for row in gate),
         "moved": float((xf - x0).detach().norm(dim=-1).mean()),
     }
 
@@ -105,6 +117,7 @@ def measure(trials: int = 20) -> dict:
             "trials_with_overwrites": sum(r["overwrites"] > 0 for r in rows),
             "mean_gate_frac": sum(r["gate_frac"] for r in rows) / len(rows),
             "worst_max_run": max(r["max_run"] for r in rows),
+            "worst_any_run": max(r["any_run"] for r in rows),
             "mean_moved": sum(r["moved"] for r in rows) / len(rows),
         }
     return out
@@ -119,10 +132,12 @@ def main() -> int:
     if args.json:
         print(json.dumps(result, indent=2))
         return 0
-    print(f"{'arm':<22}{'trials':>8}{'w/ overwrite':>14}{'gate true':>11}{'worst run':>11}{'moved':>10}")
+    print(f"{'arm':<22}{'trials':>8}{'w/ overwrite':>14}{'gate true':>11}{'worst run':>11}"
+          f"{'any-row run':>13}{'moved':>10}")
     for name, r in result.items():
         print(f"{name:<22}{r['trials']:>8}{r['trials_with_overwrites']:>14}"
-              f"{r['mean_gate_frac']:>11.3f}{r['worst_max_run']:>11}{r['mean_moved']:>10.4f}")
+              f"{r['mean_gate_frac']:>11.3f}{r['worst_max_run']:>11}{r['worst_any_run']:>13}"
+              f"{r['mean_moved']:>10.4f}")
     return 0
 
 

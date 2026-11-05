@@ -11,6 +11,11 @@ it matters the shipped `forward_step`, rather than an idealised update:
   - the state kick had no floor, so it vanished at the gate boundary (the p→0 defect)
   - ‖∇ₓL‖ and ‖∂H/∂u‖ were divided by the batch size, so the gate depended on B
   - x* was not an equilibrium of the real flow for non-normal A
+  - the gate was one decision for the batch, on mean signals and the mean Jacobian, so a collapsed
+    member could hide among healthy ones; it now decides each trajectory, and a batch run equals
+    its rows run alone
+  - the kick's subspace came from A_s, partly along directions the drift moves; it is now each
+    sample's own null(A)
 
 Also pinned: why "zero collapses" is not evidence for the operator (a placebo scores the same),
 what IS evidence (the gate clears for the real operator and stays latched for the placebo), and
@@ -209,10 +214,10 @@ def test_gate_signals_do_not_depend_on_batch_size():
     m.graph.active = LinearDynamics(torch.eye(3), B=torch.eye(3)[:, :2], noise=0.0)
     x = torch.tensor([[0.2, 0.0, 0.0]])
     u = torch.tensor([[0.1, 0.0]])
-    single = (det._grad_norm(m, x, u), det._ctrl_sensitivity(m, x, u))
-    many = (det._grad_norm(m, x.repeat(8, 1), u.repeat(8, 1)),
-            det._ctrl_sensitivity(m, x.repeat(8, 1), u.repeat(8, 1)))
-    assert many == pytest.approx(single, rel=1e-5)
+    for signal in (det._grad_norm, det._ctrl_sensitivity):        # one value per sample now
+        single, many = signal(m, x, u), signal(m, x.repeat(8, 1), u.repeat(8, 1))
+        assert single.shape == (1,) and many.shape == (8,)
+        assert torch.allclose(many, single.expand(8), rtol=1e-5)
 
 
 def test_ctrl_signal_is_the_hamiltonian_gradient_not_just_stage_cost():
@@ -225,10 +230,10 @@ def test_ctrl_signal_is_the_hamiltonian_gradient_not_just_stage_cost():
     m.graph.active = LinearDynamics(torch.zeros(d, d), B=5.0 * torch.eye(d), noise=0.0)
     x = torch.tensor([[0.3, 0.4]])                              # ∇ₓL = 2x, ‖x‖ = 0.5
     u = torch.zeros(1, d)
-    assert det._ctrl_sensitivity(m, x, u) == pytest.approx(5.0, rel=1e-5)   # ‖Bᵀ·2x‖
+    assert float(det._ctrl_sensitivity(m, x, u)) == pytest.approx(5.0, rel=1e-5)   # ‖Bᵀ·2x‖
 
     m.graph.active = LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, d), noise=0.0)
-    assert det._ctrl_sensitivity(m, x, u) == pytest.approx(0.0, abs=1e-8)   # no leverage
+    assert float(det._ctrl_sensitivity(m, x, u)) == pytest.approx(0.0, abs=1e-8)   # no leverage
 
 
 # ── x* must be an equilibrium ────────────────────────────────────────────────────────────
@@ -419,6 +424,24 @@ def test_an_armed_step_refuses_a_negative_gain_from_any_dynamics():
         m.forward_step(torch.zeros(1, d), torch.eye(d).unsqueeze(0), 0.05, torch.randn(1, d), step=0)
 
 
+class _SharedGain(LinearDynamics):
+    """One diffusion gain for every row, shape (d,): it broadcasts everywhere in forward_step."""
+
+    def diffusion(self, x):
+        return torch.tensor([0.1, -0.1, 0.1, 0.1])
+
+
+def test_a_negative_gain_shared_by_all_rows_is_refused():
+    """The guard used to index a (d,) gain by row number, so it read entries of the gain vector instead of
+    the kicked row's gain, and let a negative one through (independent review of the per-row change)."""
+    A = torch.diag(torch.tensor([-0.5, 0.0, 0.0, 0.0]))
+    m = _armed_on(_SharedGain(A, B=torch.zeros(4, 2), noise=0.0))
+    for x in (1e-4 * torch.tensor([[1.0, -1.0, 0.5, 1.0]]),
+              torch.cat([torch.full((2, 4), 0.5), 1e-4 * torch.ones(1, 4)])):   # only row 2 fires
+        with pytest.raises(ValueError, match="non-negative diffusion gain"):
+            m.forward_step(x, torch.eye(4).expand(len(x), 4, 4).clone(), 0.05, torch.ones_like(x), step=0)
+
+
 def test_a_negative_gain_is_only_refused_when_the_kick_would_use_it():
     """Away from the gate the sign does nothing: the noise is symmetric and nothing shares it."""
     d = 4
@@ -427,35 +450,420 @@ def test_a_negative_gain_is_only_refused_when_the_kick_would_use_it():
     assert info["anti_collapse_p"] == 0.0
 
 
-# ── two documented limits, pinned so that lifting them is a decision ────────────────────────────
+# ── the gate decides per trajectory (lantern-os-research PR #14, design limit 1) ─────────────────
 
-def test_the_gate_is_one_decision_for_the_batch():
-    """Each member alone triggers. Together they do not, because the mean of two rank-1 Jacobians has
-    rank 2. A per-trajectory gate would change this, and this test should change with it."""
+def test_the_gate_decides_each_trajectory_on_its_own_jacobian():
+    """e₁e₁ᵀ and e₂e₂ᵀ each have rank 1, and each triggers alone. The gate used to read the batch-mean
+    Jacobian, which has rank 2, so together neither triggered. Each now triggers on its own Jacobian."""
     d = 4
     e = torch.eye(d)
     a1, a2 = torch.outer(e[0], e[0]), torch.outer(e[1], e[1])
     m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
     gate = SemanticCollapseOperator()
 
-    def fires(As):
+    def mask(As):
         n = As.shape[0]
         return gate.evaluate(m, torch.zeros(n, d), torch.zeros(n, 2),
-                             torch.eye(d).expand(n, d, d).clone(), As).triggered
+                             torch.eye(d).expand(n, d, d).clone(), As).mask.tolist()
 
-    assert fires(a1.unsqueeze(0)) and fires(a2.unsqueeze(0))
-    assert not fires(torch.stack([a1, a2]))
+    assert mask(a1.unsqueeze(0)) == [True] and mask(a2.unsqueeze(0)) == [True]
+    assert mask(torch.stack([a1, a2])) == [True, True]
+    assert int(torch.linalg.matrix_rank(torch.stack([a1, a2]).mean(0))) == 2   # what the old gate read
 
 
-def test_the_kick_subspace_comes_from_the_symmetric_part():
-    """For non-normal A the kick is not confined to null(A). L2′ and S1 allow any projector, so neither
-    theorem depends on this, but "near-null" here means near-null for A_s."""
+def _mixed_batch(d=4, collapse_op=False):
+    """Row 0 is collapsed: at the target, flat Σ, rank-1 A, no control leverage. Row 1 differs only in
+    being far from the target (‖∇ₓL‖ = 2), so it is healthy. The batch-mean ‖∇ₓL‖ is about 1, a hundred
+    times ε_g, so a gate on mean signals sees no collapse in this batch at all."""
+    A = torch.zeros(d, d, dtype=torch.float64)
+    A[0, 0] = -0.5
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4).double()
+    _zero_policy(m)
+    m.graph.active = LinearDynamics(A, B=torch.zeros(d, 2, dtype=torch.float64), noise=0.0).double()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    if collapse_op:
+        m.collapse_op = SemanticCollapseOperator()
+    else:
+        m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    x = torch.zeros(2, d, dtype=torch.float64)
+    x[0] = 1e-4 * torch.tensor([1.0, -1.0, 0.5, 2.0], dtype=torch.float64)
+    x[1] = 0.5
+    sigma = torch.eye(d, dtype=torch.float64).expand(2, d, d).clone()
+    noise = torch.tensor([[0.3, -1.2, 0.8, 0.5], [1.0, 0.4, -0.7, 0.2]], dtype=torch.float64)
+    return m, x, sigma, noise
+
+
+def _plain_step(m, x, sigma, noise):
+    """The same step with no Σ₀ operator attached."""
+    ops = (m.anti_collapse_op, m.collapse_op)
+    m.anti_collapse_op = m.collapse_op = None
+    try:
+        return m.forward_step(x, sigma, 0.05, noise, step=0)
+    finally:
+        m.anti_collapse_op, m.collapse_op = ops
+
+
+def test_a_mixed_batch_gates_the_collapsed_member_only():
+    m, x, sigma, noise = _mixed_batch()
+    det = m.anti_collapse_op.detector
+    u = torch.zeros(2, 2, dtype=torch.float64)
+    A = torch.zeros(2, 4, 4, dtype=torch.float64)
+    A[:, 0, 0] = -0.5
+    signals = det._signals(m, x, u, sigma, A)
+    assert float(signals["grad_norm"].mean()) > 50 * det.grad_eps          # a mean-signal gate stays shut
+    assert det.evaluate(m, x, u, sigma, A).mask.tolist() == [True, False]
+    p = m.anti_collapse_op.proximity(m, x, u, sigma, A)
+    assert float(p[0]) > 0.0 and float(p[1]) == 0.0
+
+
+def test_forward_step_kicks_only_the_collapsed_member():
+    m, x, sigma, noise = _mixed_batch()
+    plain_x, plain_sigma, _ = _plain_step(m, x, sigma, noise)
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+
+    assert info["anti_collapse_fired"].tolist() == [True, False]
+    assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "excite")]
+    assert info["intervention_receipt"] is info["intervention_receipts"][0]
+    # the healthy member is exactly what the plain SDE step made
+    assert torch.equal(x_next[1], plain_x[1]) and torch.equal(sigma_next[1], plain_sigma[1])
+    # the collapsed member was kicked and lifted (C3), and its receipt is its own
+    det = m.anti_collapse_op.detector
+    assert float((x_next[0] - plain_x[0]).detach().norm()) > 0.0
+    assert float(det._anisotropy_per_sample(sigma_next)[0]) >= det.anisotropy_eps
+    r = info["intervention_receipts"][0]
+    assert r.pre_x_norm == pytest.approx(float(x[0].norm()))
+    assert r.post_x_norm == pytest.approx(float(x_next[0].detach().norm()))
+    assert r.to_dict()["sample"] == 0
+
+
+def test_forward_step_overwrites_only_the_collapsed_member():
+    m, x, sigma, noise = _mixed_batch(collapse_op=True)
+    plain_x, plain_sigma, _ = _plain_step(m, x, sigma, noise)
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+
+    assert info["collapse_mask"].tolist() == [True, False]
+    assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "project_to_attractor")]
+    assert torch.equal(x_next[1], plain_x[1]) and torch.equal(sigma_next[1], plain_sigma[1])
+    # row 0 sits on null(A) = span{e₂, e₃, e₄}, and keeps its pre-step Σ
+    assert torch.allclose(x_next[0], torch.cat([torch.zeros(1, dtype=x.dtype), x[0, 1:]]), atol=1e-12)
+    assert torch.equal(sigma_next[0], sigma[0])
+
+    _, _, trace = rollout(m, x, sigma, steps=3, dt=0.05, base_seed=0)
+    assert trace.collapses and all(c["samples"] == [0] for c in trace.collapses)
+
+
+class _Hot:
+    """A stand-in anti-collapse operator: every row listed in `hot` is in the gate."""
+
+    def __init__(self, hot):
+        self.hot = list(hot)
+
+    def proximity(self, model, x, u, sigma, A):
+        return torch.tensor(self.hot, dtype=x.dtype)
+
+    def excite(self, x, sigma, A, p, noise):
+        return 0.01 * torch.ones_like(x), torch.zeros_like(sigma)
+
+
+def test_each_trajectory_spends_its_own_budget():
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    m.intervention_policy = InterventionPolicy(observe_only=False, max_interventions=2)
+    m.anti_collapse_op = _Hot([1.0, 0.0])
+    x, sigma = torch.zeros(2, d), torch.eye(d).expand(2, d, d).clone()
+    kinds = []
+    for t in range(3):
+        x, sigma, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=t)
+        kinds.append([(r.sample, r.kind) for r in info["intervention_receipts"]])
+    assert kinds == [[(0, "excite")], [(0, "excite")], [(0, "blocked")]]
+    assert "budget exhausted (2/2)" in info["intervention_receipt"].policy_reason
+    # row 1 never fired, so its budget is untouched: one row's history does not spend another's
+    m.anti_collapse_op = _Hot([1.0, 1.0])
+    _, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=3)
+    assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "blocked"), (1, "excite")]
+    # the counts belong to this batch: a new batch size after spending them needs a reset
+    m.anti_collapse_op = _Hot([1.0])
+    with pytest.raises(ValueError, match="reset_intervention_count"):
+        m.forward_step(x[:1], sigma[:1], 0.05, torch.zeros(1, d), step=4)
+    m.reset_intervention_count()
+    _, _, info = m.forward_step(x[:1], sigma[:1], 0.05, torch.zeros(1, d), step=4)
+    assert info["intervention_receipt"].kind == "excite"
+
+
+class _BatchWide:
+    """A stand-in operator with one proximity for the batch, whose kick is p in every coordinate and whose
+    outputs broadcast, as an operator written for the batch-wide gate may do."""
+
+    def __init__(self, p, dx_shape=None):
+        self.p, self.dx_shape = p, dx_shape
+
+    def proximity(self, model, x, u, sigma, A):
+        return self.p
+
+    def excite(self, x, sigma, A, p, noise):
+        assert isinstance(p, float)                      # one number, as the operator gave one
+        dx = p if self.dx_shape == () else p * torch.ones(self.dx_shape or x.shape)
+        return dx, 0.0
+
+
+@pytest.mark.parametrize("dx_shape", [None, (4,), (1, 4), ()])
+def test_a_batch_wide_operator_output_may_broadcast(dx_shape):
+    """index_add needs the exact shape; the batch-wide engine added a broadcasting dx to every row."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    m.anti_collapse_op = _BatchWide(0.25, dx_shape)
+    x, sigma = torch.zeros(2, d), torch.eye(d).expand(2, d, d).clone()
+    plain_x, _, _ = _plain_step(m, x, sigma, torch.zeros(2, d))
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    assert torch.allclose((x_next - plain_x).detach(), torch.full((2, d), 0.25))
+    assert [r.kind for r in info["intervention_receipts"]] == ["excite", "excite"]
+
+
+def test_a_spook_does_not_change_another_rows_kick_under_a_batch_wide_operator():
+    """With one proximity for the batch, excite used to get the largest effective proximity of the rows
+    that fired, so a spook on row 0 also raised row 1's kick from 0.3 to 1.0."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    m.anti_collapse_op = _BatchWide(0.3)
+    m.surprise_monitor = _SpookRows([True, False])
+    x, sigma = torch.zeros(2, d), torch.eye(d).expand(2, d, d).clone()
+    m._surprise_pred_mean, m._surprise_pred_cov = x.clone(), sigma.clone()
+    plain_x, _, _ = _plain_step(m, x, sigma, torch.zeros(2, d))
+    m._surprise_pred_mean, m._surprise_pred_cov = x.clone(), sigma.clone()
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    kick = (x_next - plain_x).detach()
+    assert torch.allclose(kick[0], torch.full((d,), 1.0)) and torch.allclose(kick[1], torch.full((d,), 0.3))
+    assert [(r.sample, r.trigger_source) for r in info["intervention_receipts"]] == [
+        (0, "both"), (1, "structural")]
+
+
+def test_signals_are_compared_with_the_thresholds_as_given():
+    """In float32, ‖∇ₓL‖ = 2·float32(0.005) is exactly float32(0.01). It is below ε_g = 0.01, and the
+    batch-wide gate, which compared Python floats, fired here. A float32 comparison rounds ε_g first."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    det = SemanticCollapseOperator()
+    x = torch.tensor([[0.005, 0.0, 0.0, 0.0]])
+    g = det._grad_norm(m, x, torch.zeros(1, 2))
+    assert g.dtype == torch.float32 and float(g) < det.grad_eps
+    assert det.evaluate(m, x, torch.zeros(1, 2), torch.eye(d).unsqueeze(0),
+                        torch.zeros(1, d, d)).mask.tolist() == [True]
+    assert float(m.anti_collapse_op.proximity(m, x, torch.zeros(1, 2), torch.eye(d).unsqueeze(0),
+                                              torch.zeros(1, d, d))[0]) > 0.0
+
+
+class _SpookRows:
+    """A stand-in surprise monitor whose spook flags are given, one per row."""
+    anti_collapse_trigger = True
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def evaluate(self, x_pred, sigma, y, C, R):
+        return {"spook": torch.tensor(self.rows), "nis": torch.zeros(len(self.rows))}
+
+    def update(self, x_pred, sigma, y, C, R):
+        return y.detach(), sigma
+
+
+def test_a_spook_excites_only_its_own_trajectory():
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    m.surprise_monitor = _SpookRows([True, False])
+    x = torch.full((2, d), 0.5)                    # both far from target: no structural trigger
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    m._surprise_pred_mean, m._surprise_pred_cov = x.clone(), sigma.clone()
+    noise = torch.randn(2, d, generator=torch.Generator().manual_seed(2))
+    plain_x, plain_sigma, _ = _plain_step(m, x, sigma, noise)
+    m._surprise_pred_mean, m._surprise_pred_cov = x.clone(), sigma.clone()
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+    assert info["surprise_spook"] is True
+    assert [(r.sample, r.kind, r.trigger_source) for r in info["intervention_receipts"]] == [
+        (0, "excite", "surprise")]
+    assert torch.equal(x_next[1], plain_x[1]) and torch.equal(sigma_next[1], plain_sigma[1])
+
+
+@pytest.mark.parametrize("case", ["kick", "budget"])
+def test_a_batch_is_independent_trajectories(case):
+    """Row i of a batched run is the same run on row i alone: the gate, the kick, the bump, the budget and
+    the receipts all belong to the trajectory. Both operators attached, three interventions each.
+    "kick": the real operator on a non-normal rank-1 A, with noise. "budget": the covariance leg alone on
+    A = 0, which clears the gate without moving the state, so it re-fires as Σ relaxes and the two
+    near-target rows, at different Σ scales, fire at different steps and run out at different times."""
+    d, steps, dt = 4, 60, 0.05
+    A = torch.zeros(d, d, dtype=torch.float64)
+    if case == "kick":
+        A[0, 0], A[0, 1] = -0.5, 1.0                           # rank 1, non-normal
+
+    def model():
+        m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4).double()
+        _zero_policy(m)
+        m.graph.active = LinearDynamics(A, B=torch.zeros(d, 2, dtype=torch.float64),
+                                        noise=0.002 if case == "kick" else 0.0).double()
+        m.intervention_policy = InterventionPolicy(observe_only=False, max_interventions=3)
+        m.anti_collapse_op = AntiCollapseOperator(strength=0.5 if case == "kick" else 0.0)
+        m.collapse_op = SemanticCollapseOperator()
+        return m
+
+    g = torch.Generator().manual_seed(9)
+    x0 = torch.cat([1e-4 * torch.randn(2, d, generator=g, dtype=torch.float64),
+                    torch.full((1, d), 0.5, dtype=torch.float64)])        # rows 0, 1 near target; row 2 not
+    eye = torch.eye(d, dtype=torch.float64)
+    s0 = torch.stack([eye, 5.0 * eye, eye])
+    noise = torch.randn(steps, 3, d, generator=g, dtype=torch.float64)
+
+    def run(rows):
+        m, x, s, log = model(), x0[rows], s0[rows], []
+        for t in range(steps):
+            x, s, info = m.forward_step(x, s, dt, noise[t, rows], step=t)
+            log += [(t, rows[r.sample], r.kind) for r in info["intervention_receipts"]]
+        return x.detach(), s, log
+
+    xb, sb, logb = run([0, 1, 2])
+    for i in range(3):
+        xi, si, logi = run([i])
+        assert torch.equal(xb[i], xi[0]) and torch.equal(sb[i], si[0]), i
+        assert [e for e in logb if e[1] == i] == logi, i
+    fired = {i: [t for t, j, k in logb if j == i and k == "excite"] for i in range(3)}
+    assert fired[0] and fired[1] and not fired[2]
+    if case == "budget":
+        assert fired[0] != fired[1]                             # decided apart, not as one batch
+        assert len(fired[0]) == len(fired[1]) == 3
+        assert any(k == "blocked" for _, _, k in logb)          # a trajectory's own budget ran out
+
+
+# ── the kick lies in null(A) (lantern-os-research PR #14, design limit 2) ─────────────────────────
+
+def test_the_kick_lies_in_null_A_for_a_non_normal_A():
+    """A = e₁e₂ᵀ: null(A) = span{e₁, e₃, e₄}. The kick basis used to be the three smallest-|λ(A_s)|
+    eigenvectors, and one of them, (e₁ ± e₂)/√2, has ‖Av‖ = 1/√2. It is now the right singular vectors
+    of A for its small singular values. L2′ and S1 allow any projector, so neither theorem changes."""
     A = torch.zeros(4, 4)
     A[0, 1] = 1.0
     basis = AntiCollapseOperator()._near_null_basis(A.unsqueeze(0))
     assert basis.shape[1] == 3
-    assert float(torch.linalg.norm(A @ basis, ord=2)) == pytest.approx(2 ** -0.5, abs=1e-5)
+    assert float(torch.linalg.norm(A @ basis, ord=2)) < 1e-6
+    evals, evecs = torch.linalg.eigh(0.5 * (A + A.T))           # the old subspace, for contrast
+    old = evecs[:, torch.argsort(evals.abs())[:3]]
+    assert float(torch.linalg.norm(A @ old, ord=2)) == pytest.approx(2 ** -0.5, abs=1e-5)
 
+
+@pytest.mark.parametrize("d,r", [(4, 1), (8, 3), (16, 7), (64, 20)])
+def test_each_sample_kick_lies_in_its_own_null_A(d, r):
+    """A batch of different non-normal rank-r Jacobians, r < d/2 so the gate can fire: each sample's kick
+    projector satisfies A·P = 0 for ITS OWN A, with rank min(d−r, cap), and not for another sample's.
+    The covariance leg still lifts Σ when Σ's smallest eigendirections are put on that kick basis."""
+    g = torch.Generator().manual_seed(d)
+    As = torch.stack([torch.randn(d, r, generator=g, dtype=torch.float64)
+                      @ torch.randn(r, d, generator=g, dtype=torch.float64) for _ in range(3)])
+    assert all(float(torch.linalg.norm(a @ a.T - a.T @ a)) > 1e-6 for a in As)   # non-normal
+    op = AntiCollapseOperator(strength=0.5)
+    P, m = op._kick_projector(As)
+    assert m.tolist() == [min(d - r, op._max_lift_rank(d))] * 3
+    for i, a in enumerate(As):
+        assert float(torch.linalg.norm(a @ P[i], ord=2)) < 1e-9 * float(torch.linalg.norm(a, ord=2))
+        assert float(torch.linalg.norm(As[(i + 1) % 3] @ P[i], ord=2)) > 1e-3   # not one basis for all
+    # the kick and the bump from excite live there too
+    xi = torch.randn(3, d, generator=g, dtype=torch.float64)
+    det = op.detector
+    eps_a = det.anisotropy_eps
+    sigmas = []
+    for i in range(3):                                          # adversarial: Σ's smallest λ on the kick basis
+        V = torch.linalg.eigh(P[i]).eigenvectors.flip(-1)       # kick basis first
+        ev = 1.0 + 0.4 * eps_a * torch.linspace(-1.0, 1.0, d, dtype=torch.float64)
+        sigmas.append((V * ev) @ V.T)
+    sigma = torch.stack(sigmas)
+    assert bool((det._anisotropy_per_sample(sigma) < eps_a).all())
+    dx, extra = op.excite(torch.zeros(3, d, dtype=torch.float64), sigma, As, 1e-3, xi)
+    for i, a in enumerate(As):
+        assert float((a @ dx[i]).norm()) < 1e-9 * float(dx[i].norm())
+        assert float(torch.linalg.norm(a @ extra[i], ord=2)) < 1e-9 * float(torch.linalg.norm(extra[i], ord=2))
+    assert bool((det._anisotropy_per_sample(sigma + extra) >= eps_a).all())
+
+
+def test_rows_with_different_kick_ranks_each_get_their_own_floor():
+    """Ranks 1, 2 and 3 at d = 8 give kick ranks 7, 6 and 5 in one call, and each row's bump is floored
+    for its own rank: the same Δ for all of them under-lifts the highest one."""
+    d = 8
+    g = torch.Generator().manual_seed(4)
+    As = torch.stack([torch.randn(d, r, generator=g, dtype=torch.float64)
+                      @ torch.randn(r, d, generator=g, dtype=torch.float64) for r in (1, 2, 3)])
+    op = AntiCollapseOperator(strength=0.5)
+    det = op.detector
+    _, m = op._kick_projector(As)
+    assert m.tolist() == [7, 6, 5]
+    ev = 1.0 + 0.3 * det.anisotropy_eps * torch.linspace(-1.0, 1.0, d, dtype=torch.float64)
+    sigma = torch.diag(ev).expand(3, d, d).clone()
+    _, extra = op.excite(torch.zeros(3, d, dtype=torch.float64), sigma, As, 1e-3,
+                         torch.zeros(3, d, dtype=torch.float64))
+    assert bool((det._anisotropy_per_sample(sigma + extra) >= det.anisotropy_eps).all())
+    floors = op._cov_floor(sigma, d, m)
+    assert floors[0] > floors[1] > floors[2]                     # Δ grows with the kick rank here
+    assert torch.allclose(torch.linalg.matrix_norm(extra, ord=2), floors)   # b·P with b = Δ: ‖·‖₂ = Δ
+
+
+class _TwoRegimes(LinearDynamics):
+    """f(x) = A₁x where x₄ ≥ 0 and A₂x where x₄ < 0, so the rows of one batch have different Jacobians."""
+
+    def __init__(self, a1, a2):
+        super().__init__(a1, B=torch.zeros(a1.shape[0], 2), noise=0.0)
+        self.register_buffer("A2", a2.clone())
+
+    def drift(self, x, u):
+        return torch.where(x[..., -1:] >= 0, x @ self.A.T, x @ self.A2.T) + u @ self.B.T
+
+
+def test_gate_never_true_on_consecutive_steps_for_any_trajectory_of_a_batch():
+    """C3 per trajectory, through forward_step, on a batch whose rows have different Jacobians (a
+    non-normal rank-1 e₁e₂ᵀ and diag(0, 0, −0.5, 0)) and covariance scales far from and near the cap.
+    Their mean Jacobian has rank 2, so the batch-wide gate never fired here at all."""
+    d = 4
+    a1 = torch.zeros(d, d)
+    a1[0, 1] = 1.0
+    a2 = torch.diag(torch.tensor([0.0, 0.0, -0.5, 0.0]))
+    m = _zero_policy(CIO_SDE(dim=d, ctrl_dim=2, hidden=4))
+    m.graph.active = _TwoRegimes(a1, a2)
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.collapse_op = SemanticCollapseOperator()
+    g = torch.Generator().manual_seed(12)
+    x = 1e-4 * torch.randn(4, d, generator=g)
+    x[:, -1] = 1e-4 * torch.tensor([1.0, -1.0, 1.0, -1.0])
+    sigma = torch.tensor([1.0, 1.0, 900.0, 900.0]).view(4, 1, 1) * torch.eye(d)
+    from src.cio_sde.engine import drift_jacobian
+    first = drift_jacobian(m.graph.active, x, torch.zeros(4, 2))
+    assert torch.equal(first[0], a1) and torch.equal(first[1], a2)
+    assert int(torch.linalg.matrix_rank(first.mean(0))) == 2
+
+    prev = torch.zeros(4, dtype=torch.bool)
+    fired = torch.zeros(4, dtype=torch.long)
+    for t in range(60):
+        x, sigma, info = m.forward_step(x, sigma, 0.05, torch.randn(4, d, generator=g), step=t)
+        now = info["sigma0_proximity_per_sample"] > 0.0
+        assert not bool((prev & now).any()), f"a trajectory's gate was true twice at step {t}"
+        assert info["collapse"] is None
+        fired += now.long()
+        prev = now
+    assert bool((fired >= 1).all()), fired
+
+
+def test_forward_step_kicks_inside_null_A():
+    """Through the engine, with no diffusion: x_next − (x + f·dt) is the kick, and A sends it to 0."""
+    d = 4
+    A = torch.zeros(d, d, dtype=torch.float64)
+    A[0, 1] = 1.0
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4).double()
+    _zero_policy(m)
+    m.graph.active = LinearDynamics(A, B=torch.zeros(d, 2, dtype=torch.float64), noise=0.0).double()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    x = 1e-4 * torch.tensor([[1.0, 2.0, -1.0, 0.5]], dtype=torch.float64)
+    noise = torch.tensor([[0.7, -1.1, 0.4, 1.3]], dtype=torch.float64)
+    x_next, _, info = m.forward_step(x, torch.eye(d, dtype=torch.float64).unsqueeze(0), 0.05, noise, step=0)
+    assert info["anti_collapse_p"] > 0.0
+    kick = (x_next - (x + 0.05 * x @ A.T)).detach()
+    assert float(kick.norm()) > 1e-3
+    assert float((kick @ A.T).norm()) < 1e-12
 
 
 def test_armed_step_refuses_negative_effective_diffusion_from_initial_sigma():

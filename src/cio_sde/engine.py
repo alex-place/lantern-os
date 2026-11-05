@@ -251,13 +251,15 @@ class InterventionPolicy:
 @dataclass
 class InterventionReceipt:
     """
-    Replayable record of one Σ₀ operator decision per forward_step.
+    Replayable record of one Σ₀ operator decision for one trajectory in one forward_step.
 
     kind:
       "observe"              - trigger detected; state NOT mutated (observe_only or budget=0)
       "excite"               - anti_collapse_op fired and mutated x_next / sigma_next
       "project_to_attractor" - collapse_op fired and projected x_next to x_star
       "blocked"              - trigger fired but policy blocked mutation; records reason
+
+    The norms and traces are this trajectory's own. `sample` is its row in the batch.
     """
     step: int
     kind: str                        # observe | excite | project_to_attractor | blocked
@@ -270,6 +272,7 @@ class InterventionReceipt:
     post_sigma_tr: float
     policy_reason: str               # why this kind was chosen
     stage_cost_delta: Optional[float] = None   # post − pre cost, when computable
+    sample: Optional[int] = None     # row of the trajectory in the batch
 
     def to_dict(self) -> dict:
         return {
@@ -284,6 +287,7 @@ class InterventionReceipt:
             "post_sigma_tr": self.post_sigma_tr,
             "policy_reason": self.policy_reason,
             "stage_cost_delta": self.stage_cost_delta,
+            "sample": self.sample,
         }
 
 
@@ -340,7 +344,8 @@ class CIO_SDE(nn.Module):
             intervention_policy if intervention_policy is not None
             else InterventionPolicy()
         )
-        self._intervention_count: int = 0  # resets per rollout via reset_intervention_count()
+        # Interventions so far on each trajectory, (B,); resets per rollout via reset_intervention_count().
+        self._intervention_counts: Optional[Tensor] = None
         # One-step prediction (x̂_{t|t-1}, P_{t|t-1}) for the surprise observation model
         # (#657). Instead of self-observing (y=x gave innovation ν≡0), the engine runs a
         # genuine Kalman predict/update cycle: it predicts the NEXT state from the model's
@@ -365,7 +370,34 @@ class CIO_SDE(nn.Module):
 
     def reset_intervention_count(self) -> None:
         """Call at the start of each rollout to reset the per-run intervention budget."""
-        self._intervention_count = 0
+        self._intervention_counts = None
+
+    def _budget_open(self, bsz: int, device) -> Tensor:
+        """Which trajectories the policy still lets the operators change, (B,).
+
+        Each trajectory has its own budget of policy.max_interventions per rollout, so whether one may
+        be changed never depends on the others. The counts belong to the batch they were spent on:
+        changing the batch size after spending any of them raises rather than handing out fresh ones."""
+        policy = self.intervention_policy
+        if policy.observe_only or policy.max_interventions <= 0:
+            return torch.zeros(bsz, dtype=torch.bool, device=device)
+        counts = self._intervention_counts
+        if counts is not None and counts.shape[0] != bsz and bool(counts.any()):
+            raise ValueError(
+                f"the batch changed from {counts.shape[0]} to {bsz} trajectories after some of their "
+                "intervention budget was spent; call reset_intervention_count() for a new batch")
+        if counts is None or counts.shape[0] != bsz:
+            counts = self._intervention_counts = torch.zeros(bsz, dtype=torch.long, device=device)
+        return counts < policy.max_interventions
+
+    def _held(self, i: int) -> Tuple[str, str]:
+        """(kind, reason) for a trajectory whose trigger fired and that the policy did not let change."""
+        policy = self.intervention_policy
+        if policy.observe_only:
+            return "observe", "observe_only=True"
+        counts = self._intervention_counts
+        used = int(counts[i]) if counts is not None and i < counts.shape[0] else 0
+        return "blocked", f"budget exhausted ({used}/{policy.max_interventions})"
 
     # H = L + λᵀ f + tr(Σ)
     def hamiltonian(self, x: Tensor, u: Tensor, lam: Tensor, sigma: Tensor) -> Tensor:
@@ -376,6 +408,27 @@ class CIO_SDE(nn.Module):
     def forward_step(self, x: Tensor, sigma: Tensor, dt: float,
                      noise: Tensor,
                      step: int = -1) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
+        """One Euler-Maruyama step of x and one Riccati step of Σ, then the Σ₀ operators.
+
+        The Σ₀ operators decide per trajectory. Each row of the batch is gated on its own four
+        signals and, when a surprise monitor drives the anti-collapse operator, on its own spook.
+        Only the rows that fire change: the anti-collapse operator kicks and bumps exactly those
+        rows, and the collapse operator overwrites exactly the triggered rows that were not just
+        excited. Every other row keeps the x_next and sigma_next of the plain SDE step. Each
+        trajectory has its own budget of policy.max_interventions per rollout, so whether a row may
+        change never depends on the other rows. Each row that fires gets its own receipt, whose
+        `sample` is its index. So a batch is B independent trajectories: row i of a batched step is
+        that step on row i alone, given the same noise.
+
+        info["intervention_receipts"] lists every receipt of the step, and
+        info["intervention_receipt"] is the first of them, for callers that read one. The
+        "sigma0_proximity" and "anti_collapse_p" floats are the largest over the rows, so each is
+        above 0 exactly when some row was in the gate or was excited; the "_per_sample" entries
+        hold one value per row. An anti-collapse operator whose proximity() returns one number is
+        batch-wide: every row gets that number, and excite() is called with one number per distinct
+        effective proximity among the rows that fired, so a spook still lifts only its own row. Its
+        outputs may broadcast; they are applied to the fired rows only.
+        """
         node = self.graph.active
         u = self.pcsf(x, sigma)
         f = node.drift(x, u)
@@ -403,13 +456,15 @@ class CIO_SDE(nn.Module):
                 "collapse": None, "anti_collapse_p": 0.0, "sigma0_proximity": 0.0,
                 "surprise_spook": False}
 
-        # Σ₀⁻¹ anti-collapse: inject excitation along null modes to escape an
-        # imminent 42-state. When it fires it SUPPRESSES the Σ₀ freeze this step
-        # (the whole point is to prevent collapse, not freeze into it).
-        anti_active = False
-        sigma0_proximity = 0.0
-        surprise_boost = 0.0
-        
+        # Every Σ₀ quantity below is one value per trajectory (row).
+        bsz, dev = x.shape[0], x.device
+        spook = torch.zeros(bsz, dtype=torch.bool, device=dev)     # the row's NIS spook
+        boost = torch.zeros(bsz, dtype=x.dtype, device=dev)        # a spook lifts the row's proximity to 1
+        prox = torch.zeros(bsz, dtype=x.dtype, device=dev)         # the row's structural proximity
+        excited = torch.zeros(bsz, dtype=torch.bool, device=dev)
+        overwritten = torch.zeros(bsz, dtype=torch.bool, device=dev)
+        receipts: List[Optional[InterventionReceipt]] = [None] * bsz
+
         # Surprise monitor — NIS-based collapse detection (#506/#657).
         # The engine no longer self-observes (y=x gave innovation ν≡0, so the canary
         # never fired). It carries a belief mean x̂ propagated noise-free through the
@@ -427,11 +482,13 @@ class CIO_SDE(nn.Module):
                 # Score the prediction made LAST step against the realized state x.
                 surprise_result = self.surprise_monitor.evaluate(
                     self._surprise_pred_mean, self._surprise_pred_cov, x, C, R)
-                info["surprise_spook"] = bool(surprise_result["spook"].any())
+                spook = (torch.as_tensor(surprise_result["spook"], device=dev)
+                         .to(torch.bool).reshape(-1).expand(bsz))
+                info["surprise_spook"] = bool(spook.any())
                 info["surprise_nis"] = float(surprise_result["nis"].mean().item())
-                if info["surprise_spook"] and self.surprise_monitor.anti_collapse_trigger:
-                    # Spook → boost anti-collapse proximity to 1.0 (detect → excite).
-                    surprise_boost = 1.0
+                if self.surprise_monitor.anti_collapse_trigger:
+                    # A spook lifts THAT trajectory's anti-collapse proximity to 1.0 (detect → excite).
+                    boost = spook.to(x.dtype)
                 # Measurement update: fuse x to get the posterior belief.
                 x_post, P_post = self.surprise_monitor.update(
                     self._surprise_pred_mean, self._surprise_pred_cov, x, C, R)
@@ -449,106 +506,93 @@ class CIO_SDE(nn.Module):
             P_next = F @ P_post @ F.transpose(-1, -2) + Q
             self._surprise_pred_cov = 0.5 * (P_next + P_next.transpose(-1, -2)).detach()
         
-        policy = self.intervention_policy
-        pre_x_norm = x.norm().item()
-        pre_sigma_tr = torch.diagonal(sigma, dim1=-2, dim2=-1).sum(-1).mean().item()
-        receipt: Optional[InterventionReceipt] = None
+        def receipt(i: int, kind: str, source: str, reason: str, spooked: bool) -> InterventionReceipt:
+            """Row i's record, read after the mutations above it (x_next and sigma_next are late-bound)."""
+            return InterventionReceipt(
+                step=step, kind=kind, trigger_source=source, sigma0_proximity=float(prox[i]),
+                surprise_spook=spooked,
+                pre_x_norm=float(x[i].detach().norm()), post_x_norm=float(x_next[i].detach().norm()),
+                pre_sigma_tr=float(torch.diagonal(sigma[i].detach()).sum()),
+                post_sigma_tr=float(torch.diagonal(sigma_next[i].detach()).sum()),
+                policy_reason=reason, sample=i,
+            )
 
+        # Σ₀⁻¹ anti-collapse: inject excitation along null modes to escape an
+        # imminent 42-state. On the rows where it fires it SUPPRESSES the Σ₀ freeze this
+        # step (the whole point is to prevent collapse, not freeze into it).
+        effective = prox
         if self.anti_collapse_op is not None:
-            sigma0_proximity = self.anti_collapse_op.proximity(self, x, u, sigma, A)
-            effective_proximity = max(sigma0_proximity, surprise_boost)
-            info["sigma0_proximity"] = sigma0_proximity
+            raw = self.anti_collapse_op.proximity(self, x, u, sigma, A)
+            batch_wide = not (isinstance(raw, Tensor) and raw.dim() > 0)
+            prox = torch.as_tensor(raw, dtype=x.dtype, device=dev).detach().reshape(-1).expand(bsz)
+            effective = torch.maximum(prox, boost)
+            info["sigma0_proximity"] = float(prox.max()) if bsz else 0.0
 
-            if effective_proximity > 0.0:
-                trigger_src = "surprise" if surprise_boost >= sigma0_proximity else "structural"
-                if surprise_boost > 0.0 and sigma0_proximity > 0.0:
-                    trigger_src = "both"
-
-                budget_ok = (
-                    not policy.observe_only
-                    and self._intervention_count < policy.max_interventions
-                )
-                if budget_ok:
+            hot = effective > 0.0
+            if bool(hot.any()):
+                excited = hot & self._budget_open(bsz, dev)
+                idx = excited.nonzero().flatten()
+                if idx.numel():
                     # dW and the kick share ξ, so their signs interact. Lemma S1 needs
-                    # D = diag(g * dilation * sqrt(dt)) to be PSD, not merely g >= 0:
-                    # caller-supplied initial Sigma can make dilation negative before projection.
+                    # D = diag(g·dilation·√dt) PSD on every kicked row, not merely g ≥ 0: at D = −κ/2 the
+                    # escape probability falls to 0.40, and a caller-supplied initial Σ can make dilation
+                    # negative before projection. A subclass can break this, and so can a gain shared by
+                    # all rows, shape (d,). With strength 0 there is no state kick to protect.
                     if getattr(self.anti_collapse_op, "strength", 1.0) > 0.0:
-                        effective_gain = g * dilation
-                        if (not bool(torch.isfinite(effective_gain).all())
-                                or bool((effective_gain < 0).any())):
+                        gain = torch.broadcast_to(g * dilation, x.shape)[idx]
+                        if not bool(torch.isfinite(gain).all()) or bool((gain < 0).any()):
                             raise ValueError(
                                 "the anti-collapse kick needs a finite non-negative diffusion gain after dilation"
                             )
-                    dx_extra, sig_extra = self.anti_collapse_op.excite(
-                        x, sigma_next, A, effective_proximity, noise)
-                    x_next = x_next + dx_extra
-                    sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
-                    info["anti_collapse_p"] = effective_proximity
-                    anti_active = True
-                    self._intervention_count += 1
-                    receipt = InterventionReceipt(
-                        step=step, kind="excite", trigger_source=trigger_src,
-                        sigma0_proximity=sigma0_proximity, surprise_spook=bool(surprise_boost > 0.0),
-                        pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
-                        pre_sigma_tr=pre_sigma_tr,
-                        post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason="budget_ok: anti-collapse excite fired",
-                    )
-                else:
-                    kind = "observe" if policy.observe_only else "blocked"
-                    reason = (
-                        "observe_only=True" if policy.observe_only
-                        else f"budget exhausted ({self._intervention_count}/{policy.max_interventions})"
-                    )
-                    receipt = InterventionReceipt(
-                        step=step, kind=kind, trigger_source=trigger_src,
-                        sigma0_proximity=sigma0_proximity, surprise_spook=bool(surprise_boost > 0.0),
-                        pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
-                        pre_sigma_tr=pre_sigma_tr,
-                        post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason=reason,
-                    )
+                    # An operator with one proximity for the batch gets one number per call, so rows
+                    # at different effective proximities (a spook lifts only its own row) get their own.
+                    calls = ([(float(v), idx[effective[idx] == v]) for v in torch.unique(effective[idx])]
+                             if batch_wide else [(effective[idx], idx)])
+                    for p_fired, rows in calls:
+                        dx_extra, sig_extra = self.anti_collapse_op.excite(
+                            x[rows], sigma_next[rows], A[rows], p_fired, noise[rows])
+                        dx_extra = torch.broadcast_to(
+                            torch.as_tensor(dx_extra, dtype=x_next.dtype, device=dev), x[rows].shape)
+                        x_next = x_next.index_add(0, rows, dx_extra)
+                        sigma_next = sigma_next.index_copy(
+                            0, rows, self.cov.project_preserving_shape(sigma_next[rows] + sig_extra))
+                    self._intervention_counts[idx] += 1
+                    info["anti_collapse_p"] = float(effective[idx].max())
+                for i in hot.nonzero().flatten().tolist():
+                    source = ("both" if boost[i] > 0 and prox[i] > 0
+                              else "surprise" if boost[i] >= prox[i] else "structural")
+                    kind, reason = (("excite", "budget_ok: anti-collapse excite fired")
+                                    if excited[i] else self._held(i))
+                    receipts[i] = receipt(i, kind, source, reason, bool(boost[i] > 0))
+        info["sigma0_proximity_per_sample"] = prox
+        info["anti_collapse_fired"] = excited
+        info["anti_collapse_p_per_sample"] = torch.where(excited, effective, torch.zeros_like(effective))
 
-        # Σ₀ gating: dx = f dt + dW − Σ₀(x,Σ,G,u). When the system is
-        # underdetermined, freeze onto the minimal invariant attractor.
-        if self.collapse_op is not None and not anti_active:
+        # Σ₀ gating: dx = f dt + dW − Σ₀(x,Σ,G,u). When a trajectory is underdetermined,
+        # freeze it onto its minimal invariant attractor. The rows just excited are skipped.
+        if self.collapse_op is not None and not bool(excited.all()):
             res = self.collapse_op.evaluate(self, x, u, sigma, A)
             if res.triggered:
-                budget_ok = (
-                    not policy.observe_only
-                    and self._intervention_count < policy.max_interventions
-                )
-                if budget_ok:
-                    x_next = res.x_star
-                    sigma_next = sigma
-                    info["collapse"] = res
-                    self._intervention_count += 1
-                    receipt = InterventionReceipt(
-                        step=step, kind="project_to_attractor", trigger_source="collapse_trigger",
-                        sigma0_proximity=float(info.get("sigma0_proximity", 0.0)),
-                        surprise_spook=bool(info.get("surprise_spook", False)),
-                        pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
-                        pre_sigma_tr=pre_sigma_tr,
-                        post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason="budget_ok: collapse projected to attractor",
-                    )
-                else:
-                    kind = "observe" if policy.observe_only else "blocked"
-                    reason = (
-                        "observe_only=True" if policy.observe_only
-                        else f"budget exhausted ({self._intervention_count}/{policy.max_interventions})"
-                    )
-                    receipt = InterventionReceipt(
-                        step=step, kind=kind, trigger_source="collapse_trigger",
-                        sigma0_proximity=float(info.get("sigma0_proximity", 0.0)),
-                        surprise_spook=bool(info.get("surprise_spook", False)),
-                        pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
-                        pre_sigma_tr=pre_sigma_tr,
-                        post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason=reason,
-                    )
+                mask = getattr(res, "mask", None)    # a result without one speaks for every row
+                hit = (torch.ones(bsz, dtype=torch.bool, device=dev) if mask is None
+                       else torch.as_tensor(mask, device=dev).to(torch.bool).reshape(-1).expand(bsz))
+                hit = hit & ~excited
+                if bool(hit.any()):
+                    overwritten = hit & self._budget_open(bsz, dev)
+                    if bool(overwritten.any()):
+                        x_next = torch.where(overwritten.unsqueeze(-1), res.x_star.to(x_next.dtype), x_next)
+                        sigma_next = torch.where(overwritten.view(-1, 1, 1), sigma, sigma_next)
+                        self._intervention_counts[overwritten] += 1
+                        info["collapse"] = res
+                    for i in hit.nonzero().flatten().tolist():
+                        kind, reason = (("project_to_attractor", "budget_ok: collapse projected to attractor")
+                                        if overwritten[i] else self._held(i))
+                        receipts[i] = receipt(i, kind, "collapse_trigger", reason, bool(spook[i]))
+        info["collapse_mask"] = overwritten
 
-        info["intervention_receipt"] = receipt
+        info["intervention_receipts"] = [r for r in receipts if r is not None]
+        info["intervention_receipt"] = (info["intervention_receipts"][0]
+                                        if info["intervention_receipts"] else None)
         return x_next, sigma_next, info
 
     def costate(self, x: Tensor, u: Tensor, sigma: Tensor) -> Tensor:
@@ -597,10 +641,11 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
         x_next, sigma_next, info = model.forward_step(x, sigma, dt, noise, step=t)
 
         if info.get("collapse") is not None:
-            trace.collapses.append({"step": t, "result": info["collapse"]})
+            # one entry per step with an overwrite; `samples` are the rows it overwrote
+            trace.collapses.append({"step": t, "result": info["collapse"],
+                                    "samples": info["collapse_mask"].nonzero().flatten().tolist()})
 
-        if info.get("intervention_receipt") is not None:
-            trace.interventions.append(info["intervention_receipt"])
+        trace.interventions.extend(info.get("intervention_receipts", []))   # one per row that fired
 
         if accumulate_cost:
             running = running + model.stage_cost(x, info["u"]).mean() * dt

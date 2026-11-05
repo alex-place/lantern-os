@@ -98,13 +98,13 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine: the cap, per-sample floors, every dimension, no consecutive gate, `x*` on `null(A)`, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 34 passed |
+| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 57 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
 | Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
-| Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
+| Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED on the batch gate, before the 2026-11-05 changes; needs a re-run | research repo: `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py`, once it scores each row (§2) |
 | Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
 | Phase 0.5 prospective shot-call on the trained reservoir: sliver call held; anchor/ceiling ratio 1.4·10⁴ (§3.1, [#2690]) | MEASURED (real learned system) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
@@ -169,12 +169,13 @@ it — rests on the model-collapse literature (§7) and on this project's own me
 
 **How sure are we of each part?** Every claim below is labelled:
 - **PROVEN** — Theorem 1 for normal `A`; the spectral dichotomy for every `A` (standard linear
-  algebra); **C3**, that when the operator acts, the four-signal gate cannot be true on two consecutive
-  steps, through the engine's own projection, for all `A` and every dimension `d ≥ 2`; and **S1**, that each
-  firing moves the state out of the near-target ball with probability ≥ ½. Tests are in the audit
+  algebra); **C3**, that when the operator acts on a trajectory, that trajectory's four-signal gate cannot
+  be true on two consecutive steps, through the engine's own projection, for all `A` and every dimension
+  `d ≥ 2`; and **S1**, that each firing moves the state out of the near-target ball with probability ≥ ½.
+  The gate decides each trajectory of a batch on its own signals. Tests are in the audit
   table. "Proven" here means closed-form argument plus tests, not a formal proof.
-- **MEASURED** — the operator against a placebo (§3): the gate never stays true for two steps, against
-  runs of 60 for the placebo. The early-warning "canary" (§4).
+- **MEASURED** — the operator against a placebo (§3): no trajectory's gate stays true for two steps,
+  against runs of 60 for the placebo. The early-warning "canary" (§4).
 - **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational definition,
   deliberately *not* dressed up as a theorem. The acceptance gate's transient threshold (§1.2.3).
 - **NOT CLAIMED** — that the state keeps moving. A system with no drift, no noise and no grounding
@@ -842,8 +843,8 @@ grows 22,000× by `t = 2000`.
 
 **Status: OPERATIONAL DEFINITION — not derived from Theorem 1.**
 
-**Definition (operational).** Σ₀ fires when **all four** conditions hold
-simultaneously:
+**Definition (operational).** Σ₀ fires for a trajectory when **all four** of its own conditions hold
+simultaneously (each sample of a batch is decided on its own signals and its own Jacobian; see §3):
 
 *In plain words: this section defines the smoke alarm. Σ₀ is the moment we declare the system "stuck" — when, by four independent measures at once, it has stopped learning anything new and can no longer tell its options apart. We are honest that this is a sensible rule of thumb we chose, not something the theorem forces.*
 
@@ -890,9 +891,9 @@ Machine terminal anchor) reaches the gate through `x_target`. Both this signal a
 divided by the batch size, which made `ε_g` and `ε_c` 8× looser at `B = 8` than they claim. They are now per
 sample.
 
-**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04; predates the two corrections above, so it needs a re-run to be current).** The four-signal
-AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` calls the
-real operator over **960 samples** spanning the collapse regime and its complements and
+**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04; predates the two corrections above and the per-trajectory gate of §3, so it needs a re-run to be current).** The four-signal
+AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` (research repo) calls the
+real operator over **960 samples**, each a batch of 8 rows judged as one decision, spanning the collapse regime and its complements and
 scores it against the *spectral* ground truth (does `A_s` actually carry a null manifold
 plus stable active modes, computed independently by `eigh`). Result
 (`data/sigma0/trigger_calibration_report.json`): **precision 1.0 — 0 false-fires over 720
@@ -907,22 +908,25 @@ non-normality `ν>0` shifts the exact zero eigenvalue of `A_s` (so the clean col
 the `ν=0` case). **This upgrades §2 from bare HEURISTIC to a MEASURED soundness profile — it
 does *not* make `trigger ⇒ α<0` a theorem.** The one clean sub-statement *is*
 provable-by-construction: a collapse manifold exists ⟺ `A` is near-singular (else
-`_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch).
+`_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch). **To re-run it**, the script has to score each row
+first. It reads one decision and one value per signal for each batch, and on the per-trajectory gate it stops with a
+`ValueError` at `int(conds[c])` (checked against this revision on 2026-11-05).
 
 ---
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: C3 and S1 PROVEN in-regime, with engine-level tests (corrected 2026-11-05). The operator beats a
-placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists.**
+**Status: C3 and S1 PROVEN in-regime, per trajectory, with engine-level tests (corrected 2026-11-05). The
+operator beats a placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists.**
 
-Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it:
+Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it, one trajectory at a time:
 
 $$dx = f\,dt + dW + \kappa\,P\xi, \qquad \Sigma^{+} = \Sigma_{\text{pred}} + b\,P,$$
 
-with `P` the orthogonal projector onto a banded near-null subspace of `A_s`, of rank `m`, `ξ` the same standard normal
-that drives `dW`, and `p ∈ [0,1]` the **collapse proximity**. `p > 0` holds exactly when all four §2
-conditions hold. (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`.)
+with `P` the orthogonal projector onto the trajectory's own kick subspace, of rank `m`: the right singular vectors of
+its own `A` for its smallest singular values. `ξ` is the same standard normal that drives `dW`, and `p ∈ [0,1]` is the
+**collapse proximity**. `p > 0` holds exactly when that trajectory's four §2 conditions hold, and only those
+trajectories are kicked and bumped. (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`.)
 
 **Lemma L2′ (one-step lift, any projector).** Let `Σ ≻ 0` with eigenvalue mean `μ` and unbiased coefficient of
 variation `a`, and let `P` be any rank-`m` orthogonal projector, `1 ≤ m ≤ d−1`. Then `b ≥ Δ = (ε+a)μd / (√(m(d−m)) − εm)`,
@@ -930,10 +934,10 @@ when that denominator is positive, implies `a(Σ+bP) ≥ ε`. *Proof:* `Σ+bP �
 reverse triangle inequality in Frobenius norm gives the bound. No alignment and no normality. Independently
 re-derived twice (the audit in the research repo, and the 2026-11-05 review).
 
-**Theorem C3 (engine level).** Suppose the operator acts on a step (policy armed, budget left), and
-`ρ = d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to 9000). Then `a(Σ_next) ≥ ε_a` for every sample, where
-`Σ_next` is what the next evaluation actually reads, so the four-signal gate is false on the next step. This holds
-for all `A` and every dimension `d ≥ 2`. (At `d = 1` there is no shape to restore: the covariance leg does nothing, and
+**Theorem C3 (engine level).** Suppose the operator acts on a trajectory on a step (its gate fired, the policy is
+armed, and that trajectory's budget is not spent), and `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to 9000).
+Then `a(Σ_next) ≥ ε_a` for that trajectory, where `Σ_next` is what its next evaluation actually reads, so its
+four-signal gate is false on the next step. This holds for all `A` and every dimension `d ≥ 2`. (At `d = 1` there is no shape to restore: the covariance leg does nothing, and
 only S1 applies.) *Proof:* L2′ per sample, targeting `1.02·ε_a`, gives `a₊ = a(Σ_pred + bP) ≥ 1.02·ε_a`.
 `project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase it. Eigenvalues can
 fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ σ_max/d`. Raising them to `eps` adds `δᵢ ∈ [0, eps]`,
@@ -956,44 +960,79 @@ stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_
 probability ≥ ½, for any drift and any `p`. That reads three hypotheses onto the engine. `ξ` must be standard normal, which
 `rollout` draws and a direct caller of `forward_step` must supply. `‖∇ₓL‖ = 2‖x − x_target‖` holds for the engine's quadratic
 stage cost, and another cost needs its own argument. And `D ⪰ 0` is required, not a convenience: `dW` and the kick share `ξ`, and at
-`D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise, and
-`forward_step` refuses to fire on a negative gain from any dynamics (found by `lantern-os-research` PR #14). The kick used to be `strength·p`, which vanishes at the gate boundary:
-the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. This is per trajectory, and the gate is not: see below.
+`D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise (found
+by `lantern-os-research` PR #14), and `forward_step` refuses to kick any row whose gain on `ξ`, `g·dilation`, is negative or not
+finite, from any dynamics and in any shape. A caller-supplied `Σ` can make the dilation negative (#3811), and one gain can be
+shared by every row. With `strength = 0` there is no kick, so nothing is checked. The kick used to be `strength·p`, which vanishes at the gate boundary:
+the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. Like the gate, it is per trajectory.
 
 **What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the
 state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no
 grounding, the state rests at an equilibrium once the gate has cleared
 (`test_c3_does_not_promise_perpetual_motion`), and when `A` changes, the next regime can erase the kick outright
-(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. Two more limits, both pinned
-by tests. **The gate is one decision for the whole batch**, on mean signals and the mean Jacobian: one sample at 7·ε_g among eight
-can still fire it, and `e₁e₁ᵀ` and `e₂e₂ᵀ` at `d = 4` each trigger alone and not together, because their mean has rank 2. C3 is
-unaffected, since every sample is lifted, but the decision has no per-trajectory meaning. **The kick's subspace comes from `A_s`,
-not `null(A)`:** under `A = e₁e₂ᵀ` one of its three directions is active. L2′ and S1 allow any projector, so neither is affected,
-but the kick is not confined to the fixed points. A reference design for both is in `lantern-os-research` PR #14, not in this engine. "`P(permanent freeze) = 0`"
+(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`"
 in earlier versions meant only that the gate cannot latch, which is a narrower thing than its plain reading. Σ₀⁻¹ is
 observe-only by default in the live engine (#1138), and lives on this synthetic SDE, not a real model.
 
-**Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite whenever the operator fired, and
-`proximity > 0` is exactly the trigger condition, so an attached operator records zero overwrites by construction. The
+**Per trajectory, and in `null(A)` (changed 2026-11-05).** The audit in `lantern-os-research` PR #14 found two design limits,
+which the previous correction (#3808) stated and pinned by tests. The gate was one decision for the whole batch, on mean signals and the
+mean Jacobian, so a collapsed member could hide among healthy ones, and `e₁e₁ᵀ` and `e₂e₂ᵀ` at `d = 4` each triggered alone and
+not together, because their mean has rank 2. And the kick's subspace came from `A_s`: under `A = e₁e₂ᵀ` one of its three
+directions had `‖Av‖ = 1/√2`. Both are now changed in the operator itself, with no new subsystem:
+
+- **The gate decides each trajectory on its own.** A sample's four signals are its own gradient, the rank of its own
+  Jacobian, its own `Σ`'s anisotropy and its own `‖∂H/∂u‖`. `forward_step` changes only the rows whose own AND holds: the
+  anti-collapse operator kicks and bumps exactly those rows, the collapse operator overwrites exactly the triggered rows it
+  did not excite, and a surprise spook raises only its own row. Every other row keeps the plain SDE step. Each row that fires
+  gets its own receipt, and each trajectory spends its own budget, so whether a row may change never depends on another row.
+  A batch is therefore `B` independent trajectories: row `i` of a batched run equals the same run on row `i` alone, bit for
+  bit (`test_a_batch_is_independent_trajectories`). `e₁e₁ᵀ` and `e₂e₂ᵀ` now trigger together as they do alone, a collapsed
+  member is caught beside a healthy one when the batch mean of `‖∇ₓL‖` is about 100·`ε_g`, and a batch whose rows have the
+  Jacobians `e₁e₂ᵀ` and `diag(0, 0, −½, 0)`, which never fired as a batch, now fires and holds C3 for every row.
+- **The kick lies in `null(A)`.** Each sample's kick basis is the right singular vectors of its own `A` for its small
+  singular values, from an SVD of `A` (an eigendecomposition of `AᵀA` would square the condition number). The count of
+  directions and the cap from `_max_lift_rank` are as before, so `m` can differ from row to row, and each row's bump is
+  floored at its own `m`. When the gate fires, every counted singular value is at most `eig_eps·max(1, ‖A‖₂)` at the default
+  thresholds, so `‖A·P‖₂` is too: neither the kick nor the bump points along a direction that the linear drift moves. Under
+  `A = e₁e₂ᵀ`, `A·kick = 0` now.
+
+What this does not change, and what is still not proven. L2′ and S1 allow any projector, so the proofs of C3 and S1 are
+untouched: they are now statements about each trajectory the operator acts on, and still about one step under one `A`.
+"The kick lies in `null(A)`" is a statement about the linear part: a nonlinear drift can still move the kick, and the next
+step's `A` can differ, which is how `test_a_switching_jacobian_can_erase_the_kick` erases it. Nothing here says that the
+state retains the kick. Each trajectory is changed at most `max_interventions` times per rollout, as each row was under
+the batch gate, but the rows no longer change on the same steps. The gate now costs one SVD per sample per step rather
+than one per batch. And the §2 trigger calibration ([#1990]) measured the batch gate, so its precision and recall need a
+re-run before they describe this one. Its script is in the research repo and has to score each row first (§2).
+
+**Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite on every row the operator fired on, and
+`proximity > 0` is exactly that row's trigger condition, so an attached operator records zero overwrites by construction. The
 sweep's other condition, final norm above initial norm, is what diffusion does anyway. A placebo that fires and does
 nothing scored 36/36 on a 108-trial sample of the pre-fix engine, with the same one-third collapse-prone rate. Every collapse-prone
 trial was also `ν = 0`, because the sweep's non-normal cells were full-rank and never entered the gate, so the figure
 said nothing about non-normal `A`. And the script as written now finds 0 collapse-prone trials, because the
 engine defaults to observe-only.
 
-**Placebo-controlled measurement (MEASURED, 2026-11-05).** 18 cells over `α`, non-normality and noise, all rank-1, so
-every cell can enter the gate; 10 trials each; `python experiments/sigma0_placebo_control.py --trials 10`:
+**Placebo-controlled measurement (MEASURED, 2026-11-05; re-run on the per-trajectory gate).** 18 cells over `α`,
+non-normality and noise, all rank-1, so every cell can enter the gate; 10 trials of 8 trajectories each;
+`python experiments/sigma0_placebo_control.py --trials 10`. The gate is read per trajectory, from each row's receipts:
 
-| Arm | Trials with an overwrite | Steps with gate true | Longest gate-true run | State moved |
-|---|---|---|---|---|
-| No operator | 180/180 | 100% | 60 | 0.0007 |
-| Placebo (fires, does nothing) | 0/180 | 14.9% | 60 | 0.023 |
-| Covariance leg only | 0/180 | 1.9% | **1** | 0.024 |
-| Real operator | 0/180 | 1.7% | **1** | **0.59** |
+| Arm | Trials with an overwrite | Trajectory-steps with gate true | Longest gate-true run, one trajectory | Longest run, any trajectory | State moved |
+|---|---|---|---|---|---|
+| No operator | 180/180 | 100% | 60 | 60 | 0.0007 |
+| Placebo (fires, does nothing) | 0/180 | 14.7% | 60 | 60 | 0.023 |
+| Covariance leg only | 0/180 | 2.0% | **1** | 2 | 0.024 |
+| Real operator | 0/180 | 1.7% | **1** | 1 | **0.39** |
 
-The overwrite column shows why the old metric could not fail. The longest run is C3, measured. The covariance leg alone
-clears the gate and does not move the state beyond what noise does; only the kick does. That the state moved says nothing
-about whether it moved anywhere useful. Synthetic SDE only.
+The overwrite column shows why the old metric could not fail. The longest run of one trajectory is C3, measured. Rows are
+now decided apart, so two can be in the gate on consecutive steps, as two are once under the covariance leg alone; C3 says
+nothing about that, and the any-trajectory column is there so the aggregate is not hidden. The covariance leg alone clears the
+gate and does not move the state beyond what noise does; only the kick does. Under the batch gate the real operator moved
+the state 0.59. Little of the drop to 0.39 comes from deciding per row: the per-row gate with the old `A_s` subspace gives
+0.56. The kick's subspace accounts for the rest. In the normal cells the two subspaces agree and the state moves about the same
+(0.41 and 0.40). In the non-normal cells the old subspace put part of the kick where the drift carried it further (0.71), and in
+`null(A)` the linear drift does not carry it (0.39). That the state moved says nothing about whether it moved anywhere useful.
+Synthetic SDE only.
 
 **On "persistent excitation."** The classical PE result (Anderson 1977) concerns
 *estimator/parameter* convergence under `∫φφᵀ ≥ αI`. Here there is no estimator
@@ -2300,6 +2339,7 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Any rotation or unstable complex pair with `|Re λ| < 1` went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
 | 2026-11-05 | a batch "reports the worst member" | the bounds and gates came from one member, so a batch could read `proven_contracting` beside a diverging member, or quote one member's bound for another's 1000× transient, depending on order. Gates are now ANDed and each bound is the worst of any member's | `_worst_fate`, `_worst_collapse` |
 | 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence`, or from sources that disagree, stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied, and supports acting only if it ran this plan. Still unchecked, and stated: whether the goal is reachable at all, and whether a channel's self-reported confidence is honest | `src/cio_sde/question.py` |
+| 2026-11-05 | the anti-collapse gate as one decision for the batch, and its kick subspace from `A_s` (both stated as limits and pinned in the first round) | **lifted** (the design limits found by `lantern-os-research` PR #14): each trajectory is gated on its own four signals and its own Jacobian, and only the rows that fire are kicked, bumped or overwritten, each with its own receipt and budget; a batch run equals its rows run alone. The kick basis is the right singular vectors of each sample's own `A` for its small singular values, so `‖A·P‖₂ ≤ eig_eps·max(1, ‖A‖₂)` when the gate fires. C3 and S1 are unchanged and now hold per trajectory; neither says the state keeps the kick, and the #1990 calibration needs a re-run. An independent review of the first version of this change broke it through the engine. The S1 gain guard indexed a gain shared by all rows by row number, and let a negative gain through. An operator written for the batch gate crashed when its outputs broadcast, and with such an operator a spook on one row raised another row's kick. Signals were compared with float32-rounded thresholds, one ulp from master. All four are fixed and pinned | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
 | 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
 | 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |
