@@ -109,6 +109,7 @@
         "TRADER_RISE_SHADOW": "",
         "TRADER_ENTRY_TAGS": "",
         "TRADER_ENTRY_TAGS_DIR": "",
+        "TRADER_MAX_LOSS_RTH_ONLY": "",
         "TRADER_ENTRY_TAGS_NEWS_FETCH": ""
       },
       "universe": [
@@ -166,6 +167,7 @@
         "TRADER_RISE_SHADOW": "",
         "TRADER_ENTRY_TAGS": "",
         "TRADER_ENTRY_TAGS_DIR": "",
+        "TRADER_MAX_LOSS_RTH_ONLY": "",
         "TRADER_ENTRY_TAGS_NEWS_FETCH": ""
       },
       "universe": [
