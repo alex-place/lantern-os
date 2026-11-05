@@ -687,3 +687,24 @@ def test_excitation_noise_map_matches_the_state_kick_map():
                       torch.eye(d).expand(2, d, d).clone(), A, p, noise)
     expected = torch.bmm(M, noise.unsqueeze(-1)).squeeze(-1)
     assert torch.allclose(dx, expected, atol=1e-6)
+
+
+def test_riccati_process_noise_scales_with_covariance_dilation():
+    dim = 3
+    m = CIO_SDE(dim=dim, ctrl_dim=2, hidden=4)
+    m.graph.active = LinearDynamics(
+        torch.zeros(dim, dim),
+        B=torch.zeros(dim, 2),
+        noise=2.0,
+    )
+    _zero_policy(m)
+    sigma = 3.0 * torch.eye(dim).unsqueeze(0)
+    x = torch.zeros(1, dim)
+    dt = 0.2
+    _, sigma_next, info = m.forward_step(
+        x, sigma, dt, torch.zeros_like(x), step=0
+    )
+    # dilation = 1 + tr(Sigma)/d = 4; Q = (2*4)^2 I.
+    # Riccati term is -Sigma^2, so Sigma+ = 3I + (-9I + 64I)*0.2 = 14I.
+    assert torch.allclose(info["dilation"], torch.tensor([4.0]), atol=1e-6)
+    assert torch.allclose(sigma_next, 14.0 * torch.eye(dim).unsqueeze(0), atol=1e-5)
