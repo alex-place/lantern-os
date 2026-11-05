@@ -143,6 +143,14 @@ class CovarianceField:
         m = H.shape[1]
         if H.shape[-1] != d or R.shape[-2:] != (m, m) or observation.shape[-1] != m:
             raise ValueError("incompatible measurement dimensions")
+        for name, value in (("observation", observation), ("H", H), ("R", R)):
+            if not bool(torch.isfinite(value).all()):
+                raise ValueError(f"{name} must contain only finite values")
+        if not torch.allclose(R, R.transpose(-1, -2), atol=1e-7, rtol=1e-6):
+            raise ValueError("measurement covariance R must be symmetric")
+        _, r_info = torch.linalg.cholesky_ex(R)
+        if bool((r_info != 0).any()):
+            raise ValueError("measurement covariance R must be positive definite")
         innovation = observation - torch.bmm(H, x.unsqueeze(-1)).squeeze(-1)
         HP = H @ sigma
         S = HP @ H.transpose(-1, -2) + R
@@ -452,7 +460,8 @@ class CIO_SDE(nn.Module):
         # Stability of A is certified off this path, by collapse.dichotomy_certificate and
         # stability_gates (matrix-measure contraction analysis: Lohmiller & Slotine 1998,
         # Automatica 34(6):683-696).
-        A = closed_loop_drift_jacobian(node, self.pcsf, x.detach(), sigma.detach())
+        A = (closed_loop_drift_jacobian(node, self.pcsf, x.detach(), sigma.detach())
+             if split_covariance else drift_jacobian(node, x.detach(), u.detach()))
         # The state receives diag(g * dilation) dW, not diag(g) dW.
         # Keep the Riccati process-noise term consistent with that executed map.
         effective_diffusion = g.detach() * dilation.detach()
@@ -711,7 +720,8 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
             swap_schedule: Optional[Dict[int, Dynamics]] = None,
             record: bool = True,
             accumulate_cost: bool = False,
-            shape_sigma0: Optional[Tensor] = None
+            shape_sigma0: Optional[Tensor] = None,
+            measurement_schedule: Optional[Dict[int, Tuple[Tensor, Tensor, Tensor]]] = None
             ) -> Tuple[Tensor, Tensor, Trace]:
     """
     Deterministic, replayable rollout.
@@ -743,8 +753,10 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
             rec = model.graph.hot_swap(swap_schedule[t], x.detach(), u_probe, t)
             trace.swaps.append(rec)
 
+        measurement = (measurement_schedule or {}).get(t)
         x_next, sigma_next, info = model.forward_step(
-            x, sigma, dt, noise, step=t, shape_covariance=shape_sigma
+            x, sigma, dt, noise, step=t, shape_covariance=shape_sigma,
+            measurement=measurement,
         )
         if shape_sigma is not None:
             shape_sigma = info["shape_covariance"]
