@@ -1393,6 +1393,7 @@ def _assert_samplewise_independent(model, x: Tensor, u: Tensor, sigma: Tensor,
         if active is not None:
             check("dynamics/state", torch.func.jacrev(lambda z: active.drift(z, u))(x))
             check("dynamics/control", torch.func.jacrev(lambda z: active.drift(x, z))(u))
+            check("diffusion", torch.func.jacrev(lambda z: active.diffusion(z))(x))
     except RuntimeError:
         raise
     except Exception as exc:
