@@ -38,7 +38,7 @@ from .engine import (
     paired_control_rollout,
 )
 from .stability import (\n    verify_common_quadratic,\n    finite_horizon_excitation_gramian,\n    covariance_energy_bound,\n    augmented_transition_jacobian,\n)\nfrom .loss import gaussian_kl, free_energy
-from .diagnostics import StabilityReport, analyze_trajectory
+from .diagnostics import StabilityReport, analyze_trajectory, analyze_switched_modes
 from .collapse import (
     SemanticCollapseOperator,
     CollapseResult,
@@ -105,7 +105,7 @@ __all__ = [
     "verify_common_quadratic",\n    "finite_horizon_excitation_gramian",\n    "covariance_energy_bound",\n    "augmented_transition_jacobian",\n    "gaussian_kl",
     "free_energy",
     "StabilityReport",
-    "analyze_trajectory",
+    "analyze_trajectory",\n    "analyze_switched_modes",
     "SemanticCollapseOperator",
     "CollapseResult",
     "CollapseOutcome",
