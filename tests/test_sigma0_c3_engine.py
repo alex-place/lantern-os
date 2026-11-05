@@ -747,3 +747,75 @@ def test_engine_covariance_includes_the_actual_intervention_noise_map():
     # The same xi drives the unit kick in e1, so predicted covariance gains e1e1^T.
     assert sigma_next[0, 0, 0].item() == pytest.approx(1.0, abs=1e-5)
     assert sigma_next[0, 1, 1].item() == pytest.approx(m.cov.eps, abs=1e-6)
+
+
+
+# ── explicit belief covariance / shape regularizer split ────────────────────────────────
+
+def test_split_covariance_keeps_c3_shape_lift_out_of_belief():
+    """A deliberate C3 shape lift must not be written into belief covariance."""
+    class _ShapeOnlyLift(AntiCollapseOperator):
+        def proximity_per_sample(self, model, x, u, shape, A):
+            return torch.ones(x.shape[0], device=x.device, dtype=x.dtype)
+
+        def excite(self, x, shape, A, p, noise):
+            extra = torch.zeros_like(shape)
+            extra[:, 0, 0] = 0.5
+            return torch.zeros_like(x), extra
+
+    d, dt = 4, 0.1
+    model = CIO_SDE(dim=d, ctrl_dim=2, hidden=8).double()
+    model.graph.active = LinearDynamics(
+        torch.zeros(d, d, dtype=torch.float64),
+        B=torch.zeros(d, 2, dtype=torch.float64), noise=0.1,
+    ).double()
+    _zero_policy(model)
+    model.intervention_policy = InterventionPolicy(**ARMED)
+    model.anti_collapse_op = _ShapeOnlyLift().double()
+
+    x = torch.zeros(1, d, dtype=torch.float64)
+    belief = torch.eye(d, dtype=torch.float64).unsqueeze(0)
+    shape = belief.clone()
+    noise = torch.zeros_like(x)
+
+    _, belief_next, info = model.forward_step(
+        x, belief, dt, noise, step=0, shape_covariance=shape
+    )
+    shape_next = info["shape_covariance"]
+
+    # No drift: belief receives the actual process-noise variance.
+    assert torch.all(torch.diagonal(belief_next, dim1=-2, dim2=-1) > 1.0)
+    # Shape receives the deliberate C3 lift, but not process noise.
+    assert shape_next[0, 0, 0] > 1.4
+    assert torch.allclose(shape_next[0, 1:, 1:], torch.eye(3, dtype=torch.float64))
+    assert not torch.allclose(belief_next, shape_next)
+    assert info["anti_collapse_p"] == pytest.approx(1.0)
+
+
+def test_split_covariance_rollout_returns_both_states_without_legacy_change():
+    d = 3
+    model = CIO_SDE(dim=d, ctrl_dim=2, hidden=8).double()
+    model.graph.active = LinearDynamics(
+        torch.zeros(d, d, dtype=torch.float64),
+        B=torch.zeros(d, 2, dtype=torch.float64), noise=0.1,
+    ).double()
+    _zero_policy(model)
+    x = torch.zeros(2, d, dtype=torch.float64)
+    belief = torch.eye(d, dtype=torch.float64).expand(2, -1, -1).clone()
+    shape = 2.0 * belief
+
+    _, belief_final, trace = rollout(
+        model, x, belief, steps=2, dt=0.1, base_seed=7,
+        shape_sigma0=shape,
+    )
+    assert trace.final_shape_covariance is not None
+    assert trace.final_shape_covariance.shape == shape.shape
+    assert len(trace.shape_traces) == 2
+    assert torch.allclose(trace.final_shape_covariance, shape)
+    assert torch.all(torch.diagonal(belief_final, dim1=-2, dim2=-1) > 1.0)
+
+    # The old three-argument rollout path still returns the historical three values.
+    _, legacy_sigma, legacy_trace = rollout(model, x, belief, steps=1, dt=0.1, base_seed=7)
+    assert legacy_trace.final_shape_covariance is None
+    assert legacy_trace.shape_traces == []
+    assert legacy_sigma.shape == belief.shape
