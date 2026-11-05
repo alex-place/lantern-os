@@ -33,6 +33,12 @@ delete process.env.TRADER_MOMENTUM_EXIT;
 
 const at = require('../lib/auto-trader');
 
+// A FIXED CLOCK. runAutoTrade's `now` defaults to the wall clock, and a signal exit waits
+// until the regular session is 30 minutes old (exitMinSessionMin), so three tests below
+// went red whenever CI ran 09:30-10:00 ET on a trading day (run 42047842418, 09:46 ET).
+// Every scan here runs at noon on a plain mid-week session, whatever the hour really is.
+const NOW = Date.parse('2026-11-04T12:00:00-05:00');   // a Wednesday, 150 minutes into a full session
+
 const readRows = () => (fs.existsSync(LOG)
   ? fs.readFileSync(LOG, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []);
 
@@ -41,9 +47,9 @@ function world({ ladder = true } = {}) {
   at._resetCooldowns();
   if (fs.existsSync(LOG)) fs.unlinkSync(LOG);
   fs.writeFileSync(STATE, JSON.stringify({
-    lastPos: { LNG: { qty: 100, entry: 100, mark: 100.8, ts: Date.now() } },
-    entryAt: { LNG: Date.now() - 2 * 3600e3 },
-    stopOrders: { LNG: { id: 'S1', px: 97, qty: 100, at: Date.now() - 2 * 3600e3 } },
+    lastPos: { LNG: { qty: 100, entry: 100, mark: 100.8, ts: NOW } },
+    entryAt: { LNG: NOW - 2 * 3600e3 },
+    stopOrders: { LNG: { id: 'S1', px: 97, qty: 100, at: NOW - 2 * 3600e3 } },
     zoneLadder: ladder ? { LNG: { r1: 103, r1top: 103.2, r2: 105.1, broke: false } } : {},
   }));
   at._loadState();
@@ -65,7 +71,7 @@ const sells = (b) => b.placed.filter((o) => o.ticker === 'LNG' && o.side === 'se
 
 test('LIVE DEFAULTS: the bounce (IBS 0.72) is reached, but the ladder owns the exit — no sell', async () => {
   const bridge = world();
-  const out = await at.runAutoTrade({ signals: [bounce()] }, { bridge, userId: 't' });
+  const out = await at.runAutoTrade({ signals: [bounce()] }, { bridge, userId: 't', now: NOW });
   assert.strictEqual(sells(bridge).length, 0, 'the validated exit never fires');
   assert.ok(out.skipped.some((s) => /zone ladder owns this exit/.test(s.why)), 'skip row names the ladder');
 });
@@ -76,7 +82,7 @@ test('the conflict is journaled once per process as config_warning (the ledger s
   assert.strictEqual(warn.length, 1, 'exactly one warning row');
   assert.ok(/TRADER_ZONE_EXIT/.test(warn[0].reason) && /TRADER_EXIT_MIN_PWIN=0\.6/.test(warn[0].reason) && /TRADER_TAKE_PROFIT_R=1/.test(warn[0].reason) && /TRADER_MOMENTUM_EXIT/.test(warn[0].reason), warn[0].reason);
   const bridge = world();
-  await at.runAutoTrade({ signals: [bounce()] }, { bridge, userId: 't' });
+  await at.runAutoTrade({ signals: [bounce()] }, { bridge, userId: 't', now: NOW });
   assert.strictEqual(readRows().filter((r) => r.event === 'config_warning').length, 0, 'not repeated on the next scan (fresh log, no new row)');
 });
 
@@ -90,7 +96,7 @@ test('TRADER_ZONE_EXIT=0 alone: the ladder steps aside but the p_win gate still 
   process.env.TRADER_ZONE_EXIT = '0';
   try {
     const bridge = world();
-    const out = await at.runAutoTrade({ signals: [bounce(0.5)] }, { bridge, userId: 't' });
+    const out = await at.runAutoTrade({ signals: [bounce(0.5)] }, { bridge, userId: 't', now: NOW });
     assert.strictEqual(sells(bridge).length, 0, 'p_win 0.5 < 0.6 still blocks');
     assert.ok(out.skipped.some((s) => /bearish too weak to exit/.test(s.why)), 'skip row names the p_win gate');
   } finally { delete process.env.TRADER_ZONE_EXIT; }
@@ -101,7 +107,7 @@ test('THE VALIDATED ENV (ladder off, p_win gate off): the bounce sells, the stop
   process.env.TRADER_EXIT_MIN_PWIN = '0';
   try {
     const bridge = world();
-    await at.runAutoTrade({ signals: [bounce(0.5)] }, { bridge, userId: 't' });
+    await at.runAutoTrade({ signals: [bounce(0.5)] }, { bridge, userId: 't', now: NOW });
     assert.strictEqual(sells(bridge).length, 1, 'the bounce is banked');
     assert.ok(readRows().some((r) => r.event === 'exit_intent' && r.reason === 'signal_exit'), 'exit intent journaled');
   } finally { delete process.env.TRADER_ZONE_EXIT; delete process.env.TRADER_EXIT_MIN_PWIN; }
@@ -113,7 +119,7 @@ test('thesis intact (IBS 0.41) is still held under the validated env — the gat
   try {
     const bridge = world();
     const sig = bounce(0.5); sig.ibs = 0.41;
-    const out = await at.runAutoTrade({ signals: [sig] }, { bridge, userId: 't' });
+    const out = await at.runAutoTrade({ signals: [sig] }, { bridge, userId: 't', now: NOW });
     assert.strictEqual(sells(bridge).length, 0);
     assert.ok(out.skipped.some((s) => /washout thesis intact/.test(s.why)));
   } finally { delete process.env.TRADER_ZONE_EXIT; delete process.env.TRADER_EXIT_MIN_PWIN; }
