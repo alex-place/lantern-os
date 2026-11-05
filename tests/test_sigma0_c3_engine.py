@@ -668,7 +668,7 @@ def test_covariance_step_includes_shared_noise_cross_terms():
     # Covariance is (2ξ)^2=4, not 1+1=2.
     noise_map = torch.diag(torch.tensor([2.0, 0.0], dtype=torch.float64)).unsqueeze(0)
     out = cov.step(sigma, A, q_diag, dt=0.25, noise_map=noise_map)
-    expected = torch.diag(torch.tensor([4.0, 0.0], dtype=torch.float64)).unsqueeze(0)
+    expected = torch.diag(torch.tensor([4.0, cov.eps], dtype=torch.float64)).unsqueeze(0)
     assert torch.allclose(out, expected, atol=1e-10)
 
 
