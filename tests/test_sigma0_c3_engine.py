@@ -444,3 +444,26 @@ def test_forward_step_applies_anti_collapse_per_sample_not_to_healthy_members():
     assert torch.allclose(x_next[0], x[0] + 0.05 * x[0], atol=1e-5)
     assert torch.linalg.norm(sigma_next[1] - torch.eye(4)) > 0.0
     assert torch.linalg.norm(x_next[1] - (x[1] + 0.05 * x[1])) > 0.0
+
+
+
+class _LegacyScalarProximityOverride(AntiCollapseOperator):
+    """Custom subclass using the pre-per-sample scalar proximity contract."""
+
+    def proximity(self, model, x, u, sigma, A):
+        return 0.5
+
+
+def test_legacy_scalar_proximity_override_keeps_scalar_excite_contract():
+    m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    m.graph.active = LinearDynamics(
+        torch.zeros(4, 4), B=torch.zeros(4, 2), noise=0.0
+    )
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = _LegacyScalarProximityOverride(strength=0.5)
+    x = torch.zeros(2, 4)
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.ones_like(x), step=0)
+    assert info["sigma0_proximity"] == pytest.approx(0.5)
+    assert info["anti_collapse_p"] == pytest.approx(0.5)
+    assert torch.linalg.norm(x_next - x) > 0.0
