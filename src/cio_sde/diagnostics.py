@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from .engine import Trace
+from .engine import Trace\nfrom .stability import verify_common_quadratic, finite_horizon_excitation_gramian
 
 
 @dataclass
@@ -98,3 +98,22 @@ def _trending_down(series: List[float]) -> bool:
     first = sum(series[: n // 2]) / (n // 2)
     last = sum(series[n // 2:]) / (n - n // 2)
     return last <= first
+
+
+
+def analyze_switched_modes(modes, metric, rho, noise_maps=None):
+    """Verify a supplied switched-mode certificate and optional retained-excitation Gramian.
+
+    This is deliberately separate from analyze_trajectory: finite rollout
+    diagnostics cannot certify all future switching modes. A successful
+    Lyapunov result applies only to the supplied matrices.
+    """
+    certificate = verify_common_quadratic(modes, metric, rho)
+    result = {"stability_certificate": certificate}
+    if noise_maps is not None:
+        gramian = finite_horizon_excitation_gramian(modes, noise_maps)
+        eigs = __import__("torch").linalg.eigvalsh(gramian)
+        result["excitation_gramian"] = gramian
+        result["excitation_min_eigenvalue"] = float(eigs.min())
+        result["excitation_positive_definite"] = bool(eigs.min() > 0)
+    return result
