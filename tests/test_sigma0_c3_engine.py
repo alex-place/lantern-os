@@ -708,3 +708,42 @@ def test_riccati_process_noise_scales_with_covariance_dilation():
     # Riccati term is -Sigma^2, so Sigma+ = 3I + (-9I + 64I)*0.2 = 14I.
     assert torch.allclose(info["dilation"], torch.tensor([4.0]), atol=1e-6)
     assert torch.allclose(sigma_next, 14.0 * torch.eye(dim).unsqueeze(0), atol=1e-5)
+
+
+class _CorrelatedKickOnly(AntiCollapseOperator):
+    """Test operator with an explicit kick map and no artificial shape bump."""
+
+    def proximity(self, model, x, u, sigma, A):
+        return 0.5
+
+    def excitation_noise_map(self, A, p, batch_size, device, dtype):
+        return torch.diag(torch.tensor([1.0, 0.0], device=device, dtype=dtype)).expand(
+            batch_size, -1, -1
+        )
+
+    def excite(self, x, sigma, A, p, noise):
+        M = self.excitation_noise_map(A, p, x.shape[0], x.device, x.dtype)
+        dx = torch.bmm(M, noise.unsqueeze(-1)).squeeze(-1)
+        return dx, torch.zeros_like(sigma)
+
+
+def test_engine_covariance_includes_the_actual_intervention_noise_map():
+    dim = 2
+    m = _zero_policy(CIO_SDE(dim=dim, ctrl_dim=2, hidden=4))
+    m.graph.active = LinearDynamics(
+        torch.zeros(dim, dim),
+        B=torch.zeros(dim, 2),
+        noise=0.0,
+    )
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = _CorrelatedKickOnly(strength=0.0)
+    x = torch.zeros(1, dim)
+    sigma = torch.zeros(1, dim, dim)
+    x_next, sigma_next, info = m.forward_step(
+        x, sigma, 0.25, torch.ones_like(x), step=0
+    )
+    assert info["anti_collapse_p"] == pytest.approx(0.5)
+    assert torch.allclose(x_next, torch.tensor([[1.0, 0.0]]), atol=1e-6)
+    # The same xi drives the unit kick in e1, so predicted covariance gains e1e1^T.
+    assert sigma_next[0, 0, 0].item() == pytest.approx(1.0, abs=1e-5)
+    assert sigma_next[0, 1, 1].item() == pytest.approx(m.cov.eps, abs=1e-6)
