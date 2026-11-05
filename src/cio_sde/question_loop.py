@@ -33,12 +33,12 @@ control-leverage order.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Sequence
 
 import torch
 
 from .engine import CIO_SDE
-from .question import QuestionMachine
+from .question import QuestionMachine, Reconciliation, dynamics_defect, reconcile
 
 Tensor = torch.Tensor
 
@@ -258,6 +258,7 @@ class LoopResult:
     grounded: List[int]            # goal dims that got grounded
     blind: List[int]               # goal dims never grounded (e.g. NAP-denied channels)
     history: List[LoopRecord] = field(default_factory=list)
+    next_step: Optional[Reconciliation] = None   # act, re-plan, revise the model or gather evidence
 
 
 class QuestionDrivenLoop:
@@ -308,7 +309,11 @@ class QuestionDrivenLoop:
         return rec
 
     def run(self, max_steps: int = 12, consolidate_iters: int = 60,
-            final_iters: int = 400, lr: float = 0.05) -> LoopResult:
+            final_iters: int = 400, lr: float = 0.05,
+            observed_xs: Optional[Sequence[Tensor]] = None) -> LoopResult:
+        """`observed_xs` is a state trajectory measured under the final plan's controls. Without
+        one the loop has grounded its goal but never checked its dynamics, and `next_step` says so.
+        """
         for _ in range(max_steps):
             if self.step(consolidate_iters=consolidate_iters, lr=lr) is None:
                 break
@@ -319,6 +324,9 @@ class QuestionDrivenLoop:
         self.us = final.us
         d = self.model.dim
         blind = [j for j in range(d) if j not in self.grounded]
+        defects = (dynamics_defect(self.model, observed_xs, self.us, self.dt)
+                   if observed_xs is not None else None)
         return LoopResult(belief=self.belief.clone(), x_T=final.xs[-1],
                           final_seam=final.max_score, grounded=sorted(self.grounded),
-                          blind=blind, history=self.history)
+                          blind=blind, history=self.history,
+                          next_step=reconcile(final, defects, unresolved=len(blind)))

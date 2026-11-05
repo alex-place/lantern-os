@@ -32,18 +32,18 @@ def _A(rows):
 # ── the issue's required counterexample ────────────────────────────────────────
 
 def test_counterexample_rejected_by_smallgain_accepted_by_lyapunov():
-    """A=[[−1,3],[−3,0]] is Hurwitz (maxReλ=−0.5) but small-gain over-rejects it.
-    The Lyapunov gate must accept it; the numerical-range gate must NOT (ω=0)."""
+    """A=[[−1,3],[−3,0]] is Hurwitz (maxReλ=−0.5) but the small-gain index over-rejects it.
+    The Lyapunov gate must accept it; the numerical-range gate must NOT (ω=0, so not strict)."""
     A = _A([[-1.0, 3.0], [-3.0, 0.0]])
 
     cert = collapse_certificate(A)
-    assert cert.guaranteed is False          # small-gain alpha = −1 + 3 = 2 > 0 → rejects
+    assert cert.guaranteed is False          # A does not commute with P_M: Theorem 1 cannot apply
     assert cert.alpha > 0
 
     g = stability_gates(A)
     assert g.spectral_abscissa == pytest.approx(-0.5, abs=1e-5)  # Hurwitz
     assert g.gate_lyapunov is True           # accepted by the provable Lyapunov gate
-    assert g.gate_numerical_range is False   # ω(A)=0 → transient growth, not monotone
+    assert g.gate_numerical_range is False   # ω(A)=0 → non-expansive, but not STRICTLY contracting
     assert g.numerical_range_abscissa == pytest.approx(0.0, abs=1e-6)
     assert g.proven_contracting is True
     # the certificate exposes the wider proven region
@@ -75,11 +75,11 @@ def test_unstable_matrix_certified_by_neither():
     assert g.proven_contracting is False
 
 
-def test_crouzeix_bound_present_iff_W_in_lhp():
+def test_monotone_bound_present_iff_W_in_closed_lhp():
     g_lhp = stability_gates(_A([[-1.0, 3.0], [-3.0, 0.0]]))   # ω = 0 ≤ 0
-    assert g_lhp.crouzeix_transient_bound == pytest.approx(1.0 + 2.0 ** 0.5, abs=1e-9)
+    assert g_lhp.monotone_transient_bound == 1.0
     g_rhp = stability_gates(_A([[-1.0, 10.0], [0.0, -1.0]]))  # ω = 4 > 0
-    assert np.isnan(g_rhp.crouzeix_transient_bound)
+    assert np.isnan(g_rhp.monotone_transient_bound)
 
 
 def test_margin_tightens_both_gates():
@@ -149,29 +149,29 @@ def test_boundary_matrix_not_certified():
     assert g2.gate_lyapunov is False
 
 
-def test_crouzeix_bound_holds_numerically():
-    """PROVEN-in-literature Crouzeix–Palencia bound, verified in-repo: when W(A) ⊂ LHP
-    (ω ≤ 0), ‖e^{tA}‖₂ ≤ 1+√2 for all t."""
+def test_monotone_bound_holds_numerically():
+    """When W(A) ⊂ closed LHP (ω ≤ 0), ‖e^{tA}‖₂ ≤ 1 for all t (Lumer–Phillips). Crouzeix–Palencia
+    would give 1+√2 here: true, and weaker than this."""
     ts = np.linspace(0.0, 20.0, 400)
     for M in (np.array([[-1.0, 3.0], [-3.0, 0.0]]),     # ω = 0 (W touches axis)
               np.array([[0.0, 1.0], [-1.0, 0.0]])):     # ω = 0 (pure rotation)
         g = stability_gates(torch.tensor(M))
-        assert g.crouzeix_transient_bound == pytest.approx(1.0 + 2.0 ** 0.5, abs=1e-9)
+        assert g.monotone_transient_bound == 1.0
         sup = max(np.linalg.norm(expm(M * t), 2) for t in ts)
-        assert sup <= g.crouzeix_transient_bound + 1e-6
+        assert sup <= g.monotone_transient_bound + 1e-6
 
 
 # ── #768 gate #2: ε-pseudospectral abscissa + Kreiss constant ───────────────────
 
 def test_pseudospectral_abscissa_is_provable_upper_bound():
     """α_ε ≤ ω(A)+ε (field-of-values upper bound) must dominate the spectral abscissa, and
-    the gate must agree with the slightly-looser numerical-range gate. The ω=0 transient
-    counterexample must NOT earn a transient-free certificate."""
+    the gate must agree with the slightly-looser numerical-range gate. The ω=0 example must NOT
+    earn it: a perturbation of size ε can reach the right half-plane."""
     g = stability_gates(_A([[-1.0, 0.0], [0.0, -2.0]]))           # ω = −1
     assert g.pseudospectral_abscissa == pytest.approx(-1.0 + g.pseudospectral_eps, abs=1e-6)
     assert g.pseudospectral_abscissa >= g.spectral_abscissa       # α_ε ≥ α_0 always
     assert g.gate_pseudospectral is True
-    gc = stability_gates(_A([[-1.0, 3.0], [-3.0, 0.0]]))          # ω = 0 → transient growth
+    gc = stability_gates(_A([[-1.0, 3.0], [-3.0, 0.0]]))          # ω = 0 → no margin
     assert gc.gate_pseudospectral is False
     assert gc.pseudospectral_abscissa > 0
 

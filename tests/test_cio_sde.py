@@ -26,6 +26,21 @@ def _init_state(b=8, dim=4, scale=1.0):
     return x0, s0
 
 
+# ‖∇ₓL‖ is per sample (it used to be divided by the batch size), so "near target" has to mean
+# what ε_g=1e-2 says: ‖x‖≈2e-3 here gives ‖∇ₓL‖≈4e-3.
+NEAR_TARGET = 1e-3
+
+
+def _degenerate(m):
+    """Zero drift and zero policy, so all four Σ₀ signals can hold near the origin. A nonzero
+    policy has ‖∂H/∂u‖ = 2·ctrl_cost·‖u‖, which is real control sensitivity."""
+    for p in m.graph.active.drift_net.parameters():
+        torch.nn.init.zeros_(p)
+    for p in m.pcsf.parameters():
+        torch.nn.init.zeros_(p)
+    return m
+
+
 def _acting(m, budget=10_000):
     """Enable Σ₀ intervention. Observe-only is the production default (#1138), so a
     test that exercises what happens WHEN the operator ACTS (freeze, projection,
@@ -168,12 +183,10 @@ def test_collapse_dormant_in_structured_regime():
 
 def test_collapse_fires_in_degenerate_regime():
     """Zero drift Jacobian + near-origin + isotropic Σ ⇒ Σ₀ triggers."""
-    m = _model()
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
+    m = _degenerate(_model())
     m.collapse_op = SemanticCollapseOperator()
     _acting(m)
-    x0, s0 = _init_state(scale=0.01)
+    x0, s0 = _init_state(scale=NEAR_TARGET)
     _, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
     assert len(tr.collapses) > 0
     assert tr.collapses[0]["result"].outcome in (
@@ -182,12 +195,10 @@ def test_collapse_fires_in_degenerate_regime():
 
 def test_collapse_freezes_state():
     """When Σ₀ fires, dx→0: the collapsed state stops moving."""
-    m = _model()
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
+    m = _degenerate(_model())
     m.collapse_op = SemanticCollapseOperator()
     _acting(m)
-    x0, s0 = _init_state(scale=0.01)
+    x0, s0 = _init_state(scale=NEAR_TARGET)
     xf, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
     # last few x-norms should be essentially constant (frozen attractor)
     norms = tr.x_norms()
@@ -289,9 +300,7 @@ def _collapse_prone_model(dim=4, seed=0):
     the origin, all four Σ₀ trigger conditions hold — the system freezes onto
     the null manifold unless it is re-grounded by an external observation.
     """
-    m = _model(dim=dim, seed=seed)
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
+    m = _degenerate(_model(dim=dim, seed=seed))
     m.collapse_op = SemanticCollapseOperator()
     return _acting(m)
 
@@ -307,7 +316,7 @@ def _run_recursive_with_grounding(real_fraction, *, dim=4, segments=8,
     """
     torch.manual_seed(seed)
     m = _collapse_prone_model(dim=dim, seed=seed)
-    x, sigma = _init_state(b=16, dim=dim, scale=0.01)   # start near the attractor
+    x, sigma = _init_state(b=16, dim=dim, scale=NEAR_TARGET)   # start near the attractor
     collapse_events = 0
     for seg in range(segments):
         x, sigma, tr = rollout(m, x, sigma, steps=seg_steps, base_seed=seed + seg)
@@ -364,13 +373,13 @@ def test_collapse_scaling_monotone_in_real_fraction(
 # ── Σ₀⁻¹ Anti-Collapse Operator ──────────────────────────────────────────────
 
 def test_anti_collapse_suppresses_collapse():
-    """With Σ₀⁻¹ attached, a previously-collapsing system no longer freezes."""
-    m = _model()
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
+    """With Σ₀⁻¹ attached, a previously-collapsing system no longer freezes. Zero collapses
+    alone proves nothing (test_sigma0_c3_engine.py: a placebo scores the same); the state
+    leaving the origin is the part only the kick and the noise can do."""
+    m = _acting(_degenerate(_model()))
     m.collapse_op = SemanticCollapseOperator()
     m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
-    x0, s0 = _init_state(scale=0.01)
+    x0, s0 = _init_state(scale=NEAR_TARGET)
     _, _, tr = rollout(m, x0, s0, steps=30, base_seed=1)
     assert len(tr.collapses) == 0                    # Σ₀ suppressed
     norms = tr.x_norms()
@@ -401,10 +410,8 @@ def test_surprise_monitor_integration():
     silent — verified 0/30 spooks in a structured regime), while the collapse snap /
     Σ₀⁻¹ excitation kick spikes NIS past the χ² threshold (the spook).
     """
-    m = _model()
     # Create a system that will drift toward collapse
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
+    m = _degenerate(_model())
 
     # Wire surprise monitor to anti-collapse
     m.surprise_monitor = SurpriseMonitor(spook_sigmas=3.0, anti_collapse_trigger=True)
@@ -412,7 +419,7 @@ def test_surprise_monitor_integration():
     m.collapse_op = SemanticCollapseOperator()
     _acting(m)
 
-    x0, s0 = _init_state(scale=0.01)
+    x0, s0 = _init_state(scale=NEAR_TARGET)
     _, _, tr = rollout(m, x0, s0, steps=30, base_seed=1)
 
     # Check that surprise spook fired at least once
@@ -504,15 +511,11 @@ def test_collapse_is_nonexpansive_projection():
     flip sign and grow ‖x*‖ at strengths above ~0.217. A clean projector never
     increases the norm.
     """
-    m = _model()
+    m = _degenerate(_model())
     m.collapse_op = SemanticCollapseOperator()
 
-    # Create a collapsing regime
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
-
     _acting(m)
-    x0, s0 = _init_state(scale=0.01)
+    x0, s0 = _init_state(scale=NEAR_TARGET)
     _, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
 
     # Should collapse, and projection is non-expansive (norm never blows up)
@@ -861,7 +864,7 @@ def test_dichotomy_continuous_defective_via_schur():
 
 def test_discrete_dichotomy_radius_trichotomy():
     """Discrete fate keys off the spectral radius ρ(A), NOT the abscissa: ρ<1 COLLAPSE,
-    ρ>1 DIVERGE, |λ|=1 rotation MARGINAL — the three discrete-time fates, no fourth."""
+    ρ>1 DIVERGE, |λ|=1 rotation MARGINAL, and the rotation does not count as collapse."""
     # Like its continuous sibling, this passed on a scipy-less box because the certificate
     # silently returned uncomputed defaults. Now that the certificate refuses instead,
     # the dependency has to be declared (#3105).
@@ -873,6 +876,7 @@ def test_discrete_dichotomy_radius_trichotomy():
     assert discrete_dichotomy_certificate(contract).fate == "COLLAPSE"
     assert discrete_dichotomy_certificate(expand).fate == "DIVERGE"
     assert discrete_dichotomy_certificate(rot).fate == "MARGINAL"
+    assert discrete_dichotomy_certificate(rot).collapses is False  # bounded forever, never frozen
 
 
 def test_discrete_dichotomy_matches_continuous_under_exponential():
@@ -923,15 +927,13 @@ def test_collapse_certificate_and_nis_canary_on_live_trajectory():
     """
     from src.cio_sde.engine import drift_jacobian
 
-    m = _model()
-    for p in m.graph.active.drift_net.parameters():
-        torch.nn.init.zeros_(p)
+    m = _degenerate(_model())
     m.surprise_monitor = SurpriseMonitor(spook_sigmas=3.0, anti_collapse_trigger=True)
     m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
     m.collapse_op = SemanticCollapseOperator()
     _acting(m)
 
-    x0, s0 = _init_state(scale=0.01)
+    x0, s0 = _init_state(scale=NEAR_TARGET)
     xf, sf, tr = rollout(m, x0, s0, steps=30, base_seed=1)
 
     # (1) NIS canary fired on the live trajectory.

@@ -17,7 +17,7 @@ torch = pytest.importorskip("torch")
 
 from src.cio_sde import (
     CIO_SDE, LinearDynamics, QuestionMachine,
-    forward_states, backward_costate,
+    forward_states, backward_costate, dynamics_defect, reconcile,
 )
 
 
@@ -145,3 +145,105 @@ def test_nap_overrides_cap():
     gated = qm.ask(res, top_k=1)[0]
     assert gated.channel != denied_channel                        # NAP overrode CAP — routed around
     assert gated.admissible
+
+
+# ── 6. CAP/NAP bind the plan, not just the questions ──
+class _DenyChannel:
+    """Minimal NAP stand-in: denies exactly one channel."""
+
+    def __init__(self, channel):
+        self.channel = channel
+
+    def check(self, action_type, tier=None):
+        return type("R", (), {"denied": action_type == self.channel, "reason": "test"})()
+
+
+def _plan(qm, iterations=200, u0=None, goal=(1.0, 1.0), m=None):
+    m = m or _linear_model(torch.zeros(2, 2))
+    x0 = torch.zeros(1, 2)
+    target = torch.tensor([list(goal)])
+    us = [(u0 if u0 is not None else torch.zeros(1, 2)).clone() for _ in range(10)]
+    return m, x0, target, qm.consolidate(m, x0, us, 0.1, iterations=iterations, lr=0.5,
+                                         terminal_grad=lambda xT: 2 * (xT - target))
+
+
+def test_denied_control_is_never_planned():
+    qm = QuestionMachine(authority_gate=_DenyChannel("forbidden"), channels={0: "ok", 1: "forbidden"})
+    _, _, _, res = _plan(qm)
+    assert sum(float(u[0, 1].abs()) for u in res.us) == 0.0     # the denied dim never moves
+    assert sum(float(u[0, 0].abs()) for u in res.us) > 0.1      # the allowed one does
+    assert float(res.xs[-1][0, 1]) == 0.0                       # x_T describes the plan it may run
+
+
+def test_denied_control_is_forced_to_zero_even_if_supplied():
+    qm = QuestionMachine(authority_gate=_DenyChannel("forbidden"), channels={0: "ok", 1: "forbidden"})
+    _, _, _, res = _plan(qm, iterations=0, u0=torch.tensor([[0.2, 0.7]]))
+    assert all(float(u[0, 1]) == 0.0 for u in res.us)
+
+
+def test_a_denial_is_not_disagreement():
+    """The seam converges on what is allowed. The pull toward the denied action is real, and is
+    reported as pressure, not as a question to go and resolve."""
+    qm = QuestionMachine(authority_gate=_DenyChannel("forbidden"), channels={0: "ok", 1: "forbidden"})
+    _, _, _, res = _plan(qm, iterations=400)
+    assert res.max_score < 1e-3
+    assert max(res.blocked_pressure) > 0.05
+    assert all(q.dim == 0 for q in qm.ask(res, top_k=3))
+
+
+def test_unrestricted_machine_is_unchanged_by_the_mask():
+    _, _, _, res = _plan(QuestionMachine())
+    assert res.blocked_pressure == [0.0] * 10
+    assert sum(float(u[0, 1].abs()) for u in res.us) > 0.1
+
+
+# ── 7. uncertainty actually steers the question ──
+def test_ask_follows_the_uncertainty_weighted_score():
+    m = _linear_model(torch.zeros(2, 2))
+    qm = QuestionMachine()
+    sigmas = [torch.eye(2).unsqueeze(0) * (1e6 if t == 3 else 1e-6) for t in range(5)]
+    us = [torch.zeros(1, 2) for _ in range(5)]
+    goal = torch.tensor([[1.0, 1.0]])
+    res = qm.consolidate(m, torch.zeros(1, 2), us, 0.1, sigmas=sigmas,
+                         terminal_grad=lambda xT: 2 * (xT - goal))
+    top = qm.ask(res, top_k=1)[0]
+    assert res.scores.index(max(res.scores)) == 3
+    assert top.step == 3
+    assert top.uncertainty == pytest.approx(2e6)
+    assert top.to_record()["evidence"]["uncertainty"] == pytest.approx(2e6)
+    # the seam itself stays the raw disagreement; uncertainty is only the priority
+    assert top.score == pytest.approx(float(res.grads[3].abs().mean(dim=0).max()))
+
+
+# ── 8. convergence means contact with reality ──
+def test_the_seam_cannot_see_a_wrong_model_but_the_defect_can():
+    m, x0, goal, res = _plan(QuestionMachine(), iterations=400)
+    assert res.max_score < 1e-3                                 # internally: nothing left to ask
+    # reality: the control acts with the opposite sign
+    real = [x0]
+    for u in res.us:
+        real.append(real[-1] - u * 0.1)
+    assert float((real[-1] - goal).norm()) > 1.0                # and it is badly wrong
+    defects = dynamics_defect(m, real, res.us, 0.1)
+    assert max(defects) > 0.01
+    assert reconcile(res, defects).action == "revise_model"
+
+    honest = forward_states(m, x0, res.us, 0.1)                 # reality matches the model
+    assert max(dynamics_defect(m, honest, res.us, 0.1)) < 1e-6
+    assert reconcile(res, dynamics_defect(m, honest, res.us, 0.1)).action == "act"
+
+
+def test_reconcile_routes_each_case():
+    _, _, _, settled = _plan(QuestionMachine(), iterations=400)
+    _, _, _, unsettled = _plan(QuestionMachine(), iterations=0)
+    assert unsettled.max_score > 0.01
+    ok = [0.0]
+    assert reconcile(settled).action == "gather_evidence"       # dynamics never observed
+    assert reconcile(settled, [1.0]).action == "revise_model"
+    assert reconcile(unsettled, [1.0]).action == "revise_model"  # the model outranks the seam
+    assert reconcile(unsettled, ok).action == "replan"
+    assert reconcile(settled, ok, unresolved=2).action == "gather_evidence"
+    assert reconcile(settled, ok).action == "act"
+    settled.uncertainty = [50.0]
+    assert reconcile(settled, ok).action == "gather_evidence"   # agreement on thin evidence
+    assert reconcile(settled, ok, uncertainty_tol=100.0).action == "act"

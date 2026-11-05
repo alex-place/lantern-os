@@ -238,9 +238,11 @@ strong cheap tier escalates ≈0% of steps at 8.3× lower cost; weak-tier + fron
 88.4% > 84.8%); an internal truth-signal probe clearing the useful bar at the 1.5B tier;
 dose-response curves for distilling verified traces into small models (small aggressive doses
 *hurt*; gentle + retention holds parity — the from-scratch data rules encode these lessons);
-the collapse-prevention operator at 100% over 900 forced-collapse runs (synthetic regime;
-PROVEN anti-freeze theorem in-regime); and the JSRR acceptance gate machine-checked on
-known-spectrum cases. The verified-cascade harness itself is retained — **not as the
+the anti-collapse operator clearing the freeze gate where a placebo stays latched (synthetic
+regime; PROVEN gate theorem in-regime, which is not a claim that the state keeps moving; the
+earlier "100% over 900 runs" was retired 2026-11-05 because a placebo matched it); and a
+measured loop-contraction acceptance verdict, tested on synthetic trajectories and not yet run
+on real Ouro. The verified-cascade harness itself is retained — **not as the
 product, but as the teacher-and-examiner infrastructure** that generates Σ₀'s hardest
 training data and grades its checkpoints.
 

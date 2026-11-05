@@ -59,10 +59,11 @@ numerical-range gate and a Lyapunov/similarity-metric gate, \S\ref{sec:gates768}
 that strictly widen the certified region.
 We pair the theorem with a semantic collapse operator $\Szero$ (a heuristic
 trigger plus projection onto the null manifold --- the ``42-state''), an
-anti-collapse operator $\Sigma_0^{-1}$ (proven for all $A$ to prevent permanent
-freeze --- Theorem C3, \#768), and an early-warning signal. We read the construction as a small, honest
-warning about recursively self-improving systems: absent external grounding, the
-linearized dynamics admit only collapse or divergence. Theorem~1 is machine-checked
+anti-collapse operator $\Sigma_0^{-1}$ (proven for all $A$ to stop the trigger firing on consecutive
+steps --- Theorem C3; this does not mean the state keeps moving), and an early-warning signal. We read
+the construction as a small, honest warning about recursively self-improving systems: the linearized
+dynamics settle, diverge or rotate, and that the settled state is dead without external grounding rests
+on the model-collapse literature, not on this theorem. Theorem~1 is machine-checked
 ($46$ passing in \texttt{test\_cio\_sde.py}, incl.\ the spectral dichotomy that closes the
 non-normal contraction/fate question and Theorem~C3), with $14$
 further tests for the non-normal gates (\texttt{test\_stability\_gates.py}) and $4$ for the
@@ -75,9 +76,10 @@ stands on its own.
 \begin{caveatbox}
 \textbf{Per-section status.} \S1 theorem: \emph{proven; the non-normal contraction is
 closed in-regime by the spectral dichotomy (\#768), machine-checked}. \S2 trigger:
-\emph{operational definition; now MEASURED-calibrated (\#1990) --- sound (precision~1.0)
-but conservative}. \S3 anti-collapse: \emph{PROVEN for all $A$ (Theorem~C3,
-no-permanent-freeze; \#768)}. \S4 canary: \emph{the eigenvalue readout is unimplemented;
+\emph{operational definition; MEASURED-calibrated (\#1990), and that calibration predates the
+2026-11-05 trigger corrections}. \S3 anti-collapse: \emph{Theorem~C3 and Lemma~S1 PROVEN in-regime
+(corrected 2026-11-05; the markdown certificate is authoritative, including its corrections register)}.
+\S4 canary: \emph{the eigenvalue readout is unimplemented;
 the correct signal (innovation surprise) is implemented in \texttt{surprise.py}}. \S5
 graph: \emph{standard; a nonlinear inner ROA $\{V\le2.25\}$ is now PROVEN by interval branch-and-bound (\#1991)}. \S6
 demonstration: \emph{reproducible --- driver scripts committed}. \S7 AI-safety:
@@ -187,8 +189,8 @@ the real parts but does not by itself certify them: a rotation such as
 $A=\begin{psmallmatrix}-1&0&0\\0&0&2\\0&-2&0\end{psmallmatrix}$ has $\alpha=-1$ yet
 eigenvalues $\{-1,\pm 2i\}$, a center that never collapses in its rotating plane.
 \textbf{Recommended:} report both $\alpha$ and $\max\Real\lambda(A)$. As of \#505,
-\texttt{collapse\_certificate()} reports both (the conservative small-gain $\alpha$ and
-the exact $\max\Real\lambda(A)$); \S\ref{sec:gates768} adds two provable gates that
+\texttt{collapse\_certificate()} reports both (the small-gain index $\alpha$, which is telemetry and
+bounds nothing here, and the exact $\max\Real\lambda(A)$); \S\ref{sec:gates768} adds two provable gates that
 widen the certified non-normal region.
 
 \begin{verifybox}
@@ -202,10 +204,9 @@ unconditionally valid; it does \emph{not} exercise the non-normal case.
 
 \subsection{Provable region-wideners for non-normal $A$ (\#768)}
 \label{sec:gates768}
-The small-gain bound over-rejects strongly non-normal $A$, and $\max\Real\lambda(A)<0$
+The small-gain index over-rejects strongly non-normal $A$, and $\max\Real\lambda(A)<0$
 alone is necessary-not-sufficient (transient growth). \texttt{stability\_gates()} adds
-two \emph{sufficient, provable} contraction certificates, each strictly wider than
-small-gain (margin $m\ge0$):
+two \emph{sufficient, provable} contraction certificates (margin $m\ge0$):
 \begin{enumerate}
 \item \textbf{Numerical-range gate (monotone).}
   $\omega(A)=\lambda_{\max}(A_s)<-m \implies \norm{e^{tA}}_2\le e^{\omega t}$ --- a
@@ -219,20 +220,20 @@ small-gain (margin $m\ge0$):
   guard, so the boundary is never certified independent of solver warnings). It
   \emph{accepts the \S\ref{sec:hypothesis}~counterexample}
   $A=\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$ (Hurwitz at $-\tfrac12$) that the
-  energy proof and the small-gain bound reject; $\sqrt{\kappa(P_0)}$ (the margin-0 solve)
+  energy proof and the small-gain index reject; $\sqrt{\kappa(P_0)}$ (the margin-0 solve)
   bounds the Euclidean transient $\sup_t\norm{e^{tA}}$.
 \end{enumerate}
 \textbf{Honest scope.} Sufficient, not necessary; they certify the \emph{full}
 Jacobian's contraction, not collapse-onto-manifold (the active/null alignment gap is
-separate). The \emph{proven} transient constant is Crouzeix--Palencia (2017):
-$\norm{e^{tA}}\le 1+\sqrt2$ when $W(A)\subset$~LHP ($\omega\le0$); the sharper constant
-$2$ is Crouzeix's still-open conjecture.
+separate). When $W(A)\subset$ the closed LHP ($\omega\le0$), $\norm{e^{tA}}_2\le 1$
+(Lumer--Phillips), so there is no Euclidean transient at all; that includes the matrix above, which
+fails the numerical-range gate only because its contraction is not strict.
 \begin{verifybox}
 \textbf{Verification.} \texttt{tests/\allowbreak test\_stability\_gates.py} (14 tests): the
 $\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$ case (small-gain rejects, Lyapunov
-accepts, numerical-range flags the transient), a 400-matrix red-team finding \emph{no}
-false-positive certificate, and matrix-exponential checks that the monotone ($e^{\omega t}$),
-Lyapunov ($\sqrt{\kappa(P)}$), and Crouzeix--Palencia ($1+\sqrt2$) bounds each hold.
+accepts, numerical-range is not strict), a 400-matrix red-team finding \emph{no}
+false-positive certificate, and matrix-exponential checks that the monotone ($e^{\omega t}$, and
+$\le 1$) and Lyapunov ($\sqrt{\kappa(P)}$) bounds each hold.
 (\texttt{stability\_gates}, \texttt{StabilityGates}, \texttt{src/cio\_sde/collapse.py}.)
 \end{verifybox}
 
@@ -269,10 +270,10 @@ x^\ast = P x, \qquad P = V_{\mathrm{null}} V_{\mathrm{null}}^{\top},
 the ``42-state'' (a colloquial name, no formal meaning).
 
 \begin{caveatbox}
-\textbf{Caveat.} $x^\ast=Px$ is a true fixed point only when $A$ is normal. For
-non-normal $A$ the projection kills the symmetric part but the skew rotation leaves
-$\norm{A x^\ast}$ large, so $x^\ast$ is not an equilibrium of the real flow. In the
-implementation the apparent ``freeze'' is produced by the integrator overwriting
+\textbf{Caveat.} $x^\ast=Px$ now projects onto $\operatorname{null}(A)$, so it is an equilibrium of the
+linearized flow for any $A$ (corrected 2026-11-05; projecting onto the null space of $A_s$ left
+$\norm{A x^\ast}$ large whenever a skew part was present). In the
+implementation the ``freeze'' is still produced by the integrator overwriting
 $x_{\text{next}}=x^\ast$ and discarding the diffusion term --- a clamp, not an
 emergent attractor. (\texttt{SemanticCollapseOperator}.)
 \end{caveatbox}
@@ -280,41 +281,38 @@ emergent attractor. (\texttt{SemanticCollapseOperator}.)
 % ====================================================================
 \section{The anti-collapse operator $\Sigma_0^{-1}$}
 \begin{caveatbox}
-\textbf{Status: PROVEN for all $A$ (Theorem~C3, no-permanent-freeze; \#768). The
-$N{=}1$ observation is superseded by a $900$-run measured sweep and a closed-form proof
-(the alignment hypothesis L1 was removable via L2$'$).}
+\textbf{Status (corrected 2026-11-05): Theorem~C3 and Lemma~S1 PROVEN in-regime, with engine-level tests.
+The $900$-run figure is retired: a placebo matched it. No state-level anti-collapse theorem exists.}
 \end{caveatbox}
 Where $\Szero$ projects \emph{onto} the null subspace, $\Sigma_0^{-1}$ injects
 energy \emph{along} it:
 \begin{equation}
 dx = f\,dt + dW + \Sigma_0^{-1}, \qquad
-\Sigma_0^{-1} = s\cdot p \cdot (V_{\mathrm{null}}\,\xi),
+\Sigma_0^{-1} = \kappa\,(V_{\mathrm{null}}V_{\mathrm{null}}^\top\xi),
 \end{equation}
-with $\xi$ standard normal, $s$ the strength, $p\in[0,1]$ the collapse proximity.
+with $\xi$ standard normal, $\kappa=\max(s\,p,\ \varepsilon_g/(2\cdot0.6745))$, $s$ the strength,
+$p\in[0,1]$ the collapse proximity.
 The implementation injects noise in the null subspace and re-anisotropizes $\Sigma$;
 the proximity gate $p$ is the soft-AND of the four \S\ref{sec:sigma0} signals, so far
-from the boundary it is a no-op. Two results now back it. \textbf{(i)~A closed-form
-lemma (L2):} one bump of magnitude $b\ge\Delta=(\varepsilon+a)\mu d/(\sqrt{k(d-k)}-\varepsilon k)$
-provably lifts the eigenvalue coefficient-of-variation above the flatness threshold, so the
-trigger cannot fire the next step. \textbf{(ii)~A no-permanent-freeze theorem (C3):} chaining
-L2 with the operator's lift dynamics gives $\Pr(\text{permanent freeze})=0$ --- first for
-normal $A$ (2026-06-25), then for \emph{non-normal $A$ too} once L2$'$ showed the alignment
-hypothesis was removable (any rank-$k$ orthogonal projector lifts anisotropy at
-$\Sigma\approx\mu I$, by a Frobenius reverse-triangle bound). The classical
-persistent-excitation result (Anderson 1977) concerns estimator convergence; here there is no
-estimator, so the PE invocation is \emph{analogy only}.
+from the boundary it is a no-op. Three results back it. \textbf{(i)~Lemma L2$'$:} for any
+rank-$k$ orthogonal projector, $b\ge\Delta=(\varepsilon+a)\mu d/(\sqrt{k(d-k)}-\varepsilon k)$ lifts the
+eigenvalue coefficient-of-variation above $\varepsilon$ (reverse triangle inequality in Frobenius norm; no
+alignment, no normality). \textbf{(ii)~Theorem C3:} when the operator acts and
+$d\,\epsilon_{\rm cov}/\sigma_{\max}\le 9\cdot10^{-4}$, the covariance the next step reads has
+$a\ge\varepsilon_a$ for every sample, so the trigger is false on the next step, for all $A$ and every dimension. This
+needed four engine fixes: scale rather than clip at $\sigma_{\max}$, floor per sample, use the actual $a$, and cap the
+rank. \textbf{(iii)~Lemma S1:} each firing moves the state out of $\{\norm{\nabla_x L}<\varepsilon_g\}$ with
+probability $\ge\tfrac12$, by Anderson's and Weyl's inequalities. None of these says the state keeps moving: with no
+drift, no noise and no grounding it rests at an equilibrium once the gate clears. The classical persistent-excitation
+result (Anderson 1977) concerns estimator convergence; here there is no estimator, so the PE invocation is
+\emph{analogy only}.
 
 \begin{verifybox}
-\textbf{Evidence (PROVEN $+$ MEASURED).} Theorem~C3 is machine-checked
-(\texttt{test\_c3\_\allowbreak no\_\allowbreak consecutive\_\allowbreak freeze},
-\texttt{test\_c3\_\allowbreak nonnormal\_\allowbreak covariance\_\allowbreak lift}) and swept
-(\texttt{prove\_\allowbreak c3\_\allowbreak noncollapse.py}, $3000$ configs;
-\texttt{prove\_\allowbreak c3\_\allowbreak noncollapse\_\allowbreak nonnormal.py}, $4000$
-non-normal configs incl.\ the adversarial worst-case alignment --- $0$ lift failures, old
-scale-blind bump fails $100\%$). Independently, over the \textbf{$900$ forced-collapse trials}
-that collapse without protection, $\Sigma_0^{-1}$ suppressed collapse and re-excited the state
-in \textbf{$100\%$} (\texttt{data/sigma0\_regime\_sweep\_report.json}). What remains open is a
-\emph{global} escape guarantee for all initial conditions, not the freeze theorem.
+\textbf{Evidence.} \texttt{tests/\allowbreak test\_sigma0\_c3\_engine.py} drives the real
+\texttt{forward\_step}. The earlier $900$-run figure is retired: the engine skips the overwrite whenever the operator
+fires, so its metric could not fail, and a do-nothing placebo scored the same. The placebo-controlled measurement
+(\texttt{experiments/\allowbreak sigma0\_placebo\_control.py}, $180$ trials per arm, synthetic SDE) gives a longest
+trigger-true run of $1$ for the operator against $60$ for the placebo, and state displacement of $0.59$ against $0.023$.
 \end{verifybox}
 
 \begin{remark}
@@ -408,12 +406,12 @@ the flow $\dot x = f(x)$ where $f$ only ever sees $x$. The linearized certificat
 frames two degenerate fates absent outside contact: \textbf{collapse} onto a dead
 fixed point (the 42-state, mirrors agreeing with mirrors), or \textbf{divergence}.
 The only stable middle required an external bound. \textbf{Grounding is the safety
-mechanism.} This does not need the certificate's physics or the \S6 numbers: it is
+mechanism.} This does not need the certificate's physics or the \S6 numbers, and does not follow from them: it is
 the documented phenomenon of \emph{model collapse} \cite{shumailov2024}, closely
 related to reward hacking \cite{amodei2016}. The ``parrot attractor'' is model
 collapse renamed. Two honest qualifications: the strict ``collapse or diverge, no
-third'' dichotomy is the \emph{linearized} framing (real training also admits limit
-cycles and partial-information equilibria --- better stated as ``tends to degenerate
+third'' dichotomy is not true even of the linearized system, where a rotating mode is bounded and never frozen
+(real training also admits limit cycles and partial-information equilibria --- better stated as ``tends to degenerate
 or destabilize absent grounding''); and although \S6 is now reproducible, it runs on a
 partly-synthetic log, so the \emph{argument} still rests primarily on the published
 literature, not the demo.
