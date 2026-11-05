@@ -27,6 +27,11 @@ nothing left to ask," which is exactly the dead 42-state if the loop is unground
 escape is an EXTERNAL terminal condition (a real goal / observation): grounding reopens
 the question. `consolidate(...)` is internal; `ask(...)`'s output is a hypothesis to be
 externally verified, never an answer.
+
+An external TERMINAL condition grounds the goal, not the model: the whole backward pass runs
+through the system's own f, so the seam reaches 0 on a wrong model just as readily. That is what
+`dynamics_defect` checks, against observed transitions, and `reconcile` turns the signals into
+the next step: revise the model, re-plan, gather evidence, or act.
 """
 
 from __future__ import annotations
@@ -108,6 +113,21 @@ def backward_costate(model: CIO_SDE, xs: Sequence[Tensor], us: Sequence[Tensor],
     return [l for l in lams], [g for g in grads]  # type: ignore[list-item]
 
 
+def dynamics_defect(model: CIO_SDE, observed_xs: Sequence[Tensor], us: Sequence[Tensor],
+                    dt: float) -> List[float]:
+    """‖x_obs[t+1] − (x_obs[t] + f(x_obs[t],u_t)·dt)‖ per step, mean over batch.
+
+    How wrong the model was about what actually happened. The one signal here that contacts
+    reality: the seam cannot see it, because both of its passes use the same f."""
+    node = model.graph.active
+    defects: List[float] = []
+    with torch.no_grad():
+        for t, u in enumerate(us):
+            predicted = observed_xs[t] + node.drift(observed_xs[t], u) * dt
+            defects.append(float((observed_xs[t + 1] - predicted).norm(dim=-1).mean().item()))
+    return defects
+
+
 # ── the question (a convergence record) ──────────────────────────────────────
 
 @dataclass
@@ -120,7 +140,7 @@ class Question:
     score: float                 # ‖∂H/∂u‖ component — forward↔backward disagreement
     admissible: bool             # passed CAP (able) AND NAP (allowed)
     gate_reason: str = ""        # why inadmissible, if so
-    uncertainty: float = 0.0     # tr(Σ_t) weight, when covariance is supplied
+    uncertainty: float = 0.0     # tr(Σ_t) at this step, when covariance is supplied
 
     @property
     def hypothesis(self) -> str:
@@ -145,13 +165,63 @@ class ConsolidationResult:
     xs: List[Tensor]
     lams: List[Tensor]
     grads: List[Tensor]                 # g_t = ∂H/∂u_t per step
-    scores: List[float]                 # ‖g_t‖ per step (mean over batch) — question scores
+    scores: List[float]                 # ‖g_t‖ on ADMISSIBLE dims, per step — question scores
     iterations: int = 0
     max_score_history: List[float] = field(default_factory=list)
+    blocked_pressure: List[float] = field(default_factory=list)  # ‖g_t‖ on CAP/NAP-blocked dims:
+                                        # what a denied action would be worth. Never a question.
+    uncertainty: List[float] = field(default_factory=list)       # tr(Σ_t) per step, when supplied
 
     @property
     def max_score(self) -> float:
         return max(self.scores) if self.scores else 0.0
+
+
+@dataclass
+class Reconciliation:
+    """What to do next, and why. The reconcile step of the convergence loop."""
+    action: str                  # revise_model | replan | gather_evidence | act
+    reason: str
+    seam: float
+    defect: Optional[float] = None
+    uncertainty: Optional[float] = None
+
+
+def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = None,
+              unresolved: int = 0, seam_tol: float = 1e-2, defect_tol: float = 1e-2,
+              uncertainty_tol: float = 1.0) -> Reconciliation:
+    """Turn the signals into one next step. Checked in this order because each later signal is
+    only as good as the earlier ones: the seam is computed through the model, so a failed model
+    makes it meaningless, and a clean plan on thin evidence is still thin.
+
+        no observed transitions   gather_evidence   the model has never been checked
+        defect > defect_tol       revise_model      the model failed against reality
+        seam > seam_tol           replan            a better admissible action exists
+        unresolved > 0            gather_evidence   named unknowns remain (e.g. blind dims)
+        uncertainty > tol         gather_evidence   model and plan agree, on thin evidence
+        otherwise                 act
+
+    The tolerances are the caller's: there is no calibrated default, and they should tighten
+    for actions that are hard to reverse. Blocked dims do not count toward the seam: a NAP denial
+    is a constraint, not a disagreement to resolve."""
+    seam = result.max_score
+    defect = max(defects) if defects else None
+    spread = max(result.uncertainty) if result.uncertainty else None
+
+    def out(action: str, reason: str) -> Reconciliation:
+        return Reconciliation(action, reason, seam, defect, spread)
+
+    if defect is None:
+        return out("gather_evidence", "dynamics never checked against an observed transition")
+    if defect > defect_tol:
+        return out("revise_model", f"model missed an observed transition by {defect:.4g}")
+    if seam > seam_tol:
+        return out("replan", f"plan is not stationary: seam {seam:.4g}")
+    if unresolved > 0:
+        return out("gather_evidence", f"{unresolved} unresolved unknowns")
+    if spread is not None and spread > uncertainty_tol:
+        return out("gather_evidence", f"model and plan agree, but tr(Σ) reaches {spread:.4g}")
+    return out("act", "model matches observation, plan is stationary, evidence is sufficient")
 
 
 # ── the machine ──────────────────────────────────────────────────────────────
@@ -184,11 +254,20 @@ class QuestionMachine:
     def _channel(self, dim: int) -> str:
         return self.channels.get(dim, self.default_channel)
 
+    def _admissible_mask(self, like: Tensor, tier: Optional[str]) -> Tensor:
+        """1 on control dims CAP and NAP both allow, 0 elsewhere. Same shape as one control."""
+        mask = torch.ones_like(like)
+        for j in range(like.shape[-1]):
+            if not self._gate(self._channel(j), tier)[0]:
+                mask[..., j] = 0.0
+        return mask
+
     # ── consolidation: the two-point boundary value problem ──────────────────
     def consolidate(self, model: CIO_SDE, x0: Tensor, us: Sequence[Tensor], dt: float,
                     terminal_grad: Optional[Callable[[Tensor], Tensor]] = None,
                     iterations: int = 0, lr: float = 0.1,
-                    sigmas: Optional[Sequence[Tensor]] = None) -> ConsolidationResult:
+                    sigmas: Optional[Sequence[Tensor]] = None,
+                    tier: Optional[str] = None) -> ConsolidationResult:
         """Run forward, then backward, then (optionally) iterate the seam toward stationarity.
 
         `terminal_grad(x_T) -> λ_T` is the EXTERNAL anchor — the end condition the backward
@@ -198,8 +277,14 @@ class QuestionMachine:
         `iterations > 0` performs forward-backward gradient descent on `us`
         (us ← us − lr·g): each step re-predicts forward and re-propagates backward, driving
         ‖∂H/∂u‖ → 0. That descent IS the search for the safe passage; at its fixed point the
-        forward and backward passes agree (question score ≈ 0)."""
-        us = [u.detach().clone() for u in us]
+        forward and backward passes agree (question score ≈ 0).
+
+        CAP and NAP bind the plan as well as the questions: blocked control dims are held at
+        zero and never descended on, so x_T and the seam describe a plan the system may actually
+        carry out. Their gradient stays nonzero at the constrained optimum, which is not
+        disagreement, so `scores` exclude it and `blocked_pressure` reports it."""
+        mask = self._admissible_mask(us[0], tier) if us else torch.ones(1)
+        us = [u.detach().clone() * mask for u in us]
         history: List[float] = []
         xs: List[Tensor] = []
         lams: List[Tensor] = []
@@ -209,49 +294,62 @@ class QuestionMachine:
             xs = forward_states(model, x0, us, dt)
             term = terminal_grad(xs[-1]) if terminal_grad is not None else None
             lams, grads = backward_costate(model, xs, us, dt, terminal_lambda=term)
-            history.append(max(float(g.norm(dim=-1).mean().item()) for g in grads))
+            allowed = [g * mask for g in grads]
+            history.append(max(float(g.norm(dim=-1).mean().item()) for g in allowed))
             if iterations <= 0:
                 break
             iterations_left = len(history) <= iterations
             if iterations_left:
-                us = [u - lr * g for u, g in zip(us, grads)]
+                us = [u - lr * g for u, g in zip(us, allowed)]
 
-        scores = self._scores(grads, sigmas)
+        scores = self._scores(allowed, sigmas)
         return ConsolidationResult(us=us, xs=xs, lams=lams, grads=grads, scores=scores,
                                    iterations=max(len(history) - 1, 0),
-                                   max_score_history=history)
+                                   max_score_history=history,
+                                   blocked_pressure=[float((g * (1.0 - mask)).norm(dim=-1).mean().item())
+                                                     for g in grads],
+                                   uncertainty=self._uncertainty(sigmas))
+
+    @staticmethod
+    def _uncertainty(sigmas: Optional[Sequence[Tensor]]) -> List[float]:
+        if sigmas is None:
+            return []
+        return [float(torch.diagonal(s, dim1=-2, dim2=-1).sum(-1).mean().item()) for s in sigmas]
 
     def _scores(self, grads: Sequence[Tensor],
                 sigmas: Optional[Sequence[Tensor]]) -> List[float]:
+        trace = self._uncertainty(sigmas)
         scores: List[float] = []
         for t, g in enumerate(grads):
             base = float(g.norm(dim=-1).mean().item())   # ‖∂H/∂u_t‖, mean over batch
-            if sigmas is not None and t < len(sigmas):
-                tr = float(torch.diagonal(sigmas[t], dim1=-2, dim2=-1).sum(-1).mean().item())
-                base = base * (1.0 + tr)                  # weight by uncertainty (explore where unsure)
+            if t < len(trace):
+                base = base * (1.0 + trace[t])            # weight by uncertainty (explore where unsure)
             scores.append(base)
         return scores
 
     # ── ask: surface the top admissible question ─────────────────────────────
     def ask(self, result: ConsolidationResult, top_k: int = 1,
             tier: Optional[str] = None) -> List[Question]:
-        """Rank questions by seam disagreement, gate each through CAP then NAP (NAP
-        overrides), and return the top_k ADMISSIBLE ones. Inadmissible candidates are
-        skipped but their reason is recorded on the returned objects when surfaced."""
-        # candidate (step, dim, magnitude) sorted by |g| descending
+        """Rank questions by seam disagreement weighted by uncertainty (the same weight as
+        `scores`: explore where unsure), gate each through CAP then NAP (NAP overrides), and
+        return the top_k ADMISSIBLE ones. Inadmissible candidates are skipped but their reason
+        is recorded on the returned objects when surfaced."""
+        # candidate (step, dim, magnitude) sorted by |g|·(1 + tr Σ_t) descending
+        trace = result.uncertainty
         candidates: List[Tuple[int, int, float]] = []
         for t, g in enumerate(result.grads):
             mag = g.abs().mean(dim=0)                     # per-dim magnitude, mean over batch
             for j in range(mag.shape[-1]):
                 candidates.append((t, j, float(mag[j].item())))
-        candidates.sort(key=lambda c: c[2], reverse=True)
+        tr_at = lambda t: trace[t] if t < len(trace) else 0.0
+        candidates.sort(key=lambda c: c[2] * (1.0 + tr_at(c[0])), reverse=True)
 
         admitted: List[Question] = []
         for step, dim, mag in candidates:
             channel = self._channel(dim)
             ok, reason = self._gate(channel, tier)
             q = Question(step=step, dim=dim, channel=channel, score=mag,
-                         admissible=ok, gate_reason=reason)
+                         admissible=ok, gate_reason=reason, uncertainty=tr_at(step))
             if ok:
                 admitted.append(q)
             if len(admitted) >= top_k:
