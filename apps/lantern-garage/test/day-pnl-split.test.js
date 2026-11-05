@@ -352,6 +352,14 @@ test('no previous close on record: banked is still known, marks are not', () => 
   assert.match(s.notes.join(' '), /No previous close on record/);
 });
 
+test('no journal at all is unknown, not a day that closed nothing', async () => {
+  const s = await split.forAccount({ equity: 100000, prevEquity: 100040, baselineDate: '2026-11-03', sources: { primary: null, extras: [] }, now: AT.wed1400, historyKey: 'none' });
+  assert.deepStrictEqual(s.realized.journals, []);
+  assert.strictEqual(s.realized.total, null);
+  assert.strictEqual(s.marks, null);
+  assert.strictEqual(s.day_pnl, -40);
+});
+
 test('a baseline older than the last session: everything unknown, rather than a label that is not true', async () => {
   const { sources } = journals(REAL);
   const s = await split.forAccount({ equity: 98000, prevEquity: PREV, baselineDate: '2026-11-03', sources, now: AT.thu0930, historyKey: 'stale' });

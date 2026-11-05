@@ -12,9 +12,9 @@
  *     banked + marks + after hours == Day P&L       to the cent, whenever all three are known
  *
  * BANKED   Every closed trade whose fill is dated in the session, each counted WHOLE, entry to exit
- *          (the journal's `pnl`, the broker's sense of realized): what the trade made or lost.
- *          The page's Realized P&L tile is a different figure on purpose: it counts only today's
- *          part of those trades (lib/day-pnl.js).
+ *          (the journal's `pnl`, the broker's sense of realized): what the trade made or lost. The stable
+ *          server's overnight book counts too. The page's Realized P&L tile is a different figure on
+ *          purpose: it counts only today's part of those trades (lib/day-pnl.js).
  * AFTER HOURS  Account equity now minus equity at the session's close (16:00 ET, 13:00 on an early
  *          close), from the close onward.
  * MARKS    The rest of the equity change. It is a remainder, which is what makes the sum exact: today's
@@ -86,8 +86,8 @@ function sessionFor(baselineDate, now = Date.now()) {
 }
 
 /**
- * The lines holding a marker, without splitting the text into lines: stable's ledger is 20 MB and about 2% of
- * its lines are exits or session rows, and this runs on every poll, in the process that may be trading.
+ * The lines holding a marker, without splitting the text into lines: stable's ledger is 20 MB and under 3% of
+ * its lines hold one, and this runs on every poll, in the process that may be trading.
  */
 function linesWith(text, markers) {
   const out = [];
@@ -256,7 +256,7 @@ function buildSplit({ equity, prevEquity, session, journals = [], late = [], clo
   const eq = Number(equity), prev = Number(prevEquity);
   const dayC = eq > 0 && prev > 0 ? cents(eq - prev) : null;
   const stale = session.phase === 'stale';
-  const complete = !stale && journals.every((j) => j.status === 'ok');
+  const complete = !stale && journals.length > 0 && journals.every((j) => j.status === 'ok');   // no journal at all is not "nothing closed"
   const bankedC = complete ? journals.reduce((t, j) => t + cents(j.pnl), 0) : null;
   const applies = session.phase === 'after_close';
   const closeEq = applies && close && Number(close.equity) > 0 ? Number(close.equity) : null;
