@@ -468,8 +468,16 @@ class CIO_SDE(nn.Module):
                     (cls for cls in mro if "proximity" in cls.__dict__),
                     None,
                 )
-                if per_owner is not None and scalar_owner is not None:
-                    supports_per_sample = mro.index(per_owner) <= mro.index(scalar_owner)
+                excite_owner = next(
+                    (cls for cls in mro if "excite" in cls.__dict__),
+                    None,
+                )
+                if per_owner is not None and scalar_owner is not None and excite_owner is not None:
+                    per_depth = mro.index(per_owner)
+                    supports_per_sample = (
+                        per_depth <= mro.index(scalar_owner)
+                        and per_depth <= mro.index(excite_owner)
+                    )
             if supports_per_sample:
                 proximity_per_sample = per_sample_method(self, x, u, sigma, A)
                 sigma0_proximity = float(proximity_per_sample.max().item())
