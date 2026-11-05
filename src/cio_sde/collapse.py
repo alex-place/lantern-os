@@ -120,6 +120,32 @@ class SemanticCollapseOperator:
         (g,) = torch.autograd.grad(L, xr)
         return float(g.norm(dim=-1).mean().item())
 
+    @torch.no_grad()
+    def _effective_rank_per_sample(self, A: Tensor) -> Tensor:
+        """Numerical rank of each Jacobian independently (never rank(mean(A)))."""
+        if A.dim() == 2:
+            A = A.unsqueeze(0)
+        s = torch.linalg.svdvals(A)
+        smax = s.max(dim=-1, keepdim=True).values
+        return (s > self.eig_eps * smax).sum(dim=-1).to(dtype=A.dtype)
+
+    def _grad_norm_per_sample(self, model, x: Tensor, u: Tensor) -> Tensor:
+        xr = x.detach().clone().requires_grad_(True)
+        L = model.stage_cost(xr, u.detach()).sum()
+        (g,) = torch.autograd.grad(L, xr)
+        return g.norm(dim=-1)
+
+    def _ctrl_sensitivity_per_sample(self, model, x: Tensor, u: Tensor) -> Tensor:
+        xr = x.detach().clone().requires_grad_(True)
+        (lam,) = torch.autograd.grad(model.stage_cost(xr, u.detach()).sum(), xr)
+        ur = u.detach().clone().requires_grad_(True)
+        H = model.stage_cost(x.detach(), ur)
+        active = getattr(getattr(model, "graph", None), "active", None)
+        if active is not None:
+            H = H + (lam.detach() * active.drift(x.detach(), ur)).sum(-1)
+        (g,) = torch.autograd.grad(H.sum(), ur)
+        return g.norm(dim=-1)
+
     def _ctrl_sensitivity(self, model, x: Tensor, u: Tensor) -> float:
         """‖∂H/∂u‖ with H = L + λᵀf and λ = ∇ₓL, the instantaneous adjoint.
 
@@ -1179,21 +1205,32 @@ class AntiCollapseOperator:
         self.strength = strength
         self.eig_eps = eig_eps
 
+    def proximity_per_sample(self, model, x: Tensor, u: Tensor, sigma: Tensor,
+                              A: Tensor) -> Tensor:
+        """Per-member collapse proximity; no batch averaging can hide one failing member."""
+        d = self.detector
+        grad_norm = d._grad_norm_per_sample(model, x, u)
+        eff_rank = d._effective_rank_per_sample(A)
+        aniso = d._anisotropy_per_sample(sigma)
+        ctrl = d._ctrl_sensitivity_per_sample(model, x, u)
+        dim = float(x.shape[-1])
+
+        def below(values, threshold):
+            if threshold <= 0:
+                return torch.zeros_like(values)
+            return (1.0 - values / threshold).clamp(0.0, 1.0)
+
+        return torch.stack((
+            below(grad_norm, d.grad_eps),
+            below(eff_rank, d.rank_frac * dim),
+            below(aniso, d.anisotropy_eps),
+            below(ctrl, d.ctrl_eps),
+        ), dim=0).amin(dim=0)
+
     def proximity(self, model, x: Tensor, u: Tensor, sigma: Tensor,
                   A: Tensor) -> float:
-        """How close the state is to a collapse (0 = safe, 1 = collapsing)."""
-        d = self.detector
-        grad_norm = d._grad_norm(model, x, u)
-        eff_rank = d._effective_rank(A)
-        aniso = d._anisotropy(sigma)
-        ctrl = d._ctrl_sensitivity(model, x, u)
-        dim = float(x.shape[-1])
-        # each term → 1 as it sinks below its trigger threshold
-        p_grad = _below(grad_norm, d.grad_eps)
-        p_rank = _below(eff_rank, d.rank_frac * dim)
-        p_flat = _below(aniso, d.anisotropy_eps)
-        p_ctrl = _below(ctrl, d.ctrl_eps)
-        return min(p_grad, p_rank, p_flat, p_ctrl)   # all must be near to act
+        """Compatibility summary: maximum per-sample proximity in the batch."""
+        return float(self.proximity_per_sample(model, x, u, sigma, A).max().item())
 
     @torch.no_grad()
     def _near_null_basis(self, A: Tensor) -> Tensor:
@@ -1235,61 +1272,89 @@ class AntiCollapseOperator:
         return max(1, min(d - 1, int(d / (1.0 + 4.0 * eps * eps))))
 
     @torch.no_grad()
-    def _cov_floor(self, sigma: Tensor, d: int, m: int) -> Tensor:
-        """L2′'s per-step bump threshold Δ(a, μ, d, m), for each sample: the μ-aware floor.
+    @torch.no_grad()
+    def _near_null_projector_per_sample(self, A: Tensor, batch_size: int) -> tuple[Tensor, Tensor]:
+        """Batched right near-kernel projectors from each member's SVD.
 
-            Δ = (ε + a)·μ·d / (√(m(d−m)) − ε·m),   a = a(Σ), μ = mean λ(Σ), ε = LIFT_MARGIN·ε_a
-
-        Holds for any rank-m orthogonal projector (reverse triangle inequality in Frobenius norm;
-        no alignment and no normality). Each sample gets its own: one batch-wide μ leaves a
-        high-scale sample flat. `a` is not clipped at ε_a: `excite` reads the Riccati-propagated Σ,
-        which can already be anisotropic, and a clipped floor lets a bump flatten it.
-        Raises on an infeasible rank, where no finite bump can reach ε (excite never asks for one).
+        Returns (P, m), with P[b] the rank-m[b] projector onto that member's
+        smallest right-singular directions. This avoids batch-mean rank masking
+        and symmetric-part eigenvectors that need not lie in ker(A) for non-normal A.
         """
+        if A.dim() == 2:
+            A = A.unsqueeze(0)
+        if A.shape[0] == 1 and batch_size > 1:
+            A = A.expand(batch_size, -1, -1)
+        if A.shape[0] != batch_size:
+            raise ValueError("Jacobian batch must match state batch")
+        _, singular_values, vh = torch.linalg.svd(A, full_matrices=True)
+        d = A.shape[-1]
+        smax = singular_values.max(dim=-1, keepdim=True).values
+        hard_null = (singular_values <= self.eig_eps * smax).sum(dim=-1)
+        rank = (singular_values > self.eig_eps * smax).sum(dim=-1)
+        m = torch.maximum(hard_null, d - rank).clamp(
+            min=1, max=self._max_lift_rank(d)
+        )
+        max_m = int(m.max().item())
+        order = torch.argsort(singular_values, dim=-1)[:, :max_m]
+        basis = vh.transpose(-1, -2).gather(
+            2, order.unsqueeze(1).expand(-1, d, -1)
+        )
+        mask = (
+            torch.arange(max_m, device=A.device).unsqueeze(0)
+            < m.unsqueeze(-1)
+        ).to(dtype=A.dtype)
+        projector = (basis * mask.unsqueeze(1)) @ basis.transpose(-1, -2)
+        return projector, m
+
+    def _cov_floor(self, sigma: Tensor, d: int, m: Tensor | int) -> Tensor:
+        """Per-sample L2′ bump threshold for each sample's own projector rank."""
         eps = self.detector.anisotropy_eps * self.LIFT_MARGIN
-        denom = (m * (d - m)) ** 0.5 - eps * m
-        if denom <= 0:
-            raise ValueError(f"no finite bump of rank {m} lifts a(Σ) to {eps:g} in dimension {d}")
+        m = torch.as_tensor(m, device=sigma.device, dtype=sigma.dtype)
+        if m.ndim == 0:
+            m = m.expand(sigma.shape[0])
+        denom = torch.sqrt(m * (d - m)) - eps * m
+        if bool((denom <= 0).any()):
+            raise ValueError("no finite covariance bump for one or more per-sample ranks")
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
         ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
         mu = ev.mean(dim=-1)
         a = ev.std(dim=-1) / mu
         return (eps + a) * mu * d / denom
 
-    def _kick_scale(self, p: float) -> float:
-        """State-kick magnitude κ. Lemma S1: for x⁺ = c + (D + κP)ξ with D ⪰ 0 and any c,
-        P(‖x⁺‖ ≥ r) ≥ P(χ_m ≥ r/κ), by Anderson's inequality and Weyl's. With r = ε_g/2 (where
-        ‖∇ₓL‖ = 2‖x−x_target‖ crosses ε_g) this floor makes that at least ½. Without it the kick
-        was strength·p, which vanishes at the gate boundary exactly where it is needed.
-        strength=0 still disables the state leg."""
+    def _kick_scale(self, p: Tensor | float) -> Tensor | float:
+        """State-kick magnitude κ, evaluated independently for each active sample."""
         if self.strength <= 0.0:
-            return 0.0
+            return torch.zeros_like(p) if torch.is_tensor(p) else 0.0
         floor = self.detector.grad_eps / (2.0 * _MEDIAN_CHI_1)
+        if torch.is_tensor(p):
+            return torch.maximum(self.strength * p, torch.full_like(p, floor))
         return max(self.strength * p, floor)
 
     @torch.no_grad()
-    def excite(self, x: Tensor, sigma: Tensor, A: Tensor, p: float,
+    def excite(self, x: Tensor, sigma: Tensor, A: Tensor, p: Tensor | float,
                noise: Tensor) -> tuple[Tensor, Tensor]:
-        """Return (dx_extra, sigma_extra) injected along the banded near-null subspace.
+        """Apply per-sample right-kernel excitation and covariance shape lift.
 
-        Two decoupled legs (docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md §2.2):
-          • covariance leg — the bump `b_cov · P_N` that breaks `cond_flat`, floored per sample to
-            L2′'s threshold Δ, so one bump provably lifts anisotropy above ε_a (Theorem C3). The
-            engine must apply it with CovarianceField.project_preserving_shape, or the σ_max cap
-            can erase it.
-          • state-kick leg — the random `dx_extra`, floored by _kick_scale (Lemma S1), so the state
-            itself leaves the gradient ball with probability ≥ ½ however small p is. This is the
-            only leg that moves x.
+        Each member gets its own right near-kernel projector. Samples with p=0
+        receive neither a state kick nor a covariance bump.
         """
-        null = self._near_null_basis(A)                   # (d, m), feasible 1 ≤ m ≤ d−1
-        m = null.shape[1]
-        d = null.shape[0]
+        p = torch.as_tensor(p, device=x.device, dtype=x.dtype)
+        if p.ndim == 0:
+            p = p.expand(x.shape[0])
+        if p.shape != (x.shape[0],):
+            raise ValueError("proximity must be scalar or one value per sample")
 
-        coeff = noise @ null                              # (B, m) random in null
-        dx_extra = self._kick_scale(p) * (coeff @ null.T)  # back to state space
+        d = x.shape[-1]
+        projector, m = self._near_null_projector_per_sample(A, x.shape[0])
+        active = (p > 0).to(dtype=x.dtype)
+        projector = projector * active[:, None, None]
 
-        b_cov = self._cov_floor(sigma, d, m).clamp_min(self.strength * p)  # each sample ≥ its Δ
-        sigma_extra = b_cov.unsqueeze(-1).unsqueeze(-1) * (null @ null.T)  # (B, d, d), rank m
+        projected_noise = torch.bmm(noise.unsqueeze(1), projector).squeeze(1)
+        kappa = self._kick_scale(p) * active
+        dx_extra = kappa.unsqueeze(-1) * projected_noise
+
+        b_cov = torch.maximum(self._cov_floor(sigma, d, m), self.strength * p)
+        sigma_extra = b_cov[:, None, None] * projector
         return dx_extra, sigma_extra
 
 

@@ -347,3 +347,100 @@ def test_c3_does_not_promise_perpetual_motion():
         x = xn
     assert fired >= 1
     assert max(tail) < 1e-6                                      # the state has stopped
+
+
+# ── per-sample decisions and true right-kernel projectors ─────────────────────────────────
+
+def test_per_sample_proximity_does_not_hide_one_collapsed_member():
+    op = AntiCollapseOperator()
+    d = 4
+    A = torch.stack((
+        torch.eye(d),
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+    ))
+    x = torch.zeros(2, d)
+    u = torch.zeros(2, 2)
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    model = _zero_policy(CIO_SDE(dim=d, ctrl_dim=2, hidden=4))
+    proximity = op.proximity_per_sample(model, x, u, sigma, A)
+    assert proximity.shape == (2,)
+    assert proximity[0].item() == pytest.approx(0.0)
+    assert proximity[1].item() > 0.0
+    assert op.proximity(model, x, u, sigma, A) == pytest.approx(float(proximity.max()))
+
+
+def test_per_sample_projectors_follow_each_members_actual_right_kernel():
+    op = AntiCollapseOperator()
+    d = 4
+    A = torch.stack((
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+        torch.diag(torch.tensor([0.0, 1.0, 0.0, 0.0])),
+    ))
+    projectors, ranks = op._near_null_projector_per_sample(A, batch_size=2)
+    assert ranks.tolist() == [3, 3]
+    assert torch.linalg.norm(A @ projectors) < 1e-5
+    assert not torch.allclose(projectors[0], projectors[1])
+    assert torch.allclose(projectors, projectors.transpose(-1, -2), atol=1e-6)
+    assert torch.allclose(projectors @ projectors, projectors, atol=1e-5)
+
+
+def test_nonnormal_right_kernel_projector_is_in_actual_kernel():
+    op = AntiCollapseOperator()
+    A = torch.zeros(1, 4, 4)
+    A[0, 0, 1] = 1.0  # A=e1 e2ᵀ: non-normal, rank one.
+    projectors, ranks = op._near_null_projector_per_sample(A, batch_size=1)
+    assert ranks.item() == 3
+    assert torch.linalg.norm(A @ projectors) < 1e-6
+
+
+def test_excite_only_kicks_and_lifts_the_samples_that_trigger():
+    op = AntiCollapseOperator(strength=0.5)
+    d = 4
+    A = torch.stack((
+        torch.eye(d),
+        torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0])),
+    ))
+    x = torch.zeros(2, d)
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    noise = torch.ones(2, d)
+    p = torch.tensor([0.0, 0.5])
+    dx, dsigma = op.excite(x, sigma, A, p, noise)
+    assert torch.allclose(dx[0], torch.zeros(d))
+    assert torch.allclose(dsigma[0], torch.zeros(d, d))
+    assert torch.linalg.norm(dx[1]) > 0.0
+    assert torch.linalg.norm(dsigma[1]) > 0.0
+
+
+class _BatchConditionalDynamics(Dynamics):
+    """Different local Jacobians for members of the same batch."""
+
+    def __init__(self, dim=4):
+        super().__init__(dim, ctrl_dim=2, hidden=4)
+
+    def drift(self, x, u):
+        eye = torch.eye(self.dim, device=x.device, dtype=x.dtype).expand(x.shape[0], -1, -1)
+        collapsed = torch.diag(torch.tensor([1.0, 0.0, 0.0, 0.0],
+                                            device=x.device, dtype=x.dtype))
+        A = torch.where((x[:, :1] > 0).unsqueeze(-1), eye,
+                        collapsed.expand(x.shape[0], -1, -1))
+        return torch.bmm(A, x.unsqueeze(-1)).squeeze(-1)
+
+    def diffusion(self, x):
+        return torch.zeros_like(x)
+
+
+def test_forward_step_applies_anti_collapse_per_sample_not_to_healthy_members():
+    m = _zero_policy(CIO_SDE(dim=4, ctrl_dim=2, hidden=4))
+    m.graph.active = _BatchConditionalDynamics()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    x = torch.tensor([[1e-3, 0.0, 0.0, 0.0],
+                      [-1e-3, 0.0, 0.0, 0.0]])
+    sigma = torch.eye(4).expand(2, 4, 4).clone()
+    noise = torch.ones_like(x)
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+    assert info["sigma0_proximity"] > 0.0
+    assert torch.allclose(sigma_next[0], torch.eye(4) * 1.05, atol=1e-5)
+    assert torch.allclose(x_next[0], x[0] + 0.05 * x[0], atol=1e-5)
+    assert torch.linalg.norm(sigma_next[1] - torch.eye(4)) > 0.0
+    assert torch.linalg.norm(x_next[1] - (x[1] + 0.05 * x[1])) > 0.0

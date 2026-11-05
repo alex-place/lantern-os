@@ -406,7 +406,7 @@ class CIO_SDE(nn.Module):
         # (the whole point is to prevent collapse, not freeze into it).
         anti_active = False
         sigma0_proximity = 0.0
-        surprise_boost = 0.0
+        surprise_boost = torch.zeros(x.shape[0], device=x.device, dtype=x.dtype)
         
         # Surprise monitor — NIS-based collapse detection (#506/#657).
         # The engine no longer self-observes (y=x gave innovation ν≡0, so the canary
@@ -429,7 +429,7 @@ class CIO_SDE(nn.Module):
                 info["surprise_nis"] = float(surprise_result["nis"].mean().item())
                 if info["surprise_spook"] and self.surprise_monitor.anti_collapse_trigger:
                     # Spook → boost anti-collapse proximity to 1.0 (detect → excite).
-                    surprise_boost = 1.0
+                    surprise_boost = surprise_result["spook"].to(dtype=x.dtype)
                 # Measurement update: fuse x to get the posterior belief.
                 x_post, P_post = self.surprise_monitor.update(
                     self._surprise_pred_mean, self._surprise_pred_cov, x, C, R)
@@ -453,14 +453,22 @@ class CIO_SDE(nn.Module):
         receipt: Optional[InterventionReceipt] = None
 
         if self.anti_collapse_op is not None:
-            sigma0_proximity = self.anti_collapse_op.proximity(self, x, u, sigma, A)
-            effective_proximity = max(sigma0_proximity, surprise_boost)
+            proximity_per_sample = self.anti_collapse_op.proximity_per_sample(
+                self, x, u, sigma, A)
+            sigma0_proximity = float(proximity_per_sample.max().item())
+            effective_per_sample = torch.maximum(proximity_per_sample, surprise_boost)
+            effective_proximity = float(effective_per_sample.max().item())
+            surprise_any = bool((surprise_boost > 0).any())
+            structural_any = sigma0_proximity > 0.0
             info["sigma0_proximity"] = sigma0_proximity
 
             if effective_proximity > 0.0:
-                trigger_src = "surprise" if surprise_boost >= sigma0_proximity else "structural"
-                if surprise_boost > 0.0 and sigma0_proximity > 0.0:
+                if surprise_any and structural_any:
                     trigger_src = "both"
+                elif surprise_any:
+                    trigger_src = "surprise"
+                else:
+                    trigger_src = "structural"
 
                 budget_ok = (
                     not policy.observe_only
@@ -468,7 +476,7 @@ class CIO_SDE(nn.Module):
                 )
                 if budget_ok:
                     dx_extra, sig_extra = self.anti_collapse_op.excite(
-                        x, sigma_next, A, effective_proximity, noise)
+                        x, sigma_next, A, effective_per_sample, noise)
                     x_next = x_next + dx_extra
                     sigma_next = self.cov.project_preserving_shape(sigma_next + sig_extra)
                     info["anti_collapse_p"] = effective_proximity
@@ -476,11 +484,11 @@ class CIO_SDE(nn.Module):
                     self._intervention_count += 1
                     receipt = InterventionReceipt(
                         step=step, kind="excite", trigger_source=trigger_src,
-                        sigma0_proximity=sigma0_proximity, surprise_spook=bool(surprise_boost > 0.0),
+                        sigma0_proximity=sigma0_proximity, surprise_spook=surprise_any,
                         pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
                         pre_sigma_tr=pre_sigma_tr,
                         post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
-                        policy_reason="budget_ok: anti-collapse excite fired",
+                        policy_reason="budget_ok: per-sample anti-collapse excite fired",
                     )
                 else:
                     kind = "observe" if policy.observe_only else "blocked"
@@ -490,7 +498,7 @@ class CIO_SDE(nn.Module):
                     )
                     receipt = InterventionReceipt(
                         step=step, kind=kind, trigger_source=trigger_src,
-                        sigma0_proximity=sigma0_proximity, surprise_spook=bool(surprise_boost > 0.0),
+                        sigma0_proximity=sigma0_proximity, surprise_spook=surprise_any,
                         pre_x_norm=pre_x_norm, post_x_norm=x_next.norm().item(),
                         pre_sigma_tr=pre_sigma_tr,
                         post_sigma_tr=torch.diagonal(sigma_next, dim1=-2, dim2=-1).sum(-1).mean().item(),
