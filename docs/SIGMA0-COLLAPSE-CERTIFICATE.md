@@ -657,6 +657,12 @@ Ours: folding the legs into `Φ(θ) = D(θ) + λ·max(0, G(θ) − G₀)`, with 
 
 **The standing counterpoint.** Across about 100 Kaggle competitions, Roelofs et al. found little adaptive overfitting in practice [18]. Whether the severe small-`n` staleness measured here materializes at realistic scale is exactly what the real A/B/C run must answer ([#2691]).
 
+**Measured on a real loop (ours, 2026-11-06, pre-registered; [`experiments/rsi_openevolve/RESULTS.md`](../experiments/rsi_openevolve/RESULTS.md)).**
+- **Setup.** This gate (16 fresh draws per decision, a burned pool, a retention veto) wrapped a recursive improver on OpenEvolve. The task was online bin packing, with gpt-4o-mini, 5 seeds and 30 generations.
+- **The fresh arm's champion was as over-reported as the reused-validation arm's.** The late gap was 0.35 against 0.37 pp, a difference of −0.02 pp [−0.41, +0.37]. The simulation's ordering of the gaps did not appear here.
+- **The likely reason is selection, not reuse.** The believed score kept the draws each child was accepted on, and the champion is the maximum of such scores. A score re-drawn after acceptance is the untested remedy.
+- **The holdout gain is inconclusive.** It was +0.20 pp over that arm (p = 0.074, 5 seeds). The two arms differ in more than freshness.
+
 ### 8.4.1 Why the anchor must be re-drawn, not merely external
 
 **Measured (ours):**
