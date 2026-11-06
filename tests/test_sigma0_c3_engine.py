@@ -29,7 +29,7 @@ torch = pytest.importorskip("torch")
 
 from src.cio_sde import (
     CIO_SDE, LinearDynamics, rollout,
-    SemanticCollapseOperator, AntiCollapseOperator, InterventionPolicy,
+    SemanticCollapseOperator, AntiCollapseOperator, InterventionPolicy, SurpriseMonitor,
 )
 from src.cio_sde.engine import CovarianceField, Dynamics
 
@@ -1130,23 +1130,27 @@ def test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other
 
 
 def test_a_spook_on_a_row_that_is_not_finite_does_not_excite_it():
-    """At d = 1 a row that has gone to +inf has an infinite innovation, NIS = inf spooks, and the anti-collapse
+    """At d = 1 a row that has gone to +inf has an infinite innovation, NIS = inf spooked, and the anti-collapse
     trigger kicked that row and spent its budget; from a gain computed on the broken state, the gain guard
-    raised for the batch instead. A row that is not finite is now never selected, by a spook or otherwise."""
-    from src.cio_sde import SurpriseMonitor
+    raised for the batch instead. The shipped monitor no longer scores such a row (its NIS is NaN, so it does
+    not spook), and the engine does not select it even for a monitor that still spooks on it."""
     d = 1
     m = CIO_SDE(dim=d, ctrl_dim=1, hidden=4)
     _zero_policy(m)
     m.graph.active = LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 1), noise=0.0)
     m.intervention_policy = InterventionPolicy(**ARMED)
     m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
-    m.surprise_monitor = SurpriseMonitor(anti_collapse_trigger=True)
     x = torch.tensor([[0.5], [float("inf")]])                  # row 0 far from target, row 1 broken
     sigma = torch.eye(d).expand(2, d, d).clone()
-    m._surprise_pred_mean, m._surprise_pred_cov = torch.zeros(2, d), sigma.clone()
-    _, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
-    assert info["surprise_spook"] is True                      # the monitor did spook, on row 1
-    assert info["intervention_receipts"] == [] and not bool(info["anti_collapse_fired"].any())
+    for monitor in (SurpriseMonitor(anti_collapse_trigger=True), _SpookRows([False, True])):
+        m.surprise_monitor = monitor
+        m._surprise_pred_mean, m._surprise_pred_cov = torch.zeros(2, d), sigma.clone()
+        _, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+        assert info["surprise_spook"] is isinstance(monitor, _SpookRows)     # only the stand-in spooks on row 1
+        assert info["intervention_receipts"] == [] and not bool(info["anti_collapse_fired"].any())
+        if isinstance(monitor, SurpriseMonitor):                          # row 0 alone is in the rolling mean
+            history = list(monitor._nis_history)
+            assert len(history) == 1 and history[0] == pytest.approx(0.25 / 1.01)
 
 
 def test_a_batch_wide_operator_cannot_select_a_row_that_is_not_finite():
@@ -1163,6 +1167,114 @@ def test_a_batch_wide_operator_cannot_select_a_row_that_is_not_finite():
     assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "excite")]
     assert torch.allclose((x_next[0] - plain_x[0]).detach(), torch.full((d,), 0.25))
     torch.testing.assert_close(x_next[1], plain_x[1], rtol=0, atol=0, equal_nan=True)
+
+
+class _Recording(SurpriseMonitor):
+    """The shipped monitor, keeping what each evaluate and update returned."""
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.scored, self.updates = [], []
+
+    def evaluate(self, x_pred, sigma, y, C, R):
+        out = super().evaluate(x_pred, sigma, y, C, R)
+        self.scored.append(out)
+        return out
+
+    def update(self, x_pred, sigma, y, C, R):
+        x_post, sigma_post = super().update(x_pred, sigma, y, C, R)
+        self.updates.append((x_pred, sigma, x_post, sigma_post))
+        return x_post, sigma_post
+
+
+def test_a_row_that_is_not_finite_stays_out_of_the_surprise_monitors_cholesky():
+    """The monitor factored every row's S = CΣCᵀ + R in one batched Cholesky, so one row whose Σ is NaN made
+    forward_step raise for the whole batch on the first step that scored the belief (step 1; step 0 seeds it).
+    That row is now not scored: its NIS is NaN, so it never spooks, its posterior is its prior, and it stays out
+    of the monitor's rolling mean and of info["surprise_nis"]. The other rows are scored as before, and row 2
+    still spooks on a jump and is the only row excited. Each row, the broken one included, is its lone run."""
+    d, steps = 4, 3
+
+    def model():
+        m = _armed_on(LinearDynamics(-0.5 * torch.eye(d), B=torch.zeros(d, 2), noise=0.05))
+        m.collapse_op = SemanticCollapseOperator()
+        m.surprise_monitor = _Recording(anti_collapse_trigger=True)
+        return m
+
+    x0 = torch.tensor([[0.5, -0.3, 0.2, 0.4], [0.5, 0.5, 0.5, 0.5], [-0.4, 0.1, 0.3, -0.2]])
+    s0 = torch.eye(d).expand(3, d, d).clone()
+    s0[1] = float("nan")
+    noise = torch.randn(steps, 3, d, generator=torch.Generator().manual_seed(3))
+    noise[1, 2, 0] = 25.0                                      # row 2 jumps; step 2 scores the jump
+
+    def run(rows):
+        m = model()
+        x, s, receipts = x0[rows], s0[rows], []
+        for t in range(steps):
+            x, s, info = m.forward_step(x, s, 0.05, noise[t, rows], step=t)
+            receipts.append([(r.sample, r.kind, r.trigger_source) for r in info["intervention_receipts"]])
+        return m.surprise_monitor, x.detach(), s.detach(), info, receipts
+
+    mon, x, s, info, receipts = run([0, 1, 2])
+    assert len(mon.scored) == steps - 1
+    nis = [res["nis"].detach() for res in mon.scored]
+    assert all(math.isnan(float(n[1])) and math.isfinite(float(n[0])) and math.isfinite(float(n[2])) for n in nis)
+    assert [res["spook"].tolist() for res in mon.scored] == [[False, False, False], [False, False, True]]
+    assert receipts == [[], [], [(2, "excite", "surprise")]]
+    for x_pred, sigma, x_post, sigma_post in mon.updates:     # row 1's posterior is its prior
+        torch.testing.assert_close(x_post[1], x_pred[1], rtol=0, atol=0, equal_nan=True)
+        torch.testing.assert_close(sigma_post[1], 0.5 * (sigma[1] + sigma[1].T), rtol=0, atol=0, equal_nan=True)
+    # the rolling mean and surprise_nis hold the scored rows' mean NIS, never a NaN
+    assert list(mon._nis_history) == [float(n[[0, 2]].mean()) for n in nis]
+    assert info["surprise_nis"] == float(nis[-1][[0, 2]].mean())
+    for i in range(3):
+        alone, xi, si, _, rec = run([i])
+        torch.testing.assert_close(xi[0], x[i], rtol=0, atol=0, equal_nan=True)
+        torch.testing.assert_close(si[0], s[i], rtol=0, atol=0, equal_nan=True)
+        for res, lone in zip(nis, alone.scored):
+            torch.testing.assert_close(lone["nis"].detach()[0], res[i], rtol=0, atol=0, equal_nan=True)
+        assert rec == [[], [], [(0, "excite", "surprise")] if i == 2 else []]
+
+
+@pytest.mark.parametrize("broken", ["covariance nan", "covariance inf", "prediction inf", "observation nan",
+                                    "observation inf", "observation matrix inf", "noise nan"])
+def test_the_surprise_monitor_scores_each_finite_row_as_it_does_alone(broken):
+    """evaluate and update factored every row's S in one Cholesky, which raised for the batch on a NaN or inf in
+    any row's Σ, and an inf observation could read NIS = inf and spook. A row with a NaN or inf in anything the update
+    reads is now not scored: its NIS is NaN, so it does not spook, and update hands back its prior. The other
+    rows read what they read alone, bit for bit. The rolling mean holds only the scored rows: a NaN in it read as
+    proximity 1.0, since max(0, min(1, NaN)) is 1.0 in Python. A batch with no row scored adds nothing."""
+    g = torch.Generator().manual_seed(5)
+    m, d = 2, 3
+    x_pred = torch.randn(3, d, generator=g, dtype=torch.float64)
+    root = torch.randn(3, d, d, generator=g, dtype=torch.float64)
+    sigma = root @ root.transpose(-1, -2) + 0.1 * torch.eye(d, dtype=torch.float64)
+    C = torch.randn(3, m, d, generator=g, dtype=torch.float64)
+    R = 0.05 * torch.eye(m, dtype=torch.float64).expand(3, m, m).clone()
+    y = (C @ x_pred.unsqueeze(-1)).squeeze(-1) + 0.3 * torch.randn(3, m, generator=g, dtype=torch.float64)
+    where, value = broken.rsplit(" ", 1)
+    target = {"covariance": sigma, "prediction": x_pred, "observation": y, "observation matrix": C, "noise": R}[where]
+    target[1].view(-1)[-1] = float(value)
+
+    mon = SurpriseMonitor()
+    res = mon.evaluate(x_pred, sigma, y, C, R)
+    x_post, sigma_post = mon.update(x_pred, sigma, y, C, R)
+    assert math.isnan(float(res["nis"][1])) and math.isnan(float(res["surprise"][1]))
+    assert not bool(res["spook"][1])
+    torch.testing.assert_close(x_post[1], x_pred[1], rtol=0, atol=0, equal_nan=True)
+    torch.testing.assert_close(sigma_post[1], 0.5 * (sigma[1] + sigma[1].T), rtol=0, atol=0, equal_nan=True)
+    for i in (0, 2):
+        rows = slice(i, i + 1)
+        lone = SurpriseMonitor()
+        alone = lone.evaluate(x_pred[rows], sigma[rows], y[rows], C[rows], R[rows])
+        for key in ("nis", "surprise", "spook", "innovation_norm"):
+            assert torch.equal(alone[key][0], res[key][i]), key
+        xi, si = lone.update(x_pred[rows], sigma[rows], y[rows], C[rows], R[rows])
+        assert torch.equal(xi[0], x_post[i]) and torch.equal(si[0], sigma_post[i])
+    assert list(mon._nis_history) == [float(res["nis"][[0, 2]].mean())]
+    assert mon.sigma0_proximity()["mean_nis"] == float(res["nis"][[0, 2]].mean())
+    mon.evaluate(x_pred[1:2], sigma[1:2], y[1:2], C[1:2], R[1:2])             # nothing to score
+    assert len(mon._nis_history) == 1
 
 
 # ── the post-merge review of #3814 ───────────────────────────────────────────────────────────────
