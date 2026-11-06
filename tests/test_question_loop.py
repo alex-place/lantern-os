@@ -188,7 +188,7 @@ def _final_verdict(channels, routes=("c0", "c1", "c2"), executed=True, noise=0.0
 def test_an_oracle_grounded_loop_with_a_checked_model_can_act():
     channels = {name: OracleChannel(TRUE_GOAL, name) for name in ("c0", "c1", "c2")}
     assert _final_verdict(channels, executed=False).next_step.action == "gather_evidence"   # never observed
-    out = _final_verdict(channels)
+    out = _final_verdict(channels, tolerances={"goal_tol": 1.0})
     assert out.grounded == [0, 1, 2] and out.weak == [] and out.blind == []
     assert out.next_step.action == "act"
 
@@ -212,7 +212,7 @@ def test_tolerances_reach_reconcile():
     reads as a failure, and run() had no way to say otherwise."""
     channels = {name: OracleChannel(TRUE_GOAL, name) for name in ("c0", "c1", "c2")}
     assert _final_verdict(channels, noise=3e-3).next_step.action == "revise_model"
-    relaxed = _final_verdict(channels, noise=3e-3, tolerances={"defect_tol": 1.0})
+    relaxed = _final_verdict(channels, noise=3e-3, tolerances={"defect_tol": 1.0, "goal_tol": 1.0})
     assert relaxed.next_step.action == "act"
 
 
