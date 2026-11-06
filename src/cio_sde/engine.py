@@ -14,6 +14,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 import torch
 import torch.nn as nn
 
+from .surprise import scored_mean
+
 Tensor = torch.Tensor
 
 
@@ -487,8 +489,13 @@ class CIO_SDE(nn.Module):
         unprojected (CovarianceField._project_psd). A row whose inputs are finite but whose
         covariance step overflows is not excited either, and its receipt says why. The batched SVDs
         and eigendecompositions never see a broken row, so it cannot make them raise for the other
-        rows or feed its values into theirs. What this does not cover: an attached surprise monitor
-        still factors every row's S in one batched Cholesky, which a NaN Σ can make raise.
+        rows or feed its values into theirs. Nor does an attached SurpriseMonitor's batched Cholesky:
+        the monitor does not score a row whose belief (last step's prediction) or observed state holds
+        a NaN or inf, and a broken Σ or Jacobian reaches the belief through the next prediction. Such
+        a row's NIS reads NaN, so it never spooks, its belief passes through the update unchanged, and
+        it stays out of info["surprise_nis"] (NaN when no row was scored) and of the monitor's rolling
+        mean. What this does not cover: a finite row whose S is not positive definite still makes
+        that Cholesky raise for every row.
 
         `noise` is ξ, one standard normal per coordinate, and dW and the kick share it. The kick
         reads it in x's dtype, so float32 noise drives a float64 model (rollout draws float32 and
@@ -557,7 +564,8 @@ class CIO_SDE(nn.Module):
                 spook = (torch.as_tensor(surprise_result["spook"], device=dev)
                          .to(torch.bool).reshape(-1).expand(bsz))
                 info["surprise_spook"] = bool(spook.any())
-                info["surprise_nis"] = float(surprise_result["nis"].mean().item())
+                nis_mean = scored_mean(surprise_result["nis"])     # a row the monitor did not score has no say
+                info["surprise_nis"] = math.nan if nis_mean is None else nis_mean
                 if self.surprise_monitor.anti_collapse_trigger:
                     # A spook lifts THAT trajectory's anti-collapse proximity to 1.0 (detect → excite).
                     boost = spook.to(x.dtype)
