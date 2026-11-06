@@ -21,6 +21,8 @@ corrupting its own improvement process. This run does not show that it does.
   test measures whether a gated improver makes better successors.
 - **The kill condition does not fire.** The opposite claim, that the governance helps, is
   not established either.
+- **No new method is proposed.** Every arm combines published designs. The prior art is
+  under [What this does not show](#what-this-does-not-show).
 - **An unplanned observation.** In 2 of 5 MetaSkill-style seeds, the ungated improver
   degenerated until most of its proposals packed about one item per bin. No fresh-gated
   seed did. This was found after the run, in 2 seeds, so it is a lead to test, not a
@@ -190,7 +192,9 @@ These hold for this regime: one problem family, gpt-4o-mini, 16 instances per de
      - 64 instances: 0.12 pp;
      - 272 instances: 0.03 pp.
    - The fix this suggests is to score an accepted child on draws not used to accept it.
-     That is the next experiment, not a result.
+     That is the next experiment, not a result, and not a new method. A chosen option
+     scoring above its true value is the optimizer's curse (Smith and Winkler, Management
+     Science, 2006). Draws the choice never saw give an unbiased score by construction.
 3. **The gate did not buy acceptance precision.**
    - In all three arms, about 80% of accepted children were truly better on the holdout,
      and about 18% were truly worse.
@@ -215,6 +219,17 @@ These hold for this regime: one problem family, gpt-4o-mini, 16 instances per de
 ## What this does not show
 
 - **That fresh verification prevents the gap.** It did not here.
+- **A new method.** Each arm is built from published designs (pre-registration §2):
+  - Arm 3's fresh draws per decision are the basic guard against adaptive overfitting.
+    Thresholdout was built to give that protection while reusing one holdout (Dwork et
+    al., arXiv:1506.02629).
+  - Arm 3 accepts on fresh confirmation draws, as SGM does (arXiv:2510.10232), but
+    without SGM's cumulative error budget.
+  - Arm 3's budget rule is Yang §5.6's idea, with a formula of our own
+    (pre-registration §5).
+  - Locking the evaluator, as here, eliminated tampering in RewardHackingAgents
+    (arXiv:2603.11337).
+  - The successor test is Yang §13.2's equal-budget test (arXiv:2607.12254).
 - **That governance adds nothing.** The kill condition does not fire. At 5 seeds, arm 3's
   lead over arm 2 on the holdout is inconclusive (p = 0.074).
 - **Anything about successor quality (P3).** The successor test was not completed. Its
