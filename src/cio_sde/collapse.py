@@ -70,8 +70,37 @@ class CollapseOutcome(str, Enum):
 
 def _numerical_rank(s: Tensor, eig_eps: float) -> Tensor:
     """Numerical rank of each matrix from its singular values s (..., d): the count above eig_eps·σ_max.
-    The gate's rank signal and the kick basis both use this one definition."""
+    The gate's rank signal and the kick basis both use this one definition. It is defined for finite s
+    only: a NaN or inf singular value fails every comparison, so such a matrix counts rank 0 and would read
+    as collapsed. Its callers mask those matrices first (see _finite_matrices)."""
     return (s > eig_eps * s.max(dim=-1, keepdim=True).values).sum(dim=-1)
+
+
+# ── non-finite samples ──────────────────────────────────────────────────────────────────────
+# LAPACK's batched decompositions are undefined on a NaN or inf, and one bad matrix reaches every
+# other: an SVD raises for the whole batch on a NaN and returns NaN singular values for an inf, and
+# eigvalsh can return finite numbers for a NaN matrix. So a sample holding one is never handed to them.
+
+def _finite_matrices(M: Tensor) -> Tensor:
+    """Which matrices of a batch (..., m, n) hold only finite entries, shape (...)."""
+    return torch.isfinite(M).flatten(-2).all(-1)
+
+
+def _finite_part(M: Tensor, ok: Tensor) -> Tensor:
+    """M with every matrix that `ok` rejects zeroed, for a batched decomposition whose result for those
+    matrices is discarded. It IS M when every matrix is accepted, so a finite batch decomposes as before,
+    and the accepted matrices are untouched in any case, so a rejected one cannot reach their results."""
+    return M if bool(ok.all()) else torch.where(ok[..., None, None], M, torch.zeros_like(M))
+
+
+def _refuse_nonfinite(ok: Tensor, what: str) -> None:
+    """Raise, naming the samples where `ok` is False, with `what` saying what is wrong there: an operator
+    asked to act on a broken sample refuses. The gate never selects one, so only a direct call gets here."""
+    if bool(ok.all()):
+        return
+    rows = (~ok).reshape(-1).nonzero().flatten().tolist()
+    raise ValueError(f"sample{'s' if len(rows) > 1 else ''} {', '.join(map(str, rows))}: {what}, and Σ₀ "
+                     "does not act on a trajectory that is not finite")
 
 
 @dataclass
@@ -81,7 +110,7 @@ class CollapseResult:
     triggered  some trajectory in the batch triggered
     mask       (B,) which ones did
     x_star     the triggered rows projected onto their own null(A); every other row unchanged
-    metrics    the four signals, one value per sample, and `dim`
+    metrics    the four signals, one value per sample (NaN for a sample that is not finite), and `dim`
     """
     triggered: bool
     outcome: CollapseOutcome
@@ -112,6 +141,12 @@ class SemanticCollapseOperator:
     sample's state, covariance and Jacobian, and a sample triggers when its own four conditions hold.
     Nothing is averaged over the batch first. A batch-wide decision on mean signals let a collapsed
     member hide among healthy ones, and the mean of two rank-1 Jacobians has rank 2.
+
+    A sample whose state, control, covariance or Jacobian holds a NaN or inf never triggers. Each of
+    its four signals reads NaN, and NaN is below no threshold. Its rank in particular is NaN, not the
+    rank 0 that NaN singular values would count, which would read as collapsed. None of its matrices
+    reaches a batched decomposition, so it cannot make one raise for the other samples or change what
+    they read.
     """
 
     def __init__(self,
@@ -128,19 +163,27 @@ class SemanticCollapseOperator:
 
     @torch.no_grad()
     def _effective_rank(self, A: Tensor) -> Tensor:
-        """Numerical rank of each sample's own Jacobian, (B,), from its singular values."""
+        """Numerical rank of each sample's own Jacobian, (B,), from its singular values. NaN for a Jacobian
+        that holds a NaN or inf, or whose singular values overflow: _numerical_rank would count it rank 0."""
         A = A if A.dim() == 3 else A.unsqueeze(0)
-        return _numerical_rank(torch.linalg.svdvals(A), self.eig_eps).to(A.dtype)
+        ok = _finite_matrices(A)
+        s = torch.linalg.svdvals(_finite_part(A, ok))
+        rank = _numerical_rank(s, self.eig_eps).to(A.dtype)
+        return torch.where(ok & torch.isfinite(s).all(dim=-1), rank, torch.full_like(rank, float("nan")))
 
     @torch.no_grad()
     def _anisotropy_per_sample(self, sigma: Tensor) -> Tensor:
         # spread of Σ eigenvalues, normalized — low ⇒ isotropic flatness. Unbiased std, so
-        # a(Σ)·μ·√(d−1) = ‖Σ−μI‖_F, the form the lift proof uses.
+        # a(Σ)·μ·√(d−1) = ‖Σ−μI‖_F, the form the lift proof uses. NaN for a Σ that holds a NaN or inf:
+        # eigvalsh can return finite numbers for a NaN matrix, which could read as flat.
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
-        ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
+        ok = _finite_matrices(sym)
+        ev = torch.linalg.eigvalsh(_finite_part(sym, ok)).clamp_min(1e-12)
         if ev.shape[-1] < 2:                     # one eigenvalue has no spread; std would read NaN
-            return torch.zeros_like(ev[..., 0])
-        return ev.std(dim=-1) / ev.mean(dim=-1)
+            a = torch.zeros_like(ev[..., 0])
+        else:
+            a = ev.std(dim=-1) / ev.mean(dim=-1)
+        return torch.where(ok, a, torch.full_like(a, float("nan")))
 
     @torch.no_grad()
     def _anisotropy(self, sigma: Tensor) -> float:
@@ -176,17 +219,27 @@ class SemanticCollapseOperator:
     def _signals(self, model, x: Tensor, u: Tensor, sigma: Tensor,
                  A: Tensor) -> Dict[str, Tensor]:
         """The four gate signals, one value per sample, in x's dtype. A Σ or Jacobian given once for
-        the batch (leading dimension 1) is read as every sample's."""
+        the batch (leading dimension 1) is read as every sample's.
+
+        A sample whose x, u, Σ or Jacobian holds a NaN or inf, or any of whose four signals is not
+        finite, reads NaN on all four, so that no signal of it reads as below its threshold. Every
+        other sample's values are left as computed."""
         grad, rank, aniso, ctrl = torch.broadcast_tensors(*(
             t.to(x.dtype) for t in (self._grad_norm(model, x, u), self._effective_rank(A),
                                     self._anisotropy_per_sample(sigma),
                                     self._ctrl_sensitivity(model, x, u))))
-        return {"grad_norm": grad, "eff_rank": rank, "anisotropy": aniso, "ctrl_sens": ctrl}
+        ok = torch.isfinite(x).all(dim=-1) & torch.isfinite(u).all(dim=-1)
+        for v in (grad, rank, aniso, ctrl):
+            ok = ok & torch.isfinite(v)
+        nan = torch.full_like(grad, float("nan"))
+        return {name: torch.where(ok, v, nan) for name, v in
+                (("grad_norm", grad), ("eff_rank", rank), ("anisotropy", aniso), ("ctrl_sens", ctrl))}
 
     def _fires(self, s: Dict[str, Tensor], dim: float) -> Tensor:
         """Each sample's own AND of the four conditions, (B,). Compared in float64, against the
         thresholds as given: a float32 comparison rounds ε_g = 0.01 to float32 first, and a signal
-        equal to float32(0.01) then reads as not below it."""
+        equal to float32(0.01) then reads as not below it. A NaN signal is below nothing, so a
+        sample that is not finite never fires."""
         s = {k: v.double() for k, v in s.items()}
         return ((s["grad_norm"] < self.grad_eps) & (s["eff_rank"] < self.rank_frac * dim)
                 & (s["anisotropy"] < self.anisotropy_eps) & (s["ctrl_sens"] < self.ctrl_eps))
@@ -207,13 +260,22 @@ class SemanticCollapseOperator:
         P = V Vᵀ is idempotent and symmetric, so it is non-expansive: ‖P x‖ ≤ ‖x‖, and there is no
         boundary to enforce. (The former "log-barrier" multiplicative shrink was misnamed and, for
         strengths above 1/ln(100) ≈ 0.217, flipped sign and grew ‖x*‖. See issue #661.)
+
+        A Jacobian that holds a NaN or inf has no null space to project onto. Outside `mask` one is
+        never decomposed, so it cannot fail the other rows; asked to project one, this raises,
+        naming it. evaluate never asks: the gate does not fire on such a row.
         """
         A = A if A.dim() == 3 else A.unsqueeze(0)
-        _, s, Vh = torch.linalg.svd(A)
+        batch = torch.broadcast_shapes(x.shape[:-1], A.shape[:-2])
+        rows = torch.ones(batch, dtype=torch.bool, device=x.device) if mask is None else mask
+        ok = _finite_matrices(A)
+        _refuse_nonfinite(torch.broadcast_to(ok, rows.shape) | ~rows, "the Jacobian holds a NaN or inf")
+        _, s, Vh = torch.linalg.svd(_finite_part(A, ok))
+        _refuse_nonfinite(torch.broadcast_to(torch.isfinite(s).all(dim=-1), rows.shape) | ~rows,
+                          "the Jacobian's singular values overflow")
         null = (s <= self.eig_eps * s.max(dim=-1, keepdim=True).values).to(A.dtype)   # (B, d)
         P = Vh.transpose(-1, -2) @ (null.unsqueeze(-1) * Vh)    # (B, d, d) projector onto each null(A)
         x_star = (x.unsqueeze(-2) @ P.transpose(-1, -2)).squeeze(-2)
-        rows = torch.ones(x_star.shape[:-1], dtype=torch.bool, device=x.device) if mask is None else mask
         if mask is not None:
             x_star = torch.where(mask.unsqueeze(-1), x_star, x)
         empty = torch.broadcast_to(null.sum(-1) == 0, rows.shape) & rows
@@ -1347,7 +1409,8 @@ class AntiCollapseOperator:
         """How close each sample is to a collapse, (B,): 0 = safe, 1 = collapsing.
 
         A sample's value is above 0 exactly when its own four-signal gate is true, so the engine
-        excites exactly the samples that the gate would freeze."""
+        excites exactly the samples that the gate would freeze. A sample that is not finite reads 0:
+        its signals are NaN (see SemanticCollapseOperator._signals)."""
         d = self.detector
         dim = float(x.shape[-1])
         s = d._signals(model, x, u, sigma, A)
@@ -1388,10 +1451,17 @@ class AntiCollapseOperator:
           • feasibility — above d≈100 the rank must also stay below _max_lift_rank(d), because
             a rank-m bump tops out at a(Σ⁺) ≈ √((d−m)/m) and d−1 modes cannot reach ε_a at all
             once d > 401. L2′ allows any projector, so bumping fewer modes loses nothing.
+
+        A Jacobian that holds a NaN or inf, or whose singular values overflow, has no kick basis, and
+        this raises, naming its sample, rather than hand the batched SVD a NaN (which raises for every
+        sample) or an inf (whose NaN singular values would give a basis of garbage). The gate never
+        fires on such a sample, so the engine does not ask for one.
         """
         A = A if A.dim() == 3 else A.unsqueeze(0)
         d = A.shape[-1]
+        _refuse_nonfinite(_finite_matrices(A), "the Jacobian holds a NaN or inf")
         _, s, Vh = torch.linalg.svd(A)                     # s in decreasing order
+        _refuse_nonfinite(torch.isfinite(s).all(dim=-1), "the Jacobian's singular values overflow")
         V = Vh.flip(-2).transpose(-1, -2)                  # columns by increasing singular value
         hard_null = (s < self.eig_eps).sum(dim=-1)
         rank_deficit = d - _numerical_rank(s, self.detector.eig_eps)
@@ -1432,7 +1502,8 @@ class AntiCollapseOperator:
         high-scale sample flat. `m` is one rank for the batch or one per sample. `a` is not clipped
         at ε_a: `excite` reads the Riccati-propagated Σ, which can already be anisotropic, and a
         clipped floor lets a bump flatten it.
-        Raises on an infeasible rank, where no finite bump can reach ε (excite never asks for one).
+        Raises on an infeasible rank, where no finite bump can reach ε (excite never asks for one),
+        and on a Σ that holds a NaN or inf, naming its sample: it has no spectrum to floor against.
         """
         eps = self.detector.anisotropy_eps * self.LIFT_MARGIN
         m = torch.as_tensor(m, dtype=sigma.dtype, device=sigma.device)
@@ -1441,6 +1512,7 @@ class AntiCollapseOperator:
             raise ValueError(f"no finite bump of rank {m.long().tolist()} lifts a(Σ) to {eps:g} "
                              f"in dimension {d}")
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
+        _refuse_nonfinite(_finite_matrices(sym), "the covariance holds a NaN or inf")
         ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
         mu = ev.mean(dim=-1)
         a = ev.std(dim=-1) / mu
@@ -1473,6 +1545,8 @@ class AntiCollapseOperator:
           • state-kick leg — the random `dx_extra = κ·Pξ`, floored by _kick_scale (Lemma S1), so the
             state itself leaves the gradient ball with probability ≥ ½ however small p is. This is
             the only leg that moves x.
+        A row whose Jacobian or covariance holds a NaN or inf is refused with a ValueError naming it
+        (_kick_basis, _cov_floor): the gate never fires on one, so only a direct call can pass it.
         """
         P, m = self._kick_projector(A)                    # (B, d, d), feasible 1 ≤ m ≤ d−1 each
         d = P.shape[-1]

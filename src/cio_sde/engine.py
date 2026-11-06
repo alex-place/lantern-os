@@ -154,18 +154,39 @@ class CovarianceField:
         _project_psd clips: at Σ_pred = σ_max·I a bump on any subspace clips straight back to
         σ_max·I, erasing the contrast it was there to create. Scaling instead keeps a(Σ) exact,
         since a(cΣ) = a(Σ): headroom comes from lowering the other directions. Per sample. Only
-        eigenvalues pushed below eps are clipped, which needs cond(Σ) > σ_max/eps."""
-        sym = 0.5 * (sigma + sigma.transpose(-1, -2))
-        evals, evecs = torch.linalg.eigh(sym)
+        eigenvalues pushed below eps are clipped, which needs cond(Σ) > σ_max/eps. A sample that
+        holds a NaN or inf is returned unprojected, as _project_psd returns it."""
+        sym, ok, safe = _split_nonfinite(sigma)
+        evals, evecs = torch.linalg.eigh(safe)
         top = evals.max(dim=-1, keepdim=True).values.clamp_min(self.eps)
         evals = torch.clamp(evals * (self.sigma_max / top).clamp_max(1.0), self.eps, self.sigma_max)
-        return (evecs * evals.unsqueeze(-2)) @ evecs.transpose(-1, -2)
+        return _rejoin_nonfinite((evecs * evals.unsqueeze(-2)) @ evecs.transpose(-1, -2), ok, sym)
 
     def _project_psd(self, sigma: Tensor) -> Tensor:
-        sym = 0.5 * (sigma + sigma.transpose(-1, -2))
-        evals, evecs = torch.linalg.eigh(sym)
+        """Clip each sample's eigenvalues to [eps, σ_max]. A sample that holds a NaN or inf is returned
+        unprojected (symmetrized, still not finite): it has no eigendecomposition, and a batched one
+        raises for every sample on a NaN, or returns numbers for it. It no longer reaches the
+        decomposition, so one broken trajectory cannot fail the step for the rest."""
+        sym, ok, safe = _split_nonfinite(sigma)
+        evals, evecs = torch.linalg.eigh(safe)
         evals = torch.clamp(evals, self.eps, self.sigma_max)
-        return evecs @ torch.diag_embed(evals) @ evecs.transpose(-1, -2)
+        return _rejoin_nonfinite(evecs @ torch.diag_embed(evals) @ evecs.transpose(-1, -2), ok, sym)
+
+
+def _split_nonfinite(sigma: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+    """(sym, ok, safe) for a batched eigendecomposition: sym = ½(Σ+Σᵀ), ok marks the samples whose sym
+    is finite, and safe is sym with every other sample zeroed. safe IS sym when all are finite, so a
+    finite batch is decomposed exactly as before."""
+    sym = 0.5 * (sigma + sigma.transpose(-1, -2))
+    ok = torch.isfinite(sym).flatten(-2).all(-1)
+    if bool(ok.all()):
+        return sym, ok, sym
+    return sym, ok, torch.where(ok[..., None, None], sym, torch.zeros_like(sym))
+
+
+def _rejoin_nonfinite(projected: Tensor, ok: Tensor, sym: Tensor) -> Tensor:
+    """The projection where the sample was finite, its unprojected sym where not."""
+    return projected if bool(ok.all()) else torch.where(ok[..., None, None], projected, sym)
 
 
 def drift_jacobian(node: Dynamics, x: Tensor, u: Tensor) -> Tensor:
@@ -184,17 +205,27 @@ class SwapRecord:
     step: int
     from_id: str
     to_id: str
-    drift_delta: float      # ‖f_old − f_new‖ on probe batch
+    drift_delta: float      # the worst trajectory's ‖f_old − f_new‖ / ‖f_old‖ on the probe batch
     accepted: bool
     reason: str = ""
+    row_deltas: List[float] = field(default_factory=list)   # each probe trajectory's own delta
+    worst_row: Optional[int] = None                         # the row drift_delta is from
 
 
 class GraphController:
     """
     Holds the active execution-graph dynamics node and performs hot-swaps.
 
-    σ: v₁ → v₂ is valid iff behaviour is preserved:
-        ‖f_old(x,u) − f_new(x,u)‖ / ‖f_old‖  <  tol   on a probe batch.
+    σ: v₁ → v₂ is valid iff behaviour is preserved on every trajectory of the probe batch:
+
+        δᵢ = ‖f_old(xᵢ,uᵢ) − f_new(xᵢ,uᵢ)‖ / ‖f_old(xᵢ,uᵢ)‖  <  tol   for every row i.
+
+    The batch is B trajectories, as it is for the Σ₀ gate, so the swap is accepted only if it
+    preserves each trajectory's own drift. One norm over the whole batch let a candidate that changes
+    one trajectory's drift a lot pass on the others: a row whose drift flips sign hid behind a
+    row with ten times its drift. With one trajectory δ₀ is the ratio the batch norm gave, computed
+    the same way, so a batch-size-1 decision is unchanged. A row whose δᵢ is NaN counts as
+    changed. The record keeps every δᵢ, and drift_delta is the worst of them (NaN if any is).
 
     Swaps are a DISCRETE outer process — the probe is run under no_grad so the
     swap decision never enters the SDE gradient tape (this is the fix for the
@@ -216,13 +247,20 @@ class GraphController:
         new_id = new_id or f"v{self._counter}"
         f_old = self.active.drift(x, u)
         f_new = candidate.drift(x, u)
-        denom = f_old.norm() + 1e-8
-        delta = (f_old - f_new).norm().item() / denom.item()
-        accepted = delta < self.tol
+        # one row per trajectory; broadcast first, as the batch-wide difference did
+        f_old, f_new = (f.reshape(-1, f.shape[-1]) for f in torch.broadcast_tensors(f_old, f_new))
+        # Each row is the ratio the batch norm took for one trajectory, in the same operations.
+        deltas = [(o - n).norm().item() / (o.norm() + 1e-8).item() for o, n in zip(f_old, f_new)]
+        accepted = all(dl < self.tol for dl in deltas)
+        broken = [i for i, dl in enumerate(deltas) if math.isnan(dl)]
+        worst = (broken[0] if broken else max(range(len(deltas)), key=deltas.__getitem__)) if deltas else None
+        delta = deltas[worst] if worst is not None else 0.0
         rec = SwapRecord(
             step=step, from_id=self.active_id, to_id=new_id,
             drift_delta=delta, accepted=accepted,
-            reason="" if accepted else f"drift delta {delta:.3f} ≥ tol {self.tol}",
+            reason="" if accepted else (f"trajectory {worst} of {len(deltas)}: drift delta {delta:.3f} "
+                                        f"is not below tol {self.tol}"),
+            row_deltas=deltas, worst_row=worst,
         )
         if accepted:
             self.active = candidate
@@ -417,8 +455,13 @@ class CIO_SDE(nn.Module):
         excited. Every other row keeps the x_next and sigma_next of the plain SDE step. Each
         trajectory has its own budget of policy.max_interventions per rollout, so whether a row may
         change never depends on the other rows. Each row that fires gets its own receipt, whose
-        `sample` is its index. So a batch is B independent trajectories: row i of a batched step is
-        that step on row i alone, given the same noise.
+        `sample` is its index. So as far as the operators go, a batch is B independent trajectories:
+        the gate, the kick, the bump, the budget and the receipt of row i are row i's own. With
+        LinearDynamics a batched step equals the step on row i alone, given the same noise, bit for
+        bit. With the neural Dynamics the rows agree only to rounding (about 1e-15 in float64, 1e-6
+        in float32), because its matrix products round differently in a batch, so a row within
+        rounding of a threshold can decide differently in a batch than alone. Independence also
+        assumes the drift, diffusion, policy and stage cost treat rows separately; nothing checks it.
 
         info["intervention_receipts"] lists every receipt of the step, and
         info["intervention_receipt"] is the first of them, for callers that read one. The
@@ -428,6 +471,19 @@ class CIO_SDE(nn.Module):
         batch-wide: every row gets that number, and excite() is called with one number per distinct
         effective proximity among the rows that fired, so a spook still lifts only its own row. Its
         outputs may broadcast; they are applied to the fired rows only.
+
+        A trajectory whose state, covariance or drift Jacobian holds a NaN or inf is broken, and the
+        Σ₀ gate never fires on it: each of its four signals reads NaN, which is below no threshold.
+        So neither operator acts on it, and its values carry forward as the plain step computes them,
+        with its Σ passed through unprojected (CovarianceField._project_psd). The batched SVDs and
+        eigendecompositions no longer see it, so it cannot make them raise for the other rows or
+        feed its values into theirs: a batch holding one equals its rows run alone wherever a batch
+        does (bit for bit with LinearDynamics). What this does not cover: an attached surprise
+        monitor still factors every row's S in one batched Cholesky.
+
+        `noise` is ξ, one standard normal per coordinate, and dW and the kick share it. The kick
+        reads it in x's dtype, so float32 noise drives a float64 model (rollout draws float32 and
+        casts it to x's dtype; see rollout).
         """
         node = self.graph.active
         u = self.pcsf(x, sigma)
@@ -458,6 +514,8 @@ class CIO_SDE(nn.Module):
 
         # Every Σ₀ quantity below is one value per trajectory (row).
         bsz, dev = x.shape[0], x.device
+        # A Σ given once for the batch, (1, d, d) or (d, d), is every row's: the receipts index it by row.
+        sigma_rows = torch.broadcast_to(sigma, (bsz, d, d))
         spook = torch.zeros(bsz, dtype=torch.bool, device=dev)     # the row's NIS spook
         boost = torch.zeros(bsz, dtype=x.dtype, device=dev)        # a spook lifts the row's proximity to 1
         prox = torch.zeros(bsz, dtype=x.dtype, device=dev)         # the row's structural proximity
@@ -512,7 +570,7 @@ class CIO_SDE(nn.Module):
                 step=step, kind=kind, trigger_source=source, sigma0_proximity=float(prox[i]),
                 surprise_spook=spooked,
                 pre_x_norm=float(x[i].detach().norm()), post_x_norm=float(x_next[i].detach().norm()),
-                pre_sigma_tr=float(torch.diagonal(sigma[i].detach()).sum()),
+                pre_sigma_tr=float(torch.diagonal(sigma_rows[i].detach()).sum()),
                 post_sigma_tr=float(torch.diagonal(sigma_next[i].detach()).sum()),
                 policy_reason=reason, sample=i,
             )
@@ -558,9 +616,10 @@ class CIO_SDE(nn.Module):
                     # at different effective proximities (a spook lifts only its own row) get their own.
                     calls = ([(float(v), idx[effective[idx] == v]) for v in torch.unique(effective[idx])]
                              if batch_wide else [(effective[idx], idx)])
+                    xi = noise.to(x.dtype)       # the kick's ξ in the state's dtype: exact for float32 → float64
                     for p_fired, rows in calls:
                         dx_extra, sig_extra = self.anti_collapse_op.excite(
-                            x[rows], sigma_next[rows], A[rows], p_fired, noise[rows])
+                            x[rows], sigma_next[rows], A[rows], p_fired, xi[rows])
                         dx_extra = torch.broadcast_to(
                             torch.as_tensor(dx_extra, dtype=x_next.dtype, device=dev), x[rows].shape)
                         x_next = x_next.index_add(0, rows, dx_extra)
@@ -626,6 +685,14 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
     rollouts with the same base_seed produce identical trajectories — this is
     what makes the trace replayable (invariant 2).
 
+    The draw is float32 in every dtype, then cast to x's dtype. A float32 run is what it always
+    was. A float64 run gets those same float32 values, exactly (float32 → float64 is exact), so
+    one that never reaches the kick is unchanged bit for bit: the float64 arithmetic of dW
+    already promoted them. The shipped kick multiplies ξ by a float64 projector and used to raise
+    on the dtype mismatch; it now runs. (An operator of your own whose excite computes with ξ now
+    gets it in float64 rather than float32.) Drawing in float64 instead would change every
+    float64 trajectory. In float64, ξ keeps float32's resolution.
+
     If accumulate_cost=True, trace.running_cost holds the differentiable
     trajectory-integrated stage cost  Σ_t L(x_t, u_t) · dt  — the optimal-control
     objective ∫L dt used for training.
@@ -640,7 +707,7 @@ def rollout(model: CIO_SDE, x0: Tensor, sigma0: Tensor, steps: int,
     for t in range(steps):
         gen = torch.Generator(device=device)
         gen.manual_seed(base_seed + t)
-        noise = torch.randn(x.shape, generator=gen, device=device)
+        noise = torch.randn(x.shape, generator=gen, device=device).to(x.dtype)   # float32 draw: see above
 
         if t in swap_schedule:
             with torch.no_grad():
