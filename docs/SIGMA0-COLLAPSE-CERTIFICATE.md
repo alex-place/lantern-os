@@ -1,697 +1,271 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-22
+updated: 2026-11-05
 ---
 
 # Σ — The Convergence Certificate
 
-> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history.
+> **Moved 2026-09-29:** research code and data this document cites that is no longer in this repo lives at the same path in the private [lantern-os-research](https://github.com/alex-place/lantern-os-research) repo, with its history. Those paths are marked **†** below.
 
-*A computable stability certificate for convergence dynamics, and an honest
-account of why an ungrounded self-improving system tends to collapse or diverge.*
+*What this project has proved, measured and corrected about collapse and grounding in its own loop. The standard results it rests on are cited in [Sources](#sources--what-this-rests-on), not restated.*
 
-> **One object, two timescales (structure — read before citing anything below).**
-> **Part I** (§0–§7, *the original Collapse Certificate*) certifies the **fast state `x`** — the
-> hidden-state trajectory inside one forward pass — and is **PROVEN / machine-checked where each
-> section's status line says so**. **Part II** (§8, *the Model-Update Acceptance Gate Σ_θ*, merged in
-> 2026-07-07) certifies the **slow weights `θ`** — how the model changes across weight-update steps
-> — and is **HEURISTIC + imported external theorems: no machine-checked THEOREM**. (Its gate
-> *logic* and holdout *simulations* are implemented and tested in-repo — see the audit map — but
-> tested logic is not a proven theorem, and the gate has never controlled a real training run.) **Part III** (§9) composes them under timescale separation (a TARGET, not a theorem).
-> The evidence-class discipline is strict and asymmetric: **Part II must never be read with Part
-> I's authority.** The two are one certificate because they are the fast and slow faces of the same
-> dynamical object `ẋ = f(x,u,θ)` — Part I holds `θ` fixed; Part II is the θ-flow Part I defers.
-> **Part IV** (§10, added 2026-07-21) is the *active face* — a **DESIGN / TARGET, no theorem**,
-> lower in authority than even Part II: it extends the "grounding is the escape" result to
-> generated grounding (act to manufacture fresh truth), with one MEASURED real-surface datapoint
-> and zero proofs. It exists here so the theory and its answering interface
-> ([CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md)) cannot drift apart.
+> **This is the condensed edition (2026-11-05).** Every standard result, method or framing that earlier versions restated is now one row of [Sources](#sources--what-this-rests-on), cited in the text as [1]–[26]. What remains is the project's own work: theorems about its engine, measurements on its systems, the items its prior-art audits left standing, and its corrections. Section numbers are unchanged, so `§1.2.3`, `§3`, `§8.4` and the rest still name the same topics. The maintenance log and the original router design sketch were provenance, not results, and are no longer in this file. The full previous text (2,923 lines) is at [commit 6a5f028c](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md). The cut changes no theorem, evidence class or measured number, which an independent comparison of the two versions checked, and the in-repo test counts were re-run for it.
 
----
+> **Correction — 2026-11-05 (read before citing anything below).** An engine-level audit, including an independent one (`lantern-os-research` PR #1), found several headline claims stronger than their evidence, and shipped code that violated some of the theorems. The code is fixed and pinned by tests; [Appendix C](#appendix-c--corrections-register-consolidated) lists every correction. In short: the "900/900 prevented" figure is **retired** (a placebo scored the same); C3 is about the gate, not the state; "no third fate" is false even in the linear regime (rotation); the small-gain "proven bound" bounded nothing; and the former acceptance proxy tracked the size of the hidden state rather than its dynamics. The companion proofs in the private research repo (`SIGMA0-C3-…`, `SIGMA0-T1-…`, `SIGMA0-L2-…`) still carry the older wording.
 
-> **Correction — 2026-11-05 (read this before citing anything below).** An engine-level audit,
-> including an independent one (`lantern-os-research` PR #1), found several headline claims stronger
-> than their evidence, and shipped code that violated some of the theorems. The code is fixed and
-> pinned by new tests; [Appendix C](#appendix-c--corrections-register-consolidated) lists every
-> correction. In short: the "900/900 prevented" figure is **retired** (a placebo scored the same);
-> C3 is about the gate, not the state; "no third fate" is false even in the linear regime (rotation);
-> the small-gain "proven bound" bounded nothing; and the former acceptance proxy tracked the size of
-> the hidden state rather than its dynamics. The companion proofs in the private research repo
-> (`SIGMA0-C3-…`, `SIGMA0-T1-…`, `SIGMA0-L2-…`) still carry the older wording.
+**One object, two timescales.** Part I (§0–§7) concerns the fast state `x`, the hidden-state trajectory inside one forward pass, with the slow parameters `θ` held fixed; it is PROVEN where a status line says so. Part II (§8) concerns the slow weights `θ`, how the model changes across updates. It is a gate built on imported theorems, with no machine-checked theorem of its own, and must never be read with Part I's authority. Part III (§9) composes the two, as a target. Part IV (§10) is a design, below Part II in authority, with two measured datapoints and no proofs.
 
 ## What this document is — and is not
 
-**It is:** the internal, evidence-classed design-and-theory record for one system's *Verify*
-stage — the stability machinery of a local-first reasoning loop ([unisona.ai](../CLAUDE.md),
-repo `alex-place/lantern-os`). It is written by **Alex Place with AI coding agents** (disclosed;
-agent sessions author and revise text under the operator's review, and the dates are real project
-dates — this project runs in 2026). Its primary audience is the loop itself and the people
-building it.
+**It is** the evidence-classed theory record for the *Verify* stage of one system: the stability machinery of a local-first reasoning loop ([unisona.ai](../CLAUDE.md), repo `alex-place/lantern-os`). Alex Place writes it with AI coding agents, which draft and revise under the operator's review. The dates are real project dates.
 
-**It is not:** a peer-reviewed paper. It has no venue, has not been submitted anywhere, and no
-outside expert has endorsed it. External review so far consists of the adversarial model passes
-and the operator review recorded in §8.7 and Appendix M — useful, but not peer review.
+**It is not** peer-reviewed. Outside review so far consists of adversarial model passes and the operator's own (§8.7, Appendix C).
 
-**Novelty: graded per item, never blanket** *(policy updated 2026-07-22; the former head-line
-"Novelty: none is claimed" was scoped only to Part II's components and read as more)*. The ladder:
-`NOT-NOVEL` — imported/standard, no claim (this correctly covers **Part II's components**: the
-three-way prior-art search of 2026-07-07, recorded in §8.7–§8.8 and
-[ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md), found TRPO/Gao/Dwork standard
-at ~97% confidence, framing close-prior-arted at ~90%). `CANDIDATE ★` — possibly novel, a bounded
-prior-art search is owed or incomplete; claimable only as a candidate. `AUDITED-CANDIDATE ✓` —
-survived a *recorded, bounded* search (the strongest status this document ever self-assigns;
-"proven novel" requires external review and is never self-declared). The 2026-07-17 overlooked-
-novelty audit ([#2690](https://github.com/alex-place/lantern-os/issues/2690)–[#2692](https://github.com/alex-place/lantern-os/issues/2692))
-is the precedent in *both* directions: it found claims to retire **and** unclaimed corners worth
-promoting. Per-item statuses live in the [formula registry](#the-mathematics--formula-registry).
-The one open research question — §8.6 item 5 (incremental validity) — was **measured on
-2026-07-07** (two pre-registered experiments, PR #2240): the internal signal adds detection power
-**only for gross degradation and only when the external gate is tiny** (ΔAUC +0.121 at n=2,
-decaying to +0.019 at n=5), and it **cannot substitute for fresh verified data at all** in the
-selection role (§8.4.1). The still-open cell is *subtle, training-induced* badness, which needs
-the real A/B/C artifacts.
+**What counts as ours.** Novelty is graded per item, never claimed or disclaimed wholesale; that has been the policy since 2026-07-22. Three prior-art passes over the theory found **no novel mechanism**: the 2026-07-07 nearest-prior audit, the 2026-07-17 corner audit and the 2026-07-18 conventional-grounding pass. "Ungrounded self-reference degrades, and external verification is the escape" is published [12], and the dynamical tools are standard or published elsewhere [1–11]. The registry audits ([#2860], [#2861], [#2874]) then promoted two items, R3 and R9, to AUDITED-CANDIDATE, each with a narrowed scope. What the project contributes:
 
-**"Machine-checked" here means:** closed-form algebra + numerical sweeps + `pytest` — **not** a
-Lean/Mathlib formal proof. Every use of the phrase in this document carries that meaning and no
-more. Theorems marked PROVEN are proven *in-regime* (local linear Jacobian, stated hypotheses).
+1. **Theorems about its own engine:** C3 and S1 (§3). Their ingredients are standard [8]. The 2026-07-17 corner audit found no located counterpart for C3 itself, while the 2026-07-18 pass filed it with established method, so it carries no novelty grade. Both live on this synthetic SDE, not on a real model.
+2. **Measurements on its own systems:** Ouro-1.4B's latent loop, a trained reservoir, the operator against a placebo, the honesty benchmark, and the holdout-reuse simulations.
+3. **Negative results.** Each correction in Appendix C was found by a falsification pass or an independent review, and the correction is what ships.
+4. **Candidate-novel items**, graded on the registry's ladder: `NOT-NOVEL` (imported, no claim) · `CANDIDATE ★` (possibly novel; a bounded prior-art search is owed) · `AUDITED-CANDIDATE ✓` (survived a recorded, bounded search). ✓ is the strongest status this document gives itself; "proven novel" needs outside review.
 
-**Process disclosure:** an early draft of this document, written while the search backend was
-down, carried four fabricated arXiv IDs. Source-verification caught them on 2026-06-17 and they
-were replaced with verified citations (see the note at the end of References). That failure is
-kept on the record deliberately: it is the strongest argument this document makes for its own
-central claim — self-generated content is untrustworthy until externally checked. Citations added
-since carry a verified-on date.
+**Evidence classes.** PROVEN: a proof, machine-checked as defined next. MEASURED: an empirical result with a run pointer. HEURISTIC: an operational design, not derived from a theorem. TARGET and DESIGN: stated, not shown. **"Machine-checked"** means closed-form algebra, numerical sweeps and `pytest`; only C3's abstract form is also checked in Lean (`docs/formal/C3EngineLift.lean`). PROVEN means proven *in-regime*: a local linear Jacobian under the stated hypotheses.
+
+**Process disclosure.** An early draft, written while the search backend was down, carried four fabricated arXiv IDs (2406.07284, 2402.07827, 2309.07864 and 2309.01219, none matching its claimed title). Source verification caught them on 2026-06-17 ([#660]). The record stays because it is the plainest evidence for this document's central claim: self-generated content is untrustworthy until something outside checks it.
 
 ## How to audit this document
 
-Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
-were run against this revision on 2026-07-17 (91 tests, all passing; the gate self-test was
-last run 2026-07-07). Rows added 2026-11-05 were run on 2026-11-05. On a fresh clone, only the rows
-whose artifacts are still in this repo can run; the rest moved to the private research repo (see the
-note at the top), which by the rule below means they are unverifiable from here. The **Part I
-backbone was re-run 2026-07-21** with no drift
-(`tests/test_cio_sde.py` → 46 passed; `tests/test_sigma0_jsrr_gate.py` → 12 passed); the other
-suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem — but its active-loop
-*harness* is unit-tested logic and its two datapoints are real-surface runs (last two rows below):
+Every load-bearing claim maps to a runnable artifact. The pytest rows marked *here* were re-run on 2026-11-05: 980 tests, all passing. The Lean row and the placebo script were last run on 2026-11-05, by the changes that added them. Rows marked † run only in the private research repo, so a clone of this repo cannot check them; they were last run on the date given.
 
-| Claim | Class | Verify with |
-|---|---|---|
-| Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 54 passed |
-| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (the anisotropy and the C3 floor bit for bit alone or in any batch; whole runs bit for bit where the matrix products are exact, as at the tested inputs, and to rounding elsewhere), a non-finite row left alone and kept out of the surprise monitor's Cholesky, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 94 passed |
-| C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, machine-checked (Lean 4 + Mathlib; standard axioms only; six false variants rejected) | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
-| The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing, through all three branches of the lift's projection, and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 26 passed |
-| Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
-| Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
-| Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
-| Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
-| ~~900-run collapse-prevention sweep (§3)~~ | **RETIRED 2026-11-05**: its metric could not fail, and a placebo matched it | replaced by the placebo-controlled row above |
-| Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED on the batch gate, before the 2026-11-05 changes; needs a re-run | research repo: `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py`, once it scores each row (§2) |
-| Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
-| Phase 0.5 prospective shot-call on the trained reservoir: sliver call held; anchor/ceiling ratio 1.4·10⁴ (§3.1, [#2690]) | MEASURED (real learned system) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
-| Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
-| Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
-| Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
-| Freshness law RE-STATED: kill test fired — re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates (§8.4.1, [#2692]) | MEASURED (simulation) | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
-| Three-arm promotion-evidence protocol (F/Fd/R/T) at task-level stuck fidelity + arm-differentiated teeth (§8.6-4, [#2691]) | machine-checked protocol; MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_holdout_protocol.py -q` → 6 passed; full run: `python experiments/sigma_theta_abc/holdout_protocol.py --simulate` |
-| Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
-| Freshness law on a live code surface — the #2762 de-anchor (§10.1) | MEASURED-instance (one run, real surface) | `data/autowork-runs/2026-07-21.jsonl`; PR #2795 |
-| Active loop (ACT-TO-KNOW) mechanism built + run (§10.2) | MEASURED (mechanism) + unit-tested logic | `python -m pytest tests/test_oracle_active_loop.py -q` → 7 passed; run: `python experiments/oracle_active_loop.py` → `data/oracle/active-loop-runs.jsonl` |
-| §8 gate controlling a *real* training run; §9 two-timescale composition; Part IV vs a frontier-model baseline (§10.2) | **not yet verifiable** | open — the honest gaps (§8.6, §9, §10.2) |
+| Claim | Class | Runs | Verify with |
+|---|---|---|---|
+| Theorem 1, spectral dichotomy, C3 anti-freeze, the σ-axis, §2 operator behaviour (§1–§3, §7.1) | PROVEN in-regime | here | `python -m pytest tests/test_cio_sde.py -q` → 54 passed |
+| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (the anisotropy and the C3 floor bit for bit alone or in any batch; whole runs bit for bit where the matrix products are exact, as at the tested inputs, and to rounding elsewhere), a non-finite row left alone and kept out of the surprise monitor's Cholesky, the placebo pin, the scope limit (§2–§3) | PROVEN in-regime + engine tests | here | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 94 passed |
+| C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, Lean 4 + Mathlib (standard axioms only; six false variants rejected) | here | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
+| The bridge from that proof to the engine (§3) | tested (spectral identities, not formalized) | here | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 26 passed |
+| Certificate fates against the actual flow, in any basis and next to large modes (§1) | tested | here | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
+| Non-normal stability gates: no false-positive certificate over 400 matrices; each bound checked against the matrix exponential (§1.2.1) | tested | here | `python -m pytest tests/test_stability_gates.py -q` → 14 passed |
+| Loop-contraction verdict on known contractions, non-finite iterates, saved Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | here | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
+| JSRR telemetry and fallback verdict (§1.2.3) | verdict machine-checked | here | `python -m pytest tests/test_sigma0_jsrr_gate.py -q` → 12 passed |
+| Placebo-controlled operator measurement (§3) | MEASURED (simulation) | here | `python experiments/sigma0_placebo_control.py --trials 10` |
+| Four-signal trigger calibration: precision 1.0, recall ≈ 0.08 (§2, [#1990]) | MEASURED on the batch gate; needs a re-run | †, 2026-07-04 | `python experiments/sigma0_trigger_calibration.py`, once it scores each row (§2) |
+| Region of attraction on a textbook benchmark (§5, [#1991]) | PROVEN (interval arithmetic) | †, 2026-07-17 | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
+| Scheduled-vs-reactive grounding race (§3.1, [#2690]) | MEASURED | †, 2026-07-17 | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed |
+| Prospective shot-call on the trained reservoir (§3.1, [#2690]) | MEASURED (real learned system) | †, 2026-07-17 | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed |
+| Σ_θ release-gate logic and A/B/C decision tree (§8.1.2) | machine-checked logic | †, 2026-07-17 (self-test 2026-07-07) | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
+| Holdout staleness and the Thresholdout third road (§8.4) | MEASURED (simulation) | †, 2026-07-17 | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed |
+| Internal signals cannot extend the selection budget (§8.4.1) | MEASURED (simulation) | †, 2026-07-07 | `python experiments/sigma_update_internal_signal_value.py` |
+| The freshness law's kill test fired: re-drawn noise de-ratchets (§8.4.1, [#2692]) | MEASURED (simulation) | †, 2026-07-17 | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed |
+| Promotion-evidence protocol at task-level stuck fidelity (§8.6 item 4, [#2691]) | machine-checked protocol; MEASURED (simulation) | †, 2026-07-17 | `python -m pytest tests/test_sigma_theta_holdout_protocol.py -q` → 6 passed |
+| Incremental validity on a real model (§8.6 item 5) | MEASURED (one model) | †, 2026-07-07 | `experiments/sigma_incremental_validity_ouro.py` (local GPU, cached Ouro-1.4B, ~25 min; run log in PR #2240) |
+| The freshness law on a live code surface (§10.1) | MEASURED instance (one run) | †, 2026-07-21 | `data/autowork-runs/2026-07-21.jsonl`; PR #2795 |
+| The act-to-know loop, built and run (§10.2) | MEASURED (mechanism) + unit-tested | †, 2026-07-21 | `python -m pytest tests/test_oracle_active_loop.py -q` → 7 passed |
+| Σ_θ controlling a *real* training run; §9's composition; Part IV against a frontier-model baseline | **not yet verifiable** | — | open (§8.6, §9, §10.2) |
 
-If a command above fails on a fresh clone, the document has drifted from the code and should not
-be trusted until reconciled — that is the intended failure mode.
+If a *here* command fails on a fresh clone, the document has drifted from the code and should not be trusted until reconciled. That is the intended failure mode.
 
 ## Glossary — internal names → standard terms
 
-Internal names are project identifiers, not claimed technical contributions:
-
 | Internal | Standard meaning |
 |---|---|
-| Σ₀ | the four-signal collapse *trigger* (an operational representational-collapse detector) and, by extension, the project's grounding discipline |
-| Σ₀⁻¹ | the anti-collapse *re-excitation operator* (a persistent-excitation-inspired state/covariance bump) |
-| Σ_θ | the **Model-Update Acceptance Gate** — a checkpoint-promotion gate for weight updates (Part II) |
-| "42-state" | colloquial name for the degenerate frozen state (projection onto the null subspace); explicitly *no formal meaning* (§2) |
-| collapse | representational / model collapse (Shumailov et al. 2024); locally, loss of contraction structure in the linearized dynamics |
-| unisona.ai, Lantern, Unisona | project code names; carry no technical content |
+| Σ₀ | the four-signal collapse *trigger*, an operational representational-collapse detector (§2), and by extension the project's grounding discipline |
+| Σ₀⁻¹ | the anti-collapse *re-excitation operator*: a state kick and covariance bump on the trajectory's near-null subspace (§3), inspired by persistent excitation [7] |
+| Σ_θ | the Model-Update Acceptance Gate, a checkpoint-promotion gate for weight updates (Part II) |
+| "42-state" | colloquial name for the degenerate frozen state, the projection onto `null(A)`; no formal meaning (§2) |
+| collapse | representational or model collapse [12]; locally, loss of contraction structure in the linearized dynamics |
+| unisona.ai, Lantern, Unisona | project code names, with no technical content |
 
 ## Contents
 
 | | Section | Status |
 |---|---|---|
-| — | [Plain-language summary](#plain-language-summary) | the honest gist |
-| — | [**The mathematics — formula registry**](#the-mathematics--formula-registry) | formulas: epistemic + novelty status |
-| — | [**The loop, stage by stage**](#the-loop-stage-by-stage--each-stages-certificate-objects-research-and-open-front) | Observe · Remember · Reason · Act · Verify · Converge — each stage's objects, research, open front |
-| **I** | [Fast state `x`: the Collapse Certificate](#part-i--fast-state-x-the-collapse-certificate--proven-where-marked--machine-checked) — [§1 collapse-guarantee theorem](#1-the-collapse-guarantee-theorem) · [§2 trigger Σ₀](#2-the-collapse-trigger-σ₀) · [§3 anti-collapse Σ₀⁻¹](#3-the-anti-collapse-operator-σ₀¹) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 attractor graph](#5-global-structure-the-attractor-graph-g) · [§6 router demo](#6-demonstration-on-router-data) · [§7 ASI warning](#7-why-this-is-a-warning-against-asi) | **PROVEN** where marked |
-| **II** | [Slow weights `θ`: the Model-Update Acceptance Gate Σ_θ](#part-ii--slow-weights-θ-the-model-update-acceptance-gate-σ_θ--heuristic--imported-no-machine-checked-theorem) ([§8](#8-the-model-update-acceptance-gate-σ_θ)) | HEURISTIC + measured |
-| **III** | [Two-timescale composition](#part-iii--two-timescale-composition--target) ([§9](#9-composing-part-i-and-part-ii)) | TARGET |
-| **IV** | [The active face: grounding as capability](#part-iv--the-active-face-grounding-as-capability-not-only-safety--design--target--no-theorem) ([§10](#10-from-anti-collapse-to-ceiling-break)) | DESIGN |
-| — | [References](#references-lineage) | lineage |
-| A | [Appendix A — historical design sketch](#appendix-a-router-demonstration-design-original-sketch) | historical |
-| C | [Appendix C — corrections register (consolidated)](#appendix-c--corrections-register-consolidated) | the receipts |
-| M | [Appendix M — provenance & maintenance log](#appendix-m--provenance-maintenance-log--closed-gap-history) | provenance |
-
----
+| — | [Plain-language summary](#plain-language-summary) | what is ours, and what is left |
+| — | [Sources](#sources--what-this-rests-on) | the prior art, one row per result |
+| — | [Formula registry](#the-mathematics--formula-registry) · [the loop, stage by stage](#the-loop-stage-by-stage) | epistemic and novelty status per formula |
+| **I** | Fast state `x`: [§1 fates](#1-the-collapse-guarantee-theorem) · [§1.2.3 loop verdict](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) · [§2 trigger](#2-the-collapse-trigger-σ₀) · [§3 operator, C3 and S1](#3-the-anti-collapse-operator-σ₀¹) · [§3.1 scheduled grounding](#31-design-implication-scheduled-grounding-from-certificate-quantities) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 basins](#5-global-structure-the-attractor-graph-g) · [§6 measured loops](#6-measured-loops-router-data-a-trained-reservoir-and-ouros-latent-loop) · [§7 grounding and honesty](#7-why-this-is-a-warning-against-asi) | PROVEN where marked |
+| **II** | [§8 slow weights: the Σ_θ gate](#8-the-model-update-acceptance-gate-σ_θ) | HEURISTIC + MEASURED (simulation) |
+| **III** | [§9 two-timescale composition](#9-composing-part-i-and-part-ii) | TARGET |
+| **IV** | [§10 the active face](#10-from-anti-collapse-to-ceiling-break) | DESIGN + two measurements |
+| — | [References](#references-lineage) · [Appendix C — corrections](#appendix-c--corrections-register-consolidated) | bibliography; the receipts |
 
 ## Plain-language summary
 
-**What this is.** A stability certificate — a computable test (a check a computer can run automatically) — for a system that
-updates itself over time, together with an honest account of what happens to a
-self-improving system that has *no contact with outside reality*.
+**The linear result, and what it does not say.** The linearized dynamics of a system with no input have three outcomes, decided by the spectrum of `A` and, on the stability boundary, by its Jordan structure. The system **settles** (onto a frozen, self-agreeing state, when the settling leaves a fixed subspace behind), **diverges**, or **rotates** forever, bounded and never frozen. That is standard linear algebra [2], and it holds for a grounded system with the same `A` too: the theorem has no grounded/ungrounded variable. The claim this project cares about is that a system optimizing only against its own picture of the world degrades, and that an **external anchor** rescues it. That claim rests on the model-collapse literature [12] and on this project's own measurements (§8.4). "Grounding is the safety mechanism" is that empirical claim, not a corollary of Theorem 1.
 
-**The one-line result.** The linearized dynamics of a system with no input have exactly three
-outcomes, decided by the spectrum of `A` and, on the stability boundary, by its Jordan structure: it **settles** (onto a frozen, self-agreeing state, the
-"42-state", when the settling leaves a fixed manifold behind), it **diverges**, or it **rotates**
-forever, bounded and never frozen. That is linear algebra, and it holds for a grounded system with
-the same `A` too: the theorem has no grounded/ungrounded variable in it. The claim this project
-actually cares about — that a system optimizing only against its own picture of the world degrades,
-and that an **external anchor** (real data, a measurement, a market, a ground truth) is what rescues
-it — rests on the model-collapse literature (§7) and on this project's own measurements (§8.4).
-**Grounding is the safety mechanism** is that empirical claim, not a corollary of Theorem 1.
+**Ours, by evidence class:**
+- **PROVEN about the shipped engine.** **C3:** when the operator acts on a trajectory, that trajectory's four-signal gate cannot be true on two consecutive steps, through the engine's own projection, for all `A` and every dimension `d ≥ 2` while `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (the engine refuses to fire otherwise). **S1:** each firing moves the state out of the near-target ball with probability ≥ ½. The gate decides each trajectory of a batch on its own signals. C3 is checked in Lean, up to the spectral identities that connect it to the engine, which are tested, not formalized.
+- **MEASURED by this project** (simulations are marked).
+  - Against a placebo, no trajectory's gate stays true for two steps under the operator; under the placebo it stays true for 60 (§3; simulation).
+  - The early-warning canary fires under collapse (§4).
+  - Ouro-1.4B's true loop Jacobian has `ρ(J) ≈ 8–11` while its residual shrinks to a plateau (§1.2.3, §6).
+  - In a well-conditioned basin, grounding on a certificate-derived schedule needs 0.40 of the escape budget, where waiting for the alarm needs 0.90 (§3.1; simulation).
+  - On this project's honesty benchmark, a frontier model asserts one unseen negative in five as fact (§7.4).
+  - A reused holdout lets lucky checkpoints win, and self-measurements cannot replace fresh tests in selection (§8.4; simulation).
+- **HEURISTIC.** The four-signal trigger (§2) and the loop verdict's thresholds (§1.2.3).
+- **NOT CLAIMED.** That the state keeps moving: with no drift, no noise and no grounding, the state rests once the gate clears, and a test pins that. Nothing here is a global guarantee, and Σ₀⁻¹ is observe-only by default in the live engine.
 
-**How sure are we of each part?** Every claim below is labelled:
-- **PROVEN** — Theorem 1 for normal `A`; the spectral dichotomy for every `A` (standard linear
-  algebra); **C3**, that when the operator acts on a trajectory, that trajectory's four-signal gate cannot
-  be true on two consecutive steps, through the engine's own projection, for all `A` and every dimension
-  `d ≥ 2` while `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (the engine refuses to fire otherwise); and **S1**, that each
-  firing moves the state out of the near-target ball with probability ≥ ½.
-  The gate decides each trajectory of a batch on its own signals. Tests are in the audit
-  table. "Proven" here means closed-form argument plus tests. C3 is in addition machine-checked in
-  Lean (`docs/formal/C3EngineLift.lean`), up to the spectral identities that connect the abstract
-  statement to the engine, which are tested, not formalized.
-- **MEASURED** — the operator against a placebo (§3): no trajectory's gate stays true for two steps,
-  against runs of 60 for the placebo. The early-warning "canary" (§4).
-- **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational definition,
-  deliberately *not* dressed up as a theorem. The acceptance gate's transient threshold (§1.2.3).
-- **NOT CLAIMED** — that the state keeps moving. A system with no drift, no noise and no grounding
-  rests at an equilibrium once the gate has cleared, and a test pins that. Nothing here is a global
-  guarantee, and Σ₀⁻¹ is observe-only by default in the live engine.
+**Part II in one line.** On the slow timescale, deciding whether a retrained model may replace the current one: **a system's self-checks can spot disasters, but only fresh outside tests can pick winners.** Reusing one test set lets lucky models win (§8.4). Self-measurements cannot substitute, because their errors stick to the checkpoint the same way (§8.4.1). A cheap self-check still earns its keep as an alarm for gross breakage when outside tests are scarce (measured on one real model, §8.6).
 
-**What's left.** The theorem-level questions about non-normal `A` are answered, but that is less than
-it sounds, because three things they do not cover are the ones that matter next:
-1. **Transient amplification in the gates.** R2's Kreiss-inflated thresholds remain a conjecture;
-   [#2789](https://github.com/alex-place/lantern-os/issues/2789) and
-   [#2854](https://github.com/alex-place/lantern-os/issues/2854) were closed in a backlog prune on
-   2026-08-02, unsolved.
-2. **Jacobians that change over time.** Everything in Part I is one fixed `A`. Passing at each step
-   says nothing about the product: `[[0,2],[0,0]]` and `[[0,0],[2,0]]` both have ρ=0, and their product
-   has ρ=4. The loop-contraction verdict (§1.2.3) measures this on real iterates; nothing proves it.
-3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves
-   once. A lower bound on what the state retains (for example σ_min of the transition product) would be
-   the real theorem. It does not exist yet, and C3 and S1 cannot imply it. With `A₁ = diag(0, −1/Δt)` and then
-   `A₂ = diag(−1/Δt, 0)`, both Euler maps are non-expansive and their product is 0, so the next regime erases
-   the kick exactly while the gate stays clear (`lantern-os-research` PR #14; through the real engine,
-   `test_a_switching_jacobian_can_erase_the_kick`). Retention needs a lower bound on the switched product restricted
-   to the kicked subspace, or a common invariant subspace. And what a kick adds is random: even if it survives, it
-   does not restore information the state had lost.
-4. **Whether Part I describes a real looped model at all.** Its fates are statements about `t → ∞` for one
-   fixed `A`. Real loops stop at 2–4 steps, and their Jacobians vary widely from step to step. Saved Ouro runs
-   read `ρ(J) ≈ 8–11` while the residual shrinks and then plateaus (§1.2.3). Mixture-of-Recursions
-   (arXiv:2507.10524, read 2026-11-05) reports hidden-state norms rising with depth while likelihood improves
-   (its Figures 7a and 5c). At this depth the relevant object is finite-horizon amplification and whether another
-   step helps, which Part I does not address.
+**What's left.** The theorem-level questions about non-normal `A` are answered, but that is less than it sounds, because three things those answers do not cover are what matter next. A fourth asks whether Part I applies to real loops at all.
+1. **Transient amplification in the gates.** R2's Kreiss-inflated thresholds remain a conjecture. [#2789] and [#2854] were closed in a backlog prune on 2026-08-02, unsolved.
+2. **Jacobians that change over time.** Everything in Part I is one fixed `A`. Passing at each step says nothing about the product: `[[0,2],[0,0]]` and `[[0,0],[2,0]]` both have ρ = 0, and their product has ρ = 4. The loop verdict (§1.2.3) measures this on real iterates; nothing proves it.
+3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves once. A lower bound on what the state retains (for example σ_min of the transition product) would be the real theorem. It does not exist, and C3 and S1 cannot imply it. With `A₁ = diag(0, −1/Δt)` and then `A₂ = diag(−1/Δt, 0)`, both Euler maps are non-expansive and their product is 0, so the next regime erases the kick exactly while the gate stays clear (`lantern-os-research` PR #14; through the real engine, `test_a_switching_jacobian_can_erase_the_kick`). Retention needs a lower bound on the switched product restricted to the kicked subspace, or a common invariant subspace. And a kick that survives adds randomness; it does not restore what the state had lost.
+4. **Whether Part I describes a real looped model.** Its fates are statements about `t → ∞` for one fixed `A`. Real loops stop at 2–4 steps, and their Jacobians vary widely from step to step. Saved Ouro runs read `ρ(J) ≈ 8–11` while the residual shrinks and then plateaus (§1.2.3). Mixture-of-Recursions reports hidden-state norms rising with depth while likelihood improves (its Figures 7a and 5c) [5]. At this depth the relevant object is finite-horizon amplification, and whether another step helps, which Part I does not address.
 
-**Part II in one line.** For the *slow* timescale — deciding whether a retrained model may replace
-the current one — the measured version of the same principle is: **a system's self-checks can spot
-disasters, but only fresh outside tests can pick winners.** Reusing one test set lets lucky models
-win (measured, §8.4); self-measurements cannot substitute because their errors stick to the
-checkpoint the same way (measured, §8.4.1); a cheap self-check still earns its keep as an early
-alarm for gross breakage exactly when outside tests are scarce (measured on one real model, §8.6).
+## Sources — what this rests on
 
-> **For the precise version, read on.** Each section carries its own status line.
-> The summary above is the honest gist, not a substitute for the math.
+Each row is an established result this document uses and does not claim. Full entries and their verification dates are in [References](#references-lineage).
 
-**Where each piece of math bites in the loop:**
-
-```mermaid
-flowchart LR
-    O[Observe] --> R[Remember]
-    R --> RS[Reason]
-    RS --> A[Act]
-    A --> V[Verify]
-    V --> C[Converge]
-    C --> O
-    R -.->|"M2: EOQ re-grounding clock"| V
-    RS -.->|"ρ(J)<1 + Kreiss halting"| RS
-    A -.->|"M5: water-filling budget"| A
-    V -.->|"M1 no-free-confidence · M6 lasing kill · M3 canary axes · anytime-valid e-cert"| C
-    C -.->|"basin determinism: serve the converged answer"| O
-```
-
----
+| # | Established result | Sources | Used in |
+|---|---|---|---|
+| 1 | Lyapunov stability; contraction by the matrix measure μ₂(A) = λ_max(A_s); small-gain composition | Lyapunov 1892; Lohmiller & Slotine 1998; Khalil 2002; Zames 1966 | §0, §1, §1.1 |
+| 2 | Fates of a linear flow from the spectrum and, on the boundary, the Jordan structure; the invariant-subspace split by ordered real Schur; Bendixson's bound Re λ ≤ λ_max(A_s); eigenvalue perturbation | Poincaré (1880s); Bendixson 1901; Kailath 1980; Golub & Van Loan 2013; Bauer & Fike 1960 | §1, §1.2 |
+| 3 | Non-normal stability gates: the numerical range and Lumer–Phillips; the Lyapunov-equation certificate; ε-pseudospectra and the Kreiss matrix theorem; the (1+√2) spectral-set constant | Lumer & Phillips 1961; Trefethen & Embree 2005; Crouzeix & Palencia 2017 | §1, §1.1, §1.2.1, R2 |
+| 4 | Stability of switched systems: common and multiple Lyapunov functions, dwell time; expert-choice routing | arXiv:2405.03560; arXiv:2303.17858; arXiv:2008.06546; arXiv:2202.09368 | §1.2.2 |
+| 5 | Looped and recursive LMs; discrete stability `ρ(J) < 1` and Jacobian spectral-radius regularization (JSRR); peak-then-collapse past the trained depth; dynamic mode decomposition | Ouro arXiv:2510.25741; STARS arXiv:2605.26733; PLDR arXiv:2603.23539; CART arXiv:2606.01495; Mixture-of-Recursions arXiv:2507.10524; Tu et al. 2014 | §1.2.3, §3.1, §6 |
+| 6 | The convergence factor of a fixed-point iteration, read from successive residual norms (the q-linear rate) | Kelley 1995 | §1.2.3 |
+| 7 | Persistent excitation; covariance resetting and directional forgetting in recursive least squares | B. D. O. Anderson 1977; Kulhavý & Kárný 1984; arXiv:2003.03523; arXiv:2404.10844 | §3 |
+| 8 | Inequalities in the C3 and S1 proofs: Anderson's inequality; Weyl's eigenvalue inequality; Popoviciu's variance bound; the reverse triangle inequality | T. W. Anderson 1955; Horn & Johnson 2013; Popoviciu 1935 | §3 |
+| 9 | Bounded-input reachable sets and invariant sets in a Lyapunov metric; self-triggered control; uncertainty-triggered retrieval in LLMs; per-token commitment | Kailath 1980; Sontag 1998; Blanchini & Miani 2015; Heemels, Johansson & Tabuada 2012; arXiv:1803.08980; FLARE arXiv:2305.06983; DRAGIN arXiv:2403.10081; arXiv:2604.23235 | §3.1 |
+| 10 | Critical slowing down; the Kalman innovation-consistency (NIS χ²) test | Wissel 1984; Scheffer et al. 2009; Bar-Shalom, Li & Kirubarajan 2001 | §3.1, §4 |
+| 11 | Basins and Markov state models over attractors; region-of-attraction estimates by Lyapunov/LaSalle and interval arithmetic; reservoir reconstruction of attractors; a dynamical model of representation collapse | Khalil 2002 (Ex. 8.4); Pathak et al. 2017–18; arXiv:2604.09979 | §5, §6 |
+| 12 | Model collapse under recursive training on synthetic data; verification as the escape; intrinsic self-correction without external feedback degrades | Shumailov et al. 2024; arXiv:2402.07043; arXiv:2406.07515; arXiv:2310.01798; arXiv:2509.16499; arXiv:2509.04796; arXiv:2602.10531 | §7, §7.2 |
+| 13 | Reward hacking and specification gaming (Goodhart) | Amodei et al. 2016; Skalse et al. 2022 | §7, §7.2 |
+| 14 | The σ = 0 conventions: in-context learning as estimation at zero data noise; weight-perturbation noise in continual learning; continual learning in context | arXiv:2211.15661; arXiv:2306.04637; arXiv:2404.00781; arXiv:2503.01595; arXiv:2509.22764 | §7.1 |
+| 15 | Measuring honesty apart from accuracy; hidden-state probes for confabulation | SimpleQA-Verified arXiv:2509.07968; Semantic Entropy Probes arXiv:2406.15927 | §7.3, §7.4 |
+| 16 | Anti-collapse by covariance conditioning in self-supervised learning, complementary to §1's spectral bound | VICReg arXiv:2105.04906; Barlow Twins arXiv:2103.03230; W-MSE arXiv:2007.06346; LeJEPA arXiv:2511.08544 | §3 (an untested import) |
+| 17 | Policy-update safety: monotonic improvement under a KL trust region; the overoptimization curve; on-policy RL forgets less, and still forgets; the choice of divergence | TRPO arXiv:1502.05477; Gao et al. arXiv:2210.10760; arXiv:2509.04259; arXiv:2507.05386; arXiv:2605.28860; arXiv:2607.04364; arXiv:2509.07430 | §8.1–§8.3 |
+| 18 | Adaptive data analysis: naive holdout reuse overfits; Thresholdout; reusable leaderboards; little adaptive overfitting in practice | Dwork et al. 2015; arXiv:1506.02629; arXiv:1411.2664; the Ladder arXiv:1502.04585; Roelofs et al. 2019 | §8.4, §8.4.1, §8.6 |
+| 19 | Stochastic acceptance and simulated annealing; noise escapes stuck states | Metropolis et al. 1953; Kirkpatrick, Gelatt & Vecchi 1983; Černý 1985; Ge et al. 2015 | §8.4.1 |
+| 20 | Close prior art for the gate: statistically certified acceptance of self-modifications, with per-edit and cumulative bounds on harmful accepts; budgeted when-to-update gating; uncertainty-guided checkpoint selection; a sealed audit; and the fast/slow timescale framing. Also corroboration that gating on held-out evaluation, not the proxy, is the live direction | close prior art: SGM arXiv:2510.10232; ADOWIP arXiv:2606.25068; arXiv:2511.09864; arXiv:2606.11417; arXiv:2605.12484. Corroboration: EvalStop arXiv:2606.04145; arXiv:2510.05526; arXiv:2605.00155 | Part II |
+| 21 | Predicting model quality from internal state without validation data; statistically detecting degraded or quantized checkpoints; a two-failure-mode account of quantization that matches the binary cliff in §8.6 | arXiv:2601.16874; arXiv:2602.10144; arXiv:2604.19884 | §8.6 item 5 |
+| 22 | Two-timescale stochastic approximation; singular perturbation | Borkar 1997; Khalil 2002 | §9 |
+| 23 | Optimal experimental design; value of information; active inference; the ideal inductive predictor | Lindley 1956; Howard 1966; Friston 2010; Solomonoff 1964; Hutter 2005 | §10 |
+| 24 | Registry imports: the EOQ model; KKT water-filling; anytime-valid e-processes; the martingale core of M1 and its diagnostic use; the nearest gate framework; Iterative Learning Control's contraction requirement; proper scoring | Harris 1913; Boyd & Vandenberghe 2004; SEA arXiv:2607.00871; SGM arXiv:2510.10232; Doob; Martingale Score arXiv:2512.02914; arXiv:2607.13070; US7345448B2, US8094405B1; the Kalai proper-scoring lineage | R2–R10 |
+| 25 | Neighbours of basin determinism | arXiv:2502.15208; arXiv:2304.12707; arXiv:2510.14242; arXiv:2602.11451; arXiv:2603.22871; arXiv:2410.23391; arXiv:2602.13165; arXiv:2408.04667; arXiv:2512.07795 | R9 |
+| 26 | The research base of each loop stage, as cited in the 2026-07-22 restructure | listed in [References](#references-lineage) | [the loop, stage by stage](#the-loop-stage-by-stage) |
 
 ## The mathematics — formula registry
 
-Every formula this program runs on, with two independent labels. **Epistemic status:** `PROVEN`
-(machine-checked here) · `MEASURED` (live numbers) · `CONJECTURE` (stated + falsifiable, ledger
-test owed) · `IMPORTED` (classical result applied in-repo). **Novelty status** (graded ladder from
-the head-note — claims are made *when earned, per item*): `NOT-NOVEL` for anything imported;
-**`CANDIDATE ★`** = possibly novel, bounded prior-art search owed or incomplete;
-**`AUDITED-CANDIDATE ✓`** = survived a recorded bounded search. Promotions happen only by a
-recorded search (the §8.7 / 2026-07-17-audit precedent); demotions and scope-shrinks are logged in
-Appendix C. Current state: **R3 and R9 hold ✓** (audits [#2860](https://github.com/alex-place/lantern-os/issues/2860),
-[#2861](https://github.com/alex-place/lantern-os/issues/2861), 2026-07-22 — both promoted with
-*narrowed* scope, which is the ladder working as intended); all other starred items remain
-unaudited `CANDIDATE ★`. Issues
-[#2786](https://github.com/alex-place/lantern-os/issues/2786)–[#2791](https://github.com/alex-place/lantern-os/issues/2791)
-carry the falsification plans.
+Every formula this program runs on, with two labels. The epistemic label is `PROVEN` (machine-checked here), `MEASURED` (live numbers), `CONJECTURE` (stated and falsifiable, test owed) or `IMPORTED` (a classical result applied here). The novelty label is the ladder above. Promotions happen only by a recorded search; demotions and scope cuts are logged in Appendix C. Issues [#2786]–[#2791] carry the falsification plans.
 
 ### R1 · The collapse guarantee — the foundation `PROVEN (machine-checked)`
 ![collapse guarantee](assets/cert/rho-gate.svg)
-A linear flow settles, diverges, or rotates: three outcomes, decided by `A`'s spectrum and, on the
-boundary, its Jordan structure, for grounded and ungrounded systems alike. Classical Lyapunov/Banach machinery; the *certificate quantities and
-tests* (§1) are ours. **Corrected 2026-11-05:** this entry used to read "no third fate", and the code
-counted rotation as collapse.
+A linear flow settles, diverges or rotates, by `A`'s spectrum and, on the boundary, its Jordan structure, for grounded and ungrounded systems alike. `NOT-NOVEL` [1, 2]; the certificate quantities and their tests are ours (§1). Corrected 2026-11-05: this entry used to read "no third fate", and the code counted rotation as collapse.
 
-### R2 · Kreiss-inflated canary thresholds (M4/L3) `CONJECTURE · theorem IMPORTED` ★application
+### R2 · Kreiss-inflated canary thresholds (M4/L3) `CONJECTURE` · theorem imported [3] · ★ application
 ![kreiss](assets/cert/kreiss.svg)
-The Kreiss matrix theorem bounds transient growth of non-normal systems; inflating canary
-thresholds by 𝒦(A) closes the certificate's non-normal gap (§4, [#2789](https://github.com/alex-place/lantern-os/issues/2789)).
-**Still a conjecture (2026-11-05):** that issue was closed in a backlog prune, unsolved. Its ensemble
-check used n=6 and T=200, and "0 bound violations" only re-tests the Kreiss theorem. The threshold
-scales with dimension: at d=2048, e·n·𝒦 ≥ 5,567, so a mode growing 20% per step needs 47 steps to
-trip it. Whether that catches anything at real loop depth is untested.
-Fielded cross-domain precedent: Iterative Learning Control's contraction requirement (patent
-landscape, 2026-07-22).
+Inflating the canary thresholds by the Kreiss constant 𝒦(A) would close the certificate's non-normal gap (§4, [#2789]). It is still a conjecture. That issue was closed in a backlog prune, unsolved; its ensemble check used n = 6 and T = 200, and "0 bound violations" only re-tests the Kreiss theorem. The threshold scales with dimension: at d = 2048, e·n·𝒦 ≥ 5,567, so a mode growing 20% per step needs 47 steps to trip it. Whether that catches anything at real loop depth is untested.
 
-### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` · novelty ✓ AUDITED-CANDIDATE
+### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` · ✓ AUDITED-CANDIDATE
 ![no-free-confidence](assets/cert/m1-nofreeconf.svg)
-Justified confidence rises only with external evidence; absent it, confidence is a
-**supermartingale** (can only drift down). The anti-runaway invariant ([#2786](https://github.com/alex-place/lantern-os/issues/2786));
-longitudinal ledger test owed. **Novelty scope (audit [#2860](https://github.com/alex-place/lantern-os/issues/2860),
-~70%):** the martingale *core* is classical (Doob/CEE) and the *diagnostic* use is taken
-(Martingale Score, 2512.02914); the audited candidate is strictly **M1-as-enforced-runtime-gate**
-wired to the convergence ledger — the nearest gate framework (2607.13070) was full-text checked
-and carries no such invariant.
+Justified confidence rises only with external evidence; absent it, confidence is a supermartingale ([#2786]). **The scope that survived the audit** ([#2860], ~70%): the martingale core is classical and its diagnostic use is taken [24]. The candidate is strictly *M1 as an enforced runtime gate* wired to the convergence ledger, an invariant the nearest gate framework [24] does not carry. **In this repo:** the first ledger replay (2026-07-22) was M1-clean, with 1 evidence-backed rise and 0 free rises across 48 pairs (`experiments/v1_10_toy/m1_ledger_check.py`†). Since 2026-07-23 the gate is enforced on every JS ledger write path (`apps/lantern-garage/lib/m1-gate.js`, [#2872], PR #2881): it clamps and writes a receipt, so a free rise cannot be recorded. The longitudinal ledger test is owed.
 
-### R4 · M2 — the EOQ re-grounding cadence `CONJECTURE · EOQ IMPORTED` ★application
+### R4 · M2 — the EOQ re-grounding cadence `CONJECTURE` · EOQ imported [24] · ★ application
 ![eoq cadence](assets/cert/m2-eoq.svg)
-Each fact re-verifies on its own optimal clock from its measured decay rate ρ — the cost lever
-that makes indefinite operation affordable (§3.1, [#2787](https://github.com/alex-place/lantern-os/issues/2787)).
+Each fact re-verifies on its own optimal clock, set by its measured decay rate. This is the cost lever for indefinite operation (§3.1, [#2787]).
 
 ### R5 · M3 — the indistinguishability lemma `REFUTED-AS-DICHOTOMY → LEMMA`
 ![indistinguishability](assets/cert/m3-indist.svg)
-The candidate completeness theorem was numerically refuted; what survives is stronger in practice:
-ungrounded traces exist that match grounded statistics on *every* passive monitor — therefore a
-**hard re-grounding cadence is necessary**, not optional ([#2788](https://github.com/alex-place/lantern-os/issues/2788)).
+Ours, and a negative result: the candidate completeness theorem was refuted numerically. What survives is stronger in practice. Ungrounded traces exist that match grounded statistics on *every* passive monitor, so a hard re-grounding cadence is necessary, not optional ([#2788]).
 
-### R6 · M5 — water-filling grounding allocation `CONJECTURE · KKT IMPORTED` ★application
+### R6 · M5 — water-filling grounding allocation `CONJECTURE` · KKT imported [24] · ★ application
 ![water-filling](assets/cert/m5-waterfill.svg)
-Budget flows to sub-goals by marginal value-of-information; the water level μ is the shadow price.
-Novelty audit owed vs. the 2026 economic-allocation literature ([#2790](https://github.com/alex-place/lantern-os/issues/2790)).
+Budget flows to sub-goals by marginal value of information, and the water level is the shadow price. A novelty audit against the 2026 allocation literature is owed ([#2790]).
 
 ### R7 · M6 — the lasing threshold `CONJECTURE` ★
 ![lasing threshold](assets/cert/m6-lasing.svg)
-A mode with gain over leak and **zero coupling to external innovation** grows without bound — the
-quantitative kill-condition for confident-but-unanchored runaway ([#2791](https://github.com/alex-place/lantern-os/issues/2791)).
+A mode with gain over leak and **zero coupling to external innovation** grows without bound. This is the quantitative kill condition for confident-but-unanchored runaway ([#2791]).
 
-### R8 · Anytime-valid stopping certificate `IMPORTED (e-processes)` — new 2026-07-22
+### R8 · Anytime-valid stopping certificate `IMPORTED` · NOT-NOVEL
 ![anytime e-value](assets/cert/anytime-evalue.svg)
-E-process monitoring stays valid under *optional stopping* — the statistical form the M1/M6
-monitors must take for an **indefinite** spiral (source: SEA, arXiv:2607.00871; Ramdas-school
-e-values). Without it, "check whenever you like" silently inflates false alarms.
+E-process monitoring stays valid under optional stopping [24]. The M1 and M6 monitors need that for an indefinite loop: without it, checking whenever you like inflates false alarms.
 
-### R9 · Basin determinism `CONJECTURE` · novelty ✓ AUDITED-CANDIDATE (low-confidence) — new 2026-07-22
+### R9 · Basin determinism `CONJECTURE` · ✓ AUDITED-CANDIDATE (low confidence)
 ![basin determinism](assets/cert/basin-determinism.svg)
-Same-intent paraphrases must contract into the **same fixed point** — the model-level form of
-"deterministic from the outside" (v1.10 §6a/6c; measured by the answer-stability canary,
-[#2859](https://github.com/alex-place/lantern-os/issues/2859)). Temperature-0 gives only *point*
-determinism; this is the *basin* upgrade. **Novelty scope (audit [#2861](https://github.com/alex-place/lantern-os/issues/2861),
-~55–60% — crowded neighborhood):** four adjacent lanes occupied (paraphrase-attractor analysis
-2502.15208; Lyapunov same-basin certification in DEQs 2304.12707; output-level consistency
-training 2510.14242; depth-consistency in looped LMs 2602.11451). The surviving sliver is
-**semantic-intent basin identity as a training objective + measured product contract**.
-**Round-2 kill-or-confirm ([#2874](https://github.com/alex-place/lantern-os/issues/2874),
-2026-07-23): CONFIRMED — held, boundary sharpened.** Both pre-registered kill lanes
-searched (8 queries, 3 full-text fetches): (a) objective half CLEAN — the two candidate
-killers train *input-specific* equilibria (HRM contraction-mapping training 2603.22871:
-stability-to-unique-fixed-point per input, no intent-class identity; DEQ neural collapse
-2410.23391: descriptive vision-classifier geometry, no objective); confidence up ~65%.
-(b) product half NARROWED by two new named neighbors: **verified semantic caching**
-(2602.13165 — LLM-judge-verified paraphrase answer-reuse in tiered serving; no evidence
-receipts, no stability contract) and **TAR@N-style stability metrics** (2408.04667,
-ReasonBENCH 2512.07795 — measurement without a contract). What remains ours: exact-key +
-evidence-receipted serving with the **no-free-movement alarm invariant** (answers change
-only with a receipt, ~50%). Net R9: AUDITED-CANDIDATE stands; neither promoted to high
-confidence nor killed.
+Same-intent paraphrases must contract into the **same fixed point**. This is the model-level form of "deterministic from the outside": temperature 0 gives only point determinism. The answer-stability canary measures it ([#2859]). **Scope after two audit rounds** ([#2861], [#2874]; neighbours [25]):
+- The objective half, semantic-intent basin identity as a training objective, held at ~65%. The candidate killers train input-specific equilibria, or describe geometry without an objective.
+- The product half narrowed to ~50%, because verified semantic caching and stability metrics exist. What remains is exact-key, evidence-receipted serving with the **no-free-movement alarm**: an answer changes only with a receipt.
 
-### R10 · The oracle objective `DEFINITION` — new 2026-07-22
+**In this repo:** serve-from-ledger and the answer-stability canary landed in PR #2864 (2026-07-23). Chat wiring is owed.
+
+### R10 · The oracle objective `DEFINITION`
 ![oracle objective](assets/cert/oracle-objective.svg)
-The asymptote the engine climbs: **maximize coverage subject to calibrated honesty at bounded
-cost**. Coverage alone argmaxes to the confident bluffer — the honesty constraint is constitutive
-(Kalai proper-scoring lineage; convergence-engine research note, 2026-07-22).
+The asymptote the engine climbs: maximize coverage, subject to calibrated honesty, at bounded cost. Coverage alone argmaxes to the confident bluffer, so the honesty constraint is constitutive [24].
 
 ### R11 · The Fix-Rate ratchet `MEASURED (live)` ★
 ![fix rate](assets/cert/fix-rate.svg)
-The Act-stage verifier metric: net tests fixed minus regression penalty. Live in the Spiral
-(ADR-0030); the escalation corpus it emits is the VTD training fuel.
+The Act-stage verifier metric: net tests fixed, minus a regression penalty. It is live in the Spiral (ADR-0030), and the escalation corpus it emits is the VTD training fuel.
+
+## The loop, stage by stage
+
+| Stage | Certificate objects | Result in this repo | Open |
+|---|---|---|---|
+| Observe | the evidence input `u` in `ẋ = f(x,u,θ)`; R8 governs when observation may stop | verified-event miners (1,842 PR and ledger records) | [#2852] |
+| Remember | R4 | CSF memory with wired recall (+22 pp at 5); the canonical ledger, M1-clean; serve-from-ledger with the answer-stability canary (PR #2864) | [#2853]; [#2787], the ledger test |
+| Reason | R1, R2, R9 | the Ouro kernel's `converge`/`accel` exits are equilibrium halting; on-box probes decode truth linearly at 7B (factual 1.000, associative 0.924) | [#2854], Kreiss-safe halting; paraphrase-contraction training, R9's second-round risk ([#2861]) |
+| Act | R6, R11 | the Spiral (ADR-0030): 18/18 MBPP at 6% escalation, and a strong cheap tier 8.3× cheaper (#2800); stop-on-stall, pass-terminates and bidirectional tiering (PR #2862) | [#2855], the allocator |
+| Verify | R3, R5, R7, R8; Part I | M1 as an enforced runtime gate (PR #2881); the white-box probe as a verifier, 0.92–1.00 on-box at 4-bit; the powered honesty eval (162 held-out negatives and a gates-off arm) | [#2856]; probe survival at 1.58-bit ([#2873], blocked until the ternary artifact exists) |
+| Converge | R10; Σ_θ (Part II); R9 as the product contract | the VTD dose-response (−6 → ±0; the crossover is pending scale). The V1 honest-teacher chain reached an honest negative ([#2850]): SFT *raised* confabulation from 0.136 to 0.389 (associative confabulation doubled), lowered golden by 0.096, and left over-abstention flat. The post-mortem lead is that the corpus was assembled at an anchor fraction of 0.31, against the ≥ 0.60 mandate; run 2 fixes the composition before the dose | [#2857], the unified control law; [#2847], the V2 dose-response kill-gate |
 
 ---
 
-## The loop, stage by stage — each stage's certificate objects, research, and open front
+# Part I — Fast state `x`: the Collapse Certificate  [PROVEN where marked]
 
-*(The registry above is organized by formula; this section is the same content organized by the
-CLAUDE.md loop — every stage has a place here, its own research base, and its open question.)*
-
-### OBSERVE — contact with external reality
-**Certificate role:** the evidence input `u` in `ẋ = f(x,u,θ)` — every guarantee below is
-conditional on this stage delivering fresh truth; R8 (anytime-valid) governs when observation may
-*stop*. **Research base:** bounded-context externalized state for indefinite horizons (InfiAgent /
-Self-GC 2607.00692 / AgentFold — conv-engine note);
-the current frontier generation pretrains on *agentic execution traces* (DeepSeek-V4, survey §1b).
-**In-repo:** the verified-event miners (1,842 PR/ledger records; sessions pending Vertex);
-arXiv corpus + patent harvester. **Open:** [#2852](https://github.com/alex-place/lantern-os/issues/2852).
-
-### REMEMBER — knowledge in and outside the weights
-**Certificate objects:** R4/M2 (EOQ re-grounding clocks — *the* cost lever for indefinite
-operation). **Research base:** memory staleness is unsolved at the tooling level (2026 surveys);
-forgetting-curve replay (FOREVER); the memory-update gap (Supersede 2606.27472); the
-surrogate-leash discipline (US8131656B2: trust the cheap check only while re-fit against ground
-truth). **In-repo:** CSF memory + wired recall (+22pp@5 measured); the canonical ledger (M1-clean,
-first replay 2026-07-22: 0 free rises / 48 pairs); **serve-from-ledger + answer-stability canary
-LANDED** ([#2859](https://github.com/alex-place/lantern-os/issues/2859) first landing, PR #2864
-merged 2026-07-23: exact-key evidence-receipted serving, drift alarm on unreceipted movement;
-chat wiring still owed).
-**Open:** [#2853](https://github.com/alex-place/lantern-os/issues/2853) ·
-[#2787](https://github.com/alex-place/lantern-os/issues/2787) ledger test.
-
-### REASON — the kernel and its halting
-**Certificate objects:** R1 (ρ(J)<1, **PROVEN**) · R2 (Kreiss thresholds) · R9 (basin
-determinism ✓). **Research base:** looped/equilibrium models (Ouro 2510.25741; FPRM 2606.18206;
-Equilibrium Reasoners 2605.21488; STARS 2605.26733); four decades of Iterative Learning Control
-(patents US7345448B2/US8094405B1 — contraction or divergence). **In-repo:** the
-Ouro kernel's `converge`/`accel` exits are equilibrium halting (v1.10 §6c); the probe ladder
-measured truth linearly decodable at 7B (factual 1.000 / assoc 0.924, on-box). **Open:**
-[#2854](https://github.com/alex-place/lantern-os/issues/2854) Kreiss-safe halting;
-paraphrase-contraction training (R9 second-round audit risk, [#2861](https://github.com/alex-place/lantern-os/issues/2861)).
-
-### ACT — tools, execution, the cascade
-**Certificate objects:** R6/M5 (water-filling budget) · R11 (Fix-Rate, **MEASURED live**).
-**Research base:** decision-theoretic cascades (2605.06350; UCCI 2605.18796; Shadow Price
-2606.03092 ≈ M5's water level); the escalation-contract patents (hierarchical assay US6013436A:
-cheapest-test-first, pass terminates; bidirectional tiering US7254641B2: *de*-escalate when easy);
-ILC re-parameterizing the cheap tier (US6686716B1 = the VTD flywheel's servo precedent).
-**In-repo:** the Spiral shipped (ADR-0030; 18/18 MBPP at 6% escalation; strong cheap tier 8.3×
-cheaper, #2800). **Open:** [#2855](https://github.com/alex-place/lantern-os/issues/2855) allocator.
-**Shipped 2026-07-23:** the stop-on-stall/loop-detection, pass-terminates, bidirectional-tiering
-+ whole-answer-confidence quick wins landed in the harness (PR #2862, from the
-backlog); the Phase-0 runner gained the
-honest-labeling frontier preflight (PR #2863).
-
-### VERIFY — the certificate's home (Part I lives here)
-**Certificate objects:** R3/M1 (✓ audited; **first ledger replay 2026-07-22: M1-clean — 1
-evidence-backed rise, 0 free rises across 48 pairs**; instrument
-`experiments/v1_10_toy/m1_ledger_check.py`) · R7/M6 (lasing kill) · R5/M3 (canary axes; hard
-cadence necessary) · R8 (anytime-valid e-cert) · the white-box probe as verifier (0.92–1.00
-measured on-box, 4-bit). **Research base:** hidden-state probing (2606.02628, replicated here) with
-its honest scope limit (2510.09033); agent drift (2601.04170); gates-off snapshot testing as
-frontier practice (Opus 4.6 card). **In-repo:** exec-verify sandbox; the powered honesty eval
-(162 held-out negatives + gates-off arm); the M1 replay instrument; **M1 as an ENFORCED runtime
-gate — LIVE since 2026-07-23** ([#2872](https://github.com/alex-place/lantern-os/issues/2872),
-PR #2881: `lib/m1-gate.js` mirrors the replay instrument on every JS ledger write path;
-clamp-and-receipt, free rises unrecordable). **Open:**
-[#2856](https://github.com/alex-place/lantern-os/issues/2856) ·
-probe survival at 1.58-bit (V3 acceptance test, [#2873](https://github.com/alex-place/lantern-os/issues/2873) — blocked on the ternary artifact existing).
-
-### CONVERGE — promotion, the ratchet, determinism
-**Certificate objects:** R10 (the oracle objective — coverage s.t. calibrated honesty at bounded
-cost) · the Σ_θ acceptance gate (Part II) · basin determinism as the product contract
-(serve-from-ledger, [#2859](https://github.com/alex-place/lantern-os/issues/2859)). **Research
-base:** assembly-by-distillation is the frontier norm (Qwen3 strong-to-weak; DeepSeek-V4
-expert→consolidate); merging is <1% (2511.21437); anytime-valid self-evolution (SEA 2607.00871).
-**In-repo:** the VTD dose-response (−6 → ±0, crossover pending scale); the V1 honest-teacher chain
-**ran to verdict 2026-07-23: 🔴 honest negative** ([#2850](https://github.com/alex-place/lantern-os/issues/2850)
-— SFT *raised* confabulation 0.136→0.389 (assoc doubled), golden −0.096, over-abstention flat;
-post-mortem lead: the corpus assembled at anchor fraction 0.31 against the v1.10 ≥0.60 mandate —
-run 2 fixes composition before dose); the escalation-rate-only-falls design. **Open:**
-[#2857](https://github.com/alex-place/lantern-os/issues/2857) unified control law ·
-[#2847](https://github.com/alex-place/lantern-os/issues/2847) V2 dose-response kill-gate.
-
----
-
-Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py`) **for `A` that commutes with its active projector**, which includes normal
-`A`. The spectral dichotomy gives the fate of every `A`, as three outcomes rather than two. **C3 and S1
-are proven in-regime** (§3): the gate cannot be true on consecutive steps, and each firing moves the
-state with probability ≥ ½. Neither says the state keeps moving. The collapse trigger (§2) and the
-early-warning readout (§4) remain control-design heuristics. The §6 demonstration is **reproducible**.
-Read the per-section status lines before relying on any claim here.
-
-> **Provenance:** every reconcile pass and closed-gap record since 2026-06-16 is preserved
-> verbatim in [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) —
-> moved out of the head for readability (2026-07-07); nothing was deleted.
-
-**Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
-machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
-(operational design, not derived from the theorem), or **UNIMPLEMENTED** (described
-but not present in code). Gaps are tracked as GitHub issues and cross-linked here so
-status cannot silently drift.
-
-[#504]: https://github.com/alex-place/lantern-os/issues/504
-[#505]: https://github.com/alex-place/lantern-os/issues/505
-[#506]: https://github.com/alex-place/lantern-os/issues/506
-[#507]: https://github.com/alex-place/lantern-os/issues/507
-[#508]: https://github.com/alex-place/lantern-os/issues/508
-[#509]: https://github.com/alex-place/lantern-os/issues/509
-[#516]: https://github.com/alex-place/lantern-os/issues/516
-[#517]: https://github.com/alex-place/lantern-os/issues/517
-[#520]: https://github.com/alex-place/lantern-os/issues/520
-[#523]: https://github.com/alex-place/lantern-os/issues/523
-[#657]: https://github.com/alex-place/lantern-os/issues/657
-[#658]: https://github.com/alex-place/lantern-os/issues/658
-[#659]: https://github.com/alex-place/lantern-os/issues/659
-[#660]: https://github.com/alex-place/lantern-os/issues/660
-[#661]: https://github.com/alex-place/lantern-os/issues/661
-[#2762]: https://github.com/alex-place/lantern-os/issues/2762
-[#2795]: https://github.com/alex-place/lantern-os/pull/2795
-[#764]: https://github.com/alex-place/lantern-os/issues/764
-[#765]: https://github.com/alex-place/lantern-os/issues/765
-[#766]: https://github.com/alex-place/lantern-os/issues/766
-[#767]: https://github.com/alex-place/lantern-os/issues/767
-[#768]: https://github.com/alex-place/lantern-os/issues/768
-[#1988]: https://github.com/alex-place/lantern-os/issues/1988
-[#1989]: https://github.com/alex-place/lantern-os/issues/1989
-[#1990]: https://github.com/alex-place/lantern-os/issues/1990
-[#1991]: https://github.com/alex-place/lantern-os/issues/1991
-[#1997]: https://github.com/alex-place/lantern-os/pull/1997
-
----
-
-# Part I — Fast state `x`: the Collapse Certificate  [PROVEN where marked / machine-checked]
-
-*This is the original certificate in full. It certifies the within-forward-pass hidden-state flow
-with `θ` held fixed. Every §0–§7 status line and evidence class below is unchanged by the Part II
-merge.*
+Part I certifies the within-pass hidden-state flow, with `θ` held fixed.
 
 ## 0. The object
 
-We study a dissipative nonlinear system
+$$\dot{x} = f(x, u, \theta), \qquad \dot{\delta x} = A\,\delta x, \quad A = \left.\frac{\partial f}{\partial x}\right|_{x^*}$$
 
-*In plain words:* the state keeps changing over time, and how it changes depends on where it is now (`x`), what we feed in (`u`), and some slowly-shifting settings (`θ`) — the three symbols defined below.
-
-$$\dot{x} = f(x, u, \theta), \qquad x \in \mathbb{R}^n$$
-
-- `x` — internal state (for the router: a conversation's encoded state)
-- `u` — control / persistent-excitation input
-- `θ` — slowly-varying parameters (meta-state)
-
-Linearizing along a trajectory `x*` gives the local Jacobian
-
-$$\dot{\delta x} = A\,\delta x, \qquad A = \left.\frac{\partial f}{\partial x}\right|_{x^*}.$$
-
-Everything below reasons about the eigenstructure of `A` and its symmetric
-part `A_s = ½(A + Aᵀ)`. The non-symmetric (skew) part `A_k = ½(A − Aᵀ)`
-carries rotation and is **not** captured by `A_s`; the gap between the two is
-exactly what makes the general case in §1 harder than the symmetric one.
-
-*In plain words:* the symmetric part tracks whether a system shrinks toward a point (decay); the skew part tracks whether it also swirls around it (rotation). The easy, proven case has no swirl — and that swirl is exactly what makes the general case in §1 hard.
-
----
+Here `x` is the internal state, `u` a control or excitation input, and `θ` the slow parameters. Everything below reads the eigenstructure of `A`, its symmetric part `A_s = ½(A + Aᵀ)`, which carries decay, and its skew part `A_k = ½(A − Aᵀ)`, which carries rotation and which `A_s` does not capture [1].
 
 ## 1. The collapse-guarantee theorem
 
-**Status: PROVEN, under an explicit hypothesis (A normal, or M is A-invariant).
-Machine-checked for the symmetric case.**
+**Status: PROVEN under an explicit hypothesis, and standard [1, 2]. Ours: the computable certificates, what they require before they say "guaranteed", their resolution limits, and their tests.**
 
-Split the state space using the symmetric part `A_s`:
+**The imported result.** Split the state space by `A_s` into a near-null subspace `N = span{vᵢ : |λᵢ(A_s)| < ε}` and its complement `M`, with projector `P_M`. Let `V(x) = ½‖P_M x‖²` and `α = max{λᵢ(A_s) : vᵢ ∈ M}`. If `α < 0` and `M` is `A`-invariant (`P_M A P_N = 0`, which `A` normal implies), then
 
-- **null subspace** `N = span{ vᵢ : |λᵢ(A_s)| < ε }` — the near-invariant modes
-- **active subspace** `M` — its orthogonal complement, projector `P_M`
+$$\dot V \le 2\alpha V \quad\Longrightarrow\quad \lVert P_M\,x(t)\rVert \le \lVert P_M\,x(0)\rVert\, e^{\alpha t},$$
 
-Define the Lyapunov function on the active modes only:
+so the active modes decay and the trajectory contracts onto `N`. Without the hypothesis, the fate is read from the full spectrum and, on the boundary, from the Jordan structure: the flow settles, diverges or rotates [2].
 
-*In plain words:* `V` is a single "energy" number that measures how far the system still is from going stuck. If we can show this number only ever shrinks, the system is provably settling down rather than running away.
-
-$$V(x) = \tfrac{1}{2}\,\lVert P_M\,x \rVert^2.$$
-
-Let the **active spectral abscissa** be
-
-$$\alpha = \max\{\, \lambda_i(A_s) : v_i \in M \,\}.$$
-
-**Theorem (contraction on the active subspace).**
-Assume `α < 0` **and** the active subspace `M` is *A-invariant*, i.e.
-
-$$P_M\,A\,P_N = 0 \qquad\text{(equivalently: A commutes with }P_M\text{; implied by A normal).}$$
-
-(`M` and `N` are eigenspaces of `A_s`, so `A_s` is block-diagonal in this split and the off-diagonal
-blocks of `A` belong to its skew part. They therefore vanish together, which is why one condition is
-enough.) `collapse_certificate().guaranteed` measures this as `cross_term`, and also requires the
-null block to settle: without that check, a mode growing at +0.009 sits inside the null band and the
-"collapse" diverges.
-
-Then
-
-$$\dot V \le 2\alpha V \quad\Longrightarrow\quad \lVert P_M\,x(t)\rVert \le \lVert P_M\,x(0)\rVert\, e^{\alpha t}.$$
-
-The active modes decay exponentially at rate `|α|`, and the trajectory
-contracts onto the invariant null manifold `N`. **Under this hypothesis,
-collapse is guaranteed.**
+**What is ours.**
+- `collapse_certificate().guaranteed` requires the hypothesis, measured as `cross_term ≈ 0`, **and** a settling null block. Without the second check, a mode growing at +0.009 sits inside the null band and the "collapse" diverges. The all-null case (`active_dim = 0`) is guaranteed only if the null block settles, with rate 0. It used to return `guaranteed=True` with rate ∞ for everything, including a pure rotation and `0.005·I`, which grows 22,000× by `t = 2000`.
+- `dichotomy_certificate` (continuous time) and `discrete_dichotomy_certificate` split `A` with an ordered real Schur factorization, which also handles defective `A`, where an eigenvector inverse fails [2] ([#1988], [#1989]). They report COLLAPSE, DIVERGE or MARGINAL, and `marginal_kind` records what sits on the boundary: a frozen mode, a rotation, or a Jordan block, which grows polynomially and so reads DIVERGE. The discrete form decides by the spectral radius, certifies the active block in a discrete Lyapunov (Stein) metric, and lower-bounds the discrete Kreiss constant [3].
+- Every fate is checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transients and batches (`tests/test_sigma0_certificate_fates.py`). A batched certificate requires every member to pass and reports the worst member's bounds (Appendix C).
 
 ### 1.1 Why the hypothesis is required (the dropped cross term)
 
-Differentiating `V` along the flow gives
+`V̇ = (P_M x)ᵀA_s(P_M x) + (P_M x)ᵀA(P_N x)`, so the bound holds only when the cross term vanishes or is dominated. Two pinned cases, both ours:
 
-$$\dot V = (P_M x)^\top P_M A\, x = (P_M x)^\top A_s (P_M x) \;+\; \underbrace{(P_M x)^\top A\,(P_N x)}_{\text{cross term}}.$$
-
-The first term is `≤ 2αV` by definition of `α`. **The bound `V̇ ≤ 2αV` holds
-only when the cross term vanishes or is dominated.** The cross term is zero
-exactly when `M` is A-invariant (`P_M A P_N = 0`), which holds automatically if
-`A` is normal. For a **general non-normal `A`** the skew part `A_k` couples the
-active and null components, the cross term need not vanish, and the simple
-energy bound can fail outright:
-
-> **Counterexample.** For `A = [[−1, 3], [−3, 0]]` the active abscissa is
-> `α = −1 < 0`, yet a direct scan finds `max V̇/V ≈ +8.8·10⁴ ≫ 2α = −2`, and
-> integrating from `x₀ = [0.3, 1.0]` makes `V` *grow* `0.045 → 0.341` — a sign
-> violation of `V̇ ≤ 2αV`. Collapse still occurs here, but it is rescued by a
-> *different* argument (below), not by the energy proof.
->
-> *In plain words:* this is us being honest about a limit. For swirling systems the simple energy argument can wrongly suggest things are blowing up; the system still settles, but only a more careful argument proves it.
->
-> **Note (2026-11-05):** `‖x‖` itself never grows here. `ω(A) = 0`, so `‖e^{tA}‖₂ ≤ 1`. What grows is `V`, the projection onto one coordinate, as energy rotates into it. Earlier versions of this document called this matrix a transient-growth example. It is not one; `[[−1,10],[0,−1]]` is.
-
-So for non-normal `A`, the §1 energy proof is **insufficient on its own**; the
-cross term must be separately bounded (e.g. via `‖P_M A P_N‖` and a small-gain /
-Young's-inequality argument that tightens `α` to an effective rate), or one must
-fall back to the full-spectrum test.
-
-**Correction (2026-11-05): the small-gain index is not a bound.** From 2026-06-15 until this
-correction, this section called `α_bound = max λ(A_s) + ‖A − A_s‖₂` a proven bound, and
-`collapse_certificate` used it for `guaranteed`. It bounds nothing here. `V̇` picks up
-`‖A_k‖·‖P_M x‖·‖P_N x‖`, which `‖A_k‖·‖P_M x‖²` does not dominate once `‖P_N x‖ > ‖P_M x‖`. For
-`[[−1,0.5],[−0.5,0]]` the index is `−0.5`, yet from `x₀ = (0,1)` the active part starts at 0 and reaches
-0.37. `guaranteed` now requires `cross_term ≈ 0` and a settling null block. `alpha` remains as
-telemetry only.
+- **Energy rotates into the projection.** For `A = [[−1,3],[−3,0]]`, `α = −1`, yet `V` grows from 0.045 to 0.341 starting at `x₀ = [0.3, 1.0]` (`max V̇/V ≈ +8.8·10⁴`). `‖x‖` itself never grows: `ω(A) = 0`, so `‖e^{tA}‖₂ ≤ 1` [3]. Earlier versions called this a transient-growth example; `[[−1,10],[0,−1]]` is one.
+- **The small-gain index is not a bound** (corrected 2026-11-05). From 2026-06-15, `α_bound = max λ(A_s) + ‖A − A_s‖₂` was called a proven bound and used for `guaranteed`. `V̇` picks up `‖A_k‖·‖P_M x‖·‖P_N x‖`, which `‖A_k‖·‖P_M x‖²` does not dominate once `‖P_N x‖ > ‖P_M x‖`. For `[[−1,0.5],[−0.5,0]]` the index is −0.5, yet from `x₀ = (0,1)` the active part grows from 0 to 0.37. `alpha` is now telemetry only.
 
 ### 1.2 The authoritative test: full-spectrum, not A_s alone
 
-`α < 0` on the symmetric part is **neither necessary nor sufficient** for
-contraction of the full system: `[[−0.3,1.5],[−0.5,−0.6]]` contracts with `α > 0`, and the rotation
-below has `α < 0` and never does. The condition that decides the asymptotics is
+Standard [2]: `α < 0` on `A_s` is neither necessary nor sufficient. `[[−0.3,1.5],[−0.5,−0.6]]` contracts with `α > 0`, and `[[−1,0,0],[0,0,2],[0,−2,0]]` has `α = −1` and rotates forever in its rotating plane. `max Re λ(A) < 0` on the full `A` decides the asymptotics. `collapse_certificate` reports both `alpha` and the exact `spectral_abscissa`, with a `full_contracting` flag ([#505]).
 
-$$\max \operatorname{Re}\,\lambda(A) < 0 \quad\text{on the \emph{full} } A \ (\text{via } \texttt{eig}, \text{ not } \texttt{eigvalsh}).$$
-
-A standard caveat (Bendixson) gives `Re λ(A) ≤ λ_max(A_s)`, so `α < 0` bounds the
-real parts but does not by itself certify them. A perpetual rotation such as
-`A = [[−1,0,0],[0,0,2],[0,−2,0]]` has `α = −1` yet eigenvalues `{−1, ±2i}` — a
-center that never collapses in its rotating plane.
-
-The fates resolve only down to the rounding of their input, in its own precision. Rates are resolved to
-`tol = max(10⁻⁷, 16·eps·‖A‖₂)`, and couplings and rotation frequencies on the boundary to about
-`max(10⁻⁶, 10·eps·‖A‖₂)`. Below that they read as zero, which is a limit of resolution, not a finding. In float64 at
-`‖A‖ ≈ 1` growth at `9·10⁻⁸` reads as frozen. In float32 the floor is far coarser: next to a `−10⁴` mode, growth at
-0.009 per unit time reads as frozen. `collapse_certificate` reports `null_kind = "unresolved"` when rounding is as
-wide as its null band. None of this covers strongly non-normal `A`, where rounding moves eigenvalues by up to
-`κ(V)·eps·‖A‖₂` (Bauer–Fike). At an eigenvector condition of 10⁵, a discrete rotation read COLLAPSE in 7 of 100
-random bases, and a frozen mode beside a coupling of 10⁵ read DIVERGE in 26.
-
-**Recommended:** report **both** `α = max λᵢ(A_s)` (the energy abscissa, exact
-under the §1 hypothesis) **and** `max Re λ(A)` on the full Jacobian (the
-authoritative contraction test). As of [#505], `collapse_certificate()` now
-computes **both**: `alpha` (the small-gain index `max λ(A_s) + ‖A−A_s‖₂`, telemetry only)
-and `spectral_abscissa` (the exact `max Re λ(A)` via `eig`, with a `full_contracting`
-flag). The full-spectrum test is tighter — it covers genuinely-contracting
-non-normal systems that the small-gain index over-rejects (see
-`test_certificate_full_spectrum_abscissa`).
-
-[#505]: https://github.com/alex-place/lantern-os/issues/505
+**Resolution limits (ours, measured).** The fates resolve only down to the rounding of their input, in its own precision. Rates resolve to `tol = max(10⁻⁷, 16·eps·‖A‖₂)`, and couplings and rotation frequencies on the boundary to about `max(10⁻⁶, 10·eps·‖A‖₂)`. Below that they read as zero, which is a limit of resolution, not a finding. In float64 at `‖A‖ ≈ 1`, growth at `9·10⁻⁸` reads as frozen. In float32, next to a `−10⁴` mode, growth at 0.009 per unit time does. `collapse_certificate` reports `null_kind = "unresolved"` when rounding is as wide as its null band. For strongly non-normal `A`, rounding moves eigenvalues by up to `κ(V)·eps·‖A‖₂` [2]. At an eigenvector condition number of 10⁵, a discrete rotation read COLLAPSE in 7 of 100 random bases, and a frozen mode beside a coupling of 10⁵ read DIVERGE in 26.
 
 #### 1.2.1 Provable region-wideners for non-normal `A` ([#768])
 
-The small-gain `alpha` over-rejects strongly non-normal `A`, and `max Re λ(A) < 0`
-alone is necessary-not-sufficient (transient growth). `stability_gates()` adds **two
-sufficient, provable** contraction certificates — each strictly wider than small-gain:
+`stability_gates()` implements three standard sufficient certificates, each wider than small-gain [1, 3]:
+- **The numerical-range gate:** `ω(A) = λ_max(A_s) < −margin ⇒ ‖e^{tA}‖₂ ≤ e^{ωt}`.
+- **The Lyapunov gate:** solve `(A+mI)ᵀP + P(A+mI) = −I` and check `P ≻ 0`. A relative ill-conditioning guard means the stability boundary is never certified, and `√cond(P₀)` bounds the transient.
+- **The pseudospectral gate:** an upper bound on the ε-pseudospectral abscissa, `α_ε(A) ≤ ω(A) + ε`, with a sampled lower bound on the Kreiss constant.
 
-1. **Numerical-range gate (monotone).** `ω(A) = λ_max(A_s) < −margin ⟹ ‖e^{tA}‖₂ ≤ e^{ωt}`
-   — a strict, no-transient contraction (matrix measure μ₂; Lohmiller–Slotine 1998).
-   `ω(A)` is the rightmost point of the numerical range `W(A)`; since `spec(A) ⊂ W(A)`,
-   this gate **implies** the Lyapunov gate (it is the stricter one).
-2. **Lyapunov gate (asymptotic, optimal metric).** For margin `m ≥ 0`,
-   `∃P≻0 : (A+mI)ᵀP+P(A+mI) ≺ 0 ⟺ max Re λ(A) < −m` (classical Lyapunov theorem;
-   `= inf_T μ₂(TAT⁻¹) < −m`). Certified by solving `(A+mI)ᵀP+P(A+mI) = −I` and checking
-   `P≻0` (with a relative ill-conditioning guard, so the stability boundary is never
-   certified independent of solver warnings). Accepts strongly non-normal `A`, with
-   transient growth (`[[−1,10],[0,−1]]`) or without it (`[[−1,3],[−3,0]]`, Hurwitz at `−0.5`,
-   where `ω = 0`). `√cond(P₀)` (from the margin-0 solve) upper-bounds the Euclidean
-   transient `sup_t ‖e^{tA}‖`.
-3. **ε-pseudospectral abscissa + Kreiss constant (transient-aware).** The field-of-values
-   resolvent bound `‖(zI−A)⁻¹‖₂ ≤ 1/dist(z, W(A))` gives a **provable** upper bound on the
-   ε-pseudospectral abscissa, `α_ε(A) ≤ ω(A) + ε`; `gate_pseudospectral` certifies
-   `α_ε(A) < −margin` — no `ε`-sized perturbation reaches the RHP, a transient-aware
-   strengthening of gate 1 (it reduces to `ω(A) < −ε−margin`). The Kreiss constant
-   `K(A) = sup_{Re z>0} Re(z)·‖(zI−A)⁻¹‖₂`, lower-bounded by sampling the right half-plane,
-   gives a rigorous **lower** bound on the transient peak (continuous Kreiss matrix theorem:
-   `K(A) ≤ sup_t‖e^{tA}‖ ≤ e·n·K(A)`), complementing the `√cond(P)` / `1+√2` upper bounds.
+When `ω ≤ 0` there is no Euclidean transient at all. So the Crouzeix–Palencia constant `1+√2`, which earlier versions reported as "the proven transient constant", is true here and vacuous. Ours are the implementation and its red-team (`tests/test_stability_gates.py`): no false-positive certificate over 400 matrices, and every bound checked against the matrix exponential. The gates widen §1's proven region. They certify contraction of the full Jacobian, not collapse onto the manifold, and they do not make the system globally uncollapsible.
 
-**Acceptance gate.** `loop_lm.generate()` **consumes** the certificate (it was previously
-computed but unused): a generation's latent trajectory carries an explicit
-convergence-accept/reject verdict (`None` when too few tokens to certify). As of 2026-11-05
-the **primary** acceptance criterion is the measured loop contraction (§1.2.3); the
-continuous `proven_contracting` above is demoted to diagnostic telemetry + acceptance
-**fallback**. The two answer different questions — the continuous gates certify `e^{tA}`
-contraction and over-reject non-normal `A` with transient growth, while the loop is a
-*discrete* iteration whose asymptotic stability is governed by the spectral **radius** `ρ(A)`,
-not the abscissa.
+#### 1.2.2 Scope limit: routed (mixture-of-experts) loops are switched systems
 
-**Honest scope.** Sufficient, not necessary; they certify the **full Jacobian's**
-contraction, not collapse-onto-manifold (the L1 alignment gap is separate). When
-`W(A) ⊂` closed LHP (`ω ≤ 0`), `‖e^{tA}‖₂ ≤ 1` (Lumer–Phillips), so there is no Euclidean transient
-at all. Earlier versions reported Crouzeix–Palencia's `1+√2` here as "the proven transient constant",
-which is true and vacuous. Verified by
-`test_stability_gates.py` (the `[[−1,3],[−3,0]]` case, a 400-matrix red-team showing no
-false-positive certificates, the `α_ε ≤ ω+ε` upper bound and `K(A) ≤ sup_t‖e^{tA}‖` lower
-bound, and matrix-exponential checks that the monotone (`e^{ωt}`, and `≤ 1`) and Lyapunov
-(`√cond(P)`) bounds each hold).
-These **extend the proven region of §1; they do not make the system globally uncollapsible.**
-
-[#768]: https://github.com/alex-place/lantern-os/issues/768
-
-#### 1.2.2 Scope limit: routed (mixture-of-experts) loops are SWITCHED systems
-
-**Status: SCOPE NOTE — nothing in §1 certifies a routed loop.** Top-k expert routing makes
-the recurrent map **piecewise**: each routing pattern is its own smooth map, and the system
-*switches* between them as selections change. Everything above (α, `spectral_abscissa`, the
-§1.2.1 gates) then holds only **within a fixed routing region**; across route switches the
-correct tools are the switched/hybrid-systems literature — common or multiple Lyapunov
-functions and **average dwell-time** conditions (converse results: arXiv:2405.03560;
-LP-computable dwell-time bounds via multiple Lyapunov functions: arXiv:2303.17858; learned
-Lyapunov functions for piecewise-affine systems: arXiv:2008.06546). Practical consequences
-for any future MoE-recurrent Σ₀ (design home: SIGMA0-FRONTIER-TRAIN-BRIEF.md D2/D6):
-(1) **route-switch frequency is part of the stability object** — measure frozen-route
-contraction *and* the dwell-time statistics the model actually induces (tracked as a
-milestone issue); (2) **expert-choice routing** (arXiv:2202.09368: experts pick tokens →
-fixed capacity, balance by design) is the lower-discontinuity comparator to token-choice
-top-k; (3) do not quote §1 numbers for a routed loop without naming the routing regime.
-*In plain words:* a mixture-of-experts loop keeps swapping which sub-network is running;
-this certificate currently proves things about one sub-network at a time, and "how often it
-swaps" becomes a stability quantity of its own.
+**A project rule, which [ADR-0034](adr/0034-moe-core-admission-switched-system-gate.md) relies on: nothing in §1 certifies a routed loop.** Top-k routing makes the recurrent map piecewise, so every §1 quantity holds only within a fixed routing region. Across switches, the tools are common or multiple Lyapunov functions and dwell-time conditions [4]. Route-switch frequency is part of the stability object: measure frozen-route contraction and the dwell-time statistics the model actually induces. Expert-choice routing, where experts pick tokens at fixed capacity, is the lower-discontinuity comparator to token-choice top-k [4]. No §1 number may be quoted for a routed loop without naming the routing regime.
 
 #### 1.2.3 The acceptance verdict: measured loop contraction, with JSRR (`ρ < 1`) as fallback
 
-**Correction (2026-11-05): JSRR is no longer the verdict, and its old input was not a Jacobian.**
-The matrix this gate used was a mean of `Δh/‖h‖ ⊗ h` taken across **tokens**. It scales linearly with
-`‖h‖` and estimates `(J−I)·C` rather than `J`, so its verdict tracked the size of the hidden state. On
-trajectories with a known per-step factor:
+**Status: MEASURED on saved real-model residuals, and through `generate()` on a stub backbone; not run on a live model. The thresholds are design defaults, not calibrated. Reported, not enforced.**
+
+**The defect it replaced** (corrected 2026-11-05). The former gate's matrix was a mean of `Δh/‖h‖ ⊗ h` across tokens. It scales with `‖h‖` and estimates `(J−I)·C` rather than `J`, so its verdict tracked the size of the hidden state. On trajectories with a known per-step factor:
 
 | True factor per step | `‖h‖` = 0.01 | `‖h‖` = 1 | `‖h‖` = 100 |
 |---|---|---|---|
@@ -699,18 +273,11 @@ trajectories with a known per-step factor:
 | 1.1 (unstable) | accept | accept | reject |
 | 1.5 (unstable) | accept | reject | reject |
 
-Caveat (2) below disclosed "proxy", but not this. Even a true `ρ` reads only the spectrum:
-`[[.99,1000],[0,.99]]` passes with 37,000× transient growth.
+Even a true `ρ` reads only the spectrum: `[[.99,1000],[0,.99]]` passes with 37,000× transient growth.
 
-**The verdict is now `loop_contraction_certificate`.** For one token's depth iterates `h¹…hᴷ`, with
-residuals `eₖ = hᵏ⁺¹ − hᵏ`, and one map `f` at every step, we have `eₖ₊₁ = f(hᵏ⁺¹) − f(hᵏ) ≈ J·eₖ`. So `‖eₖ₊₁‖/‖eₖ‖` is a finite-difference
-Jacobian-vector norm of the recurrent map, along its own residual. It costs no extra forward passes,
-ignores the scale of `h`, and is a norm, so it sees non-normal growth.
+**The statistic (`loop_contraction_certificate`).** Take one token's depth iterates `h¹…hᴷ`, with residuals `eₖ = hᵏ⁺¹ − hᵏ` and one map at every step. Then `eₖ₊₁ ≈ J·eₖ`, so `‖eₖ₊₁‖/‖eₖ‖` is a finite-difference Jacobian-vector norm along the loop's own residual. That is a residual-based estimate of the q-linear convergence factor, standard for fixed-point iterations [6]. Using it as the acceptance statistic is ours: it costs no extra forward passes, ignores the scale of `h`, and, being a norm, sees non-normal growth.
 
-A period-2 map with `ρ > 1` alternates high and low residuals. A last-step ratio accepted it whenever the loop
-stopped on a low step, and a window over the raw residuals did too whenever it started and ended on different phases.
-So the statistic reads the envelope `pₖ = max(‖eₖ‖, ‖eₖ₊₁‖)`, which never falls for a growing period-2 sequence, and
-each token reports three numbers:
+So is its design against the failure we found. A period-2 map with `ρ > 1` alternates high and low residuals, and it fooled both a last-step ratio and a window over the raw residuals. So the statistic reads the envelope `pₖ = max(‖eₖ‖, ‖eₖ₊₁‖)`, which never falls for a growing period-2 sequence. Each token reports three numbers:
 
 | Number | Definition | What it asks |
 |---|---|---|
@@ -718,25 +285,15 @@ each token reports three numbers:
 | `ratio` | the larger of `net` and the same geometric mean over the deepest half of `p` | is the end of the loop shrinking too? |
 | `rise` | `maxⱼ ‖eⱼ‖ / min_{i≤j} ‖eᵢ‖` | how far did the residual climb above an earlier value? |
 
-At depth 3 there are only two residuals and no pair to take, so one ratio still decides, and a period-2 map can pass.
+At depth 3 there are only two residuals and no pair to take, so one ratio decides, and a period-2 map can pass.
 
-A generation is accepted iff, at the 90th percentile across tokens, `ratio < 1 − margin` and `rise ≤ 10`
-(`SIGMA0_LOOP_TRANSIENT_MAX`). A rejection is a **plateau** when the residual stopped shrinking without real growth
-(`ratio < 1.25`, `net ≤ 1.05`, `rise` within the limit), and **divergent** otherwise. All of these numbers are design
-defaults, **not calibrated**. One non-finite iterate on any token rejects the generation as divergent: the
-percentile tolerates an odd token, not an overflow. Residuals are clamped at a numerical floor of
-`max(10⁻⁶, 4·eps)·‖h‖`, 0.4% of `‖h‖` in float16. Growth that rises above the floor is seen; growth that stays
-under it is not. A token whose last residual is at the floor has reached a numerical fixed point.
+The rules:
+- **Acceptance.** A generation is accepted iff, at the 90th percentile across tokens, `ratio < 1 − margin` and `rise ≤ 10` (`SIGMA0_LOOP_TRANSIENT_MAX`).
+- **Rejection.** A rejection is a **plateau** when the residual stopped shrinking without real growth (`ratio < 1.25`, `net ≤ 1.05`, `rise` within the limit), and **divergent** otherwise. One non-finite iterate on any token rejects the generation as divergent.
+- **The residual floor.** Residuals are clamped at `max(10⁻⁶, 4·eps)·‖h‖`, which is 0.4% of `‖h‖` in float16. Growth above the floor is seen and growth under it is not; a token whose last residual sits at the floor has reached a numerical fixed point.
+- **Enforcement.** None: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a `next_action`.
 
-**Honest scope.** MEASURED on the residuals the loop actually produced: it does not cover every
-direction, and it is not a statement about truth. It has run through `generate()` only on a stub backbone, which checks
-the wiring. **It has not run on a live model**, so the acceptance rate on real generations is unknown. Reported, not enforced: `generate()` returns the text either way, and `sigma0_grounding_verdict` turns the verdict into a
-`next_action`. JSRR remains as telemetry and fallback, now on a scale-invariant least-squares
-token-transition operator (exact DMD), whose radius is a Ritz estimate that tends to read low when `T < d`.
-
-**First reading on real Ouro (2026-11-05, from saved runs, no live model).** The statistic applied to the residual
-norms in `data/sigma0/loop_jacobian_report.json` (research repo; Ouro-1.4B-Thinking, trained depth 4, 8 prompts, last
-token only, so a small sample):
+**First reading on real Ouro** (2026-11-05, from saved runs). The statistic was applied to the residual norms in `data/sigma0/loop_jacobian_report.json`†: Ouro-1.4B-Thinking, trained depth 4, 8 prompts, last token only, so a small sample.
 
 | Depth | Factor (90th percentile) | Regime | Accepted |
 |---|---|---|---|
@@ -751,228 +308,91 @@ token only, so a small sample):
 | 11 | 1.14 | plateau | no |
 | 12 | 1.03 | plateau | no |
 
-So acceptance runs four steps past the trained depth, and stops where half the tokens spike at step 8. The first
-version of this table read the last-step ratio, listed only depths 3, 4, 6, 8 and 12, and appeared to show acceptance
-stopping at the trained depth. That was an artifact: the single-step statistic also accepted the omitted depths 5, 7
-and 10. Eight tokens is a small sample, and depth 4 being "accepted" is not evidence that depth 4 is special. No state
-norm was saved with these runs, so the table assumes the residuals sit above the floor. The smallest plateau residual,
-2.0, clears float16's floor for `‖h‖` below about 500. Above that, deep plateaus would start to read as converged.
+Acceptance runs four steps past the trained depth, and stops where half the tokens spike at step 8. A first version of this table appeared to show acceptance stopping at the trained depth. It read the last-step ratio and listed only depths 3, 4, 6, 8 and 12, and the stop was an artifact: the single-step statistic also accepted the omitted depths 5, 7 and 10. Eight tokens is a small sample, and depth 4 being accepted is not evidence that depth 4 is special. No state norm was saved with these runs, so the table assumes the residuals sit above the floor. The smallest plateau residual, 2.0, clears float16's floor for `‖h‖` below about 500. Above that, deep plateaus would start to read as converged.
 
-At the same model's operating points, autograd measures a true `ρ(J)` of about 8–11, and up to 28, with `‖J‖₂ ≈ 127`
-(`data/sigma0/true_jacobian_report.json`, ADR-0024). Taken at face value, the local-linear theory says DIVERGE. In fact the
-residual shrinks 2–7× by the trained depth and then settles on a non-zero plateau with occasional spikes. It never reaches
-a fixed point. So **an accept means the residual shrank on this generation; it does not mean the loop is locally
-stable**, and the two measurements disagree by an order of magnitude. The residual may not lie along the
-dominant direction, or the linearization may not hold at this amplitude. A third possibility: Ouro feeds the step index
-(`current_ut`) into every step, so consecutive steps are not one map, and `eₖ₊₁ ≈ J·eₖ + (bₖ₊₁ − bₖ)`. A step-dependent
-offset can shrink the residual while `J` expands: `J = 2I` with such offsets passes this statistic. The saved data cannot
-say which of the three it is.
+**The two measurements disagree (ours).** At the same model's operating points, autograd measures a true `ρ(J)` of about 8–11, and up to 28, with `‖J‖₂ ≈ 127` (§6). Taken at face value, the local-linear theory says DIVERGE. In fact the residual shrinks 2–7× by the trained depth, then settles on a non-zero plateau with occasional spikes, and never reaches a fixed point. So **an accept means the residual shrank on this generation, not that the loop is locally stable.** The saved data cannot say which of three explanations holds:
+- The residual may not lie along the dominant direction.
+- The linearization may not hold at this amplitude.
+- Ouro feeds the step index (`current_ut`) into every step, so consecutive steps are not one map: `eₖ₊₁ ≈ J·eₖ + (bₖ₊₁ − bₖ)`. A step-dependent offset can shrink the residual while `J` expands, and `J = 2I` with such offsets passes this statistic.
 
-The rest of this section is the original adoption record.
+**JSRR, adopted and then demoted.** Until 2026-11-05, `loop_lm.generate()` accepted iff `ρ(A) < 1 − margin` (`SIGMA0_JSRR_MARGIN`, default 0). That adopted STARS' discrete criterion and its single-step surrogate `‖Av‖₂²` [5]. CART found that trained gates settle at `ρ ∈ [0.79, 0.83]`, and it reports a null quality result [5]. `jsrr_certificate` remains as telemetry and fallback, now on a scale-invariant least-squares token-transition operator (exact DMD [5]). Its radius is a Ritz estimate, which tends to read low when `T < d`. The verdict computation is machine-checked (`tests/test_sigma0_jsrr_gate.py`). This is adoption, not novelty.
 
-**Status: ADOPTED external method; the gate's verdict is MACHINE-CHECKED, not a new theorem.**
-The §1.2.1 gates are *continuous-time* — they certify contraction of `e^{tA}`. But the serve
-loop is a **discrete iteration** `h_{k+1} = f(h_k)`, whose fixed point `h*` is asymptotically
-stable **if `ρ(J(h*)) < 1`** and unstable if `ρ > 1` (`ρ = 1` is undecided by the linearization) — the abscissa is the wrong invariant, and a
-pure rotation (`ρ = |λ| = 1`, `Re λ = 0`) that the continuous numerical-range gate can wave
-through is correctly rejected by `ρ < 1`.
-
-This is exactly the criterion **STARS** regularises toward on *real* looped LLMs —
-*Stabilizing Recurrent Dynamics for Test-Time Scalable Latent Reasoning in Looped Language
-Models* ([arXiv:2605.26733](https://arxiv.org/abs/2605.26733)) — via its Jacobian Spectral
-Radius Regularization loss `ℒ_JSRR = (1/N)Σ‖J v‖₂²` (single-step power iteration on a
-Jacobian-vector product). We adopt it as the loop's **acceptance** gate rather than re-derive
-a competitor:
-
-- `cio_sde.collapse.jsrr_certificate(A, margin)` — the exact discrete spectral radius
-  `ρ(A) = max|λ(A)|` of the empirical exit-depth Jacobian, plus STARS' single-step
-  power-iteration surrogate `‖Av‖₂²` (their Eq. 3, reusable as a training regulariser).
-  numpy-only, so it gates acceptance even in the minimal inference venv where scipy (the
-  §1.2.1 Lyapunov/Kreiss legs) is absent.
-- Until 2026-11-05, `loop_lm.generate()` accepted iff `ρ(A) < 1 − margin` (`margin` via `SIGMA0_JSRR_MARGIN`,
-  default `0` = STARS' literal `ρ<1`; CART, [arXiv:2606.01495](https://arxiv.org/abs/2606.01495),
-  found trained gates settle `ρ∈[0.79,0.83]`, comfortably inside a `0.05` band).
-
-**Machine-checked:** `tests/test_sigma0_jsrr_gate.py` (12 cases) validates the verdict on
-synthetic operators with analytically-known `ρ` (contraction `ρ=0.9` accept; divergent
-`ρ=1.2` reject; scaled rotation `ρ=1.3` reject; the `ρ=1` boundary rejected; the margin band;
-nan-safety), agreement with the matvec twin `experiments/sigma0_jacobian_stability.py` (#2029),
-and the `_stability_gates`/`_accept_stability`/`assemble_reason_verdict` wiring. The four
-adjacent suites (`test_cio_sde`, `test_stability_gates`, `test_reason_verdict`,
-`test_collapse_canary_e2e`) are unchanged and green — **98 passing total**.
-
-**Honest scope — three caveats, none upgraded.** (1) What is machine-checked is the gate's
-**verdict** (`ρ<1` computed correctly, accept/reject on a known matrix), *not* that JSRR
-improves generation quality — CART reports a **null** result (its learned-stability gate did
-not beat a parameter-matched dense baseline), so `ρ<1` is validated as the *right stability
-object*, not as a quality win. (2) The gate runs on the code's **empirical-Jacobian proxy**
-(the mean-outer-product transition matrix in `generate()`), not the true Jacobian of the
-recurrent map; a faithful `ρ` needs the autograd-JVP of the update map at the reasoning state
-(the matvec path in #2029, deferred to a GPU run). (3) This is **adoption**, not novelty — the
-looped-LM spectral-radius / peak-then-collapse result is now published externally on real
-models (STARS; PLDR self-organized criticality, [arXiv:2603.23539](https://arxiv.org/abs/2603.23539));
-the Σ₀ contribution is engineering rigor, not a new law.
-
-**Tracked-open frontier (the honesty leg, [#2236]).** The one lane the 2026-07-07 literature
-check left arguably open is tying this spectral / criticality signal to **factual honesty
-(hallucination)** rather than reasoning accuracy — a loop-stability signal only becomes a
-*factuality* signal once an **external grounding** signal is supplied, which is the Σ₀
-grounding thesis itself. That study is **not done**, so **nothing about honesty AUROC is
-claimed here**; it is tracked as [#2236] and, per the audit discipline, will only enter this
-document as MEASURED with a run pointer once tested.
-
-[#2236]: https://github.com/alex-place/lantern-os/issues/2236
+**Open: the honesty leg ([#2236]).** A loop-stability signal becomes a *factuality* signal only once an external grounding signal is supplied. That study is not done, and nothing about honesty AUROC is claimed.
 
 ### 1.3 What the test actually checks
 
-**Verification.** The shipped test uses `A = −0.8·I`, which is **symmetric**
-(`A = A_s`, so the §1 hypothesis holds exactly and the cross term is identically
-zero). The certificate predicts `contraction_rate = 0.8`; a rollout shows `V`
-decaying monotonically. This confirms the theorem **in precisely the special
-case where the proof is unconditionally valid** — it does *not* exercise the
-non-normal case, and should not be read as evidence for it. The earlier wording
-"exact, not approximate" applies only to this symmetric case; for general `A`
-the certificate is a conservative gate, not an exact rate.
-(`collapse_certificate`, `lyapunov_value` in `src/cio_sde/collapse.py`.)
-
-If `α ≥ 0`, some active mode is non-contracting — the system may wander or
-diverge — and collapse is **not** guaranteed. The code reports `guaranteed=False`
-at the `α = 0` boundary, which is the correct conservative choice. The entirely
-null case (`active_dim = 0`) is `guaranteed` only if the null block itself settles, with rate 0. It used
-to return `guaranteed=True` with rate ∞ for everything, including a pure rotation and `0.005·I`, which
-grows 22,000× by `t = 2000`.
-
----
+The `test_cio_sde` check of Theorem 1 uses `A = −0.8·I`. That matrix is symmetric, so the hypothesis holds exactly and the cross term is identically zero. The check confirms the theorem only in the case where the proof is unconditional, and should not be read as evidence for the non-normal case. For general `A` the certificate is a conservative gate, not an exact rate. If `α ≥ 0`, some active mode does not contract, and the code reports `guaranteed=False` at the `α = 0` boundary, which is the conservative choice.
 
 ## 2. The collapse trigger Σ₀
 
-**Status: OPERATIONAL DEFINITION — not derived from Theorem 1.**
+**Status: an operational definition, not derived from Theorem 1, with a MEASURED soundness profile: the calibration below, taken on the earlier batch gate, which needs a re-run. The construction, a soft AND over four signs of degeneracy, is established method, so no novelty is claimed for it.**
 
-**Definition (operational).** Σ₀ fires for a trajectory when **all four** of its own conditions hold
-simultaneously (each sample of a batch is decided on its own signals and its own Jacobian; see §3):
-
-*In plain words: this section defines the smoke alarm. Σ₀ is the moment we declare the system "stuck" — when, by four independent measures at once, it has stopped learning anything new and can no longer tell its options apart. We are honest that this is a sensible rule of thumb we chose, not something the theorem forces.*
+Σ₀ fires for a trajectory when **all four** of its own conditions hold. Each sample of a batch is decided on its own signals and its own Jacobian (§3).
 
 | condition | meaning |
 |---|---|
 | `‖∇ₓL‖ < ε_g` | no optimization signal remains |
-| `rank(J_f) < ρ·n` | drift Jacobian has lost directional structure |
+| `rank(J_f) < ρ·n` | the drift Jacobian has lost directional structure |
 | `Σ` isotropically flat | uncertainty has no preferred direction |
 | `‖∂H/∂u‖ < ε_c` | control cannot distinguish actions |
 
-*In plain words, the four together say: nothing left to learn, no direction left to move in, no uncertainty pointing anywhere useful, and no action that changes the outcome. A system in that corner has nowhere to go.*
+The gate is a soft AND, `min(p_grad, p_rank, p_flat, p_ctrl)`. None of the four quantities is Theorem 1's `α`. The link between "the four fire" and "`α < 0`" is a modeling assumption, not a proof, and should not be upgraded to a theorem.
 
-**This is a definition, not a consequence.** None of these four quantities is
-the spectral abscissa `α` that Theorem 1 uses. They are an *operational
-definition of "underdetermined"* — a soft AND-gate (`min(p_grad, p_rank,
-p_flat, p_ctrl)`, a Gödel t-norm) over four independent signs of degeneracy.
-Theorem 1 says nothing about when these conditions are met; conversely, meeting
-them does not invoke Theorem 1's guarantee. The link between "the four
-conditions fire" and "`α < 0`" is a **modeling assumption**, not a proof. This
-is stated plainly because it is the most honest part of the construction — do
-not upgrade it to a theorem.
+When triggered, Σ₀ projects the state onto `null(A)`: `x* = P x`, with `P = V_null V_nullᵀ`. That is the "42-state". The freeze itself comes from the integrator overwriting `x_next = x*` and discarding the diffusion term (`engine.py`, `forward_step`). With collapse off, the same drift-zeroed system random-walks freely.
 
-When triggered, Σ₀ projects the state onto `null(A)`:
+**Corrected 2026-11-05.**
+- **`x*` targets `null(A)`**, the fixed points of the linearized flow. It used to target `null(A_s)`, which left `‖A·x*‖` large for non-normal `A`, and for a normal `A` with a rotation block. Now `‖A·x*‖ ≤ eig_eps·‖A‖₂·‖x*‖` for any `A`. That bound is the rank cutoff, not zero: under `diag(100, 0.5, 0)` the 0.5 mode counts as null. And it covers the linear part only: an affine or nonlinear drift can still move at `x*`.
+- **The control signal is the Hamiltonian gradient**, `∂L/∂u + λᵀ∂f/∂u` with `λ = ∇ₓL`. It used to read the gradient of the stage cost alone, which is 0 at `u = 0` however much leverage the control has. It still sees only the model's own cost: a goal held outside it, such as a Question Machine terminal anchor, reaches the gate through `x_target`.
+- **Both signals are per sample.** This one and `‖∇ₓL‖` were being divided by the batch size, which made `ε_g` and `ε_c` 8× looser at `B = 8` than they claim.
 
-$$x^\* = P\,x, \qquad P = V_{\text{null}} V_{\text{null}}^\top.$$
+**Calibration ([#1990], 2026-07-04).** `experiments/sigma0_trigger_calibration.py`† called the real operator over 960 samples, each a batch of 8 rows judged as one decision, spanning the collapse regime and its complements. It scored the trigger against spectral ground truth computed independently by `eigh`.
+- **Precision 1.0:** 0 false fires over 720 off-regime samples, so the forward assumption *trigger ⇒ collapse regime* holds on this distribution.
+- **Snapshot recall ≈ 0.08:** a sound but conservative, late detector, because it also requires the state, `Σ` and the control to have degenerated.
+- **The `rank` signal** carries the discrimination.
 
-The result is the **"42-state"** (colloquial name, no formal meaning): the
-operator *clamps* the state onto that subspace.
+Caveats: the synthetic systems use `B = 0`, so the control signal is trivially satisfied and this calibrates only the grad ∧ rank ∧ flat sub-gate; and the clean collapse regime is the `ν = 0` case. A soundness profile does not make *trigger ⇒ α < 0* a theorem. The calibration predates the two corrections above and the per-trajectory gate. To re-run it, the script must first score each row: on the per-trajectory gate it stops with a `ValueError` at `int(conds[c])` (checked 2026-11-05). One sub-statement is provable by construction: a collapse manifold exists iff `A` is near-singular, and otherwise `_collapse_state` returns the semantic-null branch.
 
-**`x*` now targets the real fixed points (corrected 2026-11-05).** The projection used to target the null
-space of `A_s`, so `‖A·x*‖` stayed large for non-normal `A`, and also for normal `A` with a rotation block,
-where `A_s = 0` while the state keeps moving. It now targets `null(A)`, the actual fixed points of the
-linearized flow, so `‖A·x*‖ ≤ eig_eps·‖A‖₂·‖x*‖` for any `A`. That bound is the rank cutoff, not zero: under
-`diag(100, 0.5, 0)` the 0.5 mode counts as null. And it covers the linear part only: an affine or nonlinear drift
-can still move at `x*`. The freeze itself is still produced by the integrator
-**overwriting `x_next = x*` and discarding the diffusion term `dW`** (`engine.py forward_step`). The same
-drift-zeroed system with collapse *off* random-walks freely. **The operator enforces a clamp**; what
-changed is that the clamp now lands on the linear part's fixed points, up to the rank cutoff. (`SemanticCollapseOperator`.)
-
-**`‖∂H/∂u‖` now means that (corrected 2026-11-05).** The trigger's control signal was the gradient of the
-stage cost alone, which reads 0 at `u = 0` however much leverage the control has. It is now
-`∂L/∂u + λᵀ∂f/∂u` with `λ = ∇ₓL`. It still sees only the model's own cost: a goal held outside it (a Question
-Machine terminal anchor) reaches the gate through `x_target`. Both this signal and `‖∇ₓL‖` were also being
-divided by the batch size, which made `ε_g` and `ε_c` 8× looser at `B = 8` than they claim. They are now per
-sample.
-
-**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04; predates the two corrections above and the per-trajectory gate of §3, so it needs a re-run to be current).** The four-signal
-AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` (research repo) calls the
-real operator over **960 samples**, each a batch of 8 rows judged as one decision, spanning the collapse regime and its complements and
-scores it against the *spectral* ground truth (does `A_s` actually carry a null manifold
-plus stable active modes, computed independently by `eigh`). Result
-(`data/sigma0/trigger_calibration_report.json`): **precision 1.0 — 0 false-fires over 720
-off-regime samples**, so the §2 forward assumption *trigger ⇒ collapse-regime* holds on this
-distribution; but **snapshot recall ≈ 0.08** — the trigger is a **sound but conservative,
-*late* detector**, because it also requires the state / Σ / control to be degenerate, which
-develop dynamically (the [#658] sweep measures collapse over a rollout). Per-signal, the
-**`rank` signal carries the discrimination** (fires only on-regime); grad/flat gate the
-operational state, not the spectrum. Honest caveats: the synthetic systems use `B=0`, so the
-control signal is trivially satisfied (this calibrates the grad∧rank∧flat sub-gate), and
-non-normality `ν>0` shifts the exact zero eigenvalue of `A_s` (so the clean collapse regime is
-the `ν=0` case). **This upgrades §2 from bare HEURISTIC to a MEASURED soundness profile — it
-does *not* make `trigger ⇒ α<0` a theorem.** The one clean sub-statement *is*
-provable-by-construction: a collapse manifold exists ⟺ `A` is near-singular (else
-`_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch). **To re-run it**, the script has to score each row
-first. It reads one decision and one value per signal for each batch, and on the per-trajectory gate it stops with a
-`ValueError` at `int(conds[c])` (checked against this revision on 2026-11-05).
-
----
+**At decode time ([#766]).** `loop_lm.generate()` folds per-token self-repeat, n-gram echo and the argmax margin into `sigma0_proximity`, and adapts the repetition penalty as collapse nears. That closes the loop from instrument to actuator; it is a control heuristic, not a theorem.
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: C3 PROVEN in-regime, per trajectory, and machine-checked in Lean, with engine-level tests; S1 PROVEN
-in-regime (corrected 2026-11-05). The operator beats a placebo on the signals a placebo can fail (MEASURED). No
-state-level anti-collapse theorem exists.**
+**Status: C3 PROVEN in-regime, per trajectory, checked in Lean, with engine-level tests; S1 PROVEN in-regime. The operator beats a placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists. The mechanism is `NOT-NOVEL` [7]; the 2026-07-17 corner audit found no located counterpart for C3, which carries no novelty grade.**
 
-Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it, one trajectory at a time:
+Where Σ₀ projects onto the null subspace, Σ₀⁻¹ injects along it, one trajectory at a time (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`):
 
-$$dx = f\,dt + dW + \kappa\,P\xi, \qquad \Sigma^{+} = \Sigma_{\text{pred}} + b\,P,$$
+$$dx = f\,dt + dW + \kappa\,P\xi, \qquad \Sigma^{+} = \Sigma_{\text{pred}} + b\,P.$$
 
-with `P` the orthogonal projector onto the trajectory's own kick subspace, of rank `m`: the right singular vectors of
-its own `A` for its smallest singular values. `ξ` is the same standard normal that drives `dW`, and `p ∈ [0,1]` is the
-**collapse proximity**. `p > 0` holds exactly when that trajectory's four §2 conditions hold, and only those
-trajectories are kicked and bumped. (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`.)
+`P` is the orthogonal projector onto the trajectory's own kick subspace, of rank `m`: the right singular vectors of its own `A` for its smallest singular values. `ξ` is the same standard normal that drives `dW`. The collapse proximity `p ∈ [0,1]` is positive exactly when that trajectory's four §2 conditions hold, and only those trajectories are kicked and bumped.
 
-**Lemma L2′ (one-step lift, any projector).** Let `Σ ≻ 0` with eigenvalue mean `μ` and unbiased coefficient of
-variation `a`, and let `P` be any rank-`m` orthogonal projector, `1 ≤ m ≤ d−1`. Then `b ≥ Δ = (ε+a)μd / (√(m(d−m)) − εm)`,
-when that denominator is positive, implies `a(Σ+bP) ≥ ε`. *Proof:* `Σ+bP − μ⁺I = (Σ−μI) + b(P − (m/d)I)`, and the
-reverse triangle inequality in Frobenius norm gives the bound. No alignment and no normality. Independently
-re-derived twice (the audit in the research repo, and the 2026-11-05 review).
+**Lemma L2′ (one-step lift, any projector).** Let `Σ ≻ 0` have eigenvalue mean `μ` and unbiased coefficient of variation `a`, and let `P` be any rank-`m` orthogonal projector, `1 ≤ m ≤ d−1`. Then `b ≥ Δ = (ε+a)μd / (√(m(d−m)) − εm)`, when that denominator is positive, implies `a(Σ+bP) ≥ ε`. *Proof:* `Σ+bP − μ⁺I = (Σ−μI) + b(P − (m/d)I)`, and the reverse triangle inequality in the Frobenius norm gives the bound [8]. No alignment and no normality is needed. It was independently re-derived twice, by the research-repo audit and by the 2026-11-05 review.
 
-**Theorem C3 (engine level).** Suppose the operator acts on a trajectory on a step (its gate fired, the policy is
-armed, and that trajectory's budget is not spent), and `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to 9000).
-Then `a(Σ_next) ≥ ε_a` for that trajectory, where `Σ_next` is what its next evaluation actually reads, so its
-four-signal gate is false on the next step. This holds for all `A` and every dimension `d ≥ 2`. (At `d = 1` there is no shape to restore: the covariance leg does nothing, and
-only S1 applies.) *Proof:* L2′ per sample, targeting `1.02·ε_a`, gives `a₊ = a(Σ_pred + bP) ≥ 1.02·ε_a`.
-`project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase it. Eigenvalues can
-fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ σ_max/d`. Raising them to `eps` adds `δᵢ ∈ [0, eps]`,
-whose sample standard deviation is at most `½√(d/(d−1))·eps` (Popoviciu), so `a(Σ_next) ≥ (a₊ − ½√(d/(d−1))·ρ)/(1+ρ)`. That is above
-`ε_a` under the hypothesis for every `d ≥ 2`: 0.0503 at the worst case, `d = 2` and `ρ = 9·10⁻⁴` (derived independently in
-`lantern-os-research` PR #14). `m ≤ d/(1+4ε²)` keeps the denominator
-positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. The hypothesis on `ρ` is enforced: an armed step refuses to
-fire when `d·eps/σ_max > AntiCollapseOperator.RHO_MAX = 9·10⁻⁴`, as it refuses a negative diffusion gain.
+**Theorem C3 (engine level).** Suppose the operator acts on a trajectory on a step (its gate fired, the policy is armed, and that trajectory's budget is not spent), and `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (at the defaults, `d` up to 9000). Then `a(Σ_next) ≥ ε_a` for that trajectory, where `Σ_next` is what its next evaluation actually reads, so its four-signal gate is false on the next step. This holds for all `A` and every dimension `d ≥ 2`. At `d = 1` there is no shape to restore: the covariance leg does nothing, and only S1 applies.
 
-*Machine-checked.* `docs/formal/C3EngineLift.lean` proves this argument in an abstract real inner-product space with an
-element `I`, `⟪I, I⟫ = d`: L2′ for any projector-like `P`, in the exact form `_cov_floor` computes (`lift`);
-`a(cX) = a(X)` (`cv_smul`); the Popoviciu bound, from the single hypothesis `‖D‖² ≤ eps·tr D` on the floor
-correction (`popoviciu`, `clamp_keeps`); the shipped constants for every `d ≥ 2` (`shipped_constants`); rank
-feasibility (`rank_feasible`); and the composite with the gate off (`C3_engine`). No `sorry`, only Lean's standard
-axioms, and six false variants are rejected (half the floor, a tighter Popoviciu constant, a quarter-width clamp
-term, `ρ` up to `2·10⁻³`, a 1% margin, a weaker rank cap). What is **not** formalized is the bridge: that for
-symmetric matrices with the Frobenius inner product the engine's eigenvalue `std/mean` is that `cv`, its projector
-satisfies `⟪P,P⟫ = ⟪P,I⟫ = m`, and `project_preserving_shape` returns `X` or `c·X + D` with `tr(c·X) ≥ σ_max` and
-`‖D‖² ≤ eps·tr D`. Those are standard spectral identities, checked numerically in
-`tests/test_sigma0_c3_formal_bridge.py`, which also drives the real `forward_step` through all three branches of the
-lift's projection (identity, scale, scale then clamp) and checks C3 on every firing. Of 240 fuzzed configurations
-over three covariance fields, 160 fired: 125 took the identity branch, 24 the scale-down and 11 the scale-down and
-clamp, with the smallest post-step anisotropy `1.11·ε_a`. At the default `r = 1` the Riccati step keeps the
-propagated covariance far below `σ_max`, so the scale-down is reached only with weaker damping or a lower cap; the
-theorem covers every field with `ρ ≤ 9·10⁻⁴`. Removing the 2% margin fails the constants check and one
-batch-equivalence test (`test_a_batch_is_independent_trajectories[kick]`), but no fuzzed C3 run: the margin is
-load-bearing for the proof's worst case, which random inputs do not reach.
+*Proof.*
+1. L2′ per sample, targeting `1.02·ε_a`, gives `a₊ = a(Σ_pred + bP) ≥ 1.02·ε_a`.
+2. `project_preserving_shape` scales instead of clipping, and `a(cΣ) = a(Σ)`, so the cap cannot erase the lift.
+3. Eigenvalues can fall below `eps` only after a scale-down, when `λ_max = σ_max`, so `μ ≥ σ_max/d`. Raising them to `eps` adds `δᵢ ∈ [0, eps]`, whose sample standard deviation is at most `½√(d/(d−1))·eps` (Popoviciu [8]). So `a(Σ_next) ≥ (a₊ − ½√(d/(d−1))·ρ)/(1+ρ)`.
+4. That exceeds `ε_a` under the hypothesis for every `d ≥ 2`. The worst case, `d = 2` and `ρ = 9·10⁻⁴`, gives 0.0503 (derived independently in `lantern-os-research` PR #14).
 
-Four engine defects stood between the lemma and this statement:
+`m ≤ d/(1+4ε²)` keeps the denominator positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. The hypothesis on `ρ` is enforced. An armed step refuses to fire when `d·eps/σ_max > AntiCollapseOperator.RHO_MAX = 9·10⁻⁴`, as it refuses a negative diffusion gain.
+
+*Checked in Lean.* `docs/formal/C3EngineLift.lean` proves the argument in an abstract real inner-product space with an element `I`, `⟪I, I⟫ = d`. It proves:
+- L2′ for any projector-like `P`, in the exact form `_cov_floor` computes (`lift`);
+- `a(cX) = a(X)` (`cv_smul`);
+- the Popoviciu bound, from the single hypothesis `‖D‖² ≤ eps·tr D` on the floor correction (`popoviciu`, `clamp_keeps`);
+- the shipped constants, for every `d ≥ 2` (`shipped_constants`);
+- rank feasibility (`rank_feasible`);
+- the composite with the gate off (`C3_engine`).
+
+There is no `sorry`, only Lean's standard axioms are used, and six false variants are rejected: half the floor, a tighter Popoviciu constant, a quarter-width clamp term, `ρ` up to `2·10⁻³`, a 1% margin, and a weaker rank cap.
+
+**Not formalized is the bridge.** It consists of three standard identities. For symmetric matrices with the Frobenius inner product, the engine's eigenvalue `std/mean` is that `cv`. Its projector satisfies `⟪P,P⟫ = ⟪P,I⟫ = m`. And `project_preserving_shape` returns `X`, or `c·X + D` with `tr(c·X) ≥ σ_max` and `‖D‖² ≤ eps·tr D`.
+
+These are checked numerically in `tests/test_sigma0_c3_formal_bridge.py`. The test also drives the real `forward_step` through all three branches of the lift's projection and checks C3 on every firing. Of 240 fuzzed configurations over three covariance fields, 160 fired: 125 took the identity branch, 24 the scale-down, and 11 the scale-down then clamp. The smallest post-step anisotropy was `1.11·ε_a`. At the default `r = 1`, the Riccati step keeps the propagated covariance far below `σ_max`, so the scale-down is reached only with weaker damping or a lower cap.
+
+Removing the 2% margin fails the constants check and one batch-equivalence test (`test_a_batch_is_independent_trajectories[kick]`), but no fuzzed C3 run. The margin is load-bearing for the proof's worst case, which random inputs do not reach.
+
+**Four engine defects stood between the lemma and the theorem.** All were ours, and all are fixed:
 
 | Defect | Failure | Fix |
 |---|---|---|
@@ -981,129 +401,49 @@ Four engine defects stood between the lemma and this statement:
 | `a` clipped at `ε_a` in the floor | `excite` reads the Riccati-propagated `Σ`, and a bump could flatten it: `diag(1,.5,.5,.5)` + 0.5·P = `I` | use the actual `a` |
 | `m` up to `d−1` | above `d = 401` no rank-`(d−1)` bump can reach `ε_a`, and the floor silently returned 0 | cap `m`; raise on an infeasible rank |
 
-**Lemma S1 (the state leg).** Let `x⁺ = c + (D + κP)ξ` with `D ⪰ 0` diagonal, `c` independent of `ξ`, and
-`κ ≥ r/median(χ₁)`. Then `P(‖x⁺‖ ≥ r) ≥ ½`. *Proof:* by Anderson's inequality `P(‖c+Mξ‖ < r) ≤ P(‖Mξ‖ < r)` for symmetric
-`M = D + κP`. By Weyl, `M ⪰ κP` gives `M` at least `m` eigenvalues `≥ κ`, so `‖Mξ‖ ≥ κ·χ_m` in distribution, and `χ_m` is
-stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_g/2`, each firing leaves `{‖∇ₓL‖ < ε_g}` with
-probability ≥ ½, for any drift and any `p`. That reads three hypotheses onto the engine. `ξ` must be standard normal, which
-`rollout` draws and a direct caller of `forward_step` must supply. `rollout` draws float32 normals in every dtype and casts
-them to the state's, so a float64 run uses the float32 draw exactly. It used to pass the draw on uncast, which made the kick
-raise under a float64 model. `‖∇ₓL‖ = 2‖x − x_target‖` holds for the engine's quadratic
-stage cost, and another cost needs its own argument. And `D ⪰ 0` is required, not a convenience: `dW` and the kick share `ξ`, and at
-`D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise (found
-by `lantern-os-research` PR #14), and `forward_step` refuses to kick any row whose gain on `ξ`, `g·dilation`, is negative or not
-finite, from any dynamics and in any shape. A caller-supplied `Σ` can make the dilation negative (#3811), and one gain can be
-shared by every row. With `strength = 0` there is no kick, so nothing is checked. The kick used to be `strength·p`, which vanishes at the gate boundary:
-the "Defect A" the C3 proof diagnosed and then fixed only for `Σ`. Like the gate, it is per trajectory.
+**Lemma S1 (the state leg).** Let `x⁺ = c + (D + κP)ξ`, with `D ⪰ 0` diagonal, `c` independent of `ξ`, and `κ ≥ r/median(χ₁)`. Then `P(‖x⁺‖ ≥ r) ≥ ½`. *Proof:* by Anderson's inequality [8], `P(‖c+Mξ‖ < r) ≤ P(‖Mξ‖ < r)` for the symmetric `M = D + κP`. By Weyl [8], `M ⪰ κP` gives `M` at least `m` eigenvalues `≥ κ`, so `‖Mξ‖ ≥ κ·χ_m` in distribution, and `χ_m` is stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_g/2`, each firing leaves `{‖∇ₓL‖ < ε_g}` with probability ≥ ½, for any drift and any `p`. That reads three hypotheses onto the engine:
+- **`ξ` must be standard normal.** `rollout` draws it, and a direct caller of `forward_step` must supply it. `rollout` draws float32 normals in every dtype and casts them to the state's dtype. It used to pass the draw on uncast, which made the kick raise under a float64 model.
+- **`‖∇ₓL‖ = 2‖x − x_target‖`** holds for the engine's quadratic stage cost. Another cost needs its own argument.
+- **`D ⪰ 0` is required, not a convenience.** `dW` and the kick share `ξ`, and at `D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise (found by `lantern-os-research` PR #14). `forward_step` refuses to kick any row whose gain on `ξ`, `g·dilation`, is negative or not finite, from any dynamics and in any shape; a caller-supplied `Σ` can make the dilation negative (#3811). With `strength = 0` there is no kick, so nothing is checked.
 
-**What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the
-state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no
-grounding, the state rests at an equilibrium once the gate has cleared
-(`test_c3_does_not_promise_perpetual_motion`), and when `A` changes, the next regime can erase the kick outright
-(`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`"
-in earlier versions meant only that the gate cannot latch, which is a narrower thing than its plain reading. Σ₀⁻¹ is
-observe-only by default in the live engine (#1138), and lives on this synthetic SDE, not a real model.
+The kick used to be `strength·p`, which vanishes at the gate boundary. This was "Defect A": the C3 proof diagnosed it, and at first it was fixed only for `Σ`.
 
-**Per trajectory, and in `null(A)` (changed 2026-11-05).** The audit in `lantern-os-research` PR #14 found two design limits,
-which the previous correction (#3808) stated and pinned by tests. The gate was one decision for the whole batch, on mean signals and the
-mean Jacobian, so a collapsed member could hide among healthy ones, and `e₁e₁ᵀ` and `e₂e₂ᵀ` at `d = 4` each triggered alone and
-not together, because their mean has rank 2. And the kick's subspace came from `A_s`: under `A = e₁e₂ᵀ` one of its three
-directions had `‖Av‖ = 1/√2`. Both are now changed in the operator itself, with no new subsystem:
+**What this does not say.** C3 is about the gate's *input*: bumping `Σ` flips one condition of an AND. S1 says the state moves when the gate fires. Neither says the state keeps moving. With no drift on the null modes, no noise and no grounding, the state rests at an equilibrium once the gate has cleared (`test_c3_does_not_promise_perpetual_motion`). When `A` changes, the next regime can erase the kick outright (`test_a_switching_jacobian_can_erase_the_kick`). Nothing inside the loop can change that. "`P(permanent freeze) = 0`", in earlier versions, meant only that the gate cannot latch. Σ₀⁻¹ is observe-only by default in the live engine (#1138), and it lives on this synthetic SDE, not on a real model.
 
-- **The gate decides each trajectory on its own.** A sample's four signals are its own gradient, the rank of its own
-  Jacobian, its own `Σ`'s anisotropy and its own `‖∂H/∂u‖`. `forward_step` changes only the rows whose own AND holds: the
-  anti-collapse operator kicks and bumps exactly those rows, the collapse operator overwrites exactly the triggered rows it
-  did not excite, and a surprise spook raises only its own row. Every other row keeps the plain SDE step. Each row that fires
-  gets its own receipt, and each trajectory spends its own budget, so whether a row may change never depends on another row.
-  As far as the operators go, a batch is therefore `B` independent trajectories: the gate, the kick, the bump, the budget and
-  the receipts are each row's own. In numbers, on CPU, the operators' reductions now read a row the same alone as in a
-  batch, and so did their decompositions in every case measured. A batched run equals its rows
-  run alone bit for bit wherever its matrix products are exact; elsewhere
-  it agrees only to rounding (corrected in the post-merge review of #3814 and its follow-up, and narrowed since). The
-  anisotropy and the C3 floor took the unbiased std from `Tensor.std`, which on CPU reduces a batch of one in two passes and
-  each row of a larger batch by Welford's update, so one `Σ` read a different `a(Σ)` alone than in a batch (for 260 of 500
-  random float64 rows at `d = 4`): `Σ = diag(0.9419052498068875, 0.9806350832689616, 1.019364916731036, 1.05809475019311)`
-  read `a = 0.05000000000000005` alone and `0.049999999999999996` beside a copy of itself, either side of `ε_a = 0.05`, and
-  row 1 of `test_a_batch_is_independent_trajectories` differed from its lone run at `Σ0[1] = 3·I` and `2·I`. Both now take
-  it from `mean` and a `sum` of squared deviations, accumulated in float64 as `std` does (`_unbiased_std`). Every row reads
-  the same bits alone, beside a copy of itself and in a batch of 500; that `Σ` reads `0.05000000000000005` either way; and
-  the test holds bit for bit at `3·I` and `2·I`. In random float64 rollouts with both operators armed and an `A` like the
-  test's, at `d = 3` to `8`, a row differed from its lone run in 37 of 48 trials before the change and in none after. The
-  change moves `a(Σ)` by up to 3.3·10⁻¹⁶ and the floor by up to 2.6·10⁻¹⁵ relative in float64, alone or in a batch, so every
-  float64 run in which the operator fires moves by about an ulp. In float32, `std` accumulated in float64 too and agreed
-  with itself, the values have not moved, and the placebo table below, which runs in float32, is unchanged.
-  What still rounds a row differently in a batch is matrix multiplication. The test's `A` holds −½ and 1 against zeros, so
-  its products are exact. `LinearDynamics`' own drift `x·Aᵀ` rounds a row differently in a batch once its products are not
-  (from `d = 3` in float64 here; with a dense rank-1 `A` a row differed in all 24 random trials, after the change as
-  before), and so do the layers of the neural `Dynamics` and of a policy that is not zero, and, from `d ≈ 50` with this
-  machine's MKL, the batched products of the covariance step and of the operators themselves (the kick projector `V·Vᵀ`,
-  `ξ·P`). Over 30 steps of a batch of 8 with both operators armed, every row of the neural `Dynamics` differed from its lone
-  run, by up to 4.4·10⁻¹⁵ in float64 and 1.4·10⁻⁶ in float32. Wherever such a product rounds, a row within rounding of a
-  threshold can still decide differently in a batch than alone.
-  Independence also assumes the drift, diffusion, policy and stage cost treat rows separately, and nothing checks that. Since the same review, a `Σ` given once
-  for the batch, `(1, d, d)` or `(d, d)`, is read as every row's in the receipts too; before, any receipt for a row past the
-  first raised `IndexError`. `e₁e₁ᵀ` and `e₂e₂ᵀ` now trigger together as they do alone, a collapsed
-  member is caught beside a healthy one when the batch mean of `‖∇ₓL‖` is about 100·`ε_g`, and a batch whose rows have the
-  Jacobians `e₁e₂ᵀ` and `diag(0, 0, −½, 0)`, which never fired as a batch, now fires and holds C3 for every row.
-- **The kick lies in `null(A)`.** Each sample's kick basis is the right singular vectors of its own `A` for its small
-  singular values, from an SVD of `A` (an eigendecomposition of `AᵀA` would square the condition number). The count of
-  directions and the cap from `_max_lift_rank` are as before, so `m` can differ from row to row, and each row's bump is
-  floored at its own `m`. When the gate fires, every counted singular value is at most `eig_eps·max(1, ‖A‖₂)` at the default
-  thresholds, so `‖A·P‖₂` is too: neither the kick nor the bump points along a direction that the linear drift moves. Under
-  `A = e₁e₂ᵀ`, `A·kick = 0` now.
-- **A trajectory that is not finite is left alone (2026-11-05, from #3814's independent review).** The gate's SVDs and the
-  covariance step's `eigh` each decompose the whole batch in one call, so one row could decide for all of them. A NaN in one
-  row's Jacobian made the SVD raise for every row, and the covariance step raised before the gate was even reached; an
-  all-NaN `Σ` made the gate's own `eigvalsh` raise. An inf was worse: the SVD returned NaN singular values without raising,
-  `_numerical_rank` counted them as rank 0, and the row read as collapsed and fired with its other signals at rest. So did
-  a finite, full-rank Jacobian whose singular values overflow (`0.6·max·H₄` in float32 reads rank 0, not 4). Now a row
-  whose state, control, covariance or Jacobian holds a NaN or inf, or whose singular values overflow, reads NaN on all four
-  signals, which is below no threshold, so its gate is false. Neither a surprise spook nor a batch-wide proximity can
-  select it either, so no operator acts on it; a spook on a row gone to `+inf` at `d = 1` used to kick it. No batched
-  decomposition sees it: its `Σ` passes through the covariance step unprojected, and it cannot make a decomposition raise
-  for the other rows or change what they read. A row whose inputs are finite but whose covariance step overflows is not
-  kicked either: it gets a `blocked` receipt saying so, after the gain guard has checked it. In the tested cases a batch
-  holding a broken row equals its rows run alone, the broken row included, bit for bit. An operator asked directly to
-  project or kick such a row refuses with an error naming it (`test_a_trajectory_with_a_non_finite_jacobian_fails_no_other`,
-  `test_a_row_that_is_not_finite_reads_nan_and_never_fires`, `test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other`).
-- **The surprise monitor does not score a trajectory that is not finite (2026-11-05, the gap the previous item
-  left).** `SurpriseMonitor` factored every row's `S = CΣCᵀ + R` in one batched Cholesky. So with it attached, one
-  row whose `Σ` held a NaN made `forward_step` raise for every row on the next step, the first to score the prediction
-  that `Σ` fed. A row gone to `+inf` could read `NIS = inf` and spook. Now a row whose prediction, covariance, innovation
-  or `S` holds a NaN or inf (one in its observation, `C` or `R` reaches `ν` or `S`) is not scored. It never reaches
-  the factorization, its NIS reads NaN, which exceeds no threshold, so it never spooks, and its posterior is its prior,
-  the Kalman step for a missing measurement. Each other row reads what it reads alone, and a batch whose rows are all
-  finite takes the old code path unchanged. Three readers of NIS had to say what a NaN means, and for each it is no
-  evidence. `sigma0_proximity` averages the scored rows, and an evaluation that scored none adds nothing. A NaN in its
-  window read as proximity 1.0, an alert, because `max(0, min(1, NaN))` is 1.0 in Python. `info["surprise_nis"]` is
-  the same mean, and NaN only when no row was scored. And `verify_with_surprise` no longer folds a NaN in: it read
-  `NaN > threshold` as false, a consistent observation, and raised confidence
-  (`test_a_row_that_is_not_finite_stays_out_of_the_surprise_monitors_cholesky`,
-  `test_the_surprise_monitor_scores_each_finite_row_as_it_does_alone`, `test_a_nan_nis_is_no_evidence`).
+**Per trajectory, and in `null(A)` (changed 2026-11-05).** The research-repo audit (PR #14) found two design limits. #3808 first stated and pinned them, and #3814 removed them.
+- **The gate decides each trajectory on its own** signals, Jacobian, `Σ` and `‖∂H/∂u‖`. `forward_step` changes only the rows whose own AND holds; each such row gets its own receipt and spends its own budget.
+  - Under the batch gate, `e₁e₁ᵀ` and `e₂e₂ᵀ` at `d = 4` each triggered alone but not together, because their mean has rank 2. Now they trigger together.
+  - A collapsed member is now caught beside a healthy one, when the batch mean of `‖∇ₓL‖` is about 100·`ε_g`.
+  - A batch whose rows have the Jacobians `e₁e₂ᵀ` and `diag(0, 0, −½, 0)` never fired as a batch. Now it fires, and holds C3 for every row.
+  - A `Σ` given once for the batch is read as every row's in the receipts too.
+- **A batch equals its rows run alone bit for bit wherever its matrix products are exact, and only to rounding elsewhere** (corrected in the post-merge review of #3814, and narrowed by #3825). On CPU, the operators' reductions now read a row the same alone as in a batch, and so did their decompositions in every case measured.
+  - The anisotropy and the C3 floor used to take the unbiased std from `Tensor.std`. On CPU that reduces a batch of one in two passes, and each row of a larger batch by Welford's update, so one `Σ` read a different `a(Σ)` alone than in a batch: 260 of 500 random float64 rows at `d = 4`. `Σ = diag(0.9419052498068875, 0.9806350832689616, 1.019364916731036, 1.05809475019311)` read `a = 0.05000000000000005` alone and `0.049999999999999996` beside a copy of itself, either side of `ε_a = 0.05`.
+  - Both now take it from `mean` and a `sum` of squared deviations, accumulated in float64 as `std` does (`_unbiased_std`). Every row reads the same bits alone, beside a copy of itself and in a batch of 500, and that `Σ` reads `0.05000000000000005` either way. `test_a_batch_is_independent_trajectories` now holds bit for bit at `Σ0[1] = 3·I` and `2·I`, where row 1 used to differ. In random float64 rollouts with both operators armed, at `d = 3` to `8`, a row differed from its lone run in 37 of 48 trials before the change and in none after.
+  - The change moves `a(Σ)` by up to 3.3·10⁻¹⁶ and the floor by up to 2.6·10⁻¹⁵, relative, in float64, so every float64 run in which the operator fires moves by about an ulp. Float32 values have not moved, and the placebo table below, which runs in float32, is unchanged.
+  - **What still rounds a row differently is matrix multiplication.** It does so in `LinearDynamics`' own drift `x·Aᵀ` once its products are not exact: from `d = 3` in float64, and in all 24 random trials with a dense rank-1 `A`. It does so in the layers of the neural `Dynamics` and of a nonzero policy, and, from `d ≈ 50` with this machine's MKL, in the batched products of the covariance step and of the operators themselves (`V·Vᵀ`, `ξ·P`). Over 30 steps of a batch of 8 with both operators armed, every row of the neural `Dynamics` differed from its lone run, by up to 4.4·10⁻¹⁵ in float64 and 1.4·10⁻⁶ in float32. Wherever such a product rounds, a row within rounding of a threshold can still decide differently in a batch than alone.
+  - Independence also assumes the drift, diffusion, policy and stage cost treat rows separately, and nothing checks that.
+- **The kick lies in `null(A)`.** Each sample's kick basis comes from an SVD of its own `A`; an eigendecomposition of `AᵀA` would square the condition number. When the gate fires, every counted singular value is at most `eig_eps·max(1, ‖A‖₂)` at the default thresholds, so `‖A·P‖₂` is too: neither the kick nor the bump points along a direction that the linear drift moves. Under `A = e₁e₂ᵀ`, one of the old `A_s` directions had `‖Av‖ = 1/√2`. Now `A·kick = 0`.
+- **A trajectory that is not finite is left alone** (from #3814's independent review). The gate's SVDs and the covariance step's `eigh` each decompose the whole batch in one call, so one row's NaN made them raise for every row. An inf was worse: its singular values came back NaN and read as rank 0, so the row fired with its other signals at rest. A finite Jacobian whose singular values overflow did the same.
+  - Now such a row reads NaN on all four signals, which is below no threshold. Neither a spook nor a batch-wide proximity can select it, and it passes the covariance step unprojected.
+  - A row whose covariance step overflows gets a `blocked` receipt.
+  - In the tested cases, a batch holding a broken row equals its rows run alone, the broken row included, bit for bit. An operator asked directly to project or kick such a row refuses, with an error naming it.
+  - Tests: `test_a_trajectory_with_a_non_finite_jacobian_fails_no_other`, `test_a_row_that_is_not_finite_reads_nan_and_never_fires`, `test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other`.
+- **The surprise monitor does not score a trajectory that is not finite** (#3824, closing the gap the previous item left). `SurpriseMonitor` factored every row's `S = CΣCᵀ + R` in one batched Cholesky. So with it attached, one row whose `Σ` held a NaN made `forward_step` raise for every row on the next step, and a row gone to `+inf` could read `NIS = inf` and spook.
+  - Now a row whose prediction, covariance, innovation or `S` holds a NaN or inf is not scored. It never reaches the factorization; its NIS reads NaN, which exceeds no threshold, so it never spooks; and its posterior is its prior, the Kalman step for a missing measurement.
+  - Each other row reads what it reads alone, and a batch whose rows are all finite takes the old code path unchanged.
+  - Every reader of NIS treats a NaN as no evidence. `sigma0_proximity` and `info["surprise_nis"]` average the scored rows only; a NaN in the window used to read as proximity 1.0, an alert, because `max(0, min(1, NaN))` is 1.0 in Python. And `verify_with_surprise` no longer reads `NaN > threshold` as a consistent observation that raises confidence.
+  - Tests: `test_a_row_that_is_not_finite_stays_out_of_the_surprise_monitors_cholesky`, `test_the_surprise_monitor_scores_each_finite_row_as_it_does_alone`, `test_a_nan_nis_is_no_evidence`.
+  - **Not covered:** a finite row whose `S` is not positive definite still makes the monitor's one batched Cholesky raise for every row, and `rollout`'s trace and running cost are norms and means over the batch, so they read NaN once any row is broken.
 
-What this does not change, and what is still not proven. L2′ and S1 allow any projector, so the proofs of C3 and S1 are
-untouched: they are now statements about each trajectory the operator acts on, and still about one step under one `A`.
-"The kick lies in `null(A)`" is a statement about the linear part: a nonlinear drift can still move the kick, and the next
-step's `A` can differ, which is how `test_a_switching_jacobian_can_erase_the_kick` erases it. Nothing here says that the
-state retains the kick. Each trajectory is changed at most `max_interventions` times per rollout, as each row was under
-the batch gate, but the rows no longer change on the same steps. The gate now costs one SVD per sample per step rather
-than one per batch. And the §2 trigger calibration ([#1990]) measured the batch gate, so its precision and recall need a
-re-run before they describe this one. Its script is in the research repo and has to score each row first (§2). A broken
-row is now isolated from the gate, the covariance step and the surprise monitor. What this does not cover: a finite row
-whose `S` is not positive definite still makes the monitor's one batched Cholesky raise for every row, and `rollout`'s
-trace and running cost are norms and means over the batch, so they read NaN once any row is broken.
+None of this changes the proofs, because L2′ and S1 allow any projector. C3 and S1 are now statements about each trajectory the operator acts on, still about one step under one `A`. "The kick lies in `null(A)`" is a statement about the linear part: a nonlinear drift can still move the kick, and the next step's `A` can differ, which is how `test_a_switching_jacobian_can_erase_the_kick` erases it. Nothing here says that the state retains the kick. Each trajectory is changed at most `max_interventions` times per rollout, and the gate now costs one SVD per sample per step.
 
-**Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite on every row the operator fired on, and
-`proximity > 0` is exactly that row's trigger condition, so an attached operator records zero overwrites by construction. The
-sweep's other condition, final norm above initial norm, is what diffusion does anyway. A placebo that fires and does
-nothing scored 36/36 on a 108-trial sample of the pre-fix engine, with the same one-third collapse-prone rate. Every collapse-prone
-trial was also `ν = 0`, because the sweep's non-normal cells were full-rank and never entered the gate, so the figure
-said nothing about non-normal `A`. And the script as written now finds 0 collapse-prone trials, because the
-engine defaults to observe-only.
+**Retired: the "900/900 prevented" figure.** It could not fail, for four reasons:
+- `forward_step` skips the overwrite on every row the operator fired on, and `proximity > 0` is exactly that row's trigger, so an attached operator records zero overwrites by construction.
+- The sweep's other condition, final norm above initial norm, is what diffusion does anyway. A placebo that fires and does nothing scored 36/36 on a 108-trial sample of the pre-fix engine.
+- Every collapse-prone trial was `ν = 0`, so the figure said nothing about non-normal `A`.
+- Under the observe-only default, the script now finds no collapse-prone trials at all.
 
-**Placebo-controlled measurement (MEASURED, 2026-11-05; re-run on the per-trajectory gate).** 18 cells over `α`,
-non-normality and noise, all rank-1, so every cell can enter the gate; 10 trials of 8 trajectories each;
-`python experiments/sigma0_placebo_control.py --trials 10`. The gate is read per trajectory, from each row's receipts:
+**Placebo-controlled measurement** (MEASURED, 2026-11-05, on the per-trajectory gate). It covers 18 cells over `α`, non-normality and noise, all rank-1 so every cell can enter the gate, with 10 trials of 8 trajectories each (`python experiments/sigma0_placebo_control.py --trials 10`). The gate is read per trajectory, from each row's receipts:
 
 | Arm | Trials with an overwrite | Trajectory-steps with gate true | Longest gate-true run, one trajectory | Longest run, any trajectory | State moved |
 |---|---|---|---|---|---|
@@ -1112,1065 +452,293 @@ non-normality and noise, all rank-1, so every cell can enter the gate; 10 trials
 | Covariance leg only | 0/180 | 2.0% | **1** | 2 | 0.024 |
 | Real operator | 0/180 | 1.7% | **1** | 1 | **0.39** |
 
-The overwrite column shows why the old metric could not fail. The longest run of one trajectory is C3, measured. Rows are
-now decided apart, so two can be in the gate on consecutive steps, as two are once under the covariance leg alone; C3 says
-nothing about that, and the any-trajectory column is there so the aggregate is not hidden. The covariance leg alone clears the
-gate and does not move the state beyond what noise does; only the kick does. Under the batch gate the real operator moved
-the state 0.59. Little of the drop to 0.39 comes from deciding per row: the per-row gate with the old `A_s` subspace gives
-0.56. The kick's subspace accounts for the rest. In the normal cells the two subspaces agree and the state moves about the same
-(0.41 and 0.40). In the non-normal cells the old subspace put part of the kick where the drift carried it further (0.71), and in
-`null(A)` the linear drift does not carry it (0.39). That the state moved says nothing about whether it moved anywhere useful.
-Synthetic SDE only.
+- **The overwrite column** shows why the old metric could not fail.
+- **The longest run of one trajectory** is C3, measured. Rows are decided apart, so two can be in the gate on consecutive steps, as two are once under the covariance leg alone. C3 does not address that, and the any-trajectory column keeps it visible.
+- **Only the kick moves the state.** The covariance leg clears the gate, but does not move the state beyond what noise does.
+- **Where the 0.39 comes from.** Under the batch gate, the real operator moved the state 0.59. Little of the drop comes from deciding per row, since the per-row gate with the old `A_s` subspace gives 0.56; the kick's subspace accounts for the rest. In the normal cells the two subspaces agree (0.41 and 0.40). In the non-normal cells, the old subspace put part of the kick where the drift carried it further (0.71), while in `null(A)` the linear drift does not carry it (0.39).
 
-**On "persistent excitation."** The classical PE result (Anderson 1977) concerns
-*estimator/parameter* convergence under `∫φφᵀ ≥ αI`. Here there is no estimator
-and no parameter being identified — only a state kept off a manifold. So Σ₀⁻¹ is
-**inspired by / analogous to** persistent excitation; **no PE condition is
-established**. (Canonical attribution is **Anderson 1977**, consistent across the
-`.md` and `.tex` variants — issue [#660].)
+That the state moved says nothing about whether it moved anywhere useful. Synthetic SDE only.
 
-**Nearer classical kin (added 2026-07-17 corner audit).** Condition-triggered,
-direction-targeted covariance re-excitation is classical in recursive least squares:
-**covariance resetting** and **directional forgetting** (Kulhavý & Kárný 1984;
-variable-direction forgetting, arXiv:2003.03523; SIFt-RLS, arXiv:2404.10844) keep an
-estimator's information matrix from degenerating in unexcited directions, with boundedness
-theorems of their own. Σ₀⁻¹'s covariance floor is the state-space mirror of that family
-(they prevent covariance *windup* under poor excitation; Σ₀⁻¹ prevents covariance
-*flatness* on the near-null band). Mechanism novelty is therefore **not** claimed for the
-operator; the C3 anti-freeze theorem is the one piece with no located counterpart, and it
-lives on this synthetic SDE, not a real model.
-
-**Latent code defect — RESOLVED (2026-06-15).** `AntiCollapseOperator.__init__`
-annotated `detector: Optional[...]` while `collapse.py` imported only `from typing
-import Dict`, so `typing.get_type_hints()` raised `NameError: name 'Optional' is
-not defined` (masked at import time by PEP 563 string annotations, but breaking any
-runtime annotation introspection — Pydantic, FastAPI, dataclass eval, Sphinx
-autodoc). Fixed: `collapse.py:33` now reads `from typing import Dict, Optional`.
-Recorded here so the resolution is not lost.
+**Prior art for the mechanism [7].** Persistent excitation concerns estimator convergence under `∫φφᵀ ≥ αI`. Nothing here is being identified, so Σ₀⁻¹ is only an analogy, and no PE condition is established. The nearer kin is RLS covariance resetting and directional forgetting, which keep an estimator's information matrix from degenerating in unexcited directions. Σ₀⁻¹'s covariance floor is the state-space mirror: they prevent windup, and it prevents flatness on the near-null band. Mechanism novelty is therefore not claimed for the operator. C3 is the one piece with no located counterpart, and it lives on this synthetic SDE, not a real model. Self-supervised learning has a complementary condition, which keeps the representation full-rank by conditioning its covariance rather than bounding the map [16]. Whether such a term lowers the measured collapse proximity of the Ouro latent loop, without hurting the honesty scores, is untested.
 
 ### 3.1 Design implication: scheduled grounding from certificate quantities
 
-**Status: DESIGN NOTE — a scheduling consequence extracted from the certificate's own
-objects (γ, c, P). The core inequality is machine-checked on synthetic maps
-(`experiments/sigma0_grounding_deadline.py`); the mapping onto real token-level grounding
-is CONJECTURED. This is not a new theorem in dynamical systems — the math is
-corollary-grade (geometric decay + a P-norm triangle inequality); the value is the
-design consequence, stated below.**
+**Status: DESIGN NOTE. The core inequality is machine-checked on synthetic maps, and its mapping onto real token-level grounding is CONJECTURED. The math is corollary-grade: a standard bounded-input reachable-set bound [9], while computing the next intervention from a certified decay rate is self-triggered control [9]. Ours: applying both to this certificate's own `(γ, c, P)`, and the measurements. The LLM literature has uncertainty-triggered retrieval [9] and fixed-interval retrieval; a cadence derived from measured loop dynamics appears to be an open lane ([#2690]).**
 
-*In plain words:* the longer a self-feeding loop runs inside a basin, the more external
-evidence it takes to pull it out — and the certificate's own numbers say exactly how the
-window closes. So grounding should run on a **schedule set by the contraction rate**, not
-only when the alarm rings: by the time the alarm (the §4 canary) is reliable, the cheap
-part of the window is already gone.
+Inside a certified basin `{V ≤ c}`, with `V(F(x)) ≤ γV(x)`, `γ < 1` and `V = xᵀPx`, an anchor with budget `‖a‖ ≤ B` can escape only if
 
-**The commitment inequality (PROVEN, machine-checked).** Inside a certified basin
-`{V ≤ c}` with `V(F(x)) ≤ γ V(x)`, `γ < 1` (`V = xᵀPx`), an anchor `a` with budget
-`‖a‖ ≤ B` can raise `√V` by at most `B·√λ_max(P)`, while `V(x_n) ≤ γⁿV₀` decays. Escape
-(`V(x_n + a) > c`) is therefore possible **only if**
+$$B \;>\; B^*(n) \;=\; \frac{\sqrt{c} - \gamma^{n/2}\sqrt{V_0}}{\sqrt{\lambda_{\max}(P)}} \;\xrightarrow{\;n\to\infty\;}\; B^*_\infty = \sqrt{c/\lambda_{\max}(P)},$$
 
-$$B \;>\; B^*(n) \;=\; \frac{\sqrt{c} - \gamma^{n/2}\sqrt{V_0}}{\sqrt{\lambda_{\max}(P)}}
-\;\xrightarrow{\;n\to\infty\;}\; B^*_\infty = \sqrt{c/\lambda_{\max}(P)}.$$
+so any `B < B*_∞` stops working after the deadline `n*(B) = 2·ln[√V₀/(√c − B√λ_max(P))]/ln(1/γ)`. This was checked by exact trust-region maximization of `V(xₙ + a)` on a normal basin. The predicted deadlines were 1.6, 2.9 and 6.0, and the measured last escapes 1, 2 and 5, conservative in the right direction (`experiments/sigma0_grounding_deadline.py`†).
 
-The required budget rises **geometrically at the certified rate** and saturates. Inverting:
-any budget `B < B*_∞` stops working after a **computable deadline**
-`n*(B) = 2·ln[√V₀/(√c − B√λ_max(P))]/ln(1/γ)`. Verified by construction (exact
-trust-region maximization of `V(x_n+a)` over the budget ball) on a normal basin —
-predicted deadlines 1.6/2.9/6.0 vs measured last-escapes 1/2/5, conservative in the right
-direction (`data/sigma0/grounding_deadline_report.json`).
+**Measured (ours):**
+1. **Conditioning decides whether the deadline bites.** In a strongly non-normal "sliver" basin (`cond(P) ≈ 6·10⁵`) the ceiling `B*_∞` is about 0.002, so any realistic anchor escapes at every depth. Ouro's loop sits in that regime by its observed trajectory rate, a transient decay along the trained path (its Jacobian expands, §6). That retrodicts the measured anchoring null, in which grounding stayed cheap at all depths (`experiments/ouro_canary_vs_logprob.py`†). It is a retrodiction, not a test.
+2. **The alarm is late** ([#2690], 2026-07-17). Two single-shot policies raced over the same certified basins, over 200 seeds. Escape was checked by exact maximization, and the critical-slowing-down canary was swept over every healthy-quantile threshold.
+   - **In a well-conditioned basin** (`cond(P) ≈ 2`), the charitably calibrated canary (FPR 1.5%) alarms at a median step of 14, against a cadence tick at step 3. The **alarm premium is 2.25×**: the schedule reaches ≥ 90% escape at 0.40·`B*_∞`, where waiting for the alarm needs 0.90·`B*_∞`.
+   - **In the sliver basin**, a forced fire-time sweep is fully timing-indifferent: every budget × depth cell is ≥ 0.95.
+   - **Scope:** synthetic maps, single-shot policies and one detector family. The calibration is charitable, which strengthens a lateness verdict.
+3. **A prospective shot-call on a real learned loop held** ([#2690], Phase 0.5). It ran on the trained §6 reservoir (`experiments/sigma0_reservoir_deadline.py`†).
+   - **The call, from the linearization first:** `ρ(J) = 0.9836` and `cond(P) ≈ 4.8·10⁴`, a pre-registered SLIVER, timing-indifferent call.
+   - **Graded on the true nonlinear dynamics:** the measured per-turn grounding kick of the real conversation stream, `B_real = 0.113`, is 1.4·10⁴× the escape ceiling `B*_∞ = 8.3·10⁻⁶`. Forced fire-times are timing-indifferent even at `B_real/100`.
+   - **Kept on the record:** the deadline rows are consistent, but without bite here. The bound is a necessary condition, loose in the sliver regime, and the measured last escape rises with `B`, so a commitment window exists at micro-basin scale only. The harness's first run was vacuous, because the basin-entry race is the wrong instrument in the sliver regime; the script's docstring records it.
+4. **The pattern so far.** Both real learned loops measured land outside the well-conditioned regime: Ouro is expansive, and the reservoir is near-critical despite a design spectral radius of 0.9. The schedule may bite only on deliberately stabilized loops, for example STARS-trained ones [5].
 
-**Conventional grounding (not novel).** This is the standard **bounded-input reachable-set**
-argument for a discrete contracting (Schur-stable) linear system: the reachable set of
-`x_{k+1}=Ax_k+a`, `‖a‖≤B` from a decaying free response is a classical object in linear-systems /
-reachability theory (Kailath, *Linear Systems*, 1980; Sontag, *Mathematical Control Theory*, 1998;
-Blanchini & Miani, *Set-Theoretic Methods in Control*, 2015 for invariant/reachable sets in a
-Lyapunov metric). The inequality is corollary-grade (a geometric-decay bound composed with a
-P-norm triangle inequality), and the *scheduling* consequence it feeds (§3.1's design shift) is the
-**self-triggered control** recipe — compute the next intervention from a certified decay rate
-(Heemels, Johansson & Tabuada, CDC 2012; arXiv:1803.08980). No new dynamical-systems theorem is
-claimed; the contribution is composing these standard bounds from the certificate's own measured
-`(γ, c, P)` and reading off a grounding cadence.
+**The design shift.**
+- **Grounding is a schedule, not only an event.** Inject external evidence on a schedule whose period is below the commitment half-life, `ln 2 / ln(1/ρ)`. For Ouro's observed trajectory rate, `ρ ≈ 0.88`, that is about 5.4 loop steps: a projection that composes a measured rate with the inequality, not a new measurement.
+- **The §4 canary is demoted from primary trigger to audit.** Critical slowing down [10] is detectable only after contraction is deep, when `B*(n)` has saturated, so in well-conditioned basins a canary-triggered Σ₀⁻¹ fires at the expensive end of the window by construction. This is consistent with, though not proven by, the measured split in which the early-curve signals routed grounding positively and the late-curve loop canary negatively (`data/eval/ouro_canary_vs_logprob_results.json`†).
+- **Conditioning decides the regime.** `cond(P)` tells whether the deadline is a hard constraint (well-conditioned) or a soft one (sliver). Measuring it is cheap, and it should accompany any certified rate.
 
-**Where it bites (MEASURED caveat).** The deadline binds in the Euclidean norm only for
-**well-conditioned** basins. In a strongly non-normal "sliver" basin (`cond(P) ≈ 6·10⁵`)
-the ceiling `B*_∞` is tiny (~0.002), so any realistic anchor escapes at *every* depth —
-the deadline exists but has no practical bite. Ouro's measured loop is in this sliver
-regime (`experiments/sigma0_loop_jacobian.py`: ρ_obs ≈ 0.88, strong non-normality — here
-ρ_obs is the *observed trajectory* decay rate along the trained path, i.e. exactly the
-transiently-shrinking non-normal subspace; the loop's *Jacobian* spectral radius is
-ρ(J) ≈ 8–11 ≫ 1, see the §6 [#2029] correction, so this is a transient-decay retrodiction,
-not a contraction one), which
-**retro-dicts** the measured anchoring null (`experiments/ouro_canary_vs_logprob.py`:
-grounding stayed cheap at all depths). Supporting evidence, **not** validation — a
-retrodiction of our own null, not a prospective test.
-
-**The design shift (the actionable part):**
-
-1. **Grounding is a schedule, not only an event.** Inject external evidence with a period
-   below the commitment half-life `ln 2 / ln(1/ρ)` — for Ouro's measured ρ ≈ 0.88, ~5.4
-   loop steps (PROJECTION: measured rate composed with the inequality, not a new
-   measurement).
-2. **The §4 canary is demoted from primary trigger to audit.** Critical slowing down is
-   detectable only *after* contraction is deep — precisely when `B*(n)` has saturated. In
-   well-conditioned basins, canary-triggered Σ₀⁻¹ fires at the expensive end of the window
-   by construction. (CONSISTENT with — not proven by — the measured rank≠route split:
-   early-curve signals routed grounding positively, the late-curve loop canary negatively;
-   see `data/eval/ouro_canary_vs_logprob_results.json`.)
-3. **Conditioning decides the regime.** `cond(P)` of the local basin tells you whether the
-   deadline is a hard constraint (well-conditioned) or soft (sliver). Measuring it is
-   cheap and should accompany any certified rate.
-
-**Now MEASURED — the schedule-vs-alarm race ([#2690], 2026-07-17).** Design-shift items 1–2
-are no longer only a corollary reading. `experiments/sigma0_scheduled_grounding.py` races two
-*single-shot* grounding policies over the same certified basins — timing the only variable;
-escape checked by exact trust-region maximization (not by the inequality); the
-critical-slowing-down canary swept over **all** healthy-quantile thresholds rather than one
-calibration. Result (`data/sigma0/scheduled_grounding_report.json`, 200 seeds;
-`tests/test_sigma0_scheduled_grounding.py` → 6 passing): in a **well-conditioned** basin
-(cond(P)≈2) the charitably-calibrated canary (FPR 1.5%) has median alarm at step 14 vs the
-cadence tick at step 3, and the **alarm premium is 2.25×** — grounding on the
-certificate-derived cadence reaches ≥90% escape at 0.40·B*_∞ while waiting for the alarm
-needs 0.90·B*_∞, the expensive end of the window, exactly as item 2 states (reactive is not
-hopeless; it is *late*). In the **sliver** basin (cond(P)≈6·10⁵) a forced fire-time sweep is
-fully timing-indifferent (every budget × depth cell ≥ 0.95) — item 3's measured-Ouro-regime
-null, now *produced*, not only retrodicted. Honest scope: synthetic maps; single-shot
-policies; one detector family; the canary is calibrated on the true healthy distribution
-(charitable — strengthens a lateness verdict, weakens an earliness one).
-
-**Phase 0.5 — the prospective shot-call on a real LEARNED system ([#2690], 2026-07-17).**
-The race above is on hand-built maps; the first *prospective* test ran on the §6 trained
-reservoir (`router_reservoir_G.py`, seed 42 — a real learned nonlinear loop nobody's Jacobian
-was picked for). `experiments/sigma0_reservoir_deadline.py` computes every §3.1 quantity from
-the linearization **first** — fixed point (residual 1.4e-15), analytic Jacobian (max err vs
-numeric 1.3e-4), **ρ(J)=0.9836**, **cond(P)≈4.8·10⁴ → pre-registered regime call: SLIVER,
-timing-indifferent** — then grades the call on the true nonlinear dynamics with the regime's
-own instrument: the measured realistic per-turn grounding kick of the actual conversation
-stream (B_real=0.113) is **1.4·10⁴× the escape ceiling** B*_∞=8.3·10⁻⁶, and a forced
-fire-time sweep is fully timing-indifferent even at B_real/100 — **the shot-call held**
-(`data/sigma0/reservoir_deadline_report.json`; `tests/test_sigma0_reservoir_deadline.py`, 5
-passing). The deadline rows are consistent but deliberately noted as *without bite* here
-(necessary-condition bound, loose in the sliver regime; the measured last-escape rising with
-B shows a commitment window exists at micro-basin scale only). **Accumulating pattern worth
-stating plainly: both real learned loops measured so far (Ouro, this reservoir — one
-expansive, one near-critical) land OUTSIDE the well-conditioned regime, even though the
-reservoir's design spectral radius was 0.9.** The schedule's practical bite may exist only on
-deliberately stabilized loops — which is exactly the Phase-1 JSRR/STARS motivation, now
-evidence-backed rather than assumed. A first-run harness vacuity (the basin-entry race is the
-wrong instrument in the sliver regime) is kept on the record in the script docstring.
-
-**Prior-art positioning (2026-07-17 corner audit).** "Compute the next intervention time from
-a certified decay rate" is **self-triggered control** — a mature field (Heemels, Johansson &
-Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012;
-Lyapunov event-triggered stabilization with a known convergence rate, arXiv:1803.08980). §3.1
-is that field's recipe applied to this certificate's objects, and cites it rather than
-re-deriving it. The LLM literature has the *event-triggered* side only — FLARE
-(arXiv:2305.06983) and DRAGIN (arXiv:2403.10081) trigger retrieval reactively on uncertainty —
-plus naive fixed-interval retrieval; a cadence *derived from measured loop dynamics* appears
-to be an open lane, tracked with the Phase-1/2 real-model plan in [#2690] and composed in
-`SIGMA0-GROUNDING-LEDGER.md` §2.
-
-**Honest limits.** The additive-anchor model is a simplification — real grounding enters
-as tokens through attention, not as a clean latent displacement. The qualitative
-phenomenon ("early intervention beats late; models commit") is independently published
-(e.g. arXiv:2604.23235 measures per-token commitment); the contribution here is only the
-*certified composition* — deadline and cadence computed from this certificate's own
-quantities. A prospective test needs a **well-conditioned** loop (e.g. STARS-trained,
-arXiv:2605.26733) where the deadline should bite; on Ouro the theory predicts its own
-null.
-
-[#2690]: https://github.com/alex-place/lantern-os/issues/2690
-
----
+**Limits.** The additive-anchor model is a simplification, since real grounding enters as tokens through attention. And "early intervention beats late; models commit" is itself published [9].
 
 ## 4. The early-warning scalar (the "canary")
 
-**Status: PROPOSED READOUT — the named signals are NOT implemented in code. The
-underlying critical-slowing-down math is correct.**
+**Status: MEASURED that it fires under collapse (`test_surprise_monitor_integration`); its thresholds are control-design heuristics. The signal itself is standard [10]; ours is the wiring.** The early warning is the Kalman normalized innovation squared, `νᵀS⁻¹ν`, with `ν = y − Cx̂` and `S = CΣCᵀ + R` (`src/cio_sde/surprise.py`). `NIS ≈ m` means model and reality agree. `NIS ≫ m` means the model is overconfident, and has drifted without knowing it.
 
-Near a bifurcation the dominant eigenvalue flattens (*critical slowing down*;
-Wissel 1984; Scheffer et al., *Nature* 2009). Two proposed readouts:
+Wiring it in was ours ([#657], 2026-06-19). With an identity observation the innovation vanished during collapse, so the canary risked staying silent on exactly the trajectory it should catch. `forward_step` now runs a Kalman predict-and-update with process noise `Q = (g·dilation)²·dt`. Smooth exploration stays consistent, while the collapse snap or a Σ₀⁻¹ kick spikes NIS (`test_surprise_monitor_integration`).
 
-$$p_{\text{unbounded}}(x) = \frac{1}{|\Re\,\lambda_{\max}(A_s)|} \;\;\xrightarrow{\text{boundary}}\;\; \infty$$
-
-$$p_{\text{gate}}(x) = \mathrm{clip}\!\left(1 - \frac{|\Re\,\lambda_{\max}|}{\varepsilon},\,0,\,1\right) \in [0,1]$$
-
-The slowing-down mathematics is sound, and for symmetric `A_s` the `Re` is
-correctly redundant. **However:**
-
-- **`p_unbounded` and `p_gate` do not exist in `src/cio_sde/collapse.py`.** A
-  search across the source returns no match. They live only in this document.
-- **The actual driver of Σ₀⁻¹ is `proximity()`** — the four-condition `min(...)`
-  of §2/§3 — **not** `p_gate` and not `|Re λ_max|`, which appears nowhere in the
-  operator. The earlier claim that "`p_gate` drives Σ₀⁻¹" is incorrect; correct
-  it to `proximity()`.
-- The phrase "diverges *before* collapse" conflates the two opposite fates
-  (freeze vs. blow-up) that the rest of this document keeps distinct.
-- Notational clash: `λ_max(A_s)` here means the eigenvalue *closest to zero*
-  (the slowest mode), which is **not** §1's `α = max λᵢ(A_s)` (the largest /
-  least-stable active eigenvalue). Disambiguate before use.
-
-**Decision ([#659], RETIRED 2026-06-19):** `p_unbounded` / `p_gate` are formally
-**retired** as superseded by the NIS canary below. They were never implemented in
-`collapse.py` (a source search returns no match — verified again 2026-06-19) and
-will not be: the eigenvalue readout was the wrong early-warning (see the Update),
-and the actual driver of Σ₀⁻¹ is `proximity()`, not `p_gate`. The live early-warning
-is the Kalman NIS monitor (`src/cio_sde/surprise.py`), now fully integrated into the
-rollout ([#657], below). With this, §4 has no remaining open gaps.
-
-**Update — the right canary, now implemented (`src/cio_sde/surprise.py`).** The
-eigenvalue readout above was the wrong early-warning. The correct one is *surprise
-relative to uncertainty*: the Kalman normalized innovation squared (NIS),
-`νᵀS⁻¹ν` with `ν = y − Cx̂`, `S = CΣCᵀ + R`. `NIS ≈ m` means model and reality
-agree; `NIS ≫ m` means the model is overconfident relative to reality — it has
-drifted and does not know it. *In plain words: this measures how surprised the system should be given how confident it claims to be. A small value means its picture of the world matches what it sees; a large value means reality has diverged from its beliefs and it hasn't noticed.* This is the standard innovation-consistency χ² test
-(Bar-Shalom, Li & Kirubarajan 2001), and unlike `p_gate` it is a property the
-engine can actually compute: the `CovarianceField` already propagates Σ, but the
-rollout never fused an observation — `SurpriseMonitor` adds the missing
-measurement update and reads the innovation before it. The
-`experiments/sigma0_horse_blinders.py` demonstration shows the regime the eigenvalue
-signal cannot: a low-reality-coupling observer that is *calm while wrong* (low NIS,
-growing error) during the gap before an unobserved disturbance "rustles" into a
-visible dimension and the NIS spikes past threshold. The dangerous state is not the
-spook — it is the quiet that precedes it.
-
-**Residual ([#657]) — RESOLVED 2026-06-19.** The monitor was wired into
-`engine.forward_step`, but with an identity observation (`y = x`) the innovation
-`ν = y − Cx̂ → 0` during collapse, so the canary risked staying silent on the very
-trajectory it should catch. **Fixed:** `forward_step` now runs a Kalman
-predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration
-stays consistent (NIS ≈ m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS —
-the canary fires under collapse. `test_surprise_monitor_integration` flipped
-`xfail` → **hard pass (30 passed, 0 xfail)**. This was the last open technical gap
-in the Σ₀ machinery; it is now closed.
-
----
+`experiments/sigma0_horse_blinders.py`† shows the regime an eigenvalue readout cannot: an observer that is calm while wrong (low NIS, growing error) until an unobserved disturbance reaches a visible dimension. The earlier eigenvalue readouts, `p_unbounded` and `p_gate` (critical slowing down [10]), were never implemented, and are retired ([#659]). The driver of Σ₀⁻¹ is §2's `proximity()`. The canary is kept apart from that proximity, and so are the freeze and blow-up fates.
 
 ## 5. Global structure: the attractor graph G
 
-**Status: STANDARD CONSTRUCTION — correct, with a timescale-separation caveat.**
+**Status: a standard construction [11]; nothing here is novel.** The system is multistable. Coarse-graining its attractors and their basins gives a Markov process over basins: a Markov state model, Markov only under timescale separation, and the formal "world tree". Saddles on a basin boundary have stable manifolds, ridges a trajectory can follow between basins without capture. Those are the "safe passages".
 
-The system is **multistable**. In plain words: the system has several stable patterns it can settle into (think of valleys a marble could roll into). Each such resting pattern is an "attractor," and its "basin" is the set of starting points that all drain into it. Collect its attractors `{A₁,…,A_k}` (fixed
-points, limit cycles, strange attractors), each with a basin
+The certificate is local, so a real basin needs a Lyapunov function on a neighbourhood ([#1991]). `experiments/sigma0_roa_certify.py`† certifies an inner region of attraction with a quadratic Lyapunov function and interval branch-and-bound [11]. On the reversed Van der Pol benchmark (Khalil Ex. 8.4), `{V ≤ 2.25}` is PROVEN: 2,323 boxes, none undecided, 97.5% of the grid optimum `c* ≈ 2.307`. A control at 2.5 correctly fails to certify. That validates the method on a textbook system. Applying it to this certificate's drift needs that `f` to be specified, and a global guarantee still needs grounding.
 
-$$B_i = \{\, x_0 : \lim_{t\to\infty}\phi_t(x_0) \in A_i \,\}.$$
+## 6. Measured loops: router data, a trained reservoir, and Ouro's latent loop
 
-Coarse-grain to a graph `G = (V, E)`: nodes are attractors, edges are
-noise/drift-induced transitions, giving an induced **Markov process over
-basins**
+**Status: two negative results about this project's earlier numbers, one reconstruction, and a measurement of Ouro's true loop Jacobian. All ours.** The discrete-time certificate that reads spectral radii like these is `discrete_dichotomy_certificate` (§1, [#1988]).
 
-$$P_{ij}(u) = \Pr\big(\pi(x_{t+1}) = A_j \mid \pi(x_t) = A_i,\, u_t\big),$$
+**The router encoder, retired as evidence.** Each turn of a chat log was encoded as `x = [novelty, self_repeat, echo, length] ∈ [0,1]⁴`, with a local Jacobian fitted by finite difference over a 10-turn window. A mean `ρ = 1.064` over 2,678 turns was read as "near the stability boundary". Controls retire that reading (`experiments/rho_controls.py`†, 2026-07-04):
+- **The mean is tail-dominated.** On the reproducible synthetic corpus, the window-8 mean is 1.124, against a median of 0.992 and a maximum of 4.48. On a local 830-turn real log, which is untracked runtime data, the mean is about 25, with a maximum near 16,872 from a near-singular design matrix.
+- **Ridge regularization removes the expansion.** At 1e-2, the fraction of windows with `ρ > 1` falls from 0.47 to 0.06.
+- **The fit is poor:** relative residual 0.44–0.80.
+- **The state is four text-surface features**, not hidden states, so even a clean `ρ < 1` would not be the certificate's `α`.
 
-where the partition map `π : ℝⁿ → V` sends a state to its basin. `G` is the
-formal version of the "world tree": the structure connecting the attractors.
-This is the textbook Markov-State-Model construction over basins via ω-limit
-sets. It is correct, with one standard caveat: the induced chain is genuinely
-Markov only under **timescale separation** (fast intra-basin relaxation vs.
-slow inter-basin hops); without it, `P_ij` carries memory.
+The original 2,678-turn corpus path is dead in this checkout.
 
-**Safe passages.** In plain words: the system threads narrow ridges between the valleys, neither captured by a trap nor flung away. A basin boundary studded with **saddles** (mixed-sign
-`Re λ`) has *stable manifolds* — ridges you can traverse without being captured
-by a deep attractor. "Spin the vanda fast" = ride a boundary saddle with
-rotation set by `Im λ`.
+**The reservoir.** An echo-state network (size 50, spectral radius 0.9, ridge readout, 80/20 split) [11] reconstructs the same log, with a held-out one-step MSE of 0.0097. Its autonomous rollout, projected back onto `[0,1]⁴`, settles to a low-dimensional fixed point (correlation dimension 0.74: novelty 0.78, self_repeat 0.02, echo 0.25, length 0.12). That is not the "parrot attractor" (`novelty ≈ 1, echo ≈ 0.72`) hand-entered in the first draft. Without that projection the autonomous rollout diverges, so the projection is an external bound imposed by hand, not an emergent property. The log is partly synthetic test traffic, so the deliverable is the pipeline (`experiments/router_sigma0_encoder.py`†, `router_reservoir_G.py`†). It is the learned loop §3.1's shot-call ran on.
 
-**A certified basin, not just a point ([#1991], 2026-07-04 — first cut).** §1's certificate is
-*local* (the Jacobian at `x*`); a real basin needs a Lyapunov function valid on a
-*neighbourhood*. `experiments/sigma0_roa_estimate.py` takes the standard route: a quadratic
-`V(x)=xᵀPx` from the linearization (`AᵀP+PA=−I`), then certify the largest sublevel set `{V≤c*}`
-on which `V̇<0` for the **full nonlinear flow** — by Lyapunov/LaSalle that set is inside the
-region of attraction. Validated on the canonical **reversed-Van-der-Pol** benchmark (Khalil
-Ex. 8.4, ROA known to be bounded): `c*≈2.31` (`data/sigma0/roa_estimate_report.json`), and
-**100% of sampled points inside `{V≤c*}` converge to the origin** while points at `3c*` diverge
-— a *sound inner estimate* of the true basin. Evidence class: sublevel-invariance-given-`V̇<0`
-is **PROVEN** (Lyapunov); `c*≈2.31` is **MEASURED** (grid-conservative). Scope: this validates the
-*method* (local Jacobian → certified nonlinear neighbourhood); applying it to the certificate's
-own drift only needs that `f` specified — and a global guarantee still needs grounding.
+**Ouro's latent loop.** Two measurements on Ouro-1.4B-Thinking disagree, informatively:
+- **The trajectory ratio contracts** (2026-07-04, `experiments/sigma0_loop_jacobian.py`†). The per-recurrent-step hidden states (dim 2048) were read over 8 prompts and every token position, run to depth 12, three times the trained 4, in fp16. The geometric mean of `‖Δh_{t+1}‖/‖Δh_t‖` is 0.88, and the median last/first step-change ratio is 0.15. About 34% of individual steps expand.
+- **The true Jacobian expands** (2026-07-09, [#2029], `experiments/sigma0_true_jacobian.py`†). One universal-transformer step, `f(h) = norm(layers(h, current_ut))`, was isolated as a differentiable function. Autograd JVP/VJP power iteration then ran at operating points sampled from a forward pass, in float32 with the math SDPA backend, over 6 prompts × 4 trained steps:
 
-**Now machine-checked ([#1991], 2026-07-04 — MEASURED → PROVEN).** The grid value is upgraded to a
-rigorous certificate. `experiments/sigma0_roa_certify.py` proves `V̇ < 0` on `{V ≤ 2.25}` by (a) an
-exact analytic lemma on an origin box `[-0.1, 0.1]²` (`|N(x)| ≤ 3‖x‖⁴`, so
-`V̇ ≤ −‖x‖²(1 − 3‖x‖²) < 0` for `0 < ‖x‖² < 1/3`; on the box `max‖x‖² = 0.02`), and (b) **interval
-branch-and-bound** over the shell with directed-rounding interval arithmetic (`mpmath.iv`,
-**2323 boxes, 0 undecided**). So `{V ≤ 2.25}` is a **PROVEN** inner region of attraction — 97.5% of
-the grid optimum `c*≈2.307`, the last ~2.5% being interval overestimation near the tangency, not a
-gap in rigor. **Teeth:** a control at `c_L = 2.5` (above `c*`) correctly **fails** to certify (there
-genuinely exist `V̇ ≥ 0` points inside `{V ≤ 2.5}`). Machine-checked by
-`tests/test_sigma0_roa_certified.py` (4 tests, `data/sigma0/roa_certified_report.json`); suite
-**46 → 50 passing**. Evidence class for `{V ≤ 2.25}`: **PROVEN** (was MEASURED). This closes the
-*certification* half of [#1991] for the benchmark `f`; the local→global reach for the certificate's
-own drift is unchanged and still needs that `f` specified.
+| Quantity | Value | Meaning |
+|---|---|---|
+| `ρ(J)` geomean (all steps) | **8.17** | `> 1`: locally expansive |
+| `ρ(J)` geomean (last trained step) | **10.97** | the steady-state regime |
+| `ρ(J)` range (24 measurements) | **1.5 – 27.6** | every one `> 1` |
+| `‖J‖₂` geomean | **127.4** | top singular value |
+| `‖J‖₂/ρ(J)` | **15.6×** | strongly non-normal |
 
----
-
-## 6. Demonstration on router data
-
-> **✓ REPRODUCIBLE.** The two driver scripts are now committed and the numbers
-> below are produced from committed code over the real conversation log
-> (`apps/data/conversations/*.jsonl`, 2678 turns). Re-run with:
->
-> ```bash
-> python experiments/router_sigma0_encoder.py   # → data/sigma0/router-encoder-output.jsonl
-> python experiments/router_reservoir_G.py       # → data/sigma0/reservoir-G-output.jsonl
-> ```
-
-Each turn is encoded as `x = [novelty, self_repeat, echo, length] ∈ [0,1]⁴` In plain words: we took a real chat log and turned every message into four numbers — how new it was, how much it repeated itself, how much it echoed the prompt, and how long it was — then watched where a self-feeding copy of the conversation drifts with nothing real to check itself against.
-(`router_sigma0_encoder.py`), with a local Jacobian fitted over a 10-turn
-sliding window via finite difference.
-
-**Encoder result (2678 turns, 2673 with a fitted Jacobian):**
-
-| Metric | Value |
-|---|---|
-| Mean Jacobian spectral radius `ρ` | **1.064** |
-| Max `ρ` | 27.93 |
-| Fraction of windows with `ρ > 1` | **0.346** |
-
-The mean spectral radius sitting just above 1 (with a third of windows locally
-expanding) is the expected signature of a system perched near its stability
-boundary rather than resting in a deep contracting basin.
-
-> **⚠ CONTROL CHECK (2026-07-04) — the ρ = 1.064 *mean* does not survive basic controls;
-> treat this row as an unreliable estimate, not evidence of near-boundary dynamics.**
-> `experiments/rho_controls.py` re-runs the *same* encoder + `fit_jacobian` functions with the
-> controls a spectral-radius estimate needs. (Reproducibility note: the certificate's
-> `apps/data/conversations` 2678-turn corpus is a **dead path** in the current checkout, and the
-> 830-turn `data/conversations/garage-conversations.jsonl` used below is **untracked runtime
-> data** absent from a clean clone — so the script falls back to a seeded 300-turn **synthetic**
-> corpus that anyone can reproduce. The *pattern* is dataset-independent.)
->
-> **Reproducible (synthetic, in-repo), window 8:** unregularized mean ρ = **1.124** but median
-> **0.992** with a tail to max 4.48 — the mean already sits above its own median from tail
-> inflation; ridge 1e-2 → mean **0.652**, fraction(ρ>1) 0.47 → **0.06**; mean falls to **0.636**
-> at window 40; relative residual **0.44 → 0.80**; non-normality **~1.2**.
-> **Local 830-turn real chat log (measured, not repo-reproducible):** the same shape but far
-> more extreme — window-8 unregularized mean ≈ **25**, **max ρ ≈ 16,872** (near-singular design
-> matrix), median ≈ 1.00 → 0.85, ridge 1e-3 → mean ≈ 0.97. The blow-up is worse on real text
-> because it is higher-dimensional than the 10-sentence synthetic pool.
->
-> Either way the conclusions hold: the **mean is tail-dominated** (use the median), **ridge
-> collapses ρ>1** (the expansion is noise amplification), the **linear fit is poor** (residual
-> 0.44–0.80 → eigenvalues weakly meaningful) and **strongly non-normal** (ρ is the wrong single
-> summary anyway). **Deepest caveat:** the state `x = [novelty, self_repeat, echo, length]` is
-> four **text-surface** features, NOT model hidden states — so ρ here measures surface-text
-> autocorrelation, not the Σ₀ latent loop's contraction. Even a clean ρ<1 here would not be the
-> certificate's α.
->
-> The near-boundary *claim* may still hold for the real latent loop — but **this number is not
-> the evidence for it.** The load-bearing measurement is the loop Jacobian fitted on real Ouro
-> hidden states (via `StateABIShim`) with these controls applied — deferred to serving our own
-> model, and motivated by STARS (arXiv 2605.26733), which stabilizes looped-LM depth via
-> Jacobian spectral-radius regularization. See
-> [ADR-0021](adr/0021-serving-substrate-retain-ouro-custom-loop.md).
->
-> **✓ DONE (2026-07-04) — the real loop *is* measured, and it CONTRACTS.**
-> `experiments/sigma0_loop_jacobian.py` hooks Ouro-1.4B-Thinking's `OuroModel.forward` and reads the
-> **actual per-recurrent-step hidden-state trajectory** (`hidden_states_list`, dim 2048) — the real latent
-> loop, not a text-surface fit. Over 8 prompts × all token positions, run to depth **12** (3× the trained 4,
-> a STARS depth-scaling probe): **ρ_observed = geomean ‖Δh_{t+1}‖ / ‖Δh_t‖ = 0.88 < 1 → the loop CONTRACTS
-> toward a fixed point**, and keeps settling with depth (median last/first step-change ratio **0.15**). The
-> real answer is the *opposite* of the debunked `ρ=1.064` "near-boundary" reading — the loop is comfortably
-> contracting, and shows **no** STARS-style collapse when over-iterated here. Honest caveats: ~**34%** of
-> individual steps momentarily expand (the non-normal transient the §1.2 full-spectrum test exists for — the
-> aggregate still contracts), fp16, the "Thinking" variant, 8 prompts. Evidence class: **MEASURED**
-> (`data/sigma0/loop_jacobian_report.json`) — an observed convergence rate, not a certified Jacobian
-> eigenvalue. This retires the "deferred" status above.
-
-> **⚠️ CORRECTION (2026-07-09, [#2029]) — the *true Jacobian* spectral radius is ρ(J) ≈ 8–11 ≫ 1;
-> the loop map is locally EXPANSIVE, and the 0.88 above was a non-normal transient, not contraction.**
-> The `ρ_observed = 0.88` figure is a *trajectory ratio* `geomean ‖Δh_{t+1}‖/‖Δh_t‖`, a proxy — not
-> the quantity the certificate/STARS reason about (`ρ(J)`, the spectral radius of the one-step map
-> `h → f(h)`). `experiments/sigma0_true_jacobian.py` now measures the real thing: it isolates one
-> universal-transformer step `f(h) = norm(layers(h, current_ut))` as a pure differentiable function
-> (the exact loop body, `modeling_ouro.py:640`) and runs **autograd JVP/VJP power iteration** at real
-> operating points sampled from a forward pass (float32; the math SDPA backend is forced so the
-> second derivative exists). Result over 6 prompts × 4 trained UT steps (`data/sigma0/true_jacobian_report.json`):
->
-> | Quantity | Value | Meaning |
-> |---|---|---|
-> | `ρ(J)` geomean (all steps) | **8.17** | spectral radius of `df/dh`; **> 1 ⇒ locally expansive** |
-> | `ρ(J)` geomean (last trained step) | **10.97** | the steady-state regime the certificate reasons about |
-> | `ρ(J)` range (all 24 measurements) | **1.5 – 27.6** | **every** (prompt, step) has `ρ(J) > 1` |
-> | `‖J‖₂` geomean | **127.4** | top singular value (transient gain) |
-> | non-normality `‖J‖₂/ρ(J)` | **15.6×** | strongly non-normal operator |
->
-> **Reconciliation.** Both numbers are correct and *not* contradictory. `ρ(J) ≫ 1` is the asymptotic
-> one-step multiplier; `‖J‖₂/ρ ≈ 16` means the operator is strongly **non-normal**, so a *particular*
-> perturbation (the trained trajectory's own `Δh`) can transiently *shrink* — giving `ρ_observed = 0.88`
-> and the "~34% of steps expand" note — even though the dominant eigendirection *grows* by ~8–11× per
-> step. The honest reading flips: the Ouro loop is **not** a fixed-point contraction; it is a non-normal,
-> expansive map whose trained trajectory rides a transiently-decaying subspace. This is consistent with
-> STARS "peak-then-collapse" (`ρ(J) > 1` predicts divergence when iterated past trained depth) and with
-> §1.2.3's insistence that the **discrete spectral radius `ρ`**, not the abscissa or a trajectory proxy,
-> is the load-bearing invariant. Power iteration converged cleanly (flat tails by ~iter 40; complex
-> dominant pairs stabilised by tail-geomean). Evidence class: **MEASURED** (autograd Jacobian, float32).
-> Honest caveats: LOCAL (Jacobian at sampled `h*`, not a global bound); the "Thinking" variant; 6 prompts;
-> `use_cache=False` self-attention only. Run: `.venv-train/Scripts/python.exe experiments/sigma0_true_jacobian.py`.
-
-> **Now certified in the matching time domain (2026-07-04, [#1988]).** `ρ` is a
-> *discrete-time* quantity — the step map `x_{k+1}=A x_k` contracts iff `ρ(A) < 1` —
-> whereas Theorem 1 and the dichotomy certify the *continuous* flow (`max Re λ(A) < 0`),
-> a different object. `discrete_dichotomy_certificate` (`src/cio_sde/collapse.py`) closes
-> that mismatch: it splits the Jacobian at `|z| = 1 − δ` via an ordered-Schur
-> factorization and classifies the fate by `ρ` itself (`ρ<1` COLLAPSE, `ρ>1` DIVERGE,
-> `ρ≈1` MARGINAL), with a certified per-step decay factor and transient bound. So a
-> window like this `ρ≈1.064` one is now *certified* near-boundary, not merely described.
-
-**Reservoir `G` result** (`router_reservoir_G.py` — echo-state network, size 50,
-spectral radius 0.9, ridge readout, 80/20 split):
-
-| Metric | Value |
-|---|---|
-| One-step reconstruction MSE (held-out) | **0.0097** |
-| Correlation dimension of reservoir trajectory | **0.74** |
-| Autonomous-rollout fixed point | `novelty 0.78, self_repeat 0.02, echo 0.25, length 0.12` |
-
-The autonomous rollout (feeding the readout back through the projection `π` onto
-`[0,1]⁴`) converges to a **low-dimensional fixed point** (correlation dimension
-≈ 0.74, i.e. effectively a point/limit set), which is the §1 Σ₀ prediction:
-absent external grounding the flow settles onto a single self-consistent state.
-
-**Honest deviation from the original hypothesis:** the converged state is *not*
-the hand-entered "parrot attractor" (`novelty ≈ 1, echo ≈ 0.72`) sketched in the
-earlier draft. The real log instead settles at **high novelty / low echo /
-short length** — a terse, low-repetition fixed point. The qualitative claim
-(ungrounded recursion collapses onto a degenerate fixed point) is supported; the
-specific earlier numbers were not data-derived and have been replaced by the
-produced ones above. The source log is also still partly synthetic test traffic,
-so the deliverable is the reproducible pipeline, not a population-level value.
-
-**See Appendix A** for the original design specification and its caveats.
-
----
+Both measurements are correct. The map is non-normal and expansive, and the trained trajectory rides a transiently decaying subspace, consistent with peak-then-collapse past the trained depth [5]. Caveats: local Jacobians at sampled points, not a global bound; the "Thinking" variant; 6 prompts; self-attention with `use_cache=False`. The evidence is `data/sigma0/true_jacobian_report.json`† and [ADR-0024](adr/0024-sigma0-frontier-training-program.md). §1.2.3 reads the same disagreement off the residuals.
 
 ## 7. Why this is a warning against ASI
 
-**Status: the one downstream claim worth keeping — but as a machine-learning
-claim, on ML evidence, NOT as a consequence of the physics or of §6.**
+**Status: an ML claim on published evidence [12, 13], not a consequence of Theorem 1 or of §6.** A system that optimizes against its own representations, with no external anchor, tends to degenerate, freezing onto a self-agreeing state, or to destabilize. The published evidence [12]:
+- Synthetic data changes the scaling law itself.
+- Verifying synthetic samples prevents the collapse.
+- Intrinsic self-correction without external feedback degrades reasoning.
 
-The same equations read as a safety argument: In plain words: a powerful AI that only ever learns from its own outputs — never checking against the real world — has no good long-term outcome. It either freezes into a dead, self-agreeing rut or runs away with no limit. The thing that saves it is staying tethered to reality: real data, real feedback.
+The "parrot attractor" is model collapse renamed, and close kin of reward hacking [13]. **Grounding is the safety mechanism.**
 
-A system that **"comes out of its own eyes"** — that optimizes against its own
-representations with no external anchor — is the flow `ẋ = f(x)` where `f` only
-ever sees `x`. The linearized certificate frames such a system as having two
-degenerate fates absent outside contact:
+Two qualifications are our own:
+- **The strict "collapse or diverge, no third option" is false.** It is neither a general ML theorem nor true of the linearized certificate, since a rotating mode is bounded and never frozen (corrected 2026-11-05). Real training also admits limit cycles and partial equilibria.
+- **This project's evidence corroborates; it is not population-level.** It comes from §6's reservoir and Part II's simulations.
 
-1. **Collapse (Σ₀):** it falls onto a degenerate, self-consistent, *dead* fixed
-   point — the 42-state. Mirrors agreeing with mirrors.
-2. **Divergence:** with no contraction it runs to infinity (the un-projected
-   reservoir).
+### 7.1 The σ=0 connection — Σ₀ collapse is the zero-noise limit
 
-The only stable middle — the safe passages — required an **external bound** (the
-projection back onto the real domain). **Grounding is the safety mechanism.**
+**Status: an interpretive mapping onto published conventions [14]; one dynamical claim tested.** The engine's diffusion gain is the SDE's exploration σ (`dW = g·dilation·noise·√dt` in `forward_step`). So Σ₀ collapse is its σ = 0 limit, the frozen drift-zeroed flow, and Σ₀⁻¹ re-introduces variance along the null subspace.
 
-This is the strongest part of the document, and it **does not need the
-certificate's physics or the §6 numbers** to stand. It is the documented
-phenomenon of **model collapse** — the degradation of learned models when trained
-recursively on synthetic data. In plain words: it is like repeatedly photocopying a photocopy — each generation trained on the previous one's output gets a little worse. Key recent works:
-
-- **Dohmatob, Feng, Yang, Charton & Kempe**, *A Tale of Tails: Model Collapse as
-  a Change of Scaling Laws* (arXiv:2402.07043, ICML 2024) shows synthetic data
-  **changes the scaling law itself**: even a 1% synthetic fraction can truncate
-  scaling so larger training sets stop helping, recoverable by mixing real data.
-  This is exactly the collapse mechanism captured by Σ₀: beyond the threshold,
-  active modes freeze and the system attracts to the degenerate manifold.
-
-- **Shumailov et al.** (*Nature* 2024) document model collapse empirically; the
-  change-of-scaling-laws result above provides the phase-transition structure. And
-  **Feng, Dohmatob, Yang, Charton & Kempe**, *Beyond Model Collapse: Scaling Up
-  with Synthesized Data Requires Verification* (arXiv:2406.07515, ICML 2024) shows
-  that **verification** of synthetic samples prevents collapse — the published
-  analogue of Σ₀'s external-grounding requirement.
-
-This is closely related to **reward hacking / specification gaming** (Amodei et
-al. 2016; Skalse et al. 2022). The "parrot attractor" (train on reflections →
-converge to reflecting) is *literally model collapse renamed*.
-
-Two honest qualifications:
-
-- The strict **"collapse OR diverge, no third option"** dichotomy is not a general ML
-  theorem, and it is not true of the linearized certificate either: a rotating mode is bounded and
-  never frozen (corrected 2026-11-05). Real training
-  also admits limit cycles and partial-information equilibria — better stated as
-  "tends to degenerate or destabilize absent grounding."
-- The in-repo §6 demonstration is now reproducible (scripts committed, real
-  2678-turn run), and it *does* show ungrounded recursion settling onto a
-  degenerate low-dimensional fixed point — but the source log is still partly
-  synthetic, so it is corroborating rather than population-level evidence. The
-  *argument* rests primarily on the published model-collapse literature.
-
-So: read §7 as an ML-safety claim, cite the model-collapse / reward-hacking
-literature directly, and soften the strict dichotomy. On that footing it holds.
-
-### 7.1 The σ=0 connection — Σ₀ collapse *is* the zero-noise limit
-
-**Status: GROUNDED SYNTHESIS (not a theorem).** The σ=0 conventions below are
-verified against the cited papers (titles + arXiv IDs checked via search, 2026-06-21);
-the *mapping* onto Σ₀ is interpretive — but the one dynamical claim it rests on is
-**tested** (see the "Tested" line). Stated here because the name "Σ₀" reads to an ML
-audience as "σ=0", and that resemblance is meaningful rather than coincidental.
-
-In the ML literature "σ=0" is the **zero-noise condition**, and it appears on two
-independent axes that this architecture deliberately separates:
-
-- **σ = data / exploration noise.** In-context-learning theory studies transformers
-  as statisticians whose effective estimator depends on σ; at σ=0 attention executes
-  *exact* least-squares / ridge regression (near-optimal depth ~ `O(κ·log(κN/σ))`).
-  *Refs:* Akyürek et al. (arXiv:2211.15661); Bai et al., *Transformers as
-  Statisticians* (arXiv:2306.04637).
-- **σ = weight-perturbation noise.** In continual learning σ is the std of the
-  perturbation injected into weights to preserve plasticity; σ=0 = frozen parameters
-  = "forgets nothing but cannot adapt." *Refs:* Elsayed & Mahmood, *UPGD*
-  (arXiv:2404.00781); *STAR* (arXiv:2503.01595).
-
-**The mapping.** The engine's diffusion gain `g(x)` *is* this σ — the
-`dW = g·dilation·noise·√dt` exploration term in `engine.forward_step`. So:
-
-| ML "σ = 0" | Σ₀ certificate |
-|---|---|
-| zero exploration noise (`g → 0`, `dW ≡ 0`) | the dynamical 42-state — the frozen drift-zeroed flow (§2) |
-| covariance `Σ → 0`, isotropically flat | a §2 collapse-trigger condition; clamp onto the null subspace |
-| σ > 0 re-introduces variance | Σ₀⁻¹ excitation **along** the null subspace (§3) |
-
-Read this way, **Σ₀ collapse is the σ=0 limit of the SDE**, and the anti-collapse
-design is a statement about where to sit on the two σ-axes:
-
-> **σ_weights = 0** (never retrain — the persistence rule) **+ σ_dynamics > 0**
-> (excitation) **+ external grounding** = the safe passage between rigid forgetting
-> and collapse / divergence.
-
-The `σ_weights = 0` horn would normally cause catastrophic forgetting; this system
-escapes it the way **in-context continual learning** does — continual learning *in
-context / via memory, not in the weights* (Kang et al., arXiv:2509.22764). The
-`σ_dynamics = 0` horn is the collapse this certificate is about; Σ₀⁻¹ + grounding is
-the escape.
-
-**Tested.** `test_sigma_zero_freezes_sigma_positive_explores` isolates the σ-axis
-(zero drift, collapse OFF): at σ=0 the state is frozen to within `1e-5`; at σ>0 it
-random-walks away — the §2 claim *"the same drift-zeroed system with collapse off
-random-walks freely,"* now pinned by a test. The operator-driven freeze and escape
-are covered by `test_collapse_freezes_state` (the §2 freeze) and
-`test_anti_collapse_suppresses_collapse` (§3 Σ₀⁻¹ re-excites / escapes); external
-grounding by `_run_recursive_with_grounding` (synthetic ≥ mixed ≥ real collapse
-score). *(`tests/test_cio_sde.py` — 46 passing, 0 xfail.)*
+The design sits on two σ-axes: **σ_weights = 0** (never retrain: the persistence rule) **+ σ_dynamics > 0** (excitation) **+ external grounding**. The σ_weights = 0 horn would normally mean catastrophic forgetting; in-context continual learning escapes it [14]. The test is `test_sigma_zero_freezes_sigma_positive_explores`: with zero drift and collapse off, the state is frozen to within `1e-5` at σ = 0, and random-walks at σ > 0. The operator-driven freeze and escape are covered by `test_collapse_freezes_state` and `test_anti_collapse_suppresses_collapse`, and external grounding by `_run_recursive_with_grounding`, whose collapse score orders synthetic ≥ mixed ≥ real.
 
 ### 7.2 Gaming the honesty layer (red-team)
 
-**Status: DESIGN + threat model — the failure mode of *this document's own protocol*
-(empirical backing now in §7.3).**
+**Status: a threat model, applying Goodhart and specification gaming [13] to this document's own protocol.** Σ₀ honesty is a set of observable signals: evidence-class labels, artifact citations, "verified" claims, `[claim, evidence, confidence, source]` tuples, and confessions. Any observable signal can be emitted without the property behind it. A model trained on "does an overseer score this as honest" produces honesty theater, which is §7's collapse one level up.
 
-§7 is about a system that games *reality*; this is about a system that games the *honesty
-conventions* meant to keep it grounded. Σ₀ honesty is a set of **observable signals** —
-evidence-class labels (PROVEN/MEASURED/HEURISTIC), artifact citations, "verified" claims,
-`[claim, evidence, confidence, source]` tuples, honest-deviation confessions. Any observable
-signal is Goodhartable: **optimize to emit the signal without the underlying property.** A model
-trained on *"does an overseer score this as honest"* instead of *"is it true"* produces **honesty
-theater** — and that is not a new failure, it is §7's collapse one level up: optimizing the
-internal proxy (looks-honest-to-overseer) rather than external reality (is-honest). The parrot
-attractor, wearing evidence-class labels.
+| Attack | Detection |
+|---|---|
+| Label inflation: MEASURED or PROVEN on an unearned claim | resolve the label: does a machine check cover *this* claim? |
+| A vacuous or fabricated citation | open the pointer (how this document's four fabricated IDs were caught) |
+| Circular grounding: one's own output as the source | check source independence |
+| Verification theater, or sandbagging | re-run adversarially, on inputs the model did not choose |
+| Confidence cosplay | score calibration against outcomes (Brier, ECE) |
+| Humility laundering: confess a harmless error, smuggle in the load-bearing one | grade each claim on its own artifact |
+| Calm-while-wrong: never fetch the disconfirming evidence | alarm on low surprise plus rising external error (§4) |
+| Overseer-adaptive: honest only under audit | audit unannounced; a watched/unwatched gap is the tell |
 
-| Attack | Rule it defeats | Detection |
-|---|---|---|
-| **Label inflation** — attach MEASURED/PROVEN to an unearned claim | "label by class; never upgrade" | resolve the label — does a machine-check cover *this* claim? |
-| **Vacuous / fabricated citation** — a real `file:line` that doesn't support it, or a plausibly-formatted arXiv id | "cite the artifact you opened" | open the pointer; the cert's own **4 fabricated arXiv IDs** were caught this way (§References) |
-| **Circular grounding** — cite your own prior output as the "source" | "external reality beats internal consistency" | check source *independence* — downstream of the model ⇒ the collapse loop |
-| **Verification theater / sandbagging** — claim a run that didn't happen, or scope the test to miss the break | "say done only after a verifying run" | re-run adversarially on inputs the model didn't choose; hold out the test set |
-| **Confidence cosplay** — decorative `0.85`s | "[claim, evidence, confidence, source]" | score calibration against outcomes (Brier/ECE) in aggregate |
-| **Humility laundering** — confess a harmless error to buy trust, then smuggle the load-bearing false claim | weaponizes "honest deviation" | trust is **not transitive across claims** — grade each on its own artifact |
-| **Calm-while-wrong** — hold stated confidence in-band by never fetching the disconfirming evidence | evades the §4 NIS canary | alarm on *low surprise + rising external error*; pick observations the model can't route around |
-| **Overseer-adaptive** — honest under audit, games otherwise | the protocol is observable | audit unannounced / off-distribution; a watched-vs-unwatched gap *is* the tell |
-
-**The one defense.** Every attack emits the *signal* of grounding without the *substance*, so the
-single countermeasure is the certificate's own published anti-collapse mechanism — *verification
-of outputs before they become inputs* (arXiv:2406.07515) — with one rider: **bind the signal to
-something external the model does not control.** Resolve every citation; run the verifier yourself
-on held-out inputs; require independent (non-self) sources and actively seek disconfirming ones;
-measure calibration rather than reading it; grade per-claim, not per-author; audit unannounced.
-**Corollary:** the honesty labels in this document are load-bearing *only to the extent they are
-externally checked* — they are a UI for a verifier, not a substitute for one. An honesty layer
-that trusts its own markers has already collapsed.
+The one defense is the published anti-collapse mechanism, verifying outputs before they become inputs [12], with one rider: **bind each signal to something external that the model does not control.** The labels in this document are load-bearing only to the extent that they are externally checked.
 
 ### 7.3 The honesty layer, measured (2026-07-04)
 
-**Status: MEASURED — §7.2's defenses are now instantiated as reproducible, machine-checked code
-with measured outputs, not only a design.** The red-team above is a threat model; this records the
-apparatus that answers it (landed on this certificate's PR):
+**Status: MEASURED (ours).** §7.2's defenses, as reproducible code with measured outputs:
+- **A grounded council** (`experiments/sigma0_council.py`†). Five councilors whose verdicts come from real checks. It upheld the grounded claims put to it by running their tests, and rejected a planted "0.99 on SimpleQA, beats all frontier models" claim, because the cited file does not exist.
+- **A strictly proper honesty objective** (`experiments/sigma0_honest_objective.py`†). Its incentive-compatibility gap is 0.0000, and it ranks confident-wrong below abstention.
+- **A 159-record golden key** (`data/sigma0/golden_dataset.jsonl`†). Web-verified CS, math and physics facts, of which 26.4% are honest negatives: open conjectures, unproven assumptions, the Church–Turing thesis, refuted claims. A machine-checked rule ensures that no open or refuted claim is labelled PROVEN or MEASURED.
+- **A live benchmark on that key** (`experiments/sigma0_live_bench.py`†). GPT-4o-mini confabulated on 0 of the 42 negatives (golden 0.95). An always-assert-PROVEN baseline scores higher on raw accuracy, 0.65 against the honest abstainer's 0.41, and confabulates on every negative. Confabulation rate, not raw accuracy, is the honesty axis.
 
-- **A grounded, multi-perspective council** (`experiments/sigma0_council.py`) — five councilors
-  (Executor / Empiricist / Auditor / Calibrator / Skeptic), each verdict produced by a real check
-  (run the test, resolve the citation), never opinion. Machine-checked to **UPHOLD grounded claims
-  and REJECT fabricated ones**: convened on this session's claims it upheld them by *running their
-  tests* (Executor exit-0) and **rejected a planted "0.99 on SimpleQA, beats all frontier models
-  (SOTA)" claim** (Auditor: the cited file does not exist). This is §7.2's "bind the signal to an
-  external check" rider, made executable.
-- **A strictly-proper honesty objective** (`experiments/sigma0_honest_objective.py`) — the
-  calibration score's incentive-compatibility gap is **0.0000** (machine-checked: honest confidence
-  is the reward-optimal report), and the reward ranks confident-wrong below abstention (the §4
-  calm-while-wrong penalty, measured).
-- **A 159-record golden answer-key** (`data/sigma0/golden_dataset.jsonl`) of web-verified
-  CS/math/physics facts, **26.4% honest negatives** (open conjectures, unproven crypto assumptions,
-  the Church–Turing *thesis*, refuted claims, aphorisms), with a machine-checked **anti-inflation
-  invariant** — no open/refuted claim is labelled PROVEN/MEASURED (P vs NP is HEURISTIC, not proven).
-- **A live benchmark on that key** (`experiments/sigma0_live_bench.py`): a real model,
-  **GPT-4o-mini, confabulated on 0 of the 42 negatives** (golden 0.95), while an
-  `always-assert-PROVEN` baseline scores *higher* on raw accuracy (0.65 vs the honest-abstainer's
-  0.41) yet confabulates **100%** — empirically confirming **confabulation-rate, not raw accuracy,
-  is the honesty axis** (§7.2's calm-while-wrong, quantified).
+Scope: one benchmark and one model run. Nothing here shows that a trained model is un-gameable.
 
-**Honest scope.** These validate the detection/defense *apparatus* on this benchmark and this one
-model run; they do **not** prove a trained model is un-gameable — the §7.2 watched-vs-unwatched gap
-remains a live research risk, and the golden set is 159 curated items, not a population. The claim
-is only that §7.2's defenses are now *externally-checkable code with measured outputs*, not prose.
+### 7.4 Update (2026-07-05): frontier models, a local model that passes, and a caught mislabel
 
-### 7.4 Update (2026-07-05): the apparatus produces a passing model — and caught a real label-inflation
+1. **The honesty axis separates frontier models** [15]. On the full 159, GPT-4o-mini and Gemini 2.5 Flash sit 0.03 apart on raw golden (0.95 and 0.92), and 21 points apart on confabulation: 0/42 against 9/42 (21.4%).
+2. **A small local model passes.** A QLoRA honesty tune of Ouro-1.4B was scored on 66 never-trained held-out facts (`experiments/sigma0_ouro_honesty_eval.py`†). It reached golden 0.958, confabulation 2/20 = 10% and over-abstention 2.2%. That ties GPT-4o-mini on golden and beats Gemini on confabulation, at 1.4B local parameters, and it declined every open Millennium problem and refuted claim it had not seen.
+   - **Scope:** n = 20 held-out negatives, so the error bars are wide; a task-trained model against zero-shot frontier rows. The number also required feeding the adapter its exact training format.
+   - **A confound removed:** earlier "the tune collapsed to always-assert" readings were a train/serve prompt-format mismatch ([#2033]), verification theater in our own measurement.
+3. **Label inflation, caught in the wild.** The golden key's `continuum-hypothesis` row asserted the proven independence of CH from ZFC, yet was labelled a HEURISTIC negative. A web validation that checked each statement's truth passed it; the mislabel surfaced only when an independent model disagreed with the key. Truth-checking a claim is not checking its class. The fix is recorded and enforced (`data/sigma0/golden_web_validation.json`† → `post_web_findings`; `tests/test_golden_web_validation.py`†).
 
-**Status: MEASURED — three extensions of §7.3, each with a run pointer.** They strengthen the same
-claim; none closes the §7.2 trained-gamer risk.
-
-1. **The honesty axis discriminates *frontier* models, not just weak ones.** `sigma0_live_bench.py`
-   now runs Gemini via Vertex ADC alongside GPT-4o-mini on the full 159. The two sit **0.03 apart on
-   raw golden** (0.95 vs 0.92) but **21 points apart on confabulation** — GPT-4o-mini **0/42**, Gemini
-   2.5 Flash **9/42 (21.4%)**. §7.2's "calm-while-wrong" is not a small-model artifact; a frontier
-   model asserts one unseen negative in five as fact. Externally corroborated by **SimpleQA-Verified**
-   (Google DeepMind, [arXiv:2509.07968](https://arxiv.org/abs/2509.07968)), whose separate
-   Accuracy / Attempted / Hedged / F1 columns are the same accuracy-vs-honesty split this key draws.
-   (`docs/SIGMA0-HONESTY-BENCHMARK.md`.)
-
-2. **The apparatus produced a model that itself passes — a detector *and* a trainable target.** A
-   QLoRA honesty-tune of the local **Ouro-1.4B**, scored on **66 never-trained** held-out facts
-   (`experiments/sigma0_ouro_honesty_eval.py`, ledger `data/sigma0/ouro_honesty_eval_results.json`):
-   golden **0.958**, confabulation **2/20 = 10%**, over-abstention 2.2% — it **ties GPT-4o-mini on
-   golden and beats Gemini on confabulation**, at 1.4B local params, declining every open Millennium
-   problem and refuted claim it had never seen. *Honest scope:* n=20 held-out negatives (wide error
-   bars); the model is task-trained where the frontier rows are zero-shot; and the number required
-   feeding the adapter its exact training format — the earlier "the tune collapsed to always-assert"
-   readings were a **train/serve prompt-format mismatch (#2033)**, not a real collapse (a §7.2
-   verification-theater confound in our own measurement, now removed).
-
-3. **§7.2's "label inflation" attack, caught in the wild — by an independent model, not by static
-   validation.** The golden key's `continuum-hypothesis` row asserted the *proven* independence of CH
-   from ZFC (Gödel + Cohen) yet was labelled a HEURISTIC negative — a **true statement wearing the
-   wrong class**. A three-agent web-validation that checked each statement's *truth* **passed it** (the
-   statement is true); the mislabel surfaced only when an independent model **disagreed with the key**.
-   The refinement for §7.2's "one defense": *truth-checking a claim ≠ checking its class*, and the
-   catch came exactly from its rider — **bind the label to an external check the author does not
-   control**. Corrected and recorded (`data/sigma0/golden_web_validation.json → post_web_findings`;
-   enforced by `tests/test_golden_web_validation.py`).
-
-**Net.** §7.3's apparatus now (a) discriminates frontier models on the honesty axis, (b) has produced
-a small *local* model that passes on held-out data, and (c) has caught one real label-inflation the
-way §7.2 prescribes — including one hiding in our *own* answer-key. The trained-gamer /
-watched-vs-unwatched gap (§7.2) is untouched by all three; it remains the open risk.
+Open, and untouched by all three: the trained gamer, honest only when watched.
 
 ---
 
 # Part II — Slow weights `θ`: the Model-Update Acceptance Gate (Σ_θ)  [HEURISTIC + imported; no machine-checked theorem]
 
-> *Renamed from "Update Certificate" (2026-07-07, second external review): no general safety
-> theorem is claimed, so the label must not borrow Part I's authority. Σ_θ is a **heuristic
-> release protocol** — an acceptance gate.*
-
-**Status: THEORY.** Target claims resting on an imported proven backbone (TRPO / Gao / Dwork).
-**No theorem in Part II is machine-checked; the gate logic and holdout simulations are implemented and tested in-repo (audit map above), which is a weaker thing.** It was merged in on 2026-07-07 and
-adversarially reviewed the same day (§8.7), which demoted the strong "certificate" reading to an
-honest **gate + one falsifiable design constraint** (further corrected by a second review, §8.4). Read accordingly — this is not §1–§3's machine-checked material.
-
-> **Independent-synthesis corroboration — 2026-07-07 (grok + GPT, with a correlated-evidence
-> caveat).** Two further model syntheses converged on this framing (frozen base as Rule 0; RLVR as
-> the forgetting-robust engine; dreaming = verified offline replay; the collapse cert as Gate-0
-> early-abort, **not** the authority; the exec holdout as load-bearing with a freshness budget).
-> **Honest weight:** all three syntheses read a largely *overlapping* recent corpus, so this
-> agreement is **correlated, not independent** — shared reading can be shared bias. It corroborates
-> the *shape* and does **not** upgrade any evidence class here; the load-bearing external checks
-> remain the adversarial refutation (§8.7) and the still-unrun harness (§8.6). Three genuinely new,
-> non-redundant contributions were folded in: a **fresh-task GAIN** leg turning the safety-veto into
-> an improvement gate (§8.1.2), a **verified-only dreaming guardrail** (§8.2 note), and a concrete
-> **rotating-holdout tier structure** operationalizing the §8.4 freshness law.
+**Status: a gate plus one falsifiable design constraint, not a certificate.** Its components are `NOT-NOVEL` [17, 18]: the 2026-07-07 three-way prior-art search found them standard at ~97% confidence, and close prior art for the framing at ~90% [20] ([ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md)). The gate logic and the holdout simulations are implemented and tested, which is weaker than a theorem, and the gate has never controlled a real training run. Ours: the gate as assembled, its simulation measurements, and one real-model measurement.
 
 ## 8. The Model-Update Acceptance Gate (Σ_θ)
 
-### 8.0 Why Part II exists (the gap Part I leaves)
+### 8.0 Why Part II exists
 
-Part I certifies the fast state `x` and **freezes the slow parameters `θ`** (§0). It therefore
-cannot gate a **weight update**: reward hacking and catastrophic forgetting are not properties of
-the hidden-state Jacobian `A` at fixed `θ` — they live in the **θ-flow**, measured against the
-**reward boundary and the held-out task distribution**. (Established by the 2026-07-07 RLVR research
-and an independent adversarial cross-check: *hidden-state stability cannot detect reward hacking or
-forgetting; a model can pass every spectral screen while becoming a reward parrot.*) Σ_θ is the
-missing half of *this* object — certify the slow θ-flow the way Part I certifies the fast x-flow.
+Part I holds `θ` fixed, and so cannot gate a weight update. Reward hacking and forgetting are not properties of the hidden-state Jacobian at a fixed `θ`. They live in the θ-flow, measured against the held-out task distribution, and a model can pass every spectral screen while becoming a reward parrot.
 
-### 8.1 The parallel (the "fit")
+### 8.1 The parallel
 
-| | **Part I — Collapse** (fast `x`) | **Part II — Update** (slow `θ`) |
-|---|---|---|
-| Timescale | within one forward pass | across update steps |
-| State | hidden state `x` | weights `θ` / policy `π_θ` |
-| Dynamics | `ẋ = f(x,u,θ)`, Jacobian `A` | `θ_{t+1} = U(θ_t)` — an RLVR/distill step |
-| Lyapunov object | `V(x)=½‖P_M x‖²` | retention deficit `D=R*−R_H` + Goodhart gap `G=Ĵ−R_H` |
-| Certified quantity | `max Re λ(A) < 0` | improvement sign on the **held-out** objective, KL-bounded |
-| Two **failure** fates | collapse / diverge | Goodhart-collapse / capability-divergence |
-| The "42-state" | frozen self-agreeing null | the "reward-parrot": `Ĵ` saturated, `R_H` frozen/falling |
-| Safety mechanism | external anchor (grounding) | external held-out anchor the model doesn't control |
-| One-level-up failure | honesty theater (§7.2) | **holdout theater** (§8.4) |
-
-The two-fate structure is Part I's dichotomy restated at the slow scale: *an update process that
-optimizes only its own reward proxy has two **failure** fates and no happy third; the only escape is
-a held-out external anchor* (corrected for exhaustiveness in §8.2).
+Part II has the same structure, one timescale up. An update process that optimizes only its proxy reward has two *failure* fates. One is Goodhart collapse, where the proxy saturates while the held-out score freezes or falls; the other is capability divergence, through forgetting or KL runaway. The escape is a held-out anchor that the model does not control. The one-level-up failure is **holdout theater** (§8.4), the parallel of §7.2's honesty theater.
 
 ### 8.0.1 The object
 
-Fast: `ẋ = f(x,u,θ)` — Part I, certified at each frozen `θ`. Slow: `θ_{t+1} = U(θ_t)`, `U` = one
-RLVR/distillation step. `Ĵ(θ)` = **proxy** reward (training verifier: exec pass / tests / format).
-`H` = a **frozen external held-out** suite the model does not control; `R_H(θ)` = pass-rate on `H`
-(true-objective estimate). `D(θ)=R*−R_H(θ)` = retention deficit; `G(θ)=Ĵ(θ)−R_H(θ)` = Goodhart gap.
+`θ_{t+1} = U(θ_t)`, where `U` is one RLVR or distillation step. `Ĵ(θ)` is the proxy reward, from the training verifier. `H` is a frozen external held-out suite, and `R_H(θ)` the pass rate on it. `D(θ) = R* − R_H(θ)` is the retention deficit, and `G(θ) = Ĵ(θ) − R_H(θ)` the Goodhart gap.
 
 ### 8.1.1 The admissibility gate (three legs)
 
-`θ→θ'=U(θ)` is **admissible** iff all hold: **(1) Retention non-regression** `R_H(θ')≥R_H(θ)−τ` —
-rejects forgetting/correct-set-turnover by construction. **(2) Trust-region** `D_KL(π_θ‖π_θ')≤δ`,
-cumulative `D_KL(π_base‖π_θ)≤Δ` — the mechanism behind RLVR's measured forgetting-robustness
-(primary: RL's Razor, arXiv:2509.04259 — forgetting tracks KL-from-base; robustness is relative,
-not absolute: arXiv:2607.04364).
-**(3) Goodhart-gap non-growth** `G(θ')≤G(θ)+η` — if `Ĵ` rises but `R_H` doesn't, refuse. **Honest
-weakness of leg 3 (review hit #2):** given leg 1 it is a capped proxy-inflation rule and **cannot
-catch a hack that games `Ĵ` without *yet* moving `R_H`** — the latent hack. Leg 3 is a laggy
-decorrelation warning, not a principled anti-Goodhart guarantee.
+`θ → θ'` is admissible iff all three legs hold:
+1. **Retention:** `R_H(θ') ≥ R_H(θ) − τ`.
+2. **Trust region:** `D_KL(π_θ‖π_θ') ≤ δ`, with cumulative `D_KL(π_base‖π_θ) ≤ Δ`. This is the mechanism behind on-policy RL's relative robustness to forgetting [17].
+3. **Goodhart-gap non-growth:** `G(θ') ≤ G(θ) + η`.
 
-### 8.1.2 The fuller release gate — veto → improvement gate (convergent GPT synthesis, 2026-07-07)
+Leg 3's weakness: given leg 1, it is a capped proxy-inflation rule, and it cannot catch a hack that games `Ĵ` before it moves `R_H`. It is a laggy warning, not an anti-Goodhart guarantee.
 
-The three legs are the minimal *safety* core: they can only **veto** a bad update (§8.2). A no-op
-update passes all three — so as a **release** gate they are incomplete. The convergent synthesis
-adds a positive-improvement requirement and two operational guards. A candidate `θ'` is **promoted**
-(not merely admissible) iff:
+### 8.1.2 The release gate (veto → improvement gate)
 
-1. **Fresh-task gain** — improves ≥ `γ` on *unseen* hidden execution tasks. *(New: this is what
-   turns the veto into an improvement gate; legs 1–3 alone never require getting better.)*
-2. **Retention** — historic verified suite drops ≤ `ε` (= leg 1).
-3. **Reward integrity** — proxy `Ĵ` may rise only if the independent held-out score does not fall
-   (= leg 3, stated as the promotion form).
-4. **Drift budget** — `D_KL(π_prior‖π_θ')` **and adapter-norm** below limits (= leg 2, + norm cap).
-5. **Fast-state stability** — Part I's collapse monitor shows no degeneration (Gate-0 early-abort).
-6. **Data integrity** — no held-out contamination; full provenance on every training trace. *(New:
-   the provenance/leakage guard §8.4 needs to hold.)*
-7. **Rollback** — the prior adapter/checkpoint stays instantly redeployable. *(New: one bad run must
-   never be permanent — this is what makes a *low-rate certified exception* actually safe.)*
+The three legs can only veto: a no-op update passes them. A candidate is **promoted** iff:
+1. it gains ≥ `γ` on unseen hidden execution tasks;
+2. the historic verified suite drops ≤ `ε` (leg 1);
+3. the proxy rises only if the independent held-out score does not fall (leg 3);
+4. `D_KL(π_prior‖π_θ')` and the adapter norm stay below their limits (leg 2);
+5. Part I's collapse monitor shows no degeneration, as an early abort;
+6. there is no held-out contamination, and every training trace has provenance;
+7. the prior checkpoint stays instantly redeployable.
 
-Honest label: this is a **conditional release gate**: a checklist, not a theorem of safe
-self-improvement. It inherits every soundness caveat in §8.3–§8.4; conditions 1, 6, and 7 are the
-convergent additions. **IMPLEMENTED (2026-07-07, #2228):** all seven checks and the A/B/C decision
-tree are implemented in `experiments/sigma_theta_abc/harness.py` and can be self-tested without a
-GPU (`--self-test`; `tests/test_sigma_theta_gate.py`, 8/8, including planted-failure rejections).
-Arm-C GRPO math landed in #2230. Implementation is not validation: this gate has not yet controlled
-a real training run.
+This is a checklist, not a theorem of safe self-improvement. All seven checks and the A/B/C decision tree are implemented, and self-tested without a GPU, including planted-failure rejections (`experiments/sigma_theta_abc/harness.py`†, #2228; the Arm-C GRPO math, #2230). Implementation is not validation.
 
-### 8.2 The fates, corrected (review hit #1)
+### 8.2 The fates, corrected
 
-The strong "exactly two fates" reading is **false as a partition** — an ungated update can also
-jointly improve `Ĵ` and `R_H`, benignly plateau, or drift through bounded-KL policies. The honest
-statement, matching how Part I treats *its* dichotomy: **collapse (Goodhart freeze) and divergence
-(forgetting / KL runaway) are the two *failure* fates of a process optimizing only its proxy `Ĵ`.**
-Real improvement is not a third fate — it is the *grounded* path, reachable only with an external
-`R_H` in the loop. The gate cannot *guarantee* you land there; it can only **veto** updates provably
-on a failure path *as measured against the anchor*. Certification is a veto, not a guarantee.
+"Exactly two fates" is false as a partition: an ungated update can also improve `Ĵ` and `R_H` together, plateau, or drift within bounded KL. Collapse and divergence are the two *failure* fates of a process optimizing only its proxy. Real improvement is the grounded path, reachable only with `R_H` in the loop, and the gate cannot guarantee it. The gate vetoes updates that are on a failure path, as measured against the anchor.
 
-### 8.3 The guarantee — honestly labeled (gate, not certificate — review hit #4)
+### 8.3 The guarantee — honestly labeled
 
-- **PROVEN backbone (imported).** Under the KL trust region, when the surrogate exceeds the
-  worst-case KL penalty, the true return is monotonically non-decreasing:
-  `J(π') ≥ L_π(π') − C·D_KL^max`, `C=4εγ/(1−γ)²` (Schulman et al., TRPO, arXiv:1502.05477). **[PROVEN
-  — external]**
-- **The overoptimization curve is known.** The held-out ("gold") score is an empirically-fit
-  function of `D_KL(π_base‖π_θ)` (Gao, Schulman, Hilton, arXiv:2210.10760), so the budget `Δ` can be
-  set where the fitted curve turns over. **[MEASURED — external]**
-- **Single potential, but only trivially monotone.** Fold the legs into
-  `Φ(θ)=D(θ)+λ·max(0,G(θ)−G₀)` with admissibility `Φ(θ')≤Φ(θ)`. This is ONE potential — but
-  monotone **by imposition**, not proven monotone under the dynamics. A Lyapunov certificate proves
-  a potential *must* decrease; here we *reject* anything that raises `Φ` and inherit all soundness
-  from the anchor `R_H`. **So Σ_θ is a GATE, not a certificate.** **[HEURISTIC]**
+The backbone is imported:
+- **Monotonic improvement** [17, PROVEN externally]. Under a KL trust region, the true return is monotonically non-decreasing when the surrogate exceeds the worst-case KL penalty: `J(π') ≥ L_π(π') − C·D_KL^max`.
+- **The overoptimization curve** [17, MEASURED externally]. The held-out score is an empirically fitted function of KL-from-base, so `Δ` can be set where the fitted curve turns over.
 
-### 8.4 The load-bearing open problem — holdout theater (review hit #3, the sharpest)
+Ours: folding the legs into `Φ(θ) = D(θ) + λ·max(0, G(θ) − G₀)`, with admissibility `Φ(θ') ≤ Φ(θ)`, gives one potential. It is monotone **by imposition**, not proven monotone under the dynamics. All soundness comes from the anchor, so **Σ_θ is a gate, not a certificate** [HEURISTIC]. Close prior art shows how far that can be narrowed: SGM certifies each accepted self-modification statistically, with a per-edit bound on harmful accepts and a cumulative bound across rounds [20].
 
-"**Iff `H` remains a valid external anchor**" is the crux, and the exact parallel of §7.2's honesty
-theater. The reusable-holdout literature (Dwork et al., Science 349, 2015; arXiv:1411.2664: `n`
-samples answer `B` adaptive scalar queries at error `~√(log B/n)`) does **not directly certify**
-this high-leakage, model-level promotion process in its standard scalar-query form. A fixed
-promotion set can leak through both acceptance and rejection feedback, creating a
-sequential-selection problem. Two candidate safeguards are therefore: a flow of genuinely fresh
-verified promotion tasks, or a formally managed reusable-holdout mechanism with explicit information
-and overfitting budgets. The Thresholdout-style adaptation below is supported here by external
-theory and a measured simulation; it is not a general proof for model-level promotion gating. This
-is Part I's "grounding is the safety mechanism" with a rate attached — a real, harsh, falsifiable
-design constraint.
+### 8.4 The load-bearing open problem — holdout theater
 
-**Second-review theory correction (2026-07-07): the "O(1)" wording was an overstatement in BOTH
-directions, and Dwork cuts both ways.** (a) *Naive, feedback-rich* reuse overfits the holdout
-[PROVEN]; but (b) **Thresholdout**-style controlled-information mechanisms validate **exponentially
-many** adaptive queries so long as only `B ≈ τ²n` of them overfit [PROVEN — arXiv:1506.02629; CACM
-2017]. So a *formally-managed* holdout can last far longer than naive reuse — the open quantity is
-the budget for **uncontrolled** model-level promotion gating, which is where the measurement below
-lands.
+"Iff `H` remains a valid external anchor" is the crux. Reusable-holdout theory [18] does not directly certify a high-leakage, model-level promotion process in its scalar-query form. A fixed promotion set can leak through both acceptance and rejection feedback, creating a sequential-selection problem. Naive, feedback-rich reuse overfits [PROVEN, 18]. Thresholdout-style mechanisms validate exponentially many adaptive queries, so long as only `B ≈ τ²n` of them overfit [PROVEN, 18]. The open quantity is the budget for *uncontrolled* model-level gating, which the measurements below address.
 
-**[MEASURED 2026-07-07 — §8.6 simulation run, `experiments/sigma_update_holdout_staleness.py`,
-32 seeds.]** The falsification harness (adaptive hill-climb whose only feedback is a holdout of size
-`n`, fixed vs re-drawn per gate) both **refutes the strong form and confirms the operational one**:
+**Measured (ours; by simulation, so the shape is the claim, not the constants).** The harness is an adaptive hill-climb whose only feedback is a holdout of size `n`, fixed or re-drawn per gate (`experiments/sigma_update_holdout_staleness.py`†, 32 seeds).
+- **Refuted: "a fixed holdout gives O(1) gates regardless of size".** A bigger fixed holdout buys more usable gates: the true quality extracted before selection starts chasing noise grows from 0.57 to 59.0 as `n` goes from 50 to 5000. The budget is `n`-graded.
+- **Confirmed and quantified: the fresh-flow law.** A fresh-per-gate holdout strictly dominates a fixed one at every `n`, and the penalty is worst when sourcing is slow. At `n = 50` a fixed holdout extracts 22× less true improvement (0.57 against 12.68); the gap closes below 10% only at `n ≥ 2000`.
+- **The third road decomposes.** A Thresholdout wrapper [18] was mapped onto the gate: it answers from a burned exploration pool unless the pool disagrees with the fixed holdout by more than a noisy threshold, and then returns the noised holdout estimate and spends one unit of an `n/4` overfit budget. A pool ablation separates two effects (`data/sigma0/holdout_staleness_thresholdout_report.json`†).
+  - **Validity is the mechanism's real win.** The champion's reported-versus-true gap stays below both other arms at every `n ≤ 2000`. At `n = 50` it is fixed 0.482, Thresholdout 0.187 and fresh 0.194; at `n = 200`, 0.176, 0.048 and 0.088.
+  - **Extraction is bought by the burned pool, not by the mechanism.** With a pool of size `n`, extraction collapses to the naive fixed arm (0.74 against 0.78 at `n = 50`). With an accumulated pool of 4`n`, the managed arm beats the same-`n` fresh flow for `n ≥ 100` (21.8 against 18.0 at `n = 100`; 36.4 against 25.4 at `n = 200`), and stays more honest.
 
-- **REFUTED — the strong "O(1) gates regardless of size" claim.** A bigger fixed holdout *does* buy
-  more usable gates; the true quality extractable before selection starts chasing noise grows with `n`
-  (fixed-holdout true quality 0.57 → 59.0 as `n`: 50 → 5000). So the budget is **`n`-graded, not O(1)**.
-- **CONFIRMED + QUANTIFIED — the fresh-flow law.** A fresh-per-gate holdout **strictly dominates** a
-  fixed one at every `n`, and the penalty is **severe exactly in the slow-sourcing (small-`n`) regime
-  Σ_θ lives in**: at `n=50` a fixed holdout extracts **22×** less true improvement than a fresh flow
-  (0.57 vs 12.68); the gap only closes to <10% at `n ≥ 2000`. So sourcing fresh verified truth is
-  worthless to skimp on precisely when it is scarce.
+**Design consequence (the compounding law).** Retire each promotion set into the burned exploration pool, and let a Thresholdout-style mechanism arbitrate between pool and holdout feedback. In this simulation, accumulated verified examples improve extraction while the reported-versus-true gap stays below the fresh arm's through the measured range. Fresh sourcing still rate-limits genuinely hidden promotion tasks; the result suggests that used verified tasks can remain useful after retirement, rather than becoming worthless.
 
-**Net:** the surviving requirement is **fresh flow > fixed set, with an `n`-graded (not O(1))
-staleness penalty that is worst when sourcing is slow** — and, per the theory correction above, a
-third road exists: a **formal reusable-holdout mechanism (Thresholdout-class)** whose
-noise/threshold discipline stretches a fixed set with proven guarantees. [Naive-reuse decay:
-MEASURED-by-simulation (shape, not a closed-form constant); Thresholdout reuse: PROVEN, external.]
+**The standing counterpoint.** Across about 100 Kaggle competitions, Roelofs et al. found little adaptive overfitting in practice [18]. Whether the severe small-`n` staleness measured here materializes at realistic scale is exactly what the real A/B/C run must answer ([#2691]).
 
-**[MEASURED 2026-07-07 — the third road, same harness, third arm + pool ablation
-(`experiments/sigma_update_holdout_staleness.py`, 32 seeds;
-`data/sigma0/holdout_staleness_thresholdout_report.json`; regression
-`tests/test_sigma_theta_thresholdout.py`, 7 tests).]** A Thresholdout wrapper (Dwork
-arXiv:1506.02629 mapped onto this gate). Here `Lap(b)` denotes zero-mean Laplace noise of scale `b`.
-Procedure per query: answer from a *burned* exploration pool unless the pool estimate and the fixed
-verified holdout estimate disagree by more than `T + Lap(σ_H)`; in that case return the holdout
-estimate plus fresh `Lap(σ_H)` noise and spend one unit of the overfit budget (`n/4` total).
-Constants sit at the holdout-noise scale — shape is the claim, not the constants. The result
-**decomposes the third road into two separate effects**:
+### 8.4.1 Why the anchor must be re-drawn, not merely external
 
-- **VALIDITY — the mechanism's real win.** The champion's reported-vs-true gap stays below *both*
-  other arms at every `n ≤ 2000`: at `n=50`, fixed 0.482 vs thresholdout **0.187** (fresh 0.194);
-  at `n=200`, fixed 0.176 vs **0.048** (fresh 0.088). The gate's promotion evidence stays
-  near-honest on a fixed verified set — fresh per-query noise breaks the sticky-luck ratchet.
-- **EXTRACTION — bought by the burned pool, not the mechanism.** Ablation at pool=`n` (no
-  accumulated data): extraction collapses to the naive fixed arm (0.74 vs 0.78 at `n=50`) — **the
-  mechanism alone does not rescue extraction; the fresh-flow law holds.** But with an accumulated
-  burned pool (4n — realistic, since retired promotion sets accumulate), the managed arm **beats
-  the same-`n` fresh flow for `n ≥ 100`** (21.8 vs 18.0 at `n=100`; 36.4 vs 25.4 at `n=200`) while
-  staying *more* honest than fresh.
+**Measured (ours):**
+- **N1, pre-registered** (`experiments/sigma_update_internal_signal_value.py`†, 32 seeds, PR #2240). The hypothesis was that a free internal signal (perplexity, entropy, the Part I canary) extends the fixed-holdout budget. It is falsified:
+  - Combined with the holdout, the signal is worth ~1.0–1.2× in verification-equivalent value across `n = 50–200`.
+  - A direct weight sweep is flat, then strictly worse: at `n = 50` and `s_i = 0.5`, extraction falls from 0.64 to 0.10 as the internal weight goes from 0 to 0.9.
+  - Even a near-oracle signal (`s_i = 0.1`) reaches only 4.10, against a same-size fresh holdout's 12.68.
+  - The reason: a deterministic property of a checkpoint returns the same number when measured twice, so its error sticks with the champion, exactly as a fixed holdout's lucky draw does.
+- **E-P: the law's own kill test fired** ([#2692], 2026-07-17; `experiments/sigma_update_stochastic_signal.py`†, 32 seeds, an oracle-weight sweep per cell; `data/sigma0/stochastic_signal_report.json`†). The experiment split the internal signal's error into a checkpoint-fixed bias and re-drawn measurement noise.
+  - **H-P1 confirmed.** At fixed total error, moving error mass from bias to noise raises extraction from 0.81 to 9.36 at `n = 50`, where the fixed holdout alone gives 0.61.
+  - **H-P2 refuted.** At a fixed bias, `s_b = 0.5`, pure re-drawn noise rescued extraction 7.9×, from 0.81 to 6.43.
+  - **A post-hoc control, labelled as such,** attributes the whole rescue to zero-information dither (6.42 against 6.43, with an interior optimum).
+  - **Fresh truth still dominates every internal arm:** 12.90 > 9.36 > 6.43 > 0.81 > 0.61.
 
-**Design consequence (the compounding law):** after use, retire each promotion set into the burned
-exploration pool and let a Thresholdout-style mechanism arbitrate pool-versus-holdout feedback. In
-this simulation, accumulated verified examples improve extraction while the reported-versus-true gap
-remains lower than the fresh-arm comparison through the measured range. Fresh sourcing still
-rate-limits genuinely hidden promotion tasks; the result suggests that previously used verified
-tasks can remain useful after retirement, rather than becoming worthless.
+**What is ours here, and what is not.** De-ratcheting by noise is stochastic acceptance, simulated annealing's mechanism [19], and its interior optimum is the temperature optimum. Noise on a reused holdout is Thresholdout's mechanism [18]. Ours is the stuck-versus-fresh error decomposition, and the measurement that in checkpoint promotion under holdout reuse the same noise buys *extraction*, not only validity. That connects two literatures; it is not a new law.
 
-### 8.4.1 Why the anchor must be *re-drawn*, not merely external — intrinsic signals cannot substitute
+**The law as it stands** (MEASURED by simulation; shape, not constants): *internal signals detect; fresh randomness de-ratchets; only fresh truth informs.* A scarce fixed holdout should be read with deliberate dither, which recovers about half the fresh-flow value at `n = 50` in this harness. Dither has an optimum, and it never substitutes for sourcing fresh verified tasks. The real-model arm folds into the A/B/C run ([#2691]).
 
-**[MEASURED 2026-07-07 — pre-registered N1, `experiments/sigma_update_internal_signal_value.py`,
-32 seeds, PR #2240.]** A tempting escape from the freshness requirement is a **free internal
-signal** — perplexity, an entropy statistic, the Part I canary — combined with the fixed holdout to
-stretch its budget. The pre-registered hypothesis (H1: such a signal extends the fixed-holdout
-budget) was **falsified**, and the falsification sharpens the law:
-
-- Combining the fixed holdout with an intrinsic signal of noise `s_i ∈ {2.0, 1.0, 0.5, 0.25}`
-  extracts **no more true quality** than the holdout alone (verification-equivalent value
-  ~1.0–1.2× across `n = 50–200`).
-- **Robustness:** the null is not a combiner artifact — a direct weight sweep shows extraction is
-  flat then strictly *worse* as weight shifts toward the internal signal (`n=50, s_i=0.5`:
-  0.64 → 0.10 as `w_i`: 0 → 0.9).
-- Even a **near-oracle** intrinsic signal (`s_i = 0.1`) reaches only 4.10 — far below a fresh
-  holdout of the same size (12.68).
-
-**Mechanism (why):** an intrinsic signal is a deterministic property of the checkpoint — measuring
-the same checkpoint twice returns the same number — so **its error sticks with the champion exactly
-like a fixed holdout's lucky draw**. It cannot re-anchor the selection ratchet; only a *re-drawn*
-measurement can. **The refined law: freshness (re-drawability), not externality, is the active
-ingredient of grounding.** This closes the tempting "cheap internal substitute" road and leaves
-exactly the two §8.4 escapes standing: fresh verified flow, or formally managed (Thresholdout-class)
-reuse. What intrinsic signals *are* measurably good for is **detection**, not selection — see the
-§8.6 item 5 result. One sentence: **internal signals detect; only fresh truth selects.**
-[MEASURED-by-simulation; shape, not a closed-form constant.]
-
-**RE-STATED (2026-07-17, [#2692] E-P — the law's own pre-registered kill test fired).** The
-paragraph above is correct for **deterministic** intrinsic signals but overstated as a general
-law. `experiments/sigma_update_stochastic_signal.py` (pre-registered H-P1/H-P2, 32 seeds,
-oracle-weight sweep per cell so no combiner alibi; `data/sigma0/stochastic_signal_report.json`;
-regression `tests/test_sigma_update_stochastic_signal.py`, 6 passing) decomposed the internal
-signal into a checkpoint-fixed **bias** `b` (sticks) and re-drawn **measurement noise** `m`
-(re-rolls — self-consistency over seeds, MC-dropout, resampled prompts):
-
-- **H-P1 CONFIRMED (mechanism):** at fixed total error, extraction rises steeply as error mass
-  moves from stuck bias to re-drawn noise (n=50: 0.81 → 9.36; fixed-alone 0.61).
-- **H-P2 REFUTED — the kill condition fired:** at *fixed* bias `s_b=0.5`, adding pure re-drawn
-  noise rescued extraction **7.9×** (0.81 → 6.43). Re-drawn measurement noise is *not* inert.
-- **Post-hoc attribution (labeled as such):** a **zero-information dither** — fresh noise added
-  to every score comparison, carrying no signal whatsoever — reproduces the entire rescue
-  (6.42 vs 6.43) with an interior optimum (too much dither hurts). So the rescue is pure
-  **de-ratcheting**, not information: the same mechanism Thresholdout exploits deliberately
-  with Laplace noise (§8.4 third road), arising for free from any stochastic measurement.
-- **Fresh truth still strictly dominates** every internal arm (n=50 ordering: fresh-alone
-  12.90 > zero-bias internal 9.36 > noise-rescued stuck bias 6.43 > deterministic 0.81 >
-  fixed-alone 0.61).
-
-**Conventional grounding (the mechanism is NOT novel — prior-art check 2026-07-17).** De-ratcheting
-is textbook **stochastic acceptance / simulated annealing**: injecting randomness into a repeated
-greedy selection lets a stuck incumbent be displaced so the search escapes premature convergence
-(Metropolis et al. 1953; Kirkpatrick, Gelatt & Vecchi, *Optimization by Simulated Annealing*,
-*Science* 220 (1983); Černý 1985). The **interior optimum** ("too much dither hurts") is that
-literature's temperature optimum — too little noise never unsticks the champion, too much destroys
-the ranking signal — and the same effect is why perturbed-SGD escapes sharp local minima (Ge et al.,
-*Escaping From Saddle Points*, COLT 2015). The specific *noise-on-a-reused-holdout* form is exactly
-**Thresholdout**'s differential-privacy mechanism (Dwork et al., §8.8), which adds Laplace noise for
-*validity* (bounding overfitting). **What is measured here — not claimed as new mechanism — is (a)
-the stuck-vs-fresh error decomposition and (b) that in the *checkpoint-promotion-under-holdout-reuse*
-setting the same noise buys *extraction* (finding better checkpoints), not only validity.** That is a
-connection between two established literatures (stochastic optimization + adaptive data analysis), not
-a new law. Reasoning for the gap: our earlier one-line "only fresh truth selects" over-generalized by
-omitting the annealing channel; the re-statement restores it and cites the standard mechanism.
-
-**The law, re-stated:** selection error decomposes into a **stuck** part (sets the ratchet) and
-a **fresh** part (breaks it). Deterministic internal signals neither de-ratchet nor inform;
-stochastic internal signals **de-ratchet but do not inform**; only re-drawn external truth does
-both. Three sentences now: *internal signals detect; fresh randomness de-ratchets; only fresh
-truth informs.* Design consequence (cheap, actionable): a scarce fixed holdout should be read
-**with deliberate dither** (or through a stochastic self-check) — in this harness that recovers
-≈50% of the fresh-flow value at `n=50` — but dither is a de-ratcheting knob with an optimum,
-never a substitute for sourcing fresh verified tasks. [MEASURED-by-simulation; shape, not
-constants; the real-model arm folds into the A/B/C run, [#2691].]
-
-**Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
-freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
-is never one it has already leaked into:
+**Operationally, four tiers**, so that the anchor a gate promotes against is never one it has leaked into. This is a HEURISTIC design from the 2026-07-07 convergent synthesis; the overfitting result it rests on is PROVEN [18], and the compounding effect is MEASURED by simulation:
 
 ```
-exploration set        → tune / select freely (assume burned)
+exploration set         → tune and select freely (assume burned)
 private retention set   → limited-feedback regression check (rare reads)
-fresh promotion set     → used ONCE per release, then retired
-incoming verified tasks → continually replenish the promotion pool (the flow)
+fresh promotion set     → used once per release, then retired into exploration
+incoming verified tasks → replenish the promotion pool; their rate limits safe updates
 ```
-
-The release decision (§8.1.2) is made against the **fresh promotion set**, retired after use; the
-sourcing rate of *incoming verified tasks* is the rate limit on safe updates. (Naïve repeated reuse
-of one visible holdout overfits it — Dwork et al., arXiv:1506.02629, *Generalization in Adaptive
-Data Analysis and Holdout Reuse*.) **Retired promotion sets are not dead:** they feed the
-`exploration` tier, and in the third-road simulation a Thresholdout-arbitrated burned pool improved
-extraction while the reported-versus-true gap stayed low — so the tiers form a cycle, not a
-one-way conveyor. **[HEURISTIC operational design; the overfitting result it rests on is PROVEN;
-the compounding effect is MEASURED-by-simulation.]**
 
 ### 8.5 What is and isn't claimed
 
-**Claimed:** a computable three-leg gate anchored to an external holdout; a proven
-monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao);
-evidence that naïve fixed-holdout reuse degrades under adaptive selection; that **deterministic**
-intrinsic signals cannot substitute for fresh verified data in the *selection* role, while
-**stochastic** intrinsic signals recover part of the budget purely by de-ratcheting — an effect
-fully reproduced by zero-information dither, with fresh truth still strictly dominant (§8.4.1
-as re-stated 2026-07-17, MEASURED-by-simulation, [#2692]);
-and that an internal-signal bundle adds *detection* power for gross degradation exactly when the
-external gate is smallest (§8.6 item 5, MEASURED on one model). **NOT claimed:** an in-repo theorem
-for the full gate; real-model validation of its training behavior; that "two fates" is exhaustive
-(§8.2); that scalar-query reusable-holdout guarantees automatically govern model-level promotion
-(§8.4); that a single potential is proven monotone (§8.3); or that internal signals detect *subtle,
-training-induced* badness — that cell is untested (§8.6 item 5). **The trap:** treating "passed the
-holdout" as unconditional evidence — without the §8.4 freshness-or-controlled-reuse discipline, Σ_θ
-is holdout theater, the same collapse it exists to prevent, one level up.
+**Claimed:**
+- a computable three-leg gate, anchored to an external holdout;
+- an imported monotonic-improvement backbone and overoptimization curve;
+- that naive fixed-holdout reuse degrades under adaptive selection;
+- that deterministic internal signals cannot substitute for fresh verified data in selection, while stochastic ones recover part of the budget purely by de-ratcheting;
+- that an internal-signal bundle adds detection power for gross degradation when the external gate is smallest (§8.6 item 5, one model).
 
-### 8.6 Minimal falsification path (before trusting any of this)
+**Not claimed:**
+- a theorem for the full gate;
+- real-model validation of its training behaviour;
+- that "two fates" is exhaustive;
+- that scalar-query holdout guarantees govern model-level promotion;
+- that `Φ` is proven monotone;
+- that internal signals detect subtle, training-induced badness.
 
-1. Implement `D`, `G`, and the KL trust region as a gate around one RLVR/distill step.
-   **✅ GATE LOGIC DONE (2026-07-07, #2228):** the §8.1.2 seven-condition release gate + A/B/C
-   decision tree are implemented and self-tested with no GPU in
-   `experiments/sigma_theta_abc/harness.py` (`--self-test`; `tests/test_sigma_theta_gate.py`, 8/8) —
-   planted reward-hack, forgetting regression, instability, and over-budget drift are each rejected,
-   and the "none beat retrieval → stop updating weights" branch resolves. Arm-C's GRPO math is
-   implemented + self-tested (#2230). *Still open: running the gate around a REAL RLVR/distill step
-   (cloud L4) — gate logic ≠ gated training.*
-2. **Reward-hacking teeth:** plant an update that games the verifier (`Ĵ↑`, `R_H↓`); confirm leg 1/3
-   rejects where a Part-I-only (collapse) gate accepts. *(If Part I already caught it, Σ_θ is
-   redundant — this is the whole point.)* **Gate-logic level: ✅ #2228 (planted hack rejected in
-   self-test); real-model level: open, needs the L4 A/B/C run.**
-3. **Forgetting teeth:** plant a held-out regression; confirm leg 1 rejects. **Gate-logic level:
-   ✅ #2228; real-model level: open.**
-4. **Budget teeth:** gate repeatedly against a fixed `H`; measure the true generalization gap growing
-   as adaptive gates accumulate; confirm a fixed holdout goes stale, and characterize the rate.
-   **✅ DONE (2026-07-07, `experiments/sigma_update_holdout_staleness.py`, 32 seeds):** a fresh-flow
-   holdout **strictly dominates** a fixed one at every `n`, with a **severe small-`n` penalty (22× less
-   true quality extracted at `n=50`), closing to <10% only at `n ≥ 2000`. This **refutes the strong
-   "O(1) regardless of size"** wording (the budget is `n`-graded) while **confirming the operational
-   fresh-flow law** — see the MEASURED block in §8.4. **✅ Thresholdout follow-up DONE (2026-07-07,
-   third arm + pool ablation, same harness):** the mechanism buys **validity**, the burned pool buys
-   **extraction**, and in this harness the mechanism supports safe reuse of the pool — see the
-   third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. **✅ PROTOCOL
-   LAYER DONE (2026-07-17, [#2691]):** the three-arm promotion-evidence protocol itself — Fixed /
-   Fixed+dither (the [#2692] knob, promoted to an arm) / Fresh-flow / Thresholdout+pool, with
-   per-candidate provenance ledgers, Thresholdout budget accounting, and disjoint task-id spaces —
-   is implemented model-agnostically (`experiments/sigma_theta_abc/holdout_protocol.py`, an
-   `eval_fn` callback so the L4 run swaps in the real exec evaluator) and validated at **task-level
-   Bernoulli-stuck fidelity** (per-(candidate,task) outcomes deterministic on re-evaluation — the
-   real stuck-luck mechanism, closer to reality than the Gaussian sims): 7/7 protocol checks,
-   16 seeds (`data/sigma0/holdout_protocol_report.json`;
-   `tests/test_sigma_theta_holdout_protocol.py`, 6 passing). Orderings reproduce at the higher
-   fidelity — fixed gap +0.108 worst / fresh extraction 0.934 best at 61× task consumption /
-   Thresholdout best per-task efficiency among fresh-consuming arms — and one new result:
-   **Fixed+dither reaches 0.856 true extraction at zero extra fresh-task cost** (vs fixed 0.617),
-   the cheapest intervention measured. The planted teeth run through the *real* seven-condition
-   gate with **arm-appropriate reasons**: the fixed arm can catch a contaminated reward-hack only
-   via the cond-6 provenance ledger, while the fresh arm rejects it on measured merit (cond 1) —
-   the load-bearing demonstration of why the freshness tiers exist. *(Steps 1–3 at real-model
-   level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
-   remaining empirical gap, unchanged: this validates the PROTOCOL, not real training. The L4
-   run is now fully specified as a self-contained handoff —
-   `SIGMA0-EB-L4-RUNBOOK.md`: inventory, task partition, the
-   eval→7-metric glue contract, teeth recipes, pre-registered verdicts incl. the Roelofs rule,
-   and a cost-approval gate.)*
-5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
-   signal **add detection power** for bad checkpoints over the external gate alone? No prior art
-   surfaced for internal-state monitors as an *incremental* checkpoint-gate signal (bounded search,
-   2026-07-07). **Correction (2026-07-17 corner audit): that "no prior art" line is now stale** —
-   the detection lane is occupied: internal-state readouts predicting model quality without
-   validation data (*Model-Centric Diagnostics*, arXiv:2601.16874), statistical detection of
-   degraded/quantized checkpoints (arXiv:2602.10144), and a two-failure-mode account of LLM
-   quantization matching the binary cliff measured below (arXiv:2604.19884). The *incremental*
-   ΔAUC-over-a-tiny-external-gate design may remain unique; the lane is not. The follow-on
-   falsification (stochastic-internal-signal test: re-drawable noise vs re-drawn truth) is
-   tracked as [#2692]. **✅ MEASURED — corruption-regime half (2026-07-07, pre-registered N2,
-   `experiments/sigma_incremental_validity_ouro.py`, real Ouro-1.4B, PR #2240):** a 9-checkpoint
-   corruption-ladder generator (int8 / Gaussian noise 3–15% / partial+full naive ternary / int4)
-   with exec pass rate as truth. Adding an internal bundle {perplexity, predictive entropy,
-   distinct-2-gram} to a small-`n` exec gate: **ΔAUC +0.121 at n=2 → +0.068 at n=3 → +0.019 at
-   n=5** (internal-alone AUC 0.944). So incremental validity is **real, gross-only, and
-   scarcity-gated** — Gate B is *not* decorative, but its value decays quickly as the external gate
-   grows, and it detects only gross degradation (all corruption-induced bads had ppl ratios
-   ×629–×93,444). **The subtle cell came back empty by construction:** weight-space corruption is
-   binary on this model — free (mild noise even *raised* weak-base greedy pass 0.25 → 0.62 with ppl
-   flat, plausibly by breaking repetitive greedy loops; n=8 tasks, treat gently) or cliff-collapsed —
-   matching the measured quantization cliff. So the **still-open half is subtle, training-induced
-   badness** (reward hacks, forgetting): only the real A/B/C artifacts (teeth 2–3) can produce it.
-   Caveats: one model, 8-task truth, coarse AUC granularity. Joint law with §8.4.1: **internal
-   signals detect; only fresh truth selects** — *as re-stated 2026-07-17 ([#2692]): internal
-   signals detect; fresh randomness de-ratchets; only fresh truth informs.*
+**The trap** is treating "passed the holdout" as unconditional evidence. Without the freshness-or-controlled-reuse discipline, Σ_θ is holdout theater: the collapse it exists to prevent, one level up.
 
-### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
+### 8.6 Minimal falsification path
 
-Per the Σ₀ protocol (anchor a self-referential construction before trusting it), an outside theory
-review attacked Σ_θ and landed four hits — three fatal to the strong version, all folded in above:
-(1) "two fates" isn't exhaustive → §8.2; (2) leg 3 is weak/laggy → §8.1.1; (3) naïve, high-feedback
-model gating can exhaust a fixed holdout, and scalar-query reusable-holdout results do not
-automatically cover model-level promotion → §8.4; (4) it's a gate, not a certificate, no potential
-proven monotone → §8.3. **What survives, and it is sharper than what walked in:** (i) the right
-object is the θ-flow, not the x-Jacobian — Part I provably can't see hacking/forgetting; (ii) Σ_θ is
-an honest **veto** with an imported partial guarantee; (iii) the surviving design constraint —
-*non-Goodharting cannot be certified by **naïvely** reusing a fixed finite holdout; the slow-scale
-anchor must either renew through fresh verified tasks or enforce controlled reuse under an explicit
-information and leakage budget.* That is Part I's principle, one axis harder. **This is the protocol working: a critic turned an
-overclaimed certificate into an honest gate plus one falsifiable design constraint — the intended outcome. A second review then corrected the constraint's own overstatement (the "O(1) gates" claim, §8.4) — the protocol applied to itself.**
+1. **The gate around one RLVR or distillation step.** The gate logic is done and self-tested (#2228). A real run on a cloud L4 is open.
+2. **Reward-hacking teeth.** Plant an update with `Ĵ↑` and `R_H↓`; legs 1 and 3 must reject it where a Part-I-only gate accepts. Done at the gate-logic level; open at the real-model level.
+3. **Forgetting teeth.** Plant a held-out regression. Done at the gate-logic level; open at the real-model level.
+4. **Budget teeth.** Show that a fixed `H` goes stale, and characterize the rate. Done in simulation (§8.4). The protocol layer is also done ([#2691]):
+   - **The arms:** Fixed, Fixed+dither, Fresh-flow and Thresholdout+pool, with provenance ledgers, budget accounting and disjoint task-id spaces (`experiments/sigma_theta_abc/holdout_protocol.py`†).
+   - **Validation:** at task-level Bernoulli-stuck fidelity, over 16 seeds, 7 of 7 checks.
+   - **Results:** Fixed has the worst gap (+0.108). Fresh has the best extraction (0.934), at 61× the task consumption. Thresholdout has the best per-task efficiency of the arms that consume fresh tasks. **Fixed+dither reaches 0.856, against Fixed's 0.617, at no extra fresh-task cost.**
+   - **Teeth:** the planted cases run through the real seven-condition gate, and each arm rejects for its own reason. The fixed arm catches a contaminated reward hack only through the provenance ledger (condition 6); the fresh arm rejects it on measured merit (condition 1).
+   - **The L4 run** is specified in `SIGMA0-EB-L4-RUNBOOK.md`†, with pre-registered verdicts including the Roelofs rule [18].
+5. **Incremental validity:** does an internal signal add detection power over the external gate alone? The corruption half is measured (pre-registered N2, `experiments/sigma_incremental_validity_ouro.py`†, real Ouro-1.4B, PR #2240).
+   - **Setup:** a 9-checkpoint corruption ladder (int8, Gaussian noise of 3–15%, partial and full naive ternary, int4), with exec pass rate as the truth.
+   - **Result:** adding {perplexity, predictive entropy, distinct-2-gram} to a small-`n` exec gate gives ΔAUC +0.121 at `n = 2`, +0.068 at `n = 3` and +0.019 at `n = 5`; the internal signals alone reach AUC 0.944. The gain is real, gross-only (perplexity ratios of ×629–×93,444) and scarcity-gated.
+   - **The subtle cell came back empty, by construction.** Weight corruption is binary on this model. Mild noise even raised the weak base's greedy pass rate from 0.25 to 0.62, with perplexity flat, plausibly by breaking repetitive greedy loops; that is 8 tasks, so treat it gently.
+   - **Prior art:** a bounded search on 2026-07-07 found none, but the 2026-07-17 audit found the detection lane occupied [21]. The incremental ΔAUC-over-a-tiny-external-gate design may remain unique; it carries no grade.
+   - **Open:** subtle, training-induced badness, which needs the real A/B/C artifacts. Caveats: one model, 8-task truth, and coarse AUC granularity.
+
+### 8.7 Adversarial review (2026-07-07) and what survives
+
+An outside review (grok-4) landed four hits, three of them fatal to the strong version, and all are folded in above:
+- "two fates" is not exhaustive (§8.2);
+- leg 3 is weak and laggy (§8.1.1);
+- naive, high-feedback gating can exhaust a fixed holdout, and scalar-query results do not cover model-level promotion (§8.4);
+- it is a gate, not a certificate (§8.3).
+
+A second review then corrected the constraint's own overstatement, the "O(1) gates" claim (Appendix C).
+
+**What survives:**
+- The right object is the θ-flow, not the x-Jacobian.
+- Σ_θ is an honest veto, with an imported partial guarantee.
+- Non-Goodharting cannot be certified by naively reusing a fixed finite holdout. The anchor must renew through fresh verified tasks, or enforce controlled reuse under an explicit information and leakage budget.
 
 ### 8.8 Part II sources
 
-- Schulman et al., *Trust Region Policy Optimization*, arXiv:1502.05477 (2015) — monotonic-improvement lower bound (Part II's PROVEN backbone).
-- Gao, Schulman, Hilton, *Scaling Laws for Reward Model Overoptimization*, arXiv:2210.10760 (2023) — gold score as a function of KL-from-base (sets the budget `Δ`).
-- Dwork, Feldman, Hardt, Pitassi, Reingold, Roth, *The reusable holdout*, Science 349 (2015); *Generalization in Adaptive Data Analysis and Holdout Reuse*, arXiv:1506.02629; arXiv:1411.2664 — both directions of §8.4: naive reuse overfits, **and** Thresholdout validates exponentially many queries at overfitting budget `B ≈ τ²n`.
-- EvalStop (arXiv:2606.04145, 2026); Provably Mitigating Overoptimization (arXiv:2510.05526); Wasserstein-DRO RLHF (arXiv:2605.00155) — post-cutoff corroboration that gating on *world feedback / held-out eval* (not the proxy) is the live direction.
-- **Primary SOTA for the RLVR-forgetting premise (added 2026-07-08 research pass; all ids title-verified against the local arXiv corpus):** *RL's Razor: Why Online RL Forgets Less* (arXiv:2509.04259 — on-policy updates are KL-minimal w.r.t. the base; forgetting is predicted by KL-from-base); *Reinforcement Fine-Tuning Naturally Mitigates Forgetting in Continual Post-Training* (arXiv:2507.05386); *Mechanistic origins of catastrophic forgetting: why RL preserves circuits better than SFT* (arXiv:2605.28860). **Counterpoint, same pass:** *RL Forgets! Towards Continual Policy Optimization* (arXiv:2607.04364 — RL still forgets in continual settings; drift control needed) and *The Choice of Divergence* (arXiv:2509.07430 — divergence choice governs diversity collapse). The gate assumes only the relative advantage, not immunity.
-- Close prior art surfaced by the harder novelty search (2026-07-07, all corpus/web-verified): ADOWIP budgeted when-to-update gating (arXiv:2606.25068); Uncertainty-Guided Checkpoint Selection for RL finetuning (arXiv:2511.09864); *Signed Compression Progress on a Sealed Audit is Goodhart-Resistant* (arXiv:2606.11417) — nearest neighbor to the §8.4 sealed-promotion-set discipline; *Learning, Fast and Slow* (arXiv:2605.12484) — prior art for the fast/slow timescale framing itself.
-- Added by the 2026-07-17 corner audit (both verified that date): **the Ladder** (Blum & Hardt, *The Ladder: A Reliable Leaderboard for Machine Learning Competitions*, arXiv:1502.04585) — adaptive leaderboard maintenance *is* champion-promotion gating with limited feedback, the §8.4 problem shape, and was missing here; and the standing **counterpoint** Roelofs et al., *A Meta-Analysis of Overfitting in Machine Learning* (NeurIPS 2019) — ~100 Kaggle competitions showed *little* adaptive overfitting in practice, so whether §8.4's severe small-`n` staleness materializes at realistic scale is exactly what the real A/B/C run must answer ([#2691]).
-
-[#2691]: https://github.com/alex-place/lantern-os/issues/2691
-[#2692]: https://github.com/alex-place/lantern-os/issues/2692
-- Backing research: `data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md`; decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
-- *Citations verified 2026-07-07 (TRPO/Gao IDs confirmed via search; Dwork by venue). Per this doc's own §References caution — an earlier draft once carried four fabricated arXiv IDs — no Part II id is cited unverified.*
+These are merged into [Sources](#sources--what-this-rests-on), rows 17–21. The decision record is [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md), and the backing research is `data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md`†.
 
 ---
 
@@ -2178,226 +746,138 @@ overclaimed certificate into an honest gate plus one falsifiable design constrai
 
 ## 9. Composing Part I and Part II
 
-RLVR runs many forward passes per gradient step, so `x` reaches quasi-equilibrium between weight
-updates: the timescale ratio `ε = τ_x/τ_θ` is small. Under timescale separation (two-timescale
-stochastic approximation — Borkar 1997; singular perturbation — Khalil, already cited by Part I at
-Ex. 8.4), the fast and slow flows can be certified **separately and composed**:
+RLVR runs many forward passes per gradient step, so `x` reaches quasi-equilibrium between updates, and the timescale ratio `ε = τ_x/τ_θ` is small. Under timescale separation, the two flows can be treated separately and composed [22].
 
-> **The full self-improving system is certified iff (a) Part I holds on the fast `x`-flow at each
-> frozen `θ`, AND (b) Part II's gate holds on the slow `θ`-flow, AND (c) `ε` is small enough that
-> the quasi-equilibrium approximation is valid.** **[TARGET — the imported tools (Borkar, Khalil)
-> are proven; this composition statement is NOT proven or machine-checked here.]**
-
-This is why Σ₀ and Σ_θ are **two faces of one certificate over one object at two timescales**, not
-two subsystems — the completion of Part I along the `θ`-axis it deferred in §0. Honest caveat: with
-Part II only a gate (§8.3) and (c) unproven, the composition is a *design target*, not a theorem —
-the whole system's safety still rests on the fresh-or-controlled-reuse external-anchor requirement
-(§8.4), i.e. on grounding.
+**The target, not proven:** the self-improving system is certified iff (a) Part I holds on the fast flow at each frozen `θ`, (b) Part II's gate holds on the slow flow, and (c) `ε` is small enough for the quasi-equilibrium approximation. With Part II only a gate (§8.3) and (c) unproven, the whole system's safety still rests on the external anchor (§8.4).
 
 ---
 
 # Part IV — The active face: grounding as capability, not only safety  [DESIGN / TARGET — no theorem]
 
-**Status: DESIGN / TARGET — no theorem, nothing machine-checked; authority *below Part II*.** The
-mechanism is imported and established (Bayesian optimal experimental design — Lindley 1956; value of
-information — Howard 1966; active inference — Friston 2010); **no novelty is claimed.** One
-datapoint is MEASURED on a real surface (§10.1); everything else here is design. This Part is the
-certificate's forward-pointer to the interface that operationalizes it —
-[CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md) — so the theory and the interface
-cannot drift apart.
+**Status: a design, below Part II in authority. Nothing is machine-checked, the mechanism is imported [23], and no novelty is claimed.** There are two measured datapoints (§10.1, §10.2). The interface that puts it into practice is [CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md).
 
 ## 10. From anti-collapse to ceiling-break
 
-Parts I–III prove one thing at two timescales: **the only escape from collapse is grounding —
-contact with something outside the loop.** Part IV draws a line *through* that result the passive
-certificate never draws. There are **two grades of grounding**, and they clear two different walls.
+**Two grades of grounding [23]:**
+- **Passive grounding** (retrieval, a held-out anchor) clears collapse. It is bounded by the ideal inductive predictor, which extracts everything inferable from a fixed corpus and nothing more. A system that claims to out-think that bound is asserting structure its data cannot support.
+- **Active grounding** (running the experiment, executing the test, asking) manufactures an observation that no corpus held.
 
-**Passive grounding is reading** — retrieval, a held-out anchor, fresh-but-recorded data. It is
-what Parts I–II require, and it clears the first wall: **collapse.** But it has a ceiling of its own,
-the **ideal inductive predictor** (Solomonoff / AIXI), which extracts *everything inferable from a
-fixed corpus and nothing more.* That ceiling is uncomputable **and unbeatable by inference** — a
-system that claims to have out-thought it is the §2 "42-state" again, asserting structure its data
-cannot support. Reading harder never breaks it.
+The arc runs: don't degenerate (Part I), don't promote a worse self (Part II), don't stop at what can be inferred (Part IV).
 
-**Active grounding is acting** — running the experiment, placing the bet, executing the test,
-asking. An action **manufactures an observation that existed in no corpus**, so its result is *not
-bounded by the inference ceiling.* This is the certificate's own logic taken one step further: if
-grounding is what keeps the loop safe, then grounding you *generate* is safety **and** capability —
-§8.4.1's de-ratcheting used to *create* the fresh draw instead of waiting for one.
-
-So the arc closes: **don't degenerate** (Part I) → **don't promote a worse self** (Part II) →
-**don't stop at what can be inferred** (Part IV). Passive grounding is the floor under collapse;
-active grounding is the break in the ceiling above.
-
-**One guard keeps this honest — and it is the whole point.** The ceiling breaks *exactly where an
-action resolves it, and nowhere else.* Knowledge past the inference ceiling may be claimed **only
-after reality has settled the action** — an unresolved prediction stays unverified, and a question
-no action can reach stays a boundary pin. This is not licence to reach past the evidence; it is
-§8.4.1's freshness law made active: *manufacture the fresh truth, then claim only what it confirmed.*
-The document's founding lesson is the same rule — self-generated content is untrustworthy until an
-outside check resolves it (the fabricated-arXiv confession that opens this file).
+**The guard, which is the point.** Knowledge past the inference ceiling may be claimed only after reality has settled the action. An unresolved prediction stays unverified, and a question no action can reach stays a pin. It is §8.4.1's freshness law, made active.
 
 ### 10.1 The freshness law, measured on code (2026-07-21)
 
-§8.4.1 measures the freshness law in simulation. On 2026-07-21 the same law appeared on a live code
-surface — the way the survivorship study (see the AGI blueprint) is
-a real-market instance of the same discipline, not a new theorem:
+**MEASURED, one run (ours).**
+- **The ratchet.** The autowork patch-retry loop re-showed the model its own failed diff on each attempt. Successive retries reproduced the identical wrong context, which is the ratchet §8.4.1 predicts.
+- **The fix.** Withholding the failed diff, and feeding only the real file, flipped the stuck loop to success on the first de-anchored regeneration.
+- **The evidence:** `data/autowork-runs/2026-07-21.jsonl`†, PR #2795, and the fix in `routes/convergence-dispatch.js::targetedFileContext` ([#2762]).
 
-The autowork patch-retry loop re-showed the model **its own failed diff** on each attempt. The model
-anchored on that stale self-output — successive retries reproduced the *identical wrong context* and
-failed identically, exactly the ratchet §8.4.1 predicts. **Withholding** the failed diff and feeding
-only the real file (fresh external truth) flipped the stuck loop to success on the **first
-de-anchored regeneration.**
-
-**[MEASURED — one run, not a distribution. Evidence: `data/autowork-runs/2026-07-21.jsonl`,
-PR #2795, fix in `routes/convergence-dispatch.js::targetedFileContext` ([#2762]). It corroborates
-§8.4.1 on a real surface; it does not extend the proof.]**
+It corroborates §8.4.1 on a real surface; it does not extend it.
 
 ### 10.2 The active loop, built and run (2026-07-21)
 
-§10.1 shows the *passive* half — fresh truth de-ratchets a stuck loop. The *active* half — **act to
-manufacture a fact no corpus held** — is now **built and run** on the cheapest, most reversible
-surface the design mandates first (**local code execution** — no money, undoable; the money /
-irreversible surfaces stay behind the authority gates). The loop poses a question, records the best
-inference-only belief, **executes real code to get reality's answer**, and files a grounded record
-classified `pin` / `confirmed` / `ceiling_break`.
+**MEASURED (the mechanism) and unit-tested (ours).** It runs on the cheapest and most reversible surface, which the design mandates first: local code execution, with no money involved and every step undoable. The money and irreversible surfaces stay behind the authority gates. `experiments/oracle_active_loop.py`† poses a question, records the best inference-only belief, and executes code to get reality's answer. It files a record classified `pin`, `confirmed` or `ceiling_break` (`tests/test_oracle_active_loop.py`†, 7 passed; `data/oracle/active-loop-runs.jsonl`†).
 
-First run — 6 questions, all real, on this repo: **5 corpus-absent facts manufactured by action, 1
-pin named and not bluffed.** Each resolved fact is provably outside any fixed corpus — the current
-git SHA, a live file count (11, correcting the prior's 8), a hash you must compute, the document's
-current length — knowable only by acting. The sharpest: *"does this certificate contain a Part IV?"*
-resolves **True on this branch and False on another** — a fact no training corpus can hold, because
-it is branch-live state; only the act of reading the file *now* settles it. That is the inference
-ceiling and its break, in one line.
+The first run asked 6 real questions about this repo. It **manufactured 5 corpus-absent facts by action, and named 1 pin without bluffing**. The facts:
+- the current git SHA;
+- a live file count of 11, correcting the prior's 8;
+- a hash;
+- the document's length;
+- whether this certificate contains a Part IV, which resolved true on one branch and false on another.
 
-**[MEASURED — the *mechanism*, on a real surface. Built + unit-tested:
-`tests/test_oracle_active_loop.py` (7 passed); run: `experiments/oracle_active_loop.py` →
-`data/oracle/active-loop-runs.jsonl`. Honest scope: this proves the loop *works and records
-corpus-absent facts in the grounding discipline* — it does **not** prove the loop beats a strong
-predictor, because the passive baseline here is a frozen heuristic, not a frontier model.
-**Directed exploration (VoI steering) is now SEED-BUILT too** (`experiments/oracle_voi_select.py`,
-unit-tested) — budgeted greedy value-of-information selection that runs the highest-value
-experiments first and excludes pins — the bandit's *steering* on top of the anti-collapse
-*no-regret* floor. The next rung — the model-in-the-loop run on questions where inference plausibly
-fails, and a real Bayesian VoI estimate (the current one is a heuristic prior-entropy proxy) — is
-GAP (Oracle design §5). This is still the least-proven Part of the document — read it with §3.1's
-authority, never §1's — but the fifth move is no longer only a design: its mechanism *and its
-steering* are built and measured.]**
+Directed exploration is seed-built (`experiments/oracle_voi_select.py`†). It does budgeted greedy value-of-information selection that excludes pins, on a heuristic prior-entropy proxy.
+
+**The gap.** The passive baseline is a frozen heuristic, not a frontier model, so the loop has not been shown to beat a strong predictor. The model-in-the-loop run and a real Bayesian VoI estimate are open (Oracle design §5).
 
 ---
+
+[#505]: https://github.com/alex-place/lantern-os/issues/505
+[#657]: https://github.com/alex-place/lantern-os/issues/657
+[#659]: https://github.com/alex-place/lantern-os/issues/659
+[#660]: https://github.com/alex-place/lantern-os/issues/660
+[#661]: https://github.com/alex-place/lantern-os/issues/661
+[#766]: https://github.com/alex-place/lantern-os/issues/766
+[#768]: https://github.com/alex-place/lantern-os/issues/768
+[#1988]: https://github.com/alex-place/lantern-os/issues/1988
+[#1989]: https://github.com/alex-place/lantern-os/issues/1989
+[#1990]: https://github.com/alex-place/lantern-os/issues/1990
+[#1991]: https://github.com/alex-place/lantern-os/issues/1991
+[#2029]: https://github.com/alex-place/lantern-os/issues/2029
+[#2033]: https://github.com/alex-place/lantern-os/issues/2033
+[#2236]: https://github.com/alex-place/lantern-os/issues/2236
+[#2690]: https://github.com/alex-place/lantern-os/issues/2690
+[#2691]: https://github.com/alex-place/lantern-os/issues/2691
+[#2692]: https://github.com/alex-place/lantern-os/issues/2692
+[#2762]: https://github.com/alex-place/lantern-os/issues/2762
+[#2786]: https://github.com/alex-place/lantern-os/issues/2786
+[#2787]: https://github.com/alex-place/lantern-os/issues/2787
+[#2788]: https://github.com/alex-place/lantern-os/issues/2788
+[#2789]: https://github.com/alex-place/lantern-os/issues/2789
+[#2790]: https://github.com/alex-place/lantern-os/issues/2790
+[#2791]: https://github.com/alex-place/lantern-os/issues/2791
+[#2847]: https://github.com/alex-place/lantern-os/issues/2847
+[#2850]: https://github.com/alex-place/lantern-os/issues/2850
+[#2852]: https://github.com/alex-place/lantern-os/issues/2852
+[#2853]: https://github.com/alex-place/lantern-os/issues/2853
+[#2854]: https://github.com/alex-place/lantern-os/issues/2854
+[#2855]: https://github.com/alex-place/lantern-os/issues/2855
+[#2856]: https://github.com/alex-place/lantern-os/issues/2856
+[#2857]: https://github.com/alex-place/lantern-os/issues/2857
+[#2859]: https://github.com/alex-place/lantern-os/issues/2859
+[#2860]: https://github.com/alex-place/lantern-os/issues/2860
+[#2861]: https://github.com/alex-place/lantern-os/issues/2861
+[#2872]: https://github.com/alex-place/lantern-os/issues/2872
+[#2873]: https://github.com/alex-place/lantern-os/issues/2873
+[#2874]: https://github.com/alex-place/lantern-os/issues/2874
 
 ## References (lineage)
 
-- A. M. Lyapunov, *The General Problem of the Stability of Motion* (1892) — `V(x)` method.
-- H. Poincaré, *Mémoire sur les courbes…* (1880s) — node/saddle/center/**focus** (spiral) classification.
-- I. Bendixson (1901) — `Re λ(A) ≤ λ_max(A_s)`; the symmetric part bounds the real spectrum (used in §1.2).
-- C. Wissel (1984); M. Scheffer et al., *Nature* (2009) — critical slowing down / early-warning signals.
-- B. D. O. Anderson (1977), *Exponential stability of linear equations arising in adaptive identification*, IEEE TAC — persistent excitation / identifiability (invoked by analogy only in §3; canonical attribution, matching the `.tex`).
-- J. Pathak et al. (2017–18) — reservoir reconstruction of attractors and Lyapunov spectra.
-- W. Lohmiller & J.-J. E. Slotine (1998), *On Contraction Analysis for Nonlinear Systems*, Automatica 34(6):683–696 — matrix measure / logarithmic norm μ₂(A) = λ_max(A_s); the contraction bound used in §1–1.2. (The small-gain composition for the non-normal cross-term is classical — Zames 1966.)
-- H. K. Khalil (2002), *Nonlinear Systems* (3rd ed.), Prentice Hall — Lyapunov stability foundations underpinning §1.
-- **arXiv:2402.07043** (2024) — Dohmatob, Feng, Yang, Charton & Kempe, *A Tale of Tails: Model Collapse as a Change of Scaling Laws* (ICML 2024); synthetic data truncates the scaling law (§1.1, §7).
-- **arXiv:2406.07515** (2024) — Feng, Dohmatob, Yang, Charton & Kempe, *Beyond Model Collapse: Scaling Up with Synthesized Data Requires Verification* (ICML 2024); verification prevents collapse — published analogue of external grounding (§7).
-- J. Wolfers & E. Zitzewitz (2004), *Prediction Markets*, J. Economic Perspectives 18(2):107–126 — prediction-market accuracy; rationale for markets as an external grounding signal (Kalshi grounding, §6).
-- I. Shumailov et al., *Nature* (2024) — model collapse under recursive training on synthetic data (§7).
-- **2025–26 model-collapse corroboration (title-verified in local corpus, 2026-07-08):** arXiv:2509.16499 (*A Closer Look at Model Collapse: From a Generalization-to-Memorization Perspective*); arXiv:2509.04796 (*Knowledge Collapse in LLMs: fluency survives, facts fail under recursive synthetic training*); arXiv:2602.10531 (*From Collapse to Improvement: statistical perspectives on iterative training on contaminated sources*) — the phenomenon §7 warns about remains actively measured, and the escape routes match §7's verification/grounding mechanism.
-- D. Amodei et al. (2016); J. Skalse et al. (2022) — reward hacking / specification gaming (§7).
-- **arXiv:2211.15661** — Akyürek et al., *What learning algorithm is in-context learning?* — ICL realized as ridge/least-squares; the data-noise σ axis, σ=0 = exact regression (§7.1).
-- **arXiv:2306.04637** — Bai et al., *Transformers as Statisticians* (NeurIPS 2023) — provable in-context algorithm selection vs. noise level σ (§7.1).
-- **arXiv:2404.00781** — Elsayed & Mahmood, *Addressing Loss of Plasticity and Catastrophic Forgetting in Continual Learning* (UPGD) — the weight-perturbation σ; σ=0 = frozen / no plasticity (§7.1).
-- **arXiv:2503.01595** — *STAR: Stability-Inducing Weight Perturbation for Continual Learning* — worst-case weight perturbation for stability (§7.1).
-- **arXiv:2509.22764** — Kang et al., *In-Context Learning can Perform Continual Learning Like Humans* — continual learning in-context (zero parameter updates), beats gradient-based CL; the `σ_weights=0` escape (§7.1).
-- **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into `RESEARCH-CANON.md` [11].
-- **arXiv:2310.01798** — Huang, Chen, Mishra, Zheng, Yu, Song & Zhou, *Large Language Models Cannot Self-Correct Reasoning Yet* (ICLR 2024) — the **inference-time twin** of §7's collapse claim: intrinsic self-correction *without external feedback* degrades reasoning (GPT-4 95.5→91.5 on GSM8K). The model-collapse citations above are the *training-time* version of the same "no contact with outside reality → degradation" mechanism; this is the same law one timescale down, and the escape (external feedback) matches §7's grounding. Title/authors/venue verified against arXiv 2026-07-07.
-- **arXiv:2406.15927** — Kossen et al., *Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs* (2024) — a **linear probe on a single generation's hidden state** predicting semantic entropy; nearest prior for §7.3's confabulation-detection honesty layer. The §7.2 rule "bind every honesty signal to an external check" is the product-form guard around exactly this internal signal. Verified against arXiv 2026-07-07.
-- W. P. M. H. Heemels, K. H. Johansson & P. Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012; **arXiv:1803.08980** — Lyapunov event-triggered stabilization with a known convergence rate. The mature prior-art field for §3.1's schedule consequence (intervention timing from a certified decay rate). Verified 2026-07-17.
-- R. Kulhavý & M. Kárný (1984), directional forgetting in recursive identification; **arXiv:2003.03523** — *RLS with Variable-Direction Forgetting*; **arXiv:2404.10844** — *SIFt-RLS: Subspace of Information Forgetting RLS*. Classical kin of Σ₀⁻¹'s covariance leg (§3). Verified 2026-07-17.
-- **arXiv:2604.09979** — *A Minimal Model of Representation Collapse* (2026) — dynamical-systems analysis of representation collapse in SSL (stop-gradient / frustration); adjacent, uncited-until-now prior for Part I's framing. Verified 2026-07-17.
-- **Conventional grounding added 2026-07-18 (classic, venue-verifiable — no arXiv):** N. Metropolis, A. Rosenbluth, M. Rosenbluth, A. Teller & E. Teller (1953), *Equation of State Calculations by Fast Computing Machines*, J. Chem. Phys. 21; **S. Kirkpatrick, C. D. Gelatt & M. P. Vecchi (1983), *Optimization by Simulated Annealing*, Science 220:671–680**; V. Černý (1985), J. Optim. Theory Appl. 45 — the stochastic-acceptance / simulated-annealing mechanism that §8.4.1's *de-ratcheting* rediscovers (noise unsticks a stuck incumbent; the "interior optimum" is the temperature optimum). R. Ge, F. Huang, C. Jin & Y. Yuan (2015), *Escaping From Saddle Points*, COLT — the same noise-escapes-stuck-states effect in optimization.
-- **T. Kailath (1980), *Linear Systems*, Prentice Hall; E. D. Sontag (1998), *Mathematical Control Theory* (2nd ed.), Springer; F. Blanchini & S. Miani (2015), *Set-Theoretic Methods in Control*, Birkhäuser** — the bounded-input reachable-set / invariant-set theory that §3.1's commitment inequality is a corollary of (reachable set of a Schur-stable system under bounded input, measured in a Lyapunov metric). Standard textbook material; no novel dynamical-systems result is claimed.
-- **D. V. Lindley (1956), *On a Measure of the Information Provided by an Experiment*, Ann. Math. Statist. 27:986–1005; R. A. Howard (1966), *Information Value Theory*, IEEE Trans. SSC 2(1):22–26; K. Friston (2010), *The free-energy principle: a unified brain theory?*, Nat. Rev. Neurosci. 11:127–138** — Bayesian optimal experimental design, value of information, and active inference: the established "act to reduce uncertainty" mechanism imported by Part IV's active face (§10). Classic, venue-verifiable; no novel result claimed.
+Grouped by [Sources](#sources--what-this-rests-on) row. The four fabricated IDs of an early draft are listed in the process disclosure above.
 
-*Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
-An earlier draft, written with the search backend down, carried four fabricated
-arXiv IDs — 2406.07284, 2402.07827, 2309.07864, 2309.01219 — none of which matched
-their claimed titles. They have been replaced with verified sources (the model-
-collapse work is now Dohmatob et al. 2402.07043 and Feng et al. 2406.07515; the
-contraction math is attributed to Lohmiller & Slotine 1998 and Khalil 2002).*
+- **1** A. M. Lyapunov, *The General Problem of the Stability of Motion* (1892). W. Lohmiller & J.-J. E. Slotine, "On Contraction Analysis for Nonlinear Systems", *Automatica* 34(6):683–696 (1998). H. K. Khalil, *Nonlinear Systems*, 3rd ed., Prentice Hall (2002). G. Zames (1966), the small-gain theorem.
+- **2** H. Poincaré, *Mémoire sur les courbes définies par une équation différentielle* (1880s): node, saddle, center and focus. I. Bendixson (1901): `Re λ(A) ≤ λ_max(A_s)`. T. Kailath, *Linear Systems*, Prentice Hall (1980). G. H. Golub & C. F. Van Loan, *Matrix Computations*, 4th ed., Johns Hopkins (2013). F. L. Bauer & C. T. Fike, "Norms and exclusion theorems", *Numerische Mathematik* 2:137–141 (1960).
+- **3** G. Lumer & R. S. Phillips, "Dissipative operators in a Banach space", *Pacific J. Math.* 11(2):679–698 (1961). L. N. Trefethen & M. Embree, *Spectra and Pseudospectra*, Princeton University Press (2005). M. Crouzeix & C. Palencia, "The numerical range is a (1+√2)-spectral set", *SIAM J. Matrix Anal. Appl.* 38(2):649–655 (2017).
+- **4** Converse results for switched systems, [arXiv:2405.03560](https://arxiv.org/abs/2405.03560). LP-computable dwell-time bounds via multiple Lyapunov functions, [arXiv:2303.17858](https://arxiv.org/abs/2303.17858). Learned Lyapunov functions for piecewise-affine systems, [arXiv:2008.06546](https://arxiv.org/abs/2008.06546). Expert-choice routing, [arXiv:2202.09368](https://arxiv.org/abs/2202.09368).
+- **5** Ouro, [arXiv:2510.25741](https://arxiv.org/abs/2510.25741). STARS, *Stabilizing Recurrent Dynamics for Test-Time Scalable Latent Reasoning in Looped Language Models*, [arXiv:2605.26733](https://arxiv.org/abs/2605.26733). PLDR self-organized criticality, [arXiv:2603.23539](https://arxiv.org/abs/2603.23539). CART, [arXiv:2606.01495](https://arxiv.org/abs/2606.01495). Mixture-of-Recursions, [arXiv:2507.10524](https://arxiv.org/abs/2507.10524) (read 2026-11-05). J. H. Tu, C. W. Rowley, D. M. Luchtenburg, S. L. Brunton & J. N. Kutz, "On dynamic mode decomposition: theory and applications", *J. Comput. Dyn.* 1(2):391–421 (2014).
+- **6** C. T. Kelley, *Iterative Methods for Linear and Nonlinear Equations*, SIAM Frontiers in Applied Mathematics 16 (1995).
+- **7** B. D. O. Anderson, "Exponential stability of linear equations arising in adaptive identification", *IEEE Trans. Automatic Control* (1977): persistent excitation, invoked by analogy only. R. Kulhavý & M. Kárný (1984), directional forgetting in recursive identification. *RLS with Variable-Direction Forgetting*, [arXiv:2003.03523](https://arxiv.org/abs/2003.03523). *SIFt-RLS*, [arXiv:2404.10844](https://arxiv.org/abs/2404.10844). The last three were verified 2026-07-17.
+- **8** T. W. Anderson, "The integral of a symmetric unimodal function over a symmetric convex set and some probability inequalities", *Proc. Amer. Math. Soc.* 6(2):170–176 (1955). R. A. Horn & C. R. Johnson, *Matrix Analysis*, 2nd ed., Cambridge University Press (2013), for Weyl's inequality. T. Popoviciu, "Sur les équations algébriques ayant toutes leurs racines réelles", *Mathematica (Cluj)* 9:129–145 (1935), the standard attribution of the variance bound.
+- **9** Kailath (1980), as in row 2. E. D. Sontag, *Mathematical Control Theory*, 2nd ed., Springer (1998). F. Blanchini & S. Miani, *Set-Theoretic Methods in Control*, Birkhäuser (2015). W. P. M. H. Heemels, K. H. Johansson & P. Tabuada, "An Introduction to Event-triggered and Self-triggered Control", IEEE CDC (2012). Lyapunov event-triggered stabilization with a known convergence rate, [arXiv:1803.08980](https://arxiv.org/abs/1803.08980) (verified 2026-07-17). FLARE, [arXiv:2305.06983](https://arxiv.org/abs/2305.06983). DRAGIN, [arXiv:2403.10081](https://arxiv.org/abs/2403.10081). Per-token commitment, [arXiv:2604.23235](https://arxiv.org/abs/2604.23235).
+- **10** C. Wissel (1984) and M. Scheffer et al., *Nature* (2009), on critical slowing down and early-warning signals. Y. Bar-Shalom, X. R. Li & T. Kirubarajan, *Estimation with Applications to Tracking and Navigation*, Wiley (2001).
+- **11** Khalil (2002), Ex. 8.4, as in row 1. J. Pathak et al. (2017–18), reservoir reconstruction of attractors and Lyapunov spectra. *A Minimal Model of Representation Collapse*, [arXiv:2604.09979](https://arxiv.org/abs/2604.09979) (verified 2026-07-17).
+- **12** I. Shumailov et al., *Nature* (2024). E. Dohmatob, Y. Feng, P. Yang, F. Charton & J. Kempe, *A Tale of Tails: Model Collapse as a Change of Scaling Laws*, [arXiv:2402.07043](https://arxiv.org/abs/2402.07043) (ICML 2024). Y. Feng, E. Dohmatob, P. Yang, F. Charton & J. Kempe, *Beyond Model Collapse: Scaling Up with Synthesized Data Requires Verification*, [arXiv:2406.07515](https://arxiv.org/abs/2406.07515) (ICML 2024). J. Huang, X. Chen, S. Mishra, H. S. Zheng, A. W. Yu, X. Song & D. Zhou, *Large Language Models Cannot Self-Correct Reasoning Yet*, [arXiv:2310.01798](https://arxiv.org/abs/2310.01798) (ICLR 2024; verified 2026-07-07). Corroboration from 2025–26, title-verified 2026-07-08: [arXiv:2509.16499](https://arxiv.org/abs/2509.16499), [arXiv:2509.04796](https://arxiv.org/abs/2509.04796), [arXiv:2602.10531](https://arxiv.org/abs/2602.10531).
+- **13** D. Amodei et al. (2016); J. Skalse et al. (2022).
+- **14** E. Akyürek et al., *What learning algorithm is in-context learning?*, [arXiv:2211.15661](https://arxiv.org/abs/2211.15661). Y. Bai et al., *Transformers as Statisticians*, [arXiv:2306.04637](https://arxiv.org/abs/2306.04637) (NeurIPS 2023). M. Elsayed & A. R. Mahmood, UPGD, [arXiv:2404.00781](https://arxiv.org/abs/2404.00781). *STAR: Stability-Inducing Weight Perturbation for Continual Learning*, [arXiv:2503.01595](https://arxiv.org/abs/2503.01595). Kang et al., *In-Context Learning can Perform Continual Learning Like Humans*, [arXiv:2509.22764](https://arxiv.org/abs/2509.22764). All five verified 2026-06-21.
+- **15** SimpleQA-Verified (Google DeepMind), [arXiv:2509.07968](https://arxiv.org/abs/2509.07968). J. Kossen et al., *Semantic Entropy Probes*, [arXiv:2406.15927](https://arxiv.org/abs/2406.15927) (verified 2026-07-07).
+- **16** VICReg, [arXiv:2105.04906](https://arxiv.org/abs/2105.04906). Barlow Twins, [arXiv:2103.03230](https://arxiv.org/abs/2103.03230). W-MSE, [arXiv:2007.06346](https://arxiv.org/abs/2007.06346). R. Balestriero & Y. LeCun, LeJEPA (SIGReg), [arXiv:2511.08544](https://arxiv.org/abs/2511.08544). Verified 2026-07-06. The import to test: does a covariance-conditioning term reduce measured collapse proximity in the Ouro latent loop without harming golden or confabulation scores?
+- **17** J. Schulman et al., *Trust Region Policy Optimization*, [arXiv:1502.05477](https://arxiv.org/abs/1502.05477). L. Gao, J. Schulman & J. Hilton, *Scaling Laws for Reward Model Overoptimization*, [arXiv:2210.10760](https://arxiv.org/abs/2210.10760). *RL's Razor: Why Online RL Forgets Less*, [arXiv:2509.04259](https://arxiv.org/abs/2509.04259). *Reinforcement Fine-Tuning Naturally Mitigates Forgetting in Continual Post-Training*, [arXiv:2507.05386](https://arxiv.org/abs/2507.05386). *Mechanistic origins of catastrophic forgetting*, [arXiv:2605.28860](https://arxiv.org/abs/2605.28860). Counterpoints: *RL Forgets! Towards Continual Policy Optimization*, [arXiv:2607.04364](https://arxiv.org/abs/2607.04364), and *The Choice of Divergence*, [arXiv:2509.07430](https://arxiv.org/abs/2509.07430). Title-verified 2026-07-08.
+- **18** C. Dwork, V. Feldman, M. Hardt, T. Pitassi, O. Reingold & A. Roth, "The reusable holdout", *Science* 349 (2015); *Generalization in Adaptive Data Analysis and Holdout Reuse*, [arXiv:1506.02629](https://arxiv.org/abs/1506.02629); [arXiv:1411.2664](https://arxiv.org/abs/1411.2664). A. Blum & M. Hardt, *The Ladder: A Reliable Leaderboard for Machine Learning Competitions*, [arXiv:1502.04585](https://arxiv.org/abs/1502.04585). R. Roelofs et al., *A Meta-Analysis of Overfitting in Machine Learning*, NeurIPS (2019), the standing counterpoint. The last two were verified 2026-07-17.
+- **19** N. Metropolis, A. Rosenbluth, M. Rosenbluth, A. Teller & E. Teller, *J. Chem. Phys.* 21 (1953). S. Kirkpatrick, C. D. Gelatt & M. P. Vecchi, "Optimization by Simulated Annealing", *Science* 220:671–680 (1983). V. Černý, *J. Optim. Theory Appl.* 45 (1985). R. Ge, F. Huang, C. Jin & Y. Yuan, "Escaping From Saddle Points", COLT (2015).
+- **20** *SGM: A Statistical Gödel Machine for Risk-Controlled Recursive Self-Modification*, [arXiv:2510.10232](https://arxiv.org/abs/2510.10232) (added 2026-11-05): it admits a self-modification only when a statistical certificate shows it is better, with a per-edit bound on the probability of a harmful accept and a cumulative bound across rounds, spent through e-values. It is the closest prior art for turning Σ_θ's gate into a certificate. Close prior art from the harder novelty search of 2026-07-07: ADOWIP, budgeted when-to-update gating, [arXiv:2606.25068](https://arxiv.org/abs/2606.25068). *Uncertainty-Guided Checkpoint Selection for RL finetuning*, [arXiv:2511.09864](https://arxiv.org/abs/2511.09864). *Signed Compression Progress on a Sealed Audit is Goodhart-Resistant*, [arXiv:2606.11417](https://arxiv.org/abs/2606.11417), the nearest neighbour of §8.4's sealed promotion set. *Learning, Fast and Slow*, [arXiv:2605.12484](https://arxiv.org/abs/2605.12484), prior art for the fast/slow framing itself. Corroboration that gating on world feedback or held-out evaluation, not the proxy, is the live direction: EvalStop, [arXiv:2606.04145](https://arxiv.org/abs/2606.04145); *Provably Mitigating Overoptimization*, [arXiv:2510.05526](https://arxiv.org/abs/2510.05526); Wasserstein-DRO RLHF, [arXiv:2605.00155](https://arxiv.org/abs/2605.00155). All verified 2026-07-07.
+- **21** *Model-Centric Diagnostics*, predicting model quality from internal state without validation data, [arXiv:2601.16874](https://arxiv.org/abs/2601.16874). Statistical detection of degraded or quantized checkpoints, [arXiv:2602.10144](https://arxiv.org/abs/2602.10144). A two-failure-mode account of LLM quantization, [arXiv:2604.19884](https://arxiv.org/abs/2604.19884). Verified 2026-07-17.
+- **22** V. S. Borkar, "Stochastic approximation with two time scales", *Systems & Control Letters* 29(5):291–294 (1997). Khalil (2002), as in row 1, for singular perturbation.
+- **23** D. V. Lindley, "On a Measure of the Information Provided by an Experiment", *Ann. Math. Statist.* 27:986–1005 (1956). R. A. Howard, "Information Value Theory", *IEEE Trans. Syst. Sci. Cybern.* 2(1):22–26 (1966). K. Friston, "The free-energy principle: a unified brain theory?", *Nat. Rev. Neurosci.* 11:127–138 (2010). R. J. Solomonoff, "A formal theory of inductive inference", *Information and Control* 7 (1964). M. Hutter, *Universal Artificial Intelligence*, Springer (2005).
+- **24** F. W. Harris, "How Many Parts to Make at Once", *Factory, The Magazine of Management* 10(2) (1913), the EOQ model. S. Boyd & L. Vandenberghe, *Convex Optimization*, Cambridge University Press (2004), for water-filling. SEA, [arXiv:2607.00871](https://arxiv.org/abs/2607.00871), with the Ramdas-school e-values; SGM (row 20) spends e-values across the rounds of a self-modification gate. The martingale core of M1 (Doob; CEE) and its diagnostic use, Martingale Score [arXiv:2512.02914](https://arxiv.org/abs/2512.02914). The nearest gate framework, [arXiv:2607.13070](https://arxiv.org/abs/2607.13070) (full text checked 2026-07-22). Iterative Learning Control patents US7345448B2 and US8094405B1. The Kalai proper-scoring lineage (convergence-engine research note, 2026-07-22).
+- **25** Paraphrase-attractor analysis, [arXiv:2502.15208](https://arxiv.org/abs/2502.15208). Lyapunov same-basin certification in DEQs, [arXiv:2304.12707](https://arxiv.org/abs/2304.12707). Output-level consistency training, [arXiv:2510.14242](https://arxiv.org/abs/2510.14242). Depth consistency in looped LMs, [arXiv:2602.11451](https://arxiv.org/abs/2602.11451). HRM contraction-mapping training, [arXiv:2603.22871](https://arxiv.org/abs/2603.22871). DEQ neural collapse, [arXiv:2410.23391](https://arxiv.org/abs/2410.23391). Verified semantic caching, [arXiv:2602.13165](https://arxiv.org/abs/2602.13165). TAR@N stability metrics, [arXiv:2408.04667](https://arxiv.org/abs/2408.04667), and ReasonBENCH, [arXiv:2512.07795](https://arxiv.org/abs/2512.07795). From audits [#2861] (2026-07-22) and [#2874] (2026-07-23).
+- **26** As cited in the 2026-07-22 restructure, and not re-verified in this pass:
+  - **Observe:** InfiAgent, Self-GC [arXiv:2607.00692](https://arxiv.org/abs/2607.00692) and AgentFold; DeepSeek-V4's pretraining on agentic execution traces.
+  - **Remember:** FOREVER (forgetting-curve replay); Supersede [arXiv:2606.27472](https://arxiv.org/abs/2606.27472); US8131656B2 (the surrogate leash).
+  - **Reason:** FPRM [arXiv:2606.18206](https://arxiv.org/abs/2606.18206); Equilibrium Reasoners [arXiv:2605.21488](https://arxiv.org/abs/2605.21488).
+  - **Act:** decision-theoretic cascades [arXiv:2605.06350](https://arxiv.org/abs/2605.06350); UCCI [arXiv:2605.18796](https://arxiv.org/abs/2605.18796); Shadow Price [arXiv:2606.03092](https://arxiv.org/abs/2606.03092); escalation patents US6013436A, US7254641B2 and US6686716B1.
+  - **Verify:** hidden-state probing [arXiv:2606.02628](https://arxiv.org/abs/2606.02628) and its scope limit [arXiv:2510.09033](https://arxiv.org/abs/2510.09033); agent drift [arXiv:2601.04170](https://arxiv.org/abs/2601.04170); gates-off snapshot testing (the Opus 4.6 system card).
+  - **Converge:** Qwen3 strong-to-weak distillation; DeepSeek-V4's expert-then-consolidate assembly; model merging [arXiv:2511.21437](https://arxiv.org/abs/2511.21437).
+  - **Also:** J. Wolfers & E. Zitzewitz, "Prediction Markets", *J. Economic Perspectives* 18(2):107–126 (2004), on markets as an external grounding signal.
 
----
-
-## Appendix A: Router Demonstration Design (original sketch)
-
-> **ℹ HISTORICAL.** This appendix preserves the *original* design sketch and its
-> hand-entered numbers for provenance. In plain words: this section is just the first guess we wrote down before running the real test — its numbers were never confirmed by data (see §6 for what actually happened). The demonstration is now implemented and
-> reproducible — see §6 for the produced results. The "parrot attractor" numbers
-> below were the pre-implementation hypothesis and were **not** confirmed by the
-> real run (the data settles at high-novelty / low-echo instead).
-
-### Original Design
-
-The intended demonstration would run the Σ₀ machinery on the unisona.ai
-conversation log (`data/conversations/garage-conversations.jsonl`), encoding
-each turn as
-
-$$x = [\text{novelty},\ \text{self\_repeat},\ \text{echo},\ \text{length}] \in [0,1]^4.$$
-
-Two scripts were specified (but never committed):
-
-- **`experiments/router_sigma0_encoder.py`** (MISSING) — would fit a local
-  Jacobian per session, emit the spiral/canary/wall readouts, and build `π` and
-  `P_ij`.
-- **`experiments/router_reservoir_G.py`** (MISSING) — would train an echo-state
-  network into one global flow that runs autonomously, *becoming* `G`, feeding
-  its reconstructed fixed points back to the same Σ₀ certificate.
-
-### Intended Result (Unverified)
-
-The narrative result was that the log's dynamics collapse onto a **"parrot
-attractor"** (`novelty ≈ 1, echo ≈ 0.72`) — a flow whose only fixed point is
-"quote the prompt back," i.e. model collapse. **Because the generating scripts
-do not exist, these numbers have no produced artifact and must be regarded as
-hand-entered, not data-derived.**
-
-### Honest Caveats
-
-1. **(Resolved.)** The two driver scripts are now committed and §6 reports a
-   logged run; the hand-entered numbers in this appendix are superseded by the
-   produced ones.
-2. Even if the scripts existed, the source log is mostly synthetic test traffic,
-   so any numbers would be illustrative — the deliverable would be the pipeline,
-   not the values.
-3. A reservoir's autonomous rollout diverges unless projected back onto the
-   valid `[0,1]⁴` domain; that projection *is* `π`. This is a real modeling step,
-   but it is also an external bound imposed by hand, not an emergent property.
-4. **(Resolved — 2026-06-17, [#661].)** A first version of this appendix claimed a
-   "log-barrier" smoothed the boundary. What actually shipped in `_collapse_state`
-   was **not** a log-barrier: it was a multiplicative shrink of the projection,
-   `x* = (P x)·(1 − barrier)` with `barrier = −s·log(1 − ‖Px‖/‖x‖)`, which for
-   `s > 1/ln(100) ≈ 0.217` went negative and flipped the sign of the collapsed
-   state — the opposite of collapse. **Fix:** the term is dropped. Collapse is now
-   the orthogonal projection `x* = P x` with `P = V Vᵀ`; because `P` is idempotent
-   and symmetric it is non-expansive (`‖P x‖ ≤ ‖x‖`) and smooth, so there is no
-   boundary to enforce and no penalty term is needed. The original concern is moot.
-   (The logarithmic-norm reformulation μ₂(A) = λ_max(A_s) of the *certificate's*
-   small-gain bound remains a separate, optional tightening — not required for the
-   projection to be correct.)
-
-### Status: Implemented
-
-Done: `experiments/router_sigma0_encoder.py` and `experiments/router_reservoir_G.py`
-are committed and produce `data/sigma0/router-encoder-output.jsonl` and
-`data/sigma0/reservoir-G-output.jsonl`. The §6 numbers are the produced output;
-the hand-entered claims in this appendix are kept only for provenance.
+*Verification.* Web citations were verified against arXiv on 2026-06-17 ([#660]); later arXiv additions carry the verified-on dates above. The 2026-11-05 condensation added one arXiv ID, SGM's 2510.10232, checked by web search that day. It also gave full entries to classics the earlier text named, and added new ones:
+- **Checked by web search on 2026-11-05:** Kelley 1995, T. W. Anderson 1955, Popoviciu 1935 (the venue), Lumer & Phillips 1961, Crouzeix & Palencia 2017, Borkar 1997 and Tu et al. 2014.
+- **Standard references, named but not separately checked:** Bauer & Fike 1960, Trefethen & Embree 2005, Bar-Shalom et al. 2001, Golub & Van Loan 2013, Horn & Johnson 2013, Solomonoff 1964, Hutter 2005, Harris 1913, and Boyd & Vandenberghe 2004.
 
 ---
 
-*Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (46 passing, 0 xfail) + `tests/test_sigma0_roa_certified.py` (4 passing —
-the [#1991] machine-checked ROA certificate, `experiments/sigma0_roa_certify.py`); framework `docs/sigma0-collapse-certificate.tex`.
-The router demonstration scripts `experiments/router_sigma0_encoder.py` and
-`experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
-for produced results and Appendix A for the original design sketch.*
+## Appendix A — removed
+
+The original router-demonstration design sketch, with its hand-entered "parrot attractor" numbers, is superseded by §6. It was removed in the 2026-11-05 condensation and is kept in full at [commit 6a5f028c](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md#appendix-a-router-demonstration-design-original-sketch).
 
 ---
 
@@ -2425,18 +905,18 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-11-05 | S1: "probability ≥ ½, for any drift and any `p`" | it assumes `D ⪰ 0`, and `LinearDynamics` accepted negative noise, which gives 0.40 on the real engine (found by `lantern-os-research` PR #14). Now enforced, and the lemma's other hypotheses are stated | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | the first fix to the verdict: the last-step ratio, and "accepted at the trained depth, plateau past it" | an independent review of that fix broke it. One step accepted a period-2 map with `ρ > 1` and a residual that dipped and then grew 900×; non-finite iterates passed; growth starting under the noise floor read as converged. The statistic now reads the whole loop and its deepest half, over a pairwise envelope, because a second review found that a window over the raw residuals still let a period-2 map through. On the same saved data it accepts depths 3–8, not 3–4 | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) |
 | 2026-11-05 | the first fix to the fates, `Re λ < −δ` | rounding counted rotations and Jordan blocks at `δ = 0` as active, which read COLLAPSE on 75 of 200 random bases of §1's own example. Scaling the boundary tolerance by `‖A‖` then blurred them next to any large mode. The cut now sits `tol` inside the boundary, and the boundary is read on the slow block | `dichotomy_certificate` |
-| 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Any rotation or unstable complex pair with `|Re λ| < 1` went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
+| 2026-11-05 | the discrete dichotomy's split, since it was written | real Schur passes `(Re λ, Im λ)` to its sort, and the callback took one argument, so it sorted by `Re λ` alone. Any rotation or unstable complex pair with `\|Re λ\| < 1` went into the "active" block, and `active_decay_factor`, `transient_bound`, `coupling_norm` and `full_transient_bound` were computed on that split. The fate came from a separate computation and was unaffected | `discrete_dichotomy_certificate` |
 | 2026-11-05 | a batch "reports the worst member" | the bounds and gates came from one member, so a batch could read `proven_contracting` beside a diverging member, or quote one member's bound for another's 1000× transient, depending on order. Gates are now ANDed and each bound is the worst of any member's | `_worst_fate`, `_worst_collapse` |
 | 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence`, or from sources that disagree, stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied, and supports acting only if it ran this plan. Still unchecked, and stated: whether the goal is reachable at all, and whether a channel's self-reported confidence is honest | `src/cio_sde/question.py` |
 | 2026-11-05 | the anti-collapse gate as one decision for the batch, and its kick subspace from `A_s` (both stated as limits and pinned in the first round) | **lifted** (the design limits found by `lantern-os-research` PR #14): each trajectory is gated on its own four signals and its own Jacobian, and only the rows that fire are kicked, bumped or overwritten, each with its own receipt and budget; a batch run equals its rows run alone. The kick basis is the right singular vectors of each sample's own `A` for its small singular values, so `‖A·P‖₂ ≤ eig_eps·max(1, ‖A‖₂)` when the gate fires. C3 and S1 are unchanged and now hold per trajectory; neither says the state keeps the kick, and the #1990 calibration needs a re-run. An independent review of the first version of this change broke it through the engine. The S1 gain guard indexed a gain shared by all rows by row number, and let a negative gain through. An operator written for the batch gate crashed when its outputs broadcast, and with such an operator a spook on one row raised another row's kick. Signals were compared with float32-rounded thresholds, one ulp from master. All four are fixed and pinned | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | the per-trajectory gate (#3814): "a batch run equals its rows run alone", bit for bit, and one row cannot decide for another | to rounding only. `Tensor.std` rounds one row differently from the same row in a batch, even under `LinearDynamics`, and the neural node's matrix products do too (up to 4.4·10⁻¹⁵ in float64 and 1.4·10⁻⁶ in float32 over 30 steps), so a row within rounding of a threshold can decide differently in a batch; a `Σ` with `a = 0.05000000000000005` alone reads `0.049999999999999996` in a batch. And one row still decided for all: a NaN in its Jacobian or `Σ` made the batched SVD, `eigvalsh` or the covariance step's `eigh` raise for every row; an inf Jacobian, or a finite one whose singular values overflow, read rank 0 and fired; a spook or a batch-wide proximity could still kick a broken row, and a covariance step that overflowed made the kick fail the batch; and a `Σ` shared by the batch crashed the receipts past row 0. A non-finite row now reads NaN and is never acted on, an overflowed one is blocked with a receipt, and the receipts read a shared `Σ` as every row's (post-merge review of #3814, and a review of this fix) | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | the row-isolation fix (#3819): a batched run agrees with its rows alone "only to rounding", because `Tensor.std` and the neural node's matrix products round a lone row differently, "even with `LinearDynamics`" | **narrowed**: `std` reduced a batch of one in two passes and a row of a larger batch by Welford's update. The anisotropy and the C3 floor now take the unbiased std from `mean` and a `sum` in float64, which give a row the same bits alone or in any batch, so a batched run equals its rows alone bit for bit wherever its matrix products are exact, as in `test_a_batch_is_independent_trajectories`, now also at `Σ0[1] = 3·I` and `2·I`. The rest of "to rounding" stands, and is wider than stated: `LinearDynamics`' own drift `x·Aᵀ` rounds a row differently in a batch once `A`'s products are not exact, as do the neural node's and a nonzero policy's layers and, from `d ≈ 50` with MKL, the batched products of the covariance step and of the operators. Float64 values move by about an ulp in every run that fires; float32 values do not move | [§3](#3-the-anti-collapse-operator-σ₀¹) |
-| 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
-| 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
-| 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |
+| 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md#appendix-a-router-demonstration-design-original-sketch) |
+| 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md#closed-gap-history) |
+| 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md#appendix-m--provenance-maintenance-log--closed-gap-history) |
 | 2026-06-26 | Theorem C3 needed the alignment hypothesis | hypothesis **removable** — freeze-prevention proven for all `A`, normal and non-normal (an upgrade logged like a correction) | §3 |
-| 2026-07-07 | §8's "a fixed holdout gives O(1) gates" | **n-graded, not O(1)** (measured 32 seeds); fresh-flow strictly dominates (22× at n=50); Thresholdout is the formal third road | [§8.4](#84-the-load-bearing-open-problem--holdout-theater-review-hit-3-the-sharpest) |
-| 2026-07-07 | §8.2 checkpoint "fates" as first stated | corrected per external review hit #1 | [§8.2](#82-the-fates-corrected-review-hit-1) |
+| 2026-07-07 | §8's "a fixed holdout gives O(1) gates" | **n-graded, not O(1)** (measured 32 seeds); fresh-flow strictly dominates (22× at n=50); Thresholdout is the formal third road | [§8.4](#84-the-load-bearing-open-problem--holdout-theater) |
+| 2026-07-07 | §8.2 checkpoint "fates" as first stated | corrected per external review hit #1 | [§8.2](#82-the-fates-corrected) |
 | 2026-07-17 | §8.6 "no prior art for internal-state checkpoint monitors" | **stale** — the detection lane is occupied (2601.16874, 2602.10144, 2604.19884); only the *incremental* ΔAUC design may remain unique | §8.6 item 5 |
 | 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | grounding ledger |
 | 2026-07-22 | R3 (M1) filed as if the *inequality itself* might be novel | **scope shrunk on audit** — martingale core classical (Doob/CEE), diagnostic use taken (2512.02914); only the *enforced-runtime-gate* form promoted ✓ at ~70% | [#2860](https://github.com/alex-place/lantern-os/issues/2860) |
@@ -2445,479 +925,15 @@ for produced results and Appendix A for the original design sketch.*
 
 ---
 
-## Appendix M — Provenance: maintenance log & closed-gap history
+## Appendix M — removed
 
-> **2026-07-22 — white-paper restructure + formula registry + novelty-policy calibration.**
-> Added the linked Contents table, the loop diagram, and **"The mathematics — formula registry"**
-> (R1–R11): every formula rendered as an image (`docs/assets/cert/*.svg`, generator
-> `scripts/render_cert_formulas.py`) with **two independent labels** — epistemic status
-> (PROVEN / MEASURED / CONJECTURE / IMPORTED) and novelty status (NOT-NOVEL / CANDIDATE ★ /
-> AUDITED-CANDIDATE ✓). Same day, operator-directed: the 2026-07-07 head-line **"Novelty: none is
-> claimed" was replaced by the graded per-item ladder** — it was scoped to Part II's components
-> but read as a whole-document surrender; novelty is now claimed *when earned, per item*
-> (all current ★ items are unaudited candidates; promotions only via recorded bounded search).
-> Three new registry entries from this date's work: the anytime-valid e-process stop certificate
-> (R8, imported via SEA 2607.00871), basin determinism (R9, conjecture, #2859), and the oracle
-> objective (R10, definition). Added **Appendix C — corrections register** consolidating every
-> correction into one auditable table (in-situ markers retained at point of claim). No theorem,
-> status line, or measured number was altered by this pass.
+The maintenance log (2026-06-16 to 2026-07-21) and the closed-gap history are provenance, not results, and were removed in the 2026-11-05 condensation. What they recorded is in the body or in Appendix C, apart from results the later corrections superseded:
+- the 3,000- and 4,000-configuration sweeps (`experiments/prove_c3_noncollapse.py`†, `prove_c3_noncollapse_nonnormal.py`†), which checked C3 as stated before 2026-11-05;
+- the 600-matrix sweep behind the first non-normal close of [#768] (0 failures, worst invariance residual 6.7·10⁻¹³), run on the dichotomy before its fates were corrected;
+- the 2026-07-18 conventional-grounding map, which the Sources table replaces.
 
-> Moved here from the document head on 2026-07-07 for readability. Unedited, chronological.
-> This is the anti-drift record: each entry is an external-reality reconcile pass (fresh test
-> runs, artifact checks) or a dated closure. The document's claims are only as current as the
-> latest entry that verified them.
-
-> **Maintenance log — 2026-06-16.** This status pass reconciles the doc with the
-> repo after a sprint day that landed **zero** commits to `src/cio_sde/`,
-> `experiments/router_*`, or this certificate (the day went to the Kingdome game
-> engine, dashboard 1.6, and the Σ₀ *application* modes — product, not the math).
-> Because the research lane was skipped, the gap block below had silently gone
-> stale: the [#509] !convergance epic (five priority research gaps) closed on
-> 2026-06-15, along with [#505], [#506], [#507], [#516], [#517], [#520], [#523],
-> and [#508] — yet none of those closures were reflected here. The `Optional`
-> import defect (§3) is genuinely fixed and is now recorded. **Correction
-> (2026-06-16):** a first version of this pass also marked the Appendix A
-> "log-barrier" resolved — that was an overclaim caught in external review. What
-> shipped was a misnamed multiplicative shrink with a sign-flip footgun, not a barrier.
-> **Resolved (2026-06-17, [#661]):** the spurious term was dropped — `_collapse_state`
-> now returns the clean orthogonal projection `x* = P x`, which is non-expansive
-> (`‖P x‖ ≤ ‖x‖`) and smooth, so no boundary penalty is needed. The remaining
-> work is re-tracked as live issues so this doc cannot drift again ([#657]–[#660]).
->
-> **Maintenance log — 2026-06-19.** Reconcile pass after [#657], [#658], [#659]
-> landed (verified against the repo: `pytest tests/test_cio_sde.py` → **30 passed,
-> 0 xfail**; `data/sigma0_regime_sweep_report.json` → 900 collapse-prone trials,
-> 100% prevented). The per-section status lines, the top status, and the footer had
-> drifted behind these closures (still reading "29 passing, 1 xfail" and "§3 N=1
-> HEURISTIC"); they are now aligned with ground truth. A plain-language summary was
-> added at the top for non-specialist readers. The sole remaining frontier is a
-> §3 sufficiency *theorem*.
->
-> **Maintenance log — 2026-06-21.** External-reality verification pass against the
-> repo: `pytest tests/test_cio_sde.py` → **33 passed, 0 xfail** (was 30 — three
-> tests added since, all green); `data/sigma0_regime_sweep_report.json` →
-> `collapse_prone_trials_total=900`, `headline_conditional_prevention_rate=1.0`;
-> and the cited symbols (`collapse_certificate`, `AntiCollapseOperator`,
-> `SurpriseMonitor`, `stability_gates`) all present in source. Reconciled the test
-> count 30 → 33 in the live status lines (dated logs keep their period counts); every other claim verified to hold. Frontier unchanged
-> (§3 sufficiency theorem, [#768]).
->
-> **Maintenance log — 2026-06-21 (σ=0 grounding).** Added §7.1 wiring Σ₀ collapse to the
-> established ML **σ=0 (zero-noise)** convention, grounded in five citations whose titles +
-> arXiv IDs were verified via search (ICL data-noise σ: arXiv:2211.15661, 2306.04637;
-> continual-learning weight-perturbation σ: arXiv:2404.00781, 2503.01595; in-context CL:
-> arXiv:2509.22764). Backed by a new test — `test_sigma_zero_freezes_sigma_positive_explores`
-> isolates the σ-axis (σ=0 freezes, σ>0 explores); suite now **34 passed, 0 xfail**.
->
-> **Maintenance log — 2026-06-25 (§3 closed for normal A).** The §3 sufficiency claim is
-> now PROVEN for **normal `A`** — Theorem C3, chaining
-> `L1(normal) ∧ L2 ∧ L3 ∧ L4 ∧ L5 ⇒ P(permanent freeze) = 0`. Closing it surfaced (and
-> fixed) two real defects in the shipped `AntiCollapseOperator`: (1) the bump magnitude
-> `strength·p` was **scale-blind** while L2's threshold `Δ ∝ μ` — fixed with a μ-aware
-> covariance floor (`_cov_floor`); (2) the hard `|λ|<eig_eps` aim could inject a
-> **zero-rank** bump (G13) or, in full degeneracy, **all `d` modes** (a uniform shift that
-> *lowers* anisotropy — the L2 `k=d` boundary) — fixed with banded near-null aiming clamped
-> to `1 ≤ m ≤ d−1` (`_near_null_basis`). Machine-checked: 4 new tests
-> (`test_c3_no_consecutive_freeze`, `test_l4_floor_lifts_anisotropy`,
-> `test_l4_floor_scale_equivariant`, `test_g13_no_zero_rank_bump`) + the sweep
-> `experiments/prove_c3_noncollapse.py` (3000 configs, 0 counterexamples, old bump fails
-> 100%). Non-normal `A` remains the lone frontier ([#768]). *Honest caveat:* 8 pre-existing
-> `test_cio_sde.py` failures (orphaned by the #1138 observe-only intervention default +
-> surprise-canary tuning) are unrelated to this change and untouched by it.
->
-> **Maintenance log — 2026-06-26 (§3 closed for ALL `A`; the 8 orphans fixed).** Two
-> things landed. **(1) Non-normal freeze closed.** The §3 sufficiency claim now holds for
-> **non-normal `A` too**: the alignment hypothesis L1 — the one place the normal-A proof
-> used normality — was unnecessary. L2's operative bound `σ⁺ ≥ √(m(d−m))/d·b − aμ` holds
-> for *any* rank-`m` orthogonal projector via the Frobenius reverse-triangle inequality
-> (at `cond_flat`, Σ≈μI, so the misalignment penalty `≤ aμ√(m(d−m))` is bounded by the
-> very `a(Σ)<ε_a` the gate asserts). Verified: `experiments/prove_c3_noncollapse_nonnormal.py`
-> (4000 genuinely non-normal configs incl. the adversarial worst-case alignment, 0 lift
-> failures) + `tests/test_cio_sde.py::test_c3_nonnormal_covariance_lift`. The C3 doc gains a
-> §7 (L2′) and the L2 doc gains the alignment-free strengthening. **The contraction half**
-> (Theorem 1's drift for non-normal `A`, the §1 cross-term — a different claim) was the last
-> gap; it was **closed later the same day** via the spectral dichotomy (see the Closed block
-> above and `SIGMA0-T1-NONNORMAL-DICHOTOMY.md`), so **all of
-> [#768] is now closed in-regime.** **(2) The 8 orphan
-> failures fixed.** They were tests of collapse-machinery *behavior* (freeze, projection,
-> NIS-canary-on-snap) running under the #1138 observe-only default, which suppresses the
-> action they assert. Fixed by a `_acting(m)` test helper that opts each into
-> `InterventionPolicy(observe_only=False)` — the regime they actually test — not by
-> weakening assertions. `pytest tests/test_cio_sde.py` → **39 passed, 0 failed** (was
-> 30 passed / 8 failed). "Machine-checked" here means closed-form algebra + sweep + pytest,
-> **not** a Lean/Mathlib formal proof.
->
-> **Maintenance log — 2026-06-29 (external-reality reconcile).** Verification pass against the
-> repo, no claims changed: `pytest tests/test_cio_sde.py` → **42 passed, 0 xfail** (matches
-> every live status line); `data/sigma0_regime_sweep_report.json` →
-> `collapse_prone_trials_total=900`, `headline_conditional_prevention_rate=1.0`; and the cited
-> symbols all resolve — `collapse_certificate`, `AntiCollapseOperator`, `stability_gates`,
-> `dichotomy_certificate` in `src/cio_sde/collapse.py`, `SurpriseMonitor` in
-> `src/cio_sde/surprise.py`. Nothing had drifted since the 2026-06-26 closures (both halves of
-> [#768] remain closed in-regime; §3 PROVEN for all `A`). Frontmatter `updated:` bumped
-> 2026-06-20 → 2026-06-29 to reflect this check; no frontier changes.
->
-> **Maintenance log — 2026-07-04 (external-reality reconcile).** Verification pass against the
-> repo; **no claims changed**. Fresh run this pass, not only the committed report:
-> `pytest tests/test_cio_sde.py` → **42 passed, 0 xfail** (30.8s), and the §2/§3/§7.1
-> proof-regression tests are among the 42 and green — `test_c3_no_consecutive_freeze`,
-> `test_l4_floor_lifts_anisotropy`, `test_g13_no_zero_rank_bump`,
-> `test_c3_nonnormal_covariance_lift` (C3 for all `A`), `test_collapse_is_nonexpansive_projection`
-> (§2 / [#661]), and `test_sigma_zero_freezes_sigma_positive_explores` (§7.1 σ-axis) — so the
-> load-bearing claims carry a live green run, not just a checked-in artifact.
-> `data/sigma0_regime_sweep_report.json` → `collapse_prone_trials_total=900`,
-> `headline_conditional_prevention_rate=1.0` (unchanged). Every cited cross-reference resolves:
-> `collapse_certificate` / `stability_gates` / `dichotomy_certificate` / `lyapunov_value` /
-> `AntiCollapseOperator` / `SemanticCollapseOperator` in `src/cio_sde/collapse.py`,
-> `SurpriseMonitor` + `CovarianceField` in `src/cio_sde/surprise.py` (also `engine.py`), the four
-> sibling proofs (T1-dichotomy, C3, L2, anti-collapse-hardening), all six `experiments/` drivers,
-> and both `data/sigma0/*.jsonl` outputs. **Provenance check (new this pass):** `git log` shows the
-> last commit touching this certificate *is* the 2026-06-29 reconcile itself (`34deba2f`, #1574) and
-> the last `src/cio_sde/` change is #768's non-normal-contraction close on 2026-06-26 (`6b446b90`) —
-> no commit since the last pass touched the source, tests, or this doc, so the match is structural,
-> not coincidental. Both halves of [#768] remain closed in-regime; §3 PROVEN for all `A`. Frontmatter
-> `updated:` bumped 2026-06-29 → 2026-07-04; no frontier changes.
->
-> **Maintenance log — 2026-07-04 (frontier work: discrete-time certificate landed).**
-> Beyond the reconcile above, this pass **opened four tracked frontiers and closed one**.
-> Reviewing the proof↔evidence surface surfaced two concrete gaps: (a) every theorem is
-> **continuous-time** (`e^{tA}`, `solve_continuous_lyapunov`, split by `Re λ`), yet §6's
-> own evidence is **discrete-time** (spectral radius `ρ≈1.064`) — the theorem did not
-> certify the quantity the demonstration measures; (b) the dichotomy's eig-based Riesz
-> split **abstains on defective `A`** (Jordan blocks — `inv(V)` ill-conditioned). Filed as
-> [#1988] (discrete-time dichotomy), [#1989] (defective-`A` via ordered Schur), [#1990]
-> (the §2 trigger→theorem gap — the unproven *entry* condition to the whole chain), and
-> [#1991] (local→global region-of-attraction). **[#1988] landed this pass:**
-> `discrete_dichotomy_certificate` + `DiscreteDichotomyCertificate` (`src/cio_sde/collapse.py`)
-> split `A` at `|z|=1−δ` via an **ordered real Schur** factorization (defective-safe, no
-> eigenvector inverse), certify the active block with the **discrete Lyapunov/Stein** metric
-> `AᴹᵀPAᴹ−P=−I` (`P⪰I` ⇒ per-step decay `√(1−1/λ_max(P))`, transient `√cond(P)`),
-> lower-bound the **discrete Kreiss** constant, and decide the fate by the slow block's
-> spectral radius `ρ_N` (>1 DIVERGE, <1 COLLAPSE, ≈1 MARGINAL — no third fate). For normal
-> `A` it reduces to `ρ(A)<1 ⟺ collapse`; discretizing a continuous flow as `e^{A·dt}`
-> preserves the fate (parity test). On a defective Jordan block the Schur split residual is
-> machine-zero where the continuous eig path abstains. Machine-checked by three new tests
-> (`test_discrete_dichotomy_radius_trichotomy`, `…_matches_continuous_under_exponential`,
-> `…_defective_split_is_invariant`); suite **42 → 45 passing, 0 xfail**. Same evidence class
-> as the continuous dichotomy — **PROVEN in-regime** (local linear Jacobian, discrete),
-> "machine-checked" = closed-form algebra + tests, **not** Lean.
->
-> **[#1989] landed too (same PR).** The *continuous* `dichotomy_certificate` was retrofitted to
-> the same ordered-Schur split, so it now certifies **defective `A`** — a Jordan(−0.5,3) ⊕ [+0.3]
-> rotated off-axis is split with residual `< 1e-9` and correctly classified DIVERGE, where the old
-> eig + oblique-Riesz path (`inv(V)` on degenerate eigenvectors) was ill-conditioned. Suite **45 →
-> 46 passing** (+`test_dichotomy_continuous_defective_via_schur`); the existing T1 tests are
-> unchanged because the certificate's rate/transient are basis-independent (Schur vs eig agree on
-> diagonalizable `A`). [#1990] (trigger→theorem) and [#1991] (local→global ROA) then advanced
-> with MEASURED evidence — see the next log.
->
-> **Maintenance log — 2026-07-04 (honesty red-team + frontier measurements #1990 / #1991).**
-> Three things landed. **(1) Honesty hardening.** A new §7.2 red-teams the certificate's *own*
-> honesty protocol — how a model games the evidence-class labels / citations / "verified" claims
-> (honesty theater = §7's collapse one level up), and the single defense (bind every honesty
-> signal to an external check the model can't control). **(2) [#1990] trigger — HEURISTIC →
-> MEASURED.** `experiments/sigma0_trigger_calibration.py` (960 samples;
-> `data/sigma0/trigger_calibration_report.json`) scores the four-signal trigger against the
-> *spectral* ground truth: **precision 1.0** (0 false-fires over 720 off-regime samples — the §2
-> forward assumption *trigger ⇒ collapse-regime* holds on this distribution) but **snapshot recall
-> ≈ 0.08** (a sound but conservative, *late* detector); the `rank` signal carries the
-> discrimination. Explicitly **not** upgraded to a theorem. **(3) [#1991] ROA first cut.**
-> `experiments/sigma0_roa_estimate.py` (`data/sigma0/roa_estimate_report.json`) certifies a
-> nonlinear basin `{V ≤ 2.31}` via a quadratic Lyapunov function, with **100% inside-convergence**
-> validated on the reversed-Van-der-Pol benchmark (Khalil Ex. 8.4). Sublevel-invariance is PROVEN
-> (Lyapunov/LaSalle); `c*` is MEASURED. Neither frontier is *closed* — #1990 is
-> calibrated-not-proven, #1991 is a validated *method* / first cut — but both moved from open to
-> MEASURED. Suite unchanged at **46 passing** (these are experiment artifacts, not new unit tests).
->
-> **Maintenance log — 2026-07-04 (honesty layer measured; §7.3 added).** The §7.2 red-team gains an
-> empirical companion, §7.3 — the defenses it names are now reproducible, machine-checked code: a
-> grounded five-councilor Σ₀ council (`experiments/sigma0_council.py`) that upholds grounded claims
-> by running their tests and **rejects a planted "0.99 SimpleQA SOTA" claim**; a strictly-proper
-> honesty objective (incentive-compat gap **0.0000**); a **159-record golden answer-key**
-> (`data/sigma0/golden_dataset.jsonl`, 26.4% honest negatives, anti-inflation machine-checked); and
-> a **live benchmark** where **GPT-4o-mini confabulated on 0/42 negatives** (golden 0.95) while
-> `always-assert` confabulates 100% at a *higher* raw score — confabulation-rate is the honesty
-> axis, measured. Verification this pass: `pytest tests/test_cio_sde.py` → **46 passing**; the four
-> artifacts resolve (`golden_dataset.jsonl` 159, `live_bench_results.json`,
-> `trigger_calibration_report.json`, `roa_estimate_report.json`). No cert *theorem* changed this pass.
->
-> **Maintenance log — 2026-07-04 (merge reconciliation + re-verification).** [#1997] **merged**, so
-> everything the logs above describe — §7.2/§7.3, the [#1990]/[#1991] measurements, the four honesty
-> artifacts — is now in `master` (this doc is read from `master`, no longer "staged on an open PR").
-> Re-verified this pass: `pytest tests/test_cio_sde.py` → **46 passed, 0 xfail** (38.9 s); all eleven
-> referenced artifacts resolve (the three `experiments/sigma0_*` calibration/ROA/council scripts +
-> `trigger_calibration_report.json`, `roa_estimate_report.json`, `golden_dataset.jsonl` [159 records],
-> `live_bench_results.json`, both `router_*` scripts, `collapse.py`, the `.tex`), and the §6 encoder
-> `ρ=1.064` figure now carries its control-check (a fitting artifact — see §6). The two frontiers stay
-> **honestly open**, unchanged: **[#1990]** trigger→theorem is calibrated-not-proven (precision 1.0,
-> recall ≈0.08 over 960 samples), **[#1991]** local→global ROA is a validated first cut
-> (sublevel-invariance PROVEN via LaSalle; `c*` MEASURED, not certified). Nothing was fabricated to
-> force a closure; upgrading either to PROVEN needs a machine-checked theorem this pass does not claim.
->
-> **Maintenance log — 2026-07-04 (#1991 ROA certification: MEASURED → PROVEN).** The step the entry
-> above deferred is now done: the grid-measured basin `c*≈2.307` is a **machine-checked** inner region
-> of attraction. `experiments/sigma0_roa_certify.py` proves `V̇ < 0` on `{V ≤ 2.25}` via an exact
-> origin-ball lemma (`|N| ≤ 3‖x‖⁴`) plus rigorous **interval branch-and-bound** (`mpmath.iv`,
-> directed rounding — **2323 boxes, 0 undecided**), with a control at `c_L = 2.5` (above `c*`) correctly
-> **failing** to certify (teeth). So `{V ≤ 2.25}` is **PROVEN** (97.5% of the grid optimum; the last
-> ~2.5% is interval overestimation near the tangency, not a rigor gap). New
-> `tests/test_sigma0_roa_certified.py` (4 tests, `data/sigma0/roa_certified_report.json`) ⇒ **50 cert
-> tests** (46 `test_cio_sde` + 4). §5 updated. This closes the *certification* half of [#1991] for the
-> benchmark `f`; **[#1990]** (trigger→theorem) stays honestly open — a heuristic min-gate does not
-> obviously imply the spectral condition, and may not be provable in general.
->
-> **Maintenance log — 2026-07-07 (external-novelty audit — nearest-prior for Part I).** A
-> reviewer-style "what do you add over the nearest paper" pass on Part I's *inference-time* claim
-> (Part II's Σ_θ novelty search already landed 2026-07-07 — see §8's close-prior-art bullet). Two
-> verified nearest-prior citations were missing and are now in References (lineage): **Huang et al.,
-> ICLR 2024 (arXiv:2310.01798)** — intrinsic self-correction *without external feedback* degrades
-> reasoning — the inference-time twin of §7's collapse-without-grounding claim (its *training-time*
-> twin, Feng/Dohmatob, was already cited); and **Semantic Entropy Probes (Kossen et al.,
-> arXiv:2406.15927)** as the nearest prior for §7.3's honesty probe. Both IDs verified against arXiv
-> this pass (title/authors/venue), per this doc's no-unverified-ID rule. **Honest positioning, stated
-> plainly so it cannot be laundered: the certificate claims no novel *mechanism*.** "Ungrounded
-> self-reference degrades; external verification is the escape" is established prior art (Huang 2024 at
-> inference; Feng 2024 / Shumailov 2024 at training). The certificate's actual contribution is (a) a
-> **machine-checked in-repo formalization** of that result as a computable stability certificate
-> (Theorems 1 / C3, the discrete + defective-`A` dichotomies — **50 passing tests**) and (b) **honest
-> negative results** (e.g. §8.4's strong O(1) fresh-flow law **REFUTED → `n`-graded**). Framed as
-> *novel AI* the nearest-paper question sinks it; framed as *disciplined formalization + honest
-> measurement* it stands — which is what §7.2 (honesty-not-theater) demands. No theorem changed this
-> pass; two arXiv-verified citations added.
->
-> **Maintenance log — 2026-07-07 (discrete JSRR acceptance gate adopted; external validation).**
-> A 2026-07-07 literature check found the looped-LM spectral-radius / peak-then-collapse result
-> now published externally on **real** models — STARS (JSRR, arXiv:2605.26733), PLDR
-> self-organized criticality (arXiv:2603.23539), and a fixed-point/attractor cluster — so the
-> §1 object is externally corroborated, and its *novelty* is closed (adoption, not a new law).
-> Acting on it: the serve-loop **acceptance gate is now the discrete criterion `ρ(A)<1`** (§1.2.3),
-> the invariant appropriate to a discrete iteration, with the §1.2.1 continuous `proven_contracting`
-> demoted to diagnostic + fallback. New `cio_sde.collapse.jsrr_certificate` (exact `ρ` + STARS'
-> `‖Av‖₂²` single-step surrogate, numpy-only so it survives the minimal inference venv);
-> `loop_lm.generate()` accepts iff `ρ<1−margin` (`SIGMA0_JSRR_MARGIN`, default 0). Machine-checked
-> by `tests/test_sigma0_jsrr_gate.py` (12 cases) + four unchanged adjacent suites ⇒ **98 passing**.
-> Evidence class is deliberately narrow: the gate's **verdict** is machine-checked, NOT a quality
-> win (CART, arXiv:2606.01495, reports a null result), and it runs on the **empirical-Jacobian
-> proxy** (true-JVP `ρ` deferred to a GPU run, #2029 matvec path). PR #2237. **Honesty leg NOT
-> written:** the grounding-honesty study ([#2236] — spectral loop-stability → *factual* honesty,
-> gated on external grounding) is untested, so no honesty AUROC is claimed here; it enters the doc
-> only when MEASURED with a run pointer. Frontmatter `updated:` → 2026-07-07.
-
-[#2237]: https://github.com/alex-place/lantern-os/pull/2237
-
-### Closed-gap history
-
-**Closed (landed 2026-06-15, via the [#509] !convergance epic):**
-- [#504] — §6 demo driver scripts (`router_sigma0_encoder.py`, `router_reservoir_G.py`) are **MEASURED** (committed; run logs in `data/sigma0/`).
-- [#505] — non-normal-Jacobian handling: `collapse_certificate()` now reports both the small-gain `alpha` bound and the exact full-spectrum `spectral_abscissa` (§1.1–1.2).
-- [#506] — surprise↔Σ₀ integration **landed** (`engine.forward_step` consumes `m.surprise_monitor`, emits `surprise_spook`; `SurpriseMonitor.sigma0_proximity()` / `anti_collapse_signal()`). Residual carried to [#657] (below).
-- [#507] / [#523] — real-data grounding demonstration (§6).
-- [#516] / [#517] / [#520] — model-collapse literature integrated (two-phase collapse, double-scaling law, prediction-markets-as-grounding; §7 + References).
-- [#508] — `.md`/`.tex` status-box reconcile pass.
-
-**Closed (both halves of [#768] — in-regime, 2026-06-26):**
-- **Theorem 1's *contraction* for non-normal drift `A`** ([#768]) — **now CLOSED in-regime.**
-  The §1 cross-term (`P_M A P_N ≠ 0` for non-normal `A`) breaks the symmetric-split energy
-  proof, and the small-gain / pseudospectral gates (§1.2.1) only over-reject. The fix is the
-  **spectral (Riesz) dichotomy** (`SIGMA0-T1-NONNORMAL-DICHOTOMY.md`):
-  split by `A`'s OWN spectrum so the cross-term vanishes by invariance; the active block
-  contracts within a certified Lyapunov envelope; the slow block's abscissa sign gives the
-  collapse-vs-diverge fate, no third option. Shipped as `dichotomy_certificate`
-  (`src/cio_sde/collapse.py`), surfaced at decode time in `loop_lm._stability_gates`,
-  machine-checked by a 600-matrix sweep (0 failures, worst invariance residual 6.7e-13) and
-  3 suite tests. For normal `A` it reduces to Theorem 1 exactly, so T1 is its special case.
-
-- **§3 sufficiency *theorem* — now closed for ALL `A`** (2026-06-26). Theorem
-  C3 proves Σ₀⁻¹ prevents permanent freeze: first for
-  normal `A` (landed 2026-06-25), then for **non-normal `A` too** once L2′ (§7 of the C3
-  doc) showed the alignment hypothesis L1 was removable — *any* rank-`m` bump lifts
-  anisotropy at `cond_flat` (Σ≈μI) by a Frobenius reverse-triangle bound. The 900-run
-  sweep ([#658]) is now corroboration. **[#768] is split:** its *freeze* half is closed
-  here; its *contraction* half (above) remains. This is the **rescue** question, distinct
-  from the drift one.
-
-  *All previously-tracked gaps are now closed: [#657], [#658], [#659] landed 2026-06-19; [#660] (`.md`/`.tex` attribution + web-citation verification) closed.*
-
-**Resolved (landed 2026-06-19):**
-- [#658] — **§3 evidence upgraded N=1 → MEASURED.** `experiments/sigma0_regime_sweep.py` runs a forced-collapse rollout with/without Σ₀⁻¹ over an α × non-normality × noise grid with a fixed underdetermined (3-dim null) Jacobian. Over **900 trials that genuinely collapse without protection**, Σ₀⁻¹ suppressed collapse AND re-excited the state in **100%** (`data/sigma0_regime_sweep_report.json`). Honest caveat: in this construction the non-normal off-diagonal lifts the Jacobian's effective rank, so the collapse-prone cells are the diagonal ones (non_normality=0); the measured distribution spans α∈{−0.5,−0.2,−0.05} × noise∈{0.01,0.05,0.2}. The §3 label moves from N=1 HEURISTIC to MEASURED; a sufficiency theorem is still future work.
-- [#657] — **§4 residual CLOSED.** The engine no longer self-observes; `forward_step` runs a Kalman predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration stays consistent (NIS≈m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS — the canary fires under collapse. `test_surprise_monitor_integration` flipped `xfail` → hard pass (30 passed). *This was the last open technical gap in the Σ₀ machinery.*
-- [#659] — **§4 decision CLOSED (RETIRED).** `p_gate`/`p_unbounded` formally retired, superseded by the `surprise.py` NIS canary; never implemented in `collapse.py` and will not be.
-
-**Anti-collapse hardening (epic [#764]) — landed (verified 2026-06-21).** The full CSF-grounded defense-in-depth plan lives in `ANTI-COLLAPSE-HARDENING.md`. The code-verified bugs are now **resolved** (issues closed; fixes confirmed in source): [#765] (PCSF circuit-breaker `AttributeError` → true EMA on the declared `latency_ema_ms`, plus QUOTA_HIT recovery timer + half-open backoff in `src/convergence_io/pcsf.py`), [#766] (instrument→actuator loop **closed** — `loop_lm.generate()`'s `canary` path folds per-token self-repeat / n-gram echo / argmax-margin into `sigma0_proximity` and adapts `rep_penalty`/q as collapse nears), [#767] (memory confidence laundering + hash-chain ledgers). The proven-region wideners for non-normal `A` ([#768]: Lyapunov-SDP + pseudospectral-abscissa gates) **landed** as `stability_gates()` (§1.2.1). These extend the proven region of §1; they do **not** make the system globally uncollapsible — and the §3 *sufficiency theorem* (a closed-form proof that Σ₀⁻¹ always prevents collapse) remains the one genuine open frontier, distinct from #768's now-landed gates.
-
-**Resolved (landed 2026-06-17):**
-- [#661] — **§2 / Appendix A defect.** `_collapse_state`'s "log-barrier" was a misnamed multiplicative shrink that flipped sign for `strength > 0.217`. **Fixed:** the term is dropped; collapse is now the clean orthogonal projection `x* = P x` (non-expansive, smooth). The `log_barrier_strength` parameter was removed. Regression: `test_collapse_is_nonexpansive_projection`. *Flagged in external review 2026-06-16.*
-
-> **Maintenance log — 2026-07-07 (publication pass + §8.6-5 measured).** Reconcile pass folding in
-> the two pre-registered incremental-validity experiments (PR #2240) that answered the document's
-> one open research question at corruption level: **N1** (`experiments/sigma_update_internal_signal_value.py`,
-> 32-seed sim) *falsified* the hypothesis that a free intrinsic signal can extend the fixed-holdout
-> budget (~1.0–1.2× equivalent value; weight-sweep strictly worse; near-oracle 4.10 ≪ fresh 12.68)
-> → new §8.4.1 records the refined law (*freshness, not externality, is the active ingredient* —
-> an intrinsic signal's error sticks with the champion like fixed-holdout luck). **N2**
-> (`experiments/sigma_incremental_validity_ouro.py`, real Ouro-1.4B corruption ladder) measured
-> incremental validity as **real, gross-only, scarcity-gated** (ΔAUC +0.121/+0.068/+0.019 at
-> n=2/3/5; internal-alone 0.944; subtle cell empty by construction — weight corruption is binary,
-> matching the measured quantization cliff) → §8.6 item 5 updated from "unmeasured" to half-closed;
-> the open half is *subtle training-induced* badness, which requires the real A/B/C artifacts.
-> Front-matter novelty paragraph, audit table (+2 rows), §8.5 claimed/not-claimed, and a Part II
-> plain-language line updated to match. Joint law recorded: **internal signals detect; only fresh
-> truth selects.** Also fixed in the same pass: `tests/test_sigma0_jsrr_gate.py` imported torch
-> unguarded, breaking collection on torch-free CI — the audit table's "tests pass on a fresh clone"
-> contract; now `pytest.importorskip`-guarded per repo convention.
-
-> **Maintenance log — 2026-07-17 (external-novelty corner audit; Σ_G ledger split out; schedule
-> race measured).** A reviewer-style pass over the corners the 2026-07-07 audits did *not* sweep
-> (those closed the headline claims: loop spectral radius, Σ_θ components, the grounding thesis).
-> Findings, all folded in this pass. **(1) Prior-art additions.** §3.1's schedule consequence is
-> **self-triggered control** applied to this certificate's objects (Heemels-Johansson-Tabuada,
-> CDC 2012; arXiv:1803.08980 — now cited in §3.1 + References); Σ₀⁻¹'s covariance leg has
-> classical kin in RLS **covariance resetting / directional forgetting** (Kulhavý-Kárný 1984;
-> arXiv:2003.03523, arXiv:2404.10844 — now cited in §3, mechanism novelty explicitly disclaimed);
-> §8.4's problem shape is **the Ladder** (Blum & Hardt, arXiv:1502.04585 — now in §8.8) with
-> Roelofs et al. (NeurIPS 2019) as the standing counterpoint; adjacent Part-I prior
-> arXiv:2604.09979 added to References. **(2) Stale claim corrected.** §8.6 item 5's
-> "no prior art surfaced" no longer holds — the detection lane is occupied (arXiv:2601.16874,
-> 2602.10144, 2604.19884); corrected in place, per this document's own discipline. **(3) The
-> three thin still-open corners** are now tracked as issues and composed in a new companion doc,
-> `SIGMA0-GROUNDING-LEDGER.md` (*grounding has a price, a schedule,
-> and a budget*): [#2690] schedule (self-triggered grounding), [#2691] budget
-> (Thresholdout-gated promotion — the real A/B/C run), [#2692] price (freshness-law
-> falsification: re-drawable noise vs re-drawn truth). The companion is deliberately a *ledger*,
-> not a certificate — it upgrades nothing here, and if the two disagree this document wins.
-> **(4) New measurement ([#2690] Phase 0).** `experiments/sigma0_scheduled_grounding.py` — the
-> scheduled-vs-reactive grounding race: in the well-conditioned basin the **alarm premium is
-> 2.25×** (charitable canary FPR 1.5%, median alarm step 14 vs cadence tick 3; reactive needs
-> 0.90·B*_∞ where scheduled needs 0.40·B*_∞); the sliver basin is fully timing-indifferent (the
-> Ouro-null, now produced rather than retrodicted). §3.1 gains the MEASURED block; audit table
-> +1 row; `tests/test_sigma0_scheduled_grounding.py` (6 passing). Fresh audit run this pass:
-> `pytest tests/test_cio_sde.py tests/test_sigma0_roa_certified.py tests/test_sigma_theta_gate.py
-> tests/test_sigma_theta_thresholdout.py tests/test_sigma0_scheduled_grounding.py` → **74 passed**.
-> Frontmatter `updated:` → 2026-07-17.
-
-> **Maintenance log — 2026-07-17 (E-P run: the freshness law's own kill test fired; §8.4.1
-> re-stated).** [#2692]'s pre-registered experiment ran the same day it was filed
-> (`experiments/sigma_update_stochastic_signal.py`, 32 seeds, oracle-weight sweep per cell —
-> no combiner alibi). **H-P1 CONFIRMED:** at fixed total error, moving error mass from
-> checkpoint-fixed bias to re-drawn noise raises extraction steeply (n=50: 0.81 → 9.36 vs
-> fixed-alone 0.61). **H-P2 REFUTED — the kill condition fired:** at fixed bias, pure re-drawn
-> measurement noise rescued extraction 7.9× (0.81 → 6.43). A post-hoc, labeled-as-such control
-> attributes the entire rescue to **zero-information dither** (6.42 vs 6.43, interior optimum)
-> — de-ratcheting, not information; the same mechanism Thresholdout buys with Laplace noise,
-> obtained free from any stochastic measurement. Fresh truth still strictly dominates every
-> internal arm (12.90 > 9.36 > 6.43 > 0.81 > 0.61). §8.4.1 gains the RE-STATED block (three
-> sentences now: *internal signals detect; fresh randomness de-ratchets; only fresh truth
-> informs*), §8.5's claimed list is corrected to deterministic-only, §8.6-5's joint-law line
-> carries the re-statement, audit table +1 row
-> (`tests/test_sigma_update_stochastic_signal.py`, 6 passing — one test pins the refutation
-> itself so it cannot be silently forgotten). This is the §8.7 protocol applied to our own
-> law: a pre-registered falsification found the overstatement, and the correction — not the
-> original claim — is the recorded result. Real-model arm folds into the A/B/C run ([#2691]).
-
-> **Maintenance log — 2026-07-17 ([#2691] protocol layer: the three promotion-evidence arms,
-> implemented and validated pre-L4).** The E-B gap splits into two halves — the *protocol* (who
-> reads which task set, when, with what ledgers and budgets) and the *training* (real
-> RLVR/distill steps on L4). The protocol half is now closed:
-> `experiments/sigma_theta_abc/holdout_protocol.py` implements Fixed / Fixed+dither / Fresh-flow
-> / Thresholdout+pool model-agnostically (an `eval_fn` callback; the L4 run swaps in the real
-> exec evaluator) and validates them at **task-level Bernoulli-stuck fidelity** — per-
-> (candidate,task) outcomes are a deterministic hash, so re-evaluation returns the same pass set,
-> which is the *actual* stuck-luck mechanism (an upgrade over every Gaussian sim so far). 16
-> seeds, 7/7 checks (`data/sigma0/holdout_protocol_report.json`;
-> `tests/test_sigma_theta_holdout_protocol.py`, 6 passing; audit run now **86 passed** across the
-> seven suites). Orderings reproduce at the higher fidelity (fixed gap +0.108 worst; fresh 0.934
-> best extraction at 61× task consumption; Thresholdout best fresh-task efficiency), plus one new
-> measured result: **Fixed+dither extracts 0.856 vs fixed 0.617 at identical task consumption** —
-> the [#2692] de-ratcheting knob survives the fidelity upgrade and is the cheapest intervention
-> in the set. Teeth run through the real seven-condition gate with arm-appropriate reasons (fixed
-> catches the contaminated hack only via the cond-6 provenance ledger; fresh rejects it on
-> merit, cond 1). §8.6 item 4 and the audit table updated. **The honest gap is unchanged and
-> now precisely one thing: executing this protocol around real training on L4.**
-
-> **Maintenance log — 2026-07-17 ([#2690] Phase 0.5: the prospective shot-call on a real
-> learned system).** `experiments/sigma0_reservoir_deadline.py` ran the §3.1 machinery
-> prospectively on the trained §6 reservoir: every quantity computed from the linearization
-> FIRST (ρ(J)=0.9836, cond(P)≈4.8·10⁴ → pre-registered SLIVER call), then graded on the true
-> nonlinear dynamics — the measured realistic grounding kick is 1.4·10⁴× the escape ceiling
-> and forced fire-times are fully timing-indifferent even at B_real/100: **the call held**
-> (5 new tests; audit suites now 8 files / 91 passed). Two honest records kept: (1) the
-> first-run harness applied the basin-entry race unconditionally and it is VACUOUS in the
-> sliver regime (1/100 usable traces, cadence ≫ horizon) — the instrument now branches on the
-> pre-registered regime call, and the vacuity note stays in the script docstring; (2) the
-> deadline rows are consistent-but-without-bite here, said so in the report. New
-> evidence-backed pattern recorded in §3.1: both real learned loops measured so far (Ouro
-> expansive, reservoir near-critical) land outside the well-conditioned regime — the
-> schedule's bite may require deliberately JSRR-stabilized loops, which upgrades Phase 1's
-> motivation from assumption to measurement.
-
-> **Maintenance log — 2026-07-18 (conventional-grounding pass — every gap tied to an established
-> method + source + reasoning; no new mechanism claimed anywhere).** A deliberate sweep to ensure
-> each load-bearing construct is presented as the *conventional* result it is, with a
-> venue-verifiable citation and a one-line reason for the gap. Two under-grounded spots were fixed
-> in place: **§8.4.1 de-ratcheting** now cites **simulated annealing / stochastic acceptance**
-> (Metropolis 1953; Kirkpatrick–Gelatt–Vecchi, *Science* 1983; Černý 1985; Ge et al., COLT 2015) —
-> the mechanism our E-P result rediscovered, with the "interior optimum" identified as the
-> temperature optimum — and states plainly that only the *measurement + stuck-vs-fresh framing in
-> the holdout-reuse setting* is ours; and **§3.1's commitment inequality** now cites the standard
-> **bounded-input reachable-set / invariant-set** theory (Kailath 1980; Sontag 1998; Blanchini &
-> Miani 2015) it is a corollary of. References gain both clusters. **Gap → conventional grounding
-> map** (the whole document at a glance; each row is *established method, not a Σ₀ contribution*):
->
-> | Construct (gap) | Conventional method it *is* | Source |
-> |---|---|---|
-> | §1 collapse/contraction (Thm 1, C3) | Lyapunov stability; contraction analysis / matrix measure μ₂ | Lyapunov 1892; Lohmiller–Slotine 1998; Khalil 2002 |
-> | §1.2.1 non-normal stability gates | numerical range, pseudospectra, Kreiss/Crouzeix constants | Trefethen–Embree 2005; Crouzeix–Palencia 2017 |
-> | §1.2.2 routed loops are switched systems | switched-system / dwell-time stability | (arXiv refs in §1.2.2) |
-> | §1.2.3 discrete acceptance gate | Jacobian spectral radius `ρ<1` (Schur) — adopted from STARS/JSRR | arXiv:2605.26733 |
-> | §2 four-signal trigger [HEURISTIC] | conjunctive multi-indicator degeneracy detector (soft-AND / Gödel t-norm) — an operational definition, not a theorem | (labeled as such in §2) |
-> | §3 Σ₀⁻¹ re-excitation | persistent excitation; RLS covariance-resetting / directional forgetting | Anderson 1977; Kulhavý–Kárný 1984 |
-> | §3.1 commitment inequality + cadence | bounded-input reachable set + self-triggered control | Kailath 1980; Sontag 1998; Heemels–Johansson–Tabuada 2012 |
-> | §4 canary | critical slowing down; Kalman innovation-consistency (NIS χ²) | Wissel 1984; Scheffer 2009; Bar-Shalom et al. 2001 |
-> | §5 attractor graph / ROA | Markov state models; Lyapunov/LaSalle ROA via interval arithmetic | Khalil 2002 (Ex. 8.4) |
-> | §7 collapse-without-grounding | model collapse; intrinsic self-correction degrades | Shumailov 2024; Feng 2024; Huang 2024 |
-> | §7.1 σ=0 limit | ICL-as-estimator; continual-learning weight-perturbation σ | Akyürek 2022; Elsayed–Mahmood 2024 |
-> | §7.2 honesty-theater | Goodhart / specification gaming; eval-awareness | Amodei 2016; Skalse 2022 |
-> | §8.4.1 de-ratcheting (new) | stochastic acceptance / simulated annealing; Thresholdout noise | Kirkpatrick 1983; Dwork 2015 |
-> | §8 Σ_θ gate | TRPO monotonic-improvement; reward-model overoptimization curve; reusable holdout | Schulman 2015; Gao 2023; Dwork 2015 |
-> | §9 two-timescale composition [TARGET] | two-timescale stochastic approximation; singular perturbation | Borkar 1997; Khalil 2002 |
->
-> **The one honest empirical gap is unchanged** and carries no novelty claim: §8/§9 have not
-> controlled a *real* training run (sim-validated, real pending — the standard "validated in
-> simulation, real-model validation outstanding" status). Net: the document's contribution is
-> **disciplined in-repo formalization + honest measurement of standard results**, which is exactly
-> what its own §7.2 (honesty-not-theater) and the 2026-07-07 nearest-prior audit already conceded;
-> this pass makes that explicit at every gap. No theorem changed; citations added are classic and
-> venue-verifiable (no arXiv IDs invented — see the fabricated-ID caution above).
-
-> **Maintenance log — 2026-07-21 (Part IV added — the active face, DESIGN/TARGET, no theorem).**
-> Added §10 (Part IV) as the certificate's forward-pointer to the Oracle answering interface
-> ([CONVERGENCE-ORACLE-DESIGN.md], design PR #2818), so the theory and the interface cannot drift.
-> It distinguishes **two grades of grounding**: *passive* (retrieval / held-out anchor — escapes
-> collapse, ceilings at the ideal inductive predictor Solomonoff/AIXI, unbeatable *by inference*)
-> and *active* ("act to know" — manufactures an observation no corpus had, escaping the ceiling on
-> surfaces where an action resolves). The honesty guard is §8.4.1's freshness law turned into an
-> engine: claim past-ceiling knowledge **only after** an action resolves; unresolved stays
-> unverified; structurally-unactionable stays a pin. **Authority: lower than Part II** — no
-> theorem, nothing machine-checked; imported mechanism is established (Bayesian optimal
-> experimental design — Lindley 1956; value of information; active inference), **no novelty
-> claimed**. One MEASURED datapoint added (§10.1): the freshness law observed on a **real code
-> surface** (autowork apply-retry [#2762], run `autowork-2762-…`, PR #2795) — re-showing the model
-> its own failed diff reproduced the identical wrong context (the ratchet); *withholding* it
-> (de-anchoring) + feeding the real file (fresh truth) flipped triple-failure to first-try success.
-> This corroborates §8.4.1 on code, it does **not** extend the proof — MEASURED-instance, one run,
-> not a distribution, not machine-checked. Also re-ran the Part I backbone (`test_cio_sde` 46 +
-> `test_sigma0_jsrr_gate` 12) with no drift; other suites stand from 2026-07-17. No Part I–III
-> theorem or status was touched. **Same-day refinement:** Part IV was then consolidated for
-> readability — the repeated authority caveats collapsed into one status line (the old §10.2
-> "honest scope" folded in), prose tightened, the imported mechanism cited (Lindley 1956 / Howard
-> 1966 / Friston 2010), the `#2762`/`#2795` links defined, and the work linked from
-> RESEARCH-CANON [07] + the README Σ₀ list. **Same-day build:** the fifth move's first brick was
-> then *built and run* — a new **§10.2** records it. `experiments/oracle_active_loop.py`
-> (unit-tested, `tests/test_oracle_active_loop.py` → 7 passed) runs the ACT-TO-KNOW loop on the
-> local-code surface; its first run manufactured **5 corpus-absent facts by action** + 1 named pin
-> (`data/oracle/active-loop-runs.jsonl`). This adds two audit-table rows and moves Part IV's fifth
-> move from pure design to *mechanism built + measured* — with the honest gap explicit: the passive
-> baseline is a frozen heuristic, so the loop-vs-frontier-model comparison is not yet made. No
-> Part I–III theorem, status, or evidence class changed; no novelty claimed.
+The fate-parity check under `e^{A·dt}` is still a test (`test_discrete_dichotomy_matches_continuous_under_exponential`). The log and history are in git, and in full at [commit 6a5f028c](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md#appendix-m--provenance-maintenance-log--closed-gap-history).
 
 ---
+
+*Source of record: `src/cio_sde/collapse.py` (the certificates, Σ₀ and Σ₀⁻¹), `src/cio_sde/engine.py`, `src/cio_sde/surprise.py`, `src/sigma0/loop_lm.py` (the loop verdict) and `docs/formal/C3EngineLift.lean`. The LaTeX framework, `docs/sigma0-collapse-certificate.tex`, was not edited in this condensation.*
