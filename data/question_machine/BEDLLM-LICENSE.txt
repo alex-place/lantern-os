@@ -1,0 +1,26 @@
+bedllm_animals.txt is copied verbatim from the BED-LLM repository (Choudhury et al., "BED-LLM:
+Intelligent Information Gathering with LLMs and Bayesian Experimental Design", ICLR 2026):
+https://github.com/DeeproChoudhury/BED-LLM/blob/476d6df917d7b91ad8869667192b06a2e0f22b80/bedllm_20q/data/animals.txt
+It is used by experiments/question_machine_20q.py under the license below.
+
+MIT License
+
+Copyright (c) 2025 Deepro Choudhury
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

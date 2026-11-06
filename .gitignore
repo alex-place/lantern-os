@@ -12,6 +12,7 @@ API Keys.txt
 *API*Keys*.txt
 
 # ─── Private / PII data (never commit) ────────────────────────────────────────
+data/question_machine/cache/
 data/private/**
 !data/private/
 !data/private/README.md

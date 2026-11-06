@@ -138,6 +138,11 @@ jobs:
             tests/test_cio_sde.py \
             tests/test_stability_gates.py \
             tests/test_question_machine.py \
+            tests/test_question_machine_wrong_prior.py \
+            tests/test_question_information.py \
+            tests/test_question_machine_20q.py \
+            tests/test_step_ratio_alarm.py \
+            tests/test_sigma0_c3_formal_bridge.py \
             tests/test_sigma0_calibration.py \
             tests/test_cio_sde_observe_only.py \
             tests/test_sigma0_c3_engine.py \
