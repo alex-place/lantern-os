@@ -196,6 +196,7 @@ class Reconciliation:
     defect: Optional[float] = None
     uncertainty: Optional[float] = None
     blocked: Optional[float] = None
+    goal_gap: Optional[float] = None
 
 
 def _worst(values: Sequence[float]) -> float:
@@ -206,7 +207,8 @@ def _worst(values: Sequence[float]) -> float:
 
 def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = None,
               unresolved: int = 0, seam_tol: float = 1e-2, defect_tol: float = 1e-2,
-              uncertainty_tol: float = 1.0, covers_plan: bool = True) -> Reconciliation:
+              uncertainty_tol: float = 1.0, covers_plan: bool = True,
+              goal_gap: Optional[float] = None, goal_tol: float = 1e-2) -> Reconciliation:
     """Turn the signals into one next step. Checked in this order because each later signal is
     only as good as the earlier ones: the seam is computed through the model, so a failed model
     makes it meaningless, and a clean plan on thin evidence is still thin.
@@ -218,6 +220,7 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
         not covers_plan           gather_evidence   the observations did not run this plan
         unresolved > 0            gather_evidence   named unknowns remain (e.g. blind dims)
         uncertainty > tol         gather_evidence   model and plan agree, on thin evidence
+        goal gap > goal_tol       replan            the predicted terminal state misses the grounded goal
         otherwise                 act
 
     The seam, the blocked pressure and the defect are read per unit time, so the answer does not
@@ -229,10 +232,11 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
     seam. It is still not "act": the plan is the best one allowed, and whoever holds the authority
     decides whether that is good enough.
 
-    "act" means that none of these checks objects, which is less than it sounds. Nothing here
-    checks that the plan reaches the goal: a goal dimension that no allowed control moves (zero
-    control authority there) reads "act" with the gap unclosed. The defect is absolute, so a model
-    tested only at small amplitude passes.
+    "act" also requires the final predicted state to be within goal_tol of the grounded goal.
+    This is an endpoint residual check, not a proof that the goal is reachable or that the real
+    world will reach it. A local optimizer can fail on a reachable goal, and the caller must
+    choose a goal_tol appropriate to the state units and action reversibility. The defect is
+    absolute, so a model tested only at small amplitude passes.
 
     The tolerances are the caller's: there is no calibrated default, and they should tighten
     for actions that are hard to reverse. defect_tol has to sit above measurement noise: a correct
@@ -244,7 +248,7 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
     spread = _worst(result.uncertainty) if result.uncertainty else None
 
     def out(action: str, reason: str) -> Reconciliation:
-        return Reconciliation(action, reason, seam, defect, spread, blocked)
+        return Reconciliation(action, reason, seam, defect, spread, blocked, goal_gap)
 
     if defect is None:
         return out("gather_evidence", "dynamics never checked against an observed transition")
@@ -260,8 +264,11 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
         return out("gather_evidence", f"{unresolved} unresolved unknowns")
     if spread is not None and not spread <= uncertainty_tol:
         return out("gather_evidence", f"model and plan agree, but tr(Σ) reaches {spread:.4g}")
+    if goal_gap is not None and not goal_gap <= goal_tol:
+        return out("replan", f"predicted terminal state misses the grounded goal by {goal_gap:.4g} "
+                             f"(tolerance {goal_tol:.4g})")
     return out("act", "no check here objects: the model matched what it was tested on, the plan "
-                      "is stationary, and nothing is unresolved")
+                      "is stationary, the predicted endpoint meets the grounded goal, and nothing is unresolved")
 
 
 # ── the machine ──────────────────────────────────────────────────────────────

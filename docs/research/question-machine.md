@@ -125,6 +125,8 @@ safety mechanism* (§7 of the certificate) as two numbers. A NAP-denied channel 
 dimension a permanent **blind spot** (`LoopResult.blind`) — denials keep you safe and leave you
 blind, surfaced not hidden.
 
+**Goal-attainment guard (2026-11-05):** `QuestionDrivenLoop.run` now passes the worst-sample terminal residual `max_i ‖x_T[i] − belief[i]‖` into reconciliation. Even if the forward/backward seam is quiet and all other gates pass, an endpoint outside `goal_tol` produces `replan` rather than `act`. The default tolerance is `1e-2`; callers should override it through `tolerances` for their state units. This prevents the known false-`act` case with an uncontrollable goal dimension, but it does not prove mathematical reachability or guarantee that the optimizer found the best attainable endpoint.
+
 **Still toy:** the channels return scalars (a goal component). The remaining work is swapping
 `OracleChannel`/`CallbackChannel` for organs backed by *real* external systems — the web tool,
 a document store, a market feed, an actual human prompt — and letting an LLM (e.g. the Ouro
