@@ -1,0 +1,60 @@
+name: Lean C3 proof
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/C3EngineLift.lean"
+      - ".github/workflows/lean-c3-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c3-formal-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Lean toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.27.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install leanprover/lean4:v4.27.0
+
+      - name: Create isolated Mathlib project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c3-proof"
+          cd "$RUNNER_TEMP/c3-proof"
+          cat > lean-toolchain <<'EOF'
+          leanprover/lean4:v4.27.0
+          EOF
+          cat > lakefile.lean <<'EOF'
+          import Lake
+          open Lake DSL
+
+          package c3Proof
+
+          require mathlib from git
+            "https://github.com/leanprover-community/mathlib4" @ "v4.27.0"
+
+          lean_lib C3Proof
+          EOF
+          lake update
+          lake exe cache get
+
+      - name: Compile C3 theorem and reject placeholders
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/c3-proof"
+          lake env lean "$GITHUB_WORKSPACE/docs/formal/C3EngineLift.lean" 2>&1 | tee c3-proof.log
+          if grep -E "sorryAx|declaration uses 'sorry'" c3-proof.log; then
+            echo "The C3 file contains an admitted proof."
+            exit 1
+          fi
