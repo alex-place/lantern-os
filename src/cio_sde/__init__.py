@@ -68,6 +68,11 @@ from .question import (
     dynamics_defect,
     Reconciliation,
     reconcile,
+    Experiment,
+    Selection,
+    select_next_experiment,
+    expected_information_gain_bits,
+    posterior_after,
 )
 from .question_loop import (
     QuestionDrivenLoop,
@@ -138,6 +143,11 @@ __all__ = [
     "dynamics_defect",
     "Reconciliation",
     "reconcile",
+    "Experiment",
+    "Selection",
+    "select_next_experiment",
+    "expected_information_gain_bits",
+    "posterior_after",
     "QuestionDrivenLoop",
     "Channel",
     "CallbackChannel",

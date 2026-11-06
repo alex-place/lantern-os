@@ -37,8 +37,10 @@ or act.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from dataclasses import dataclass, field, replace
+from math import fsum, inf, isfinite, log2
+from numbers import Real
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import torch
 
@@ -271,6 +273,241 @@ def reconcile(result: ConsolidationResult, defects: Optional[Sequence[float]] = 
                       "is stationary, the predicted endpoint meets the grounded goal, and nothing is unresolved")
 
 
+# ── which question separates the hypotheses: exact expected information gain ─────────────────
+#
+# The seam asks where a change of control has the most leverage on the cost. It cannot ask which
+# observation would separate competing explanations: on the wrong-prior benchmark
+# (experiments/question_machine_wrong_prior.py) it pushes a direction every live hypothesis agrees on.
+# This section scores candidate experiments against a finite set of hypotheses by their exact expected
+# information gain, I(H; O) in bits, enumerating every hypothesis and outcome. It is G2 from
+# lantern-os-research (experiments/oracle_bayesian_voi.py, as hardened in research PR #17), ported:
+# the selector and Bayes' rule, not the run_design loop.
+#
+# Assumed, not established: the likelihoods are inputs. Under a miscalibrated likelihood model the
+# exact calculation gives the exact answer to the wrong question, and a belief resolved under the model
+# is not evidence that the model is right. Not claimed: optimality. The choice is one-step greedy by
+# information per unit cost. With unequal costs that can capture an arbitrarily small fraction of what
+# one affordable experiment would give, and with noisy observations it can be far from the best
+# adaptive policy (Golovin, Krause & Ray, NeurIPS 2010).
+#
+# Numerics: each table is validated once and normalised, so a table summing to 1 ± 1e-9 cannot bias
+# the gain. Gains use the mutual-information form with exactly rounded sums (math.fsum). An experiment
+# whose outcome distribution is the same under every live hypothesis scores exactly 0, and a gain at or
+# below MIN_GAIN_BITS counts as none.
+
+SUM_TOLERANCE = 1e-9       # a table may sum to 1 within this; it is then normalised
+MIN_GAIN_BITS = 1e-9       # at or below this, an experiment carries no information
+BUDGET_TOLERANCE = 1e-12   # relative slack, so decimal costs that add up to the budget fit
+
+STOP_REASONS = (
+    "resolved",            # the belief's entropy is at most MIN_GAIN_BITS
+    "no_candidates",       # no experiment is left to run
+    "uninformative",       # no admissible experiment carries information under the belief
+    "budget",              # informative experiments remain, but none is affordable
+    "converged",           # the best affordable gain per cost is below the declared threshold
+    "denied",              # only experiments that CAP or NAP refuse carry information
+)
+
+Distribution = Mapping[str, float]
+
+
+@dataclass(frozen=True)
+class Experiment:
+    """A candidate observation: its cost, the outcome distribution under each hypothesis, and the
+    channel it would run through, which CAP and NAP gate."""
+    experiment_id: str
+    cost: float
+    likelihoods: Mapping[str, Distribution]
+    channel: str = "probe"
+
+
+@dataclass(frozen=True)
+class ExperimentScore:
+    experiment: Experiment
+    information_gain_bits: float
+    gain_per_cost: float
+
+
+@dataclass(frozen=True)
+class Selection:
+    selected: Optional[ExperimentScore]
+    ranked: Tuple[ExperimentScore, ...]
+    remaining_budget: float
+    stop_reason: Optional[str] = None                 # one of STOP_REASONS when nothing was selected
+    blocked: Tuple[Tuple[str, float, str], ...] = ()  # (id, gain in bits, why) for each experiment CAP
+                                                      # or NAP refused: what the denied question was worth
+
+
+def _number(value, where: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ValueError(f"{where} must be a real number, got {value!r}")
+    number = float(value)
+    if not isfinite(number):
+        raise ValueError(f"{where} must be finite, got {value!r}")
+    return number
+
+
+def _nonnegative(value, where: str) -> float:
+    number = _number(value, where)
+    if number < 0.0:
+        raise ValueError(f"{where} must be non-negative, got {value!r}")
+    return number
+
+
+def _table(table, where: str) -> Dict[str, float]:
+    """Validate a probability table and return a normalised copy."""
+    if not isinstance(table, Mapping) or not table:
+        raise ValueError(f"{where} must be a non-empty mapping from labels to probabilities")
+    values = {}
+    for label, value in table.items():
+        if not isinstance(label, str) or not label:
+            raise ValueError(f"{where}: labels must be non-empty strings, got {label!r}")
+        values[label] = _nonnegative(value, f"{where}[{label!r}]")
+    total = fsum(values.values())
+    if abs(total - 1.0) > SUM_TOLERANCE:
+        raise ValueError(f"{where}: probabilities must sum to 1, got {total!r}")
+    return {label: p / total for label, p in values.items()}
+
+
+def _prior(prior) -> Dict[str, float]:
+    return _table(prior, "prior")
+
+
+def _likelihoods(belief: Mapping[str, float], experiment) -> Dict[str, Dict[str, float]]:
+    if not isinstance(experiment, Experiment):
+        raise ValueError(f"expected an Experiment, got {experiment!r}")
+    eid = experiment.experiment_id
+    if not isinstance(eid, str) or not eid:
+        raise ValueError("experiment_id must be a non-empty string")
+    if _number(experiment.cost, f"{eid}: cost") <= 0.0:
+        raise ValueError(f"{eid}: cost must be positive")
+    table = experiment.likelihoods
+    if not isinstance(table, Mapping) or set(table) != set(belief):
+        raise ValueError(f"{eid}: likelihoods must specify exactly the prior's hypotheses")
+    return {h: _table(table[h], f"{eid}: P(outcome | {h})") for h in belief}
+
+
+def _outcome_label(outcome) -> str:
+    if not isinstance(outcome, str):
+        raise ValueError(f"outcomes are string labels, got {outcome!r}")
+    return outcome
+
+
+def _support(row: Mapping[str, float]) -> Dict[str, float]:
+    return {o: p for o, p in row.items() if p > 0.0}
+
+
+def _predictive(belief, rows) -> Dict[str, float]:
+    """P(o) = Σ_h P(h) P(o | h), for every outcome a live hypothesis allows."""
+    outcomes = sorted({o for h, p in belief.items() if p > 0.0 for o, q in rows[h].items() if q > 0.0})
+    return {o: fsum(belief[h] * rows[h].get(o, 0.0) for h in belief) for o in outcomes}
+
+
+def _gain(belief, rows) -> float:
+    """I(H; O) = Σ_h P(h) Σ_o P(o | h) log2(P(o | h) / P(o)), on normalised inputs."""
+    live = [h for h, p in belief.items() if p > 0.0]
+    first = _support(rows[live[0]])
+    if all(_support(rows[h]) == first for h in live[1:]):
+        return 0.0                                   # the outcome cannot depend on the hypothesis
+    marginal = _predictive(belief, rows)
+    terms = []
+    for h in live:
+        for o, like in rows[h].items():
+            mass = belief[h] * like
+            if mass > 0.0:                           # then marginal[o] >= mass > 0
+                ratio = like / marginal[o]
+                terms.append(mass * (log2(ratio) if ratio < inf else log2(like) - log2(marginal[o])))
+    gain = fsum(terms)
+    return gain if gain > 0.0 else 0.0
+
+
+def _update(belief, rows, outcome: str) -> Optional[Dict[str, float]]:
+    masses = {h: belief[h] * rows[h].get(outcome, 0.0) for h in belief}
+    total = fsum(masses.values())
+    if total <= 0.0:
+        return None
+    return {h: m / total for h, m in masses.items()}
+
+
+def entropy_bits(distribution: Distribution) -> float:
+    """Shannon entropy in bits."""
+    h = -fsum(float(p) * log2(float(p)) for p in distribution.values() if p > 0.0)
+    return h if h > 0.0 else 0.0
+
+
+def outcome_probability(prior: Distribution, experiment: Experiment, outcome: str) -> float:
+    belief = _prior(prior)
+    rows = _likelihoods(belief, experiment)
+    return fsum(belief[h] * rows[h].get(_outcome_label(outcome), 0.0) for h in belief)
+
+
+def posterior_after(prior: Distribution, experiment: Experiment, outcome: str) -> Dict[str, float]:
+    """Bayes' rule after one observed outcome. An outcome the model gives zero probability refutes the
+    model, and raises instead of updating."""
+    belief = _prior(prior)
+    posterior = _update(belief, _likelihoods(belief, experiment), _outcome_label(outcome))
+    if posterior is None:
+        raise ValueError(f"outcome {outcome!r} has zero probability under the prior")
+    return posterior
+
+
+def expected_information_gain_bits(prior: Distribution, experiment: Experiment) -> float:
+    """H(H) − E_o[H(H | o)] for the supplied finite Bayesian model."""
+    belief = _prior(prior)
+    return _gain(belief, _likelihoods(belief, experiment))
+
+
+def _scores(belief, experiments: Sequence[Experiment]) -> Tuple[ExperimentScore, ...]:
+    scores, seen = [], set()
+    for experiment in experiments:
+        rows = _likelihoods(belief, experiment)
+        if experiment.experiment_id in seen:
+            raise ValueError(f"duplicate experiment id: {experiment.experiment_id}")
+        seen.add(experiment.experiment_id)
+        gain = _gain(belief, rows)
+        scores.append(ExperimentScore(experiment, gain, gain / float(experiment.cost)))
+    scores.sort(key=lambda s: (-s.gain_per_cost, -s.information_gain_bits, s.experiment.experiment_id))
+    return tuple(scores)
+
+
+def score_experiments(prior: Distribution, experiments: Sequence[Experiment]) -> Tuple[ExperimentScore, ...]:
+    """Rank experiments by exact expected information gain per unit cost."""
+    return _scores(_prior(prior), experiments)
+
+
+def _choose(belief, ranked, budget: float, threshold: float, scale: float):
+    if entropy_bits(belief) <= MIN_GAIN_BITS:
+        return None, "resolved"
+    if not ranked:
+        return None, "no_candidates"
+    informative = [s for s in ranked if s.information_gain_bits > MIN_GAIN_BITS]
+    if not informative:
+        return None, "uninformative"
+    slack = BUDGET_TOLERANCE * max(1.0, scale)
+    affordable = [s for s in informative if float(s.experiment.cost) <= budget + slack]
+    if not affordable:
+        return None, "budget"
+    if affordable[0].gain_per_cost < threshold:
+        return None, "converged"
+    return affordable[0], None
+
+
+def select_next_experiment(prior: Distribution, experiments: Sequence[Experiment], budget: float, *,
+                           min_gain_per_cost: float = 0.0) -> Selection:
+    """The best affordable next experiment by exact expected information gain per unit cost.
+
+    `min_gain_per_cost` is the declared decision threshold, in bits per unit cost: when the best
+    affordable experiment falls below it, nothing is selected ("converged"). One-step greedy; no
+    budget-optimality or submodularity guarantee is claimed."""
+    budget = _nonnegative(budget, "budget")
+    threshold = _nonnegative(min_gain_per_cost, "min_gain_per_cost")
+    belief = _prior(prior)
+    ranked = _scores(belief, experiments)
+    chosen, reason = _choose(belief, ranked, budget, threshold, budget)
+    remaining = max(0.0, budget - float(chosen.experiment.cost)) if chosen else budget
+    return Selection(selected=chosen, ranked=ranked, remaining_budget=remaining, stop_reason=reason)
+
+
 # ── the machine ──────────────────────────────────────────────────────────────
 
 class QuestionMachine:
@@ -418,6 +655,36 @@ class QuestionMachine:
             if len(admitted) >= top_k:
                 break
         return admitted
+
+    # ── ask by information: the question that separates the hypotheses ──────
+    def ask_by_information(self, belief: Distribution, experiments: Sequence[Experiment], budget: float,
+                           *, min_gain_per_cost: float = 0.0, tier: Optional[str] = None) -> Selection:
+        """The experiment that best separates the hypotheses in `belief`: the most expected information
+        gain per unit cost (`select_next_experiment`), among the experiments whose channel CAP and NAP
+        both admit. `ask` ranks by the seam, which is leverage on the cost; this ranks by what the answer
+        would teach.
+
+        A refused experiment is never selected. It is still scored and listed in `blocked`, and when only
+        refused experiments carry information, the stop reason is "denied", not "uninformative": the
+        machine could find out, and is not allowed to."""
+        admitted, refused = [], []
+        for experiment in experiments:
+            ok, reason = self._gate(experiment.channel, tier)
+            if ok:
+                admitted.append(experiment)
+            else:
+                refused.append((experiment, reason))
+        selection = select_next_experiment(belief, admitted, budget, min_gain_per_cost=min_gain_per_cost)
+        prior = _prior(belief)
+        blocked = tuple((e.experiment_id, _gain(prior, _likelihoods(prior, e)), reason) for e, reason in refused)
+        stop = selection.stop_reason
+        if stop in ("uninformative", "no_candidates") and any(g > MIN_GAIN_BITS for _, g, _ in blocked):
+            stop = "denied"
+        return replace(selection, stop_reason=stop, blocked=blocked)
+
+    def admits(self, channel: str, tier: Optional[str] = None) -> Tuple[bool, str]:
+        """Whether CAP and NAP let a question through `channel`, and if not, why."""
+        return self._gate(channel, tier)
 
     def _gate(self, channel: str, tier: Optional[str]) -> Tuple[bool, str]:
         """CAP (able) AND NAP (allowed). NAP denial overrides CAP — denials win."""
