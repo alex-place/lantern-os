@@ -1016,8 +1016,9 @@ directions had `‖Av‖ = 1/√2`. Both are now changed in the operator itself,
   did not excite, and a surprise spook raises only its own row. Every other row keeps the plain SDE step. Each row that fires
   gets its own receipt, and each trajectory spends its own budget, so whether a row may change never depends on another row.
   As far as the operators go, a batch is therefore `B` independent trajectories: the gate, the kick, the bump, the budget and
-  the receipts are each row's own. In numbers, the operators' reductions and decompositions now read a row the same alone
-  as in a batch, and a batched run equals its rows run alone bit for bit wherever its matrix products are exact; elsewhere
+  the receipts are each row's own. In numbers, on CPU, the operators' reductions now read a row the same alone as in a
+  batch, and so did their decompositions in every case measured. A batched run equals its rows
+  run alone bit for bit wherever its matrix products are exact; elsewhere
   it agrees only to rounding (corrected in the post-merge review of #3814 and its follow-up, and narrowed since). The
   anisotropy and the C3 floor took the unbiased std from `Tensor.std`, which on CPU reduces a batch of one in two passes and
   each row of a larger batch by Welford's update, so one `Σ` read a different `a(Σ)` alone than in a batch (for 260 of 500

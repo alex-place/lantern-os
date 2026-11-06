@@ -79,7 +79,7 @@ def _numerical_rank(s: Tensor, eig_eps: float) -> Tensor:
 def _unbiased_std(ev: Tensor) -> Tensor:
     """The unbiased std of each row of ev (..., d), d ≥ 2: √(Σᵢ(λᵢ − μ)²/(d − 1)), μ the row's mean.
 
-    A row reads the same bits alone as in any batch, which Tensor.std does not give. On CPU, std takes a tensor
+    On CPU a row reads the same bits alone as in any batch, which Tensor.std does not give. There, std takes a tensor
     it reduces to one value (a batch of one) in two passes and each row of a larger batch by Welford's update,
     so in float64 one Σ read a different a(Σ) alone than beside a copy of itself (260 of 500 random rows at
     d = 4), on either side of ε_a. Here every row takes the two passes, from `mean` and a `sum`, which reduce
