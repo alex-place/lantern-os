@@ -71,7 +71,7 @@
     "nodemailer": "^10.0.12",
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
