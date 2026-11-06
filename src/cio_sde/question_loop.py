@@ -352,11 +352,14 @@ class QuestionDrivenLoop:
         defects = (dynamics_defect(self.model, observed[0], observed[1], self.dt)
                    if observed is not None else None)
         covers = observed is None or self._ran_this_plan(observed, plan_tol)
+        # A stationary control sequence is not sufficient: the optimizer can settle while the
+        # predicted endpoint still misses the externally grounded goal (e.g. an uncontrollable dim).
+        goal_gap = float((final.xs[-1] - self.belief).norm(dim=-1).max().item())
         return LoopResult(belief=self.belief.clone(), x_T=final.xs[-1],
                           final_seam=final.max_score, grounded=sorted(self.asked - set(weak)),
                           blind=blind, history=self.history,
                           next_step=reconcile(final, defects, unresolved=len(blind) + len(weak),
-                                              covers_plan=covers, **(tolerances or {})),
+                                              covers_plan=covers, goal_gap=goal_gap, **(tolerances or {})),
                           weak=weak)
 
     def _ran_this_plan(self, observed: Tuple[Sequence[Tensor], Sequence[Tensor]], tol: float) -> bool:
