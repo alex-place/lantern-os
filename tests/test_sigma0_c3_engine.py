@@ -686,7 +686,9 @@ def test_a_spook_excites_only_its_own_trajectory():
 @pytest.mark.parametrize("case", ["kick", "budget"])
 def test_a_batch_is_independent_trajectories(case):
     """Row i of a batched run is the same run on row i alone: the gate, the kick, the bump, the budget and
-    the receipts all belong to the trajectory. Both operators attached, three interventions each.
+    the receipts all belong to the trajectory. Both operators attached, three interventions each. Bit for bit
+    at these inputs; in general only to rounding, since Tensor.std can round one row differently from the
+    same row in a batch (in the "kick" case at Σ0[1] = 3·I, row 1 is no longer bit-identical).
     "kick": the real operator on a non-normal rank-1 A, with noise. "budget": the covariance leg alone on
     A = 0, which clears the gate without moving the state, so it re-fires as Σ relaxes and the two
     near-target rows, at different Σ scales, fire at different steps and run out at different times."""
@@ -1100,6 +1102,69 @@ def test_the_covariance_projections_pass_a_non_finite_sample_through():
         torch.testing.assert_close(out[1], batch[1], rtol=0, atol=0, equal_nan=True)
 
 
+class _LoudRow(LinearDynamics):
+    """Diffusion gain 1e20 on rows with x₄ < 0 and 0.002 elsewhere. In float32 g² overflows, so such a row's
+    covariance step returns inf from finite inputs, and the gate, which reads the inputs, still fires on it."""
+
+    def diffusion(self, x):
+        loud = x[..., 3:] < 0
+        return torch.where(loud, torch.full_like(x[..., 3:], 1e20), torch.full_like(x[..., 3:], 0.002)).expand_as(x)
+
+
+def test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other():
+    """Both rows are collapsed and finite, so the gate fires on both; row 1's covariance step overflows. The
+    kick's floor then refused, or LAPACK raised, for the whole batch, and named row 1 by its place among the
+    fired rows. Row 1 is now blocked, with a receipt saying why, after the gain guard checked it; row 0 is kicked."""
+    d = 4
+    m = _armed_on(_LoudRow(torch.diag(torch.tensor([-0.5, 0.0, 0.0, 0.0])), B=torch.zeros(d, 2), noise=0.0))
+    x = 1e-4 * torch.tensor([[1.0, -1.0, 0.5, 1.0], [1.0, 1.0, -0.5, -1.0]])
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    plain_x, plain_sigma, _ = _plain_step(m, x, sigma, torch.zeros(2, d))
+    assert bool(torch.isfinite(plain_sigma[0]).all()) and not bool(torch.isfinite(plain_sigma[1]).all())
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    receipts = info["intervention_receipts"]
+    assert [(r.sample, r.kind) for r in receipts] == [(0, "excite"), (1, "blocked")]
+    assert "not finite after the step" in receipts[1].policy_reason
+    assert torch.equal(x_next[1], plain_x[1])                  # row 1 is the plain step, not kicked
+    assert m._intervention_counts.tolist() == [1, 0]           # and it spent nothing
+
+
+def test_a_spook_on_a_row_that_is_not_finite_does_not_excite_it():
+    """At d = 1 a row that has gone to +inf has an infinite innovation, NIS = inf spooks, and the anti-collapse
+    trigger kicked that row and spent its budget; from a gain computed on the broken state, the gain guard
+    raised for the batch instead. A row that is not finite is now never selected, by a spook or otherwise."""
+    from src.cio_sde import SurpriseMonitor
+    d = 1
+    m = CIO_SDE(dim=d, ctrl_dim=1, hidden=4)
+    _zero_policy(m)
+    m.graph.active = LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 1), noise=0.0)
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.surprise_monitor = SurpriseMonitor(anti_collapse_trigger=True)
+    x = torch.tensor([[0.5], [float("inf")]])                  # row 0 far from target, row 1 broken
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    m._surprise_pred_mean, m._surprise_pred_cov = torch.zeros(2, d), sigma.clone()
+    _, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    assert info["surprise_spook"] is True                      # the monitor did spook, on row 1
+    assert info["intervention_receipts"] == [] and not bool(info["anti_collapse_fired"].any())
+
+
+def test_a_batch_wide_operator_cannot_select_a_row_that_is_not_finite():
+    """A batch-wide proximity names every row, including one whose Σ is NaN, so its dilation and gain are NaN,
+    and the gain guard raised for the batch. That row is now left alone, and the other one is kicked."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    m.anti_collapse_op = _BatchWide(0.25)
+    x = torch.zeros(2, d)
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    sigma[1] = float("nan")
+    plain_x, _, _ = _plain_step(m, x, sigma, torch.zeros(2, d))
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "excite")]
+    assert torch.allclose((x_next[0] - plain_x[0]).detach(), torch.full((d,), 0.25))
+    torch.testing.assert_close(x_next[1], plain_x[1], rtol=0, atol=0, equal_nan=True)
+
+
 # ── the post-merge review of #3814 ───────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("shape", ["(1,d,d)", "(d,d)"])
@@ -1130,10 +1195,10 @@ def test_a_covariance_shared_by_the_batch_gives_each_row_its_receipt(shape):
 
 
 def test_the_neural_node_matches_its_lone_runs_to_rounding():
-    """A regression pin, not a gap. "A batch run equals its rows run alone, bit for bit" holds for LinearDynamics.
-    The neural node's matrix products round differently in a batch, so its rows agree with their lone runs to
-    rounding only, about 1e-15 in float64. This pins that agreement for the default node with both operators
-    armed. It does not ask the rows to differ: whether they do depends on the math library."""
+    """A regression pin, not a gap. A batch run agrees with its rows run alone to rounding, and bit for bit only
+    where nothing rounds differently: Tensor.std rounds one row differently from the same row in a batch, and
+    the neural node's matrix products do too, about 1e-15 in float64. This pins the agreement for the default
+    node with both operators armed. It does not ask the rows to differ: whether they do depends on the library."""
     torch.manual_seed(0)
     m = CIO_SDE(dim=4, ctrl_dim=2, hidden=64).double()
     m.graph.active.double()                            # the graph node is not a registered submodule

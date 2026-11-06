@@ -249,9 +249,11 @@ class GraphController:
         f_new = candidate.drift(x, u)
         # one row per trajectory; broadcast first, as the batch-wide difference did
         f_old, f_new = (f.reshape(-1, f.shape[-1]) for f in torch.broadcast_tensors(f_old, f_new))
-        # Each row is the ratio the batch norm took for one trajectory, in the same operations.
-        deltas = [(o - n).norm().item() / (o.norm() + 1e-8).item() for o, n in zip(f_old, f_new)]
-        accepted = all(dl < self.tol for dl in deltas)
+        # Each row is the ratio the batch norm took for one trajectory, in the same operations. The
+        # 1e-8 floor is kept in double where the dtype rounds it to 0 (float16), instead of dividing by 0.
+        deltas = [(o - n).norm().item() / ((o.norm() + 1e-8).item() or 1e-8) for o, n in zip(f_old, f_new)]
+        # An empty probe has nothing to compare: δ = 0, decided as the batch norm decided it.
+        accepted = all(dl < self.tol for dl in deltas) if deltas else 0.0 < self.tol
         broken = [i for i, dl in enumerate(deltas) if math.isnan(dl)]
         worst = (broken[0] if broken else max(range(len(deltas)), key=deltas.__getitem__)) if deltas else None
         delta = deltas[worst] if worst is not None else 0.0
@@ -295,7 +297,8 @@ class InterventionReceipt:
       "observe"              - trigger detected; state NOT mutated (observe_only or budget=0)
       "excite"               - anti_collapse_op fired and mutated x_next / sigma_next
       "project_to_attractor" - collapse_op fired and projected x_next to x_star
-      "blocked"              - trigger fired but policy blocked mutation; records reason
+      "blocked"              - trigger fired but the row was not changed: its budget is spent, or its
+                               covariance step overflowed (no spectrum to lift); records reason
 
     The norms and traces are this trajectory's own. `sample` is its row in the batch.
     """
@@ -456,12 +459,14 @@ class CIO_SDE(nn.Module):
         trajectory has its own budget of policy.max_interventions per rollout, so whether a row may
         change never depends on the other rows. Each row that fires gets its own receipt, whose
         `sample` is its index. So as far as the operators go, a batch is B independent trajectories:
-        the gate, the kick, the bump, the budget and the receipt of row i are row i's own. With
-        LinearDynamics a batched step equals the step on row i alone, given the same noise, bit for
-        bit. With the neural Dynamics the rows agree only to rounding (about 1e-15 in float64, 1e-6
-        in float32), because its matrix products round differently in a batch, so a row within
-        rounding of a threshold can decide differently in a batch than alone. Independence also
-        assumes the drift, diffusion, policy and stage cost treat rows separately; nothing checks it.
+        the gate, the kick, the bump, the budget and the receipt of row i are row i's own. In numbers,
+        a batched step agrees with the step on row i alone, given the same noise, only to rounding:
+        Tensor.std rounds one row differently from the same row in a batch (the anisotropy and the C3
+        floor use it), and the neural Dynamics' matrix products do too (about 1e-15 in float64, 1e-6 in
+        float32). It is bit for bit where nothing rounds differently, as in
+        test_a_batch_is_independent_trajectories, and a row within rounding of a threshold can decide
+        differently in a batch than alone. Independence also assumes the drift, diffusion, policy and
+        stage cost treat rows separately; nothing checks it.
 
         info["intervention_receipts"] lists every receipt of the step, and
         info["intervention_receipt"] is the first of them, for callers that read one. The
@@ -472,14 +477,15 @@ class CIO_SDE(nn.Module):
         effective proximity among the rows that fired, so a spook still lifts only its own row. Its
         outputs may broadcast; they are applied to the fired rows only.
 
-        A trajectory whose state, covariance or drift Jacobian holds a NaN or inf is broken, and the
-        Σ₀ gate never fires on it: each of its four signals reads NaN, which is below no threshold.
-        So neither operator acts on it, and its values carry forward as the plain step computes them,
-        with its Σ passed through unprojected (CovarianceField._project_psd). The batched SVDs and
-        eigendecompositions no longer see it, so it cannot make them raise for the other rows or
-        feed its values into theirs: a batch holding one equals its rows run alone wherever a batch
-        does (bit for bit with LinearDynamics). What this does not cover: an attached surprise
-        monitor still factors every row's S in one batched Cholesky.
+        A trajectory whose state, covariance or drift Jacobian holds a NaN or inf is broken, and no
+        operator acts on it. The Σ₀ gate never fires on it, since each of its four signals reads NaN,
+        which is below no threshold, and neither a spook nor a batch-wide proximity can select it.
+        Its values carry forward as the plain step computes them, with its Σ passed through
+        unprojected (CovarianceField._project_psd). A row whose inputs are finite but whose
+        covariance step overflows is not excited either, and its receipt says why. The batched SVDs
+        and eigendecompositions never see a broken row, so it cannot make them raise for the other
+        rows or feed its values into theirs. What this does not cover: an attached surprise monitor
+        still factors every row's S in one batched Cholesky, which a NaN Σ can make raise.
 
         `noise` is ξ, one standard normal per coordinate, and dW and the kick share it. The kick
         reads it in x's dtype, so float32 noise drives a float64 model (rollout draws float32 and
@@ -516,6 +522,11 @@ class CIO_SDE(nn.Module):
         bsz, dev = x.shape[0], x.device
         # A Σ given once for the batch, (1, d, d) or (d, d), is every row's: the receipts index it by row.
         sigma_rows = torch.broadcast_to(sigma, (bsz, d, d))
+        # A row whose state, covariance or Jacobian is not finite is broken, and no operator acts on it,
+        # whatever a spook or a batch-wide proximity says of it. (The shipped gate never fires on one.)
+        finite_in = (torch.isfinite(x).all(dim=-1) & torch.isfinite(sigma_rows).flatten(-2).all(dim=-1)
+                     & torch.isfinite(A).flatten(-2).all(dim=-1))
+        lost = torch.zeros(bsz, dtype=torch.bool, device=dev)    # fired, but its covariance step overflowed
         spook = torch.zeros(bsz, dtype=torch.bool, device=dev)     # the row's NIS spook
         boost = torch.zeros(bsz, dtype=x.dtype, device=dev)        # a spook lifts the row's proximity to 1
         prox = torch.zeros(bsz, dtype=x.dtype, device=dev)         # the row's structural proximity
@@ -586,7 +597,7 @@ class CIO_SDE(nn.Module):
             effective = torch.maximum(prox, boost)
             info["sigma0_proximity"] = float(prox.max()) if bsz else 0.0
 
-            hot = effective > 0.0
+            hot = (effective > 0.0) & finite_in
             if bool(hot.any()):
                 excited = hot & self._budget_open(bsz, dev)
                 idx = excited.nonzero().flatten()
@@ -612,6 +623,15 @@ class CIO_SDE(nn.Module):
                                 f"the covariance lift needs d*eps/sigma_max <= {rho_max:g} "
                                 f"(Theorem C3); got {rho:.3g}. Raise sigma_max or lower eps."
                             )
+                    # A row whose covariance step overflowed (finite inputs, Σ_next not) has no spectrum
+                    # to lift, so it is not excited. This comes after the gain guard, which still checks
+                    # every row the kick was about to touch.
+                    overflowed = ~torch.isfinite(sigma_next[idx]).flatten(-2).all(dim=-1)
+                    if bool(overflowed.any()):
+                        lost[idx[overflowed]] = True
+                        excited = excited & ~lost
+                        idx = idx[~overflowed]
+                if idx.numel():
                     # An operator with one proximity for the batch gets one number per call, so rows
                     # at different effective proximities (a spook lifts only its own row) get their own.
                     calls = ([(float(v), idx[effective[idx] == v]) for v in torch.unique(effective[idx])]
@@ -630,8 +650,9 @@ class CIO_SDE(nn.Module):
                 for i in hot.nonzero().flatten().tolist():
                     source = ("both" if boost[i] > 0 and prox[i] > 0
                               else "surprise" if boost[i] >= prox[i] else "structural")
-                    kind, reason = (("excite", "budget_ok: anti-collapse excite fired")
-                                    if excited[i] else self._held(i))
+                    kind, reason = (("excite", "budget_ok: anti-collapse excite fired") if excited[i]
+                                    else ("blocked", "not finite after the step: its covariance holds a NaN or inf")
+                                    if lost[i] else self._held(i))
                     receipts[i] = receipt(i, kind, source, reason, bool(boost[i] > 0))
         info["sigma0_proximity_per_sample"] = prox
         info["anti_collapse_fired"] = excited
@@ -645,7 +666,7 @@ class CIO_SDE(nn.Module):
                 mask = getattr(res, "mask", None)    # a result without one speaks for every row
                 hit = (torch.ones(bsz, dtype=torch.bool, device=dev) if mask is None
                        else torch.as_tensor(mask, device=dev).to(torch.bool).reshape(-1).expand(bsz))
-                hit = hit & ~excited
+                hit = hit & ~excited & finite_in
                 if bool(hit.any()):
                     overwritten = hit & self._budget_open(bsz, dev)
                     if bool(overwritten.any()):

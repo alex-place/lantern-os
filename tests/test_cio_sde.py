@@ -282,6 +282,24 @@ def test_a_hot_swap_probe_row_that_is_not_finite_counts_as_changed():
     assert rec.row_deltas[0] == 0.0 and rec.row_deltas[2] == 0.0
 
 
+def test_a_float16_probe_with_a_still_row_does_not_divide_by_zero():
+    """In float16 1e-8 rounds to 0, so a probe row whose old drift is exactly 0 divided by 0 once each row
+    was its own ratio. The floor is kept in double there. An empty probe is decided as the batch norm
+    decided it: δ = 0 against tol."""
+    d = 4
+    half = lambda t: t.to(torch.float16)
+    graph = GraphController(LinearDynamics(half(torch.eye(d)), B=half(torch.zeros(d, 2)), noise=0.0))
+    cand = LinearDynamics(half(1.01 * torch.eye(d)), B=half(torch.zeros(d, 2)), noise=0.0)
+    x = half(torch.tensor([[1.0, 2.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]))
+    rec = graph.hot_swap(cand, x, half(torch.zeros(2, 2)), step=0)
+    assert rec.accepted and rec.row_deltas[1] == 0.0 and rec.worst_row == 0
+    for tol, accepted in ((0.25, True), (0.0, False)):
+        empty = GraphController(LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0), equivalence_tol=tol)
+        r = empty.hot_swap(LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0),
+                           torch.zeros(0, d), torch.zeros(0, 2), step=0)
+        assert r.accepted is accepted and r.drift_delta == 0.0 and r.row_deltas == []
+
+
 def test_a_one_trajectory_hot_swap_is_decided_as_before():
     """A regression pin, not a gap: it passes on the batch-norm code too. With one trajectory the row's ratio is
     the batch norm's, in the same operations, so drift_delta and the decision are what they were, bit for bit,
