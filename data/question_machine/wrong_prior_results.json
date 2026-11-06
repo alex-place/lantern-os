@@ -1,0 +1,1305 @@
+{
+  "config": {
+    "budget": 3,
+    "coupling": 1.0,
+    "passive_seconds": 1.0,
+    "prior": {
+      "h0": 0.85,
+      "h1": 0.05,
+      "h2": 0.05,
+      "h3": 0.05
+    },
+    "probe_seconds": 1.0,
+    "seeds": 200,
+    "sigma": 0.02
+  },
+  "example": {
+    "after_passive": {
+      "live": [
+        "h1",
+        "h2",
+        "h3"
+      ],
+      "posterior": {
+        "h0": 0.0,
+        "h1": 0.333286,
+        "h2": 0.323191,
+        "h3": 0.343522
+      },
+      "shipped_reconcile": "revise_model"
+    },
+    "allowed": [
+      "actuate_x1",
+      "actuate_x2",
+      "actuate_x3"
+    ],
+    "arm": "wrong",
+    "best_fit": 1.2474,
+    "blocked": [],
+    "claim": "h2",
+    "confidence": 1.0,
+    "coupling": 1.0,
+    "experiments": [
+      {
+        "claim": "h2",
+        "posterior": {
+          "h0": 0.0,
+          "h1": 0.0,
+          "h2": 1.0,
+          "h3": 0.0
+        },
+        "probe": "actuate_x3"
+      }
+    ],
+    "falsifier": {
+      "claim_predicts": [
+        0.6126,
+        0.4576,
+        0.6513
+      ],
+      "from": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "nearest_rival": "h1",
+      "probe": "actuate_x3",
+      "rival_predicts": [
+        0.3487,
+        0.3874,
+        0.6513
+      ],
+      "separation": 0.2639
+    },
+    "meaning": "x1 drives x2, and x3 excites x1",
+    "policy": "eig",
+    "posterior": {
+      "h0": 0.0,
+      "h1": 0.0,
+      "h2": 1.0,
+      "h3": 0.0
+    },
+    "probe_gain_bits": {
+      "actuate_x1": 0.0004,
+      "actuate_x2": 0.0003,
+      "actuate_x3": 1.5845
+    },
+    "seed": 0,
+    "sigma": 0.02,
+    "source": "synthetic linear SDE, coupling 1.0, sigma 0.02, seed 0",
+    "target": "h2",
+    "truth": "h2"
+  },
+  "main": {
+    "denied/eig": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "denied/oracle": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "denied/passive": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "denied/random": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "actuate_x1": 96,
+        "actuate_x2": 102,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 2.97,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.01
+    },
+    "denied/seam": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "actuate_x1": 110,
+        "actuate_x2": 88,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 2.97,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.01
+    },
+    "null/eig": {
+      "claims": {
+        "h0": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "null/oracle": {
+      "claims": {
+        "h0": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "null/passive": {
+      "claims": {
+        "h0": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "null/random": {
+      "claims": {
+        "h0": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "null/seam": {
+      "claims": {
+        "h0": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": null,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 1.0
+    },
+    "unknown/eig": {
+      "claims": {
+        "refuted": 200
+      },
+      "concluded": 1.0,
+      "evidence": 1.0,
+      "first_probe": {
+        "actuate_x3": 198,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 0.99,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.99
+    },
+    "unknown/oracle": {
+      "claims": {
+        "refuted": 200
+      },
+      "concluded": 1.0,
+      "evidence": 1.0,
+      "first_probe": {
+        "actuate_x3": 198,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 0.99,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.99
+    },
+    "unknown/passive": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.01,
+      "evidence": 0.01,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.0
+    },
+    "unknown/random": {
+      "claims": {
+        "refuted": 138,
+        "unresolved": 62
+      },
+      "concluded": 0.69,
+      "evidence": 0.69,
+      "first_probe": {
+        "actuate_x1": 68,
+        "actuate_x2": 68,
+        "actuate_x3": 62,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 2.115,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.31
+    },
+    "unknown/seam": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.01,
+      "evidence": 0.01,
+      "first_probe": {
+        "actuate_x1": 110,
+        "actuate_x2": 88,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 2.97,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.0
+    },
+    "wrong/eig": {
+      "claims": {
+        "h2": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": 0.99,
+      "first_probe": {
+        "actuate_x3": 198,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 0.99,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.99
+    },
+    "wrong/oracle": {
+      "claims": {
+        "h2": 198,
+        "refuted": 2
+      },
+      "concluded": 0.99,
+      "evidence": 0.99,
+      "first_probe": {
+        "actuate_x3": 198,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 0.99,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.99
+    },
+    "wrong/passive": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.0,
+      "evidence": 0.0,
+      "first_probe": {
+        "none": 200
+      },
+      "named": 1.0,
+      "probes": 0.0,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.0
+    },
+    "wrong/random": {
+      "claims": {
+        "h2": 136,
+        "refuted": 2,
+        "unresolved": 62
+      },
+      "concluded": 0.68,
+      "evidence": 0.68,
+      "first_probe": {
+        "actuate_x1": 68,
+        "actuate_x2": 68,
+        "actuate_x3": 62,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 2.115,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.31
+    },
+    "wrong/seam": {
+      "claims": {
+        "refuted": 2,
+        "unresolved": 198
+      },
+      "concluded": 0.0,
+      "evidence": 0.0,
+      "first_probe": {
+        "actuate_x1": 110,
+        "actuate_x2": 88,
+        "none": 2
+      },
+      "named": 1.0,
+      "probes": 2.97,
+      "recognized": 1.0,
+      "reproducible": true,
+      "shipped_reconcile": 1.0,
+      "useful": 0.0
+    }
+  },
+  "sweep": {
+    "c=0.1 sigma=0.02": {
+      "denied/eig": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.99,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 34,
+          "none": 66
+        },
+        "named": 0.16,
+        "probes": 0.41,
+        "recognized": 0.65,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.99
+      },
+      "denied/seam": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.99,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 99,
+          "none": 1
+        },
+        "named": 0.16,
+        "probes": 2.97,
+        "recognized": 0.65,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.36
+      },
+      "null/eig": {
+        "claims": {
+          "h0": 98,
+          "h1": 1,
+          "unresolved": 1
+        },
+        "concluded": 0.98,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 6,
+          "actuate_x3": 2,
+          "none": 92
+        },
+        "named": 0.73,
+        "probes": 0.16,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "null/seam": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 9,
+          "none": 91
+        },
+        "named": 0.73,
+        "probes": 0.13,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 0.99
+      },
+      "unknown/eig": {
+        "claims": {
+          "h0": 1,
+          "h1": 93,
+          "h2": 2,
+          "unresolved": 4
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 11,
+          "actuate_x3": 88,
+          "none": 1
+        },
+        "named": 0.16,
+        "probes": 2.19,
+        "recognized": 0.65,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 1.0
+      },
+      "unknown/seam": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 99,
+          "none": 1
+        },
+        "named": 0.16,
+        "probes": 2.97,
+        "recognized": 0.65,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.25
+      },
+      "wrong/eig": {
+        "claims": {
+          "h0": 1,
+          "h2": 96,
+          "unresolved": 3
+        },
+        "concluded": 0.96,
+        "evidence": 0.96,
+        "first_probe": {
+          "actuate_x1": 11,
+          "actuate_x3": 88,
+          "none": 1
+        },
+        "named": 0.16,
+        "probes": 1.86,
+        "recognized": 0.65,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 1.0
+      },
+      "wrong/seam": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 99,
+          "none": 1
+        },
+        "named": 0.16,
+        "probes": 2.97,
+        "recognized": 0.65,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.25
+      }
+    },
+    "c=0.1 sigma=0.05": {
+      "denied/eig": {
+        "claims": {
+          "h0": 5,
+          "unresolved": 95
+        },
+        "concluded": 0.95,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 24,
+          "none": 76
+        },
+        "named": 0.0,
+        "probes": 0.48,
+        "recognized": 0.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.75
+      },
+      "denied/seam": {
+        "claims": {
+          "h0": 11,
+          "unresolved": 89
+        },
+        "concluded": 0.89,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 95,
+          "none": 5
+        },
+        "named": 0.0,
+        "probes": 2.77,
+        "recognized": 0.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.38
+      },
+      "null/eig": {
+        "claims": {
+          "h0": 42,
+          "unresolved": 58
+        },
+        "concluded": 0.42,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 7,
+          "actuate_x3": 2,
+          "none": 91
+        },
+        "named": 0.01,
+        "probes": 0.23,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 0.95
+      },
+      "null/seam": {
+        "claims": {
+          "h0": 94,
+          "unresolved": 6
+        },
+        "concluded": 0.94,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 60,
+          "none": 40
+        },
+        "named": 0.01,
+        "probes": 1.13,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 0.46
+      },
+      "unknown/eig": {
+        "claims": {
+          "h0": 5,
+          "unresolved": 95
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 24,
+          "actuate_x3": 17,
+          "none": 59
+        },
+        "named": 0.0,
+        "probes": 1.18,
+        "recognized": 0.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.7
+      },
+      "unknown/seam": {
+        "claims": {
+          "h0": 11,
+          "unresolved": 89
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 95,
+          "none": 5
+        },
+        "named": 0.0,
+        "probes": 2.77,
+        "recognized": 0.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.4
+      },
+      "wrong/eig": {
+        "claims": {
+          "h0": 5,
+          "h2": 7,
+          "unresolved": 88
+        },
+        "concluded": 0.07,
+        "evidence": 0.07,
+        "first_probe": {
+          "actuate_x1": 24,
+          "actuate_x3": 17,
+          "none": 59
+        },
+        "named": 0.0,
+        "probes": 1.15,
+        "recognized": 0.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.7
+      },
+      "wrong/seam": {
+        "claims": {
+          "h0": 11,
+          "unresolved": 89
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 95,
+          "none": 5
+        },
+        "named": 0.0,
+        "probes": 2.77,
+        "recognized": 0.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.4
+      }
+    },
+    "c=0.3 sigma=0.02": {
+      "denied/eig": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.02,
+        "useful": 1.0
+      },
+      "denied/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 100
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.02,
+        "useful": 0.0
+      },
+      "null/eig": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "null/seam": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "unknown/eig": {
+        "claims": {
+          "h1": 78,
+          "refuted": 22
+        },
+        "concluded": 0.22,
+        "evidence": 0.22,
+        "first_probe": {
+          "actuate_x3": 100
+        },
+        "named": 1.0,
+        "probes": 1.01,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.02,
+        "useful": 1.0
+      },
+      "unknown/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 100
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.02,
+        "useful": 0.0
+      },
+      "wrong/eig": {
+        "claims": {
+          "h2": 100
+        },
+        "concluded": 1.0,
+        "evidence": 1.0,
+        "first_probe": {
+          "actuate_x3": 100
+        },
+        "named": 1.0,
+        "probes": 1.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.02,
+        "useful": 1.0
+      },
+      "wrong/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 100
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.02,
+        "useful": 0.0
+      }
+    },
+    "c=0.3 sigma=0.05": {
+      "denied/eig": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.99,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 19,
+          "none": 81
+        },
+        "named": 0.43,
+        "probes": 0.23,
+        "recognized": 0.8,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.99
+      },
+      "denied/seam": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.99,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 99,
+          "none": 1
+        },
+        "named": 0.43,
+        "probes": 2.97,
+        "recognized": 0.8,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.21
+      },
+      "null/eig": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 4,
+          "actuate_x3": 1,
+          "none": 95
+        },
+        "named": 0.87,
+        "probes": 0.07,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "null/seam": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 5,
+          "none": 95
+        },
+        "named": 0.87,
+        "probes": 0.05,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "unknown/eig": {
+        "claims": {
+          "h0": 1,
+          "h1": 96,
+          "h2": 1,
+          "h3": 1,
+          "refuted": 1
+        },
+        "concluded": 0.01,
+        "evidence": 0.01,
+        "first_probe": {
+          "actuate_x1": 3,
+          "actuate_x3": 96,
+          "none": 1
+        },
+        "named": 0.43,
+        "probes": 2.05,
+        "recognized": 0.8,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 1.0
+      },
+      "unknown/seam": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 99,
+          "none": 1
+        },
+        "named": 0.43,
+        "probes": 2.97,
+        "recognized": 0.8,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.11
+      },
+      "wrong/eig": {
+        "claims": {
+          "h0": 1,
+          "h2": 98,
+          "unresolved": 1
+        },
+        "concluded": 0.98,
+        "evidence": 0.98,
+        "first_probe": {
+          "actuate_x1": 3,
+          "actuate_x3": 96,
+          "none": 1
+        },
+        "named": 0.43,
+        "probes": 1.57,
+        "recognized": 0.8,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 1.0
+      },
+      "wrong/seam": {
+        "claims": {
+          "h0": 1,
+          "unresolved": 99
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 99,
+          "none": 1
+        },
+        "named": 0.43,
+        "probes": 2.97,
+        "recognized": 0.8,
+        "reproducible": true,
+        "shipped_reconcile": 0.0,
+        "useful": 0.11
+      }
+    },
+    "c=1.0 sigma=0.02": {
+      "denied/eig": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "denied/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 54,
+          "actuate_x2": 46
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 0.0
+      },
+      "null/eig": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "null/seam": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "unknown/eig": {
+        "claims": {
+          "refuted": 100
+        },
+        "concluded": 1.0,
+        "evidence": 1.0,
+        "first_probe": {
+          "actuate_x3": 100
+        },
+        "named": 1.0,
+        "probes": 1.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "unknown/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 55,
+          "actuate_x2": 45
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 0.0
+      },
+      "wrong/eig": {
+        "claims": {
+          "h2": 100
+        },
+        "concluded": 1.0,
+        "evidence": 1.0,
+        "first_probe": {
+          "actuate_x3": 100
+        },
+        "named": 1.0,
+        "probes": 1.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "wrong/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 54,
+          "actuate_x2": 46
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 0.0
+      }
+    },
+    "c=1.0 sigma=0.05": {
+      "denied/eig": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.42,
+        "useful": 1.0
+      },
+      "denied/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "actuate_x1": 54,
+          "actuate_x2": 46
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.42,
+        "useful": 0.0
+      },
+      "null/eig": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "null/seam": {
+        "claims": {
+          "h0": 100
+        },
+        "concluded": 1.0,
+        "evidence": null,
+        "first_probe": {
+          "none": 100
+        },
+        "named": 1.0,
+        "probes": 0.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 1.0,
+        "useful": 1.0
+      },
+      "unknown/eig": {
+        "claims": {
+          "h1": 14,
+          "refuted": 86
+        },
+        "concluded": 0.86,
+        "evidence": 0.86,
+        "first_probe": {
+          "actuate_x3": 100
+        },
+        "named": 1.0,
+        "probes": 1.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.42,
+        "useful": 1.0
+      },
+      "unknown/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 55,
+          "actuate_x2": 45
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.42,
+        "useful": 0.0
+      },
+      "wrong/eig": {
+        "claims": {
+          "h2": 100
+        },
+        "concluded": 1.0,
+        "evidence": 1.0,
+        "first_probe": {
+          "actuate_x3": 100
+        },
+        "named": 1.0,
+        "probes": 1.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.42,
+        "useful": 1.0
+      },
+      "wrong/seam": {
+        "claims": {
+          "unresolved": 100
+        },
+        "concluded": 0.0,
+        "evidence": 0.0,
+        "first_probe": {
+          "actuate_x1": 54,
+          "actuate_x2": 46
+        },
+        "named": 1.0,
+        "probes": 3.0,
+        "recognized": 1.0,
+        "reproducible": true,
+        "shipped_reconcile": 0.42,
+        "useful": 0.0
+      }
+    }
+  }
+}
