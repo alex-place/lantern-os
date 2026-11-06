@@ -962,6 +962,7 @@ def test_switched_mode_diagnostics_reports_certificate_and_gramian():
     assert report["excitation_positive_definite"]
     assert report["excitation_min_eigenvalue"] == pytest.approx(0.0064)
 
+
 # ── a trajectory that is not finite (independent review of #3814) ────────────────────────────────
 
 class _Kinked(LinearDynamics):

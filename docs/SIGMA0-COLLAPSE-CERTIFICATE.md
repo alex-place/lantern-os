@@ -98,7 +98,9 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 53 passed |
-| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (bit for bit with `LinearDynamics`; to rounding with the neural node), a non-finite row left alone, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 69 passed |
+| C3 and S1 through the real engine, per trajectory: cap, per-sample floors, every dimension, no consecutive gate, null(A) kick, mixed batches, per-row budgets and receipts, non-finite-row isolation, shared-covariance receipts, neural batch agreement to rounding, placebo pin, scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 69 passed |
+| C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, machine-checked (Lean 4 + Mathlib; standard axioms only; six false variants rejected) | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
+| The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing, through all three branches of the lift's projection, and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 26 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
 | Loop-contraction verdict on trajectories of known contraction, non-finite iterates, saved real Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
 | Placebo-controlled operator measurement (§3) | MEASURED (simulation) | `python experiments/sigma0_placebo_control.py --trials 10` |
@@ -171,9 +173,12 @@ it — rests on the model-collapse literature (§7) and on this project's own me
 - **PROVEN** — Theorem 1 for normal `A`; the spectral dichotomy for every `A` (standard linear
   algebra); **C3**, that when the operator acts on a trajectory, that trajectory's four-signal gate cannot
   be true on two consecutive steps, through the engine's own projection, for all `A` and every dimension
-  `d ≥ 2`; and **S1**, that each firing moves the state out of the near-target ball with probability ≥ ½.
+  `d ≥ 2` while `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (the engine refuses to fire otherwise); and **S1**, that each
+  firing moves the state out of the near-target ball with probability ≥ ½.
   The gate decides each trajectory of a batch on its own signals. Tests are in the audit
-  table. "Proven" here means closed-form argument plus tests, not a formal proof.
+  table. "Proven" here means closed-form argument plus tests. C3 is in addition machine-checked in
+  Lean (`docs/formal/C3EngineLift.lean`), up to the spectral identities that connect the abstract
+  statement to the engine, which are tested, not formalized.
 - **MEASURED** — the operator against a placebo (§3): no trajectory's gate stays true for two steps,
   against runs of 60 for the placebo. The early-warning "canary" (§4).
 - **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational definition,
@@ -916,8 +921,9 @@ first. It reads one decision and one value per signal for each batch, and on the
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: C3 and S1 PROVEN in-regime, per trajectory, with engine-level tests (corrected 2026-11-05). The
-operator beats a placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists.**
+**Status: C3 PROVEN in-regime, per trajectory, and machine-checked in Lean, with engine-level tests; S1 PROVEN
+in-regime (corrected 2026-11-05). The operator beats a placebo on the signals a placebo can fail (MEASURED). No
+state-level anti-collapse theorem exists.**
 
 Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects along it, one trajectory at a time:
 
@@ -944,7 +950,29 @@ fall below `eps` only after a scale-down, when `λ_max = σ_max` and so `μ ≥ 
 whose sample standard deviation is at most `½√(d/(d−1))·eps` (Popoviciu), so `a(Σ_next) ≥ (a₊ − ½√(d/(d−1))·ρ)/(1+ρ)`. That is above
 `ε_a` under the hypothesis for every `d ≥ 2`: 0.0503 at the worst case, `d = 2` and `ρ = 9·10⁻⁴` (derived independently in
 `lantern-os-research` PR #14). `m ≤ d/(1+4ε²)` keeps the denominator
-positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. Four engine defects stood between the lemma and this statement:
+positive, with `Δ ≲ (1+a/ε)μ` in the trigger regime. The hypothesis on `ρ` is enforced: an armed step refuses to
+fire when `d·eps/σ_max > AntiCollapseOperator.RHO_MAX = 9·10⁻⁴`, as it refuses a negative diffusion gain.
+
+*Machine-checked.* `docs/formal/C3EngineLift.lean` proves this argument in an abstract real inner-product space with an
+element `I`, `⟪I, I⟫ = d`: L2′ for any projector-like `P`, in the exact form `_cov_floor` computes (`lift`);
+`a(cX) = a(X)` (`cv_smul`); the Popoviciu bound, from the single hypothesis `‖D‖² ≤ eps·tr D` on the floor
+correction (`popoviciu`, `clamp_keeps`); the shipped constants for every `d ≥ 2` (`shipped_constants`); rank
+feasibility (`rank_feasible`); and the composite with the gate off (`C3_engine`). No `sorry`, only Lean's standard
+axioms, and six false variants are rejected (half the floor, a tighter Popoviciu constant, a quarter-width clamp
+term, `ρ` up to `2·10⁻³`, a 1% margin, a weaker rank cap). What is **not** formalized is the bridge: that for
+symmetric matrices with the Frobenius inner product the engine's eigenvalue `std/mean` is that `cv`, its projector
+satisfies `⟪P,P⟫ = ⟪P,I⟫ = m`, and `project_preserving_shape` returns `X` or `c·X + D` with `tr(c·X) ≥ σ_max` and
+`‖D‖² ≤ eps·tr D`. Those are standard spectral identities, checked numerically in
+`tests/test_sigma0_c3_formal_bridge.py`, which also drives the real `forward_step` through all three branches of the
+lift's projection (identity, scale, scale then clamp) and checks C3 on every firing. Of 240 fuzzed configurations
+over three covariance fields, 160 fired: 125 took the identity branch, 24 the scale-down and 11 the scale-down and
+clamp, with the smallest post-step anisotropy `1.11·ε_a`. At the default `r = 1` the Riccati step keeps the
+propagated covariance far below `σ_max`, so the scale-down is reached only with weaker damping or a lower cap; the
+theorem covers every field with `ρ ≤ 9·10⁻⁴`. Removing the 2% margin fails the constants check and one
+batch-equivalence test (`test_a_batch_is_independent_trajectories[kick]`), but no fuzzed C3 run: the margin is
+load-bearing for the proof's worst case, which random inputs do not reach.
+
+Four engine defects stood between the lemma and this statement:
 
 | Defect | Failure | Fix |
 |---|---|---|
@@ -2349,6 +2377,7 @@ for produced results and Appendix A for the original design sketch.*
 |---|---|---|---|
 | 2026-11-05 | "900/900 forced-collapse runs prevented" | **retired**: the metric could not fail (the engine skips the overwrite whenever the operator fires) and a do-nothing placebo matched it; all collapse-prone trials were `ν=0`; the script no longer reproduces under the observe-only default. Replaced by a placebo-controlled measurement | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | C3: "PROVEN for all `A`", "`P(permanent freeze) = 0`" | the lemma holds; the engine violated it (σ_max cap, batch floor, clipped `a`, `d > 400`). Fixed, and restated as a gate statement. It does not mean the state keeps moving | [§3](#3-the-anti-collapse-operator-σ₀¹) |
+| 2026-11-05 | C3 "for every dimension `d ≥ 2`", with `ρ ≤ 9·10⁻⁴` only stated | the hypothesis was not enforced (at the defaults it allows `d ≤ 9000`). The engine now refuses to fire outside it | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | "no third fate"; `collapses=True` on any bounded slow block | rotation is a third outcome of the linear system; Jordan blocks on the boundary grow, against the T1 doc's own caveat. `marginal_kind` added, `collapses` corrected | [§1](#1-the-collapse-guarantee-theorem), [R1](#r1--the-collapse-guarantee--the-foundation-proven-machine-checked) |
 | 2026-11-05 | small-gain `α_bound` "a proven bound"; `guaranteed` built on it, rate ∞ on the all-null case | it bounds nothing here; a counterexample is pinned. `guaranteed` now requires commutation and a settling null block | [§1.1](#11-why-the-hypothesis-is-required-the-dropped-cross-term) |
 | 2026-11-05 | non-normality "shows up only as a bounded overshoot" `√cond(P)` | that is the active block's overshoot in oblique coordinates; `[[−1,1000],[0,0]]` reports 1 and peaks at 1000. `coupling_norm` and `full_transient_bound` added | `dichotomy_certificate` |
