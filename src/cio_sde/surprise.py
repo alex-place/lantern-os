@@ -46,6 +46,12 @@ the Σ₀⁻¹ anti-collapse operator. This creates a closed loop:
 This implements the "detect → excite → re-ground" cycle described in issue #506.
 
 Batched conventions:  x (B, d) · Σ (B, d, d) · y (B, m) · C (B, m, d) · R (B, m, m).
+
+Each row of the batch is a trajectory of its own. A row whose x̂, Σ, ν or S holds a NaN or inf (a NaN or
+inf in its y, C or R reaches ν or S) is not scored. It never reaches the batched Cholesky, so it cannot make
+it raise for the other rows. Its NIS reads NaN, so it never spooks, its posterior is its prior, and it stays
+out of the rolling NIS mean. Every other row reads what it reads alone. A batch whose rows are all finite is
+computed exactly as before.
 """
 from __future__ import annotations
 
@@ -64,6 +70,24 @@ def kalman_predict(x: Tensor, sigma: Tensor, F: Tensor, Q: Tensor) -> tuple[Tens
     x_pred = x @ F.transpose(-1, -2)
     sigma_pred = F @ sigma @ F.transpose(-1, -2) + Q
     return x_pred, 0.5 * (sigma_pred + sigma_pred.transpose(-1, -2))
+
+
+def _rows_finite(t: Tensor, event_dims: int) -> Tensor:
+    """For each row of a batch, whether its last `event_dims` dims hold only finite numbers."""
+    return torch.isfinite(t).flatten(-event_dims).all(-1)
+
+
+def scored_mean(nis: Tensor) -> Optional[float]:
+    """The mean NIS of the rows that were scored, or None when no row was.
+
+    A NaN NIS is a row that was not scored (see SurpriseMonitor.evaluate), and it is no evidence either way,
+    so it stays out of the mean. When every row was scored this is the batch mean, computed as before."""
+    scored = ~torch.isnan(nis)
+    if not bool(scored.any()):
+        return None
+    if bool(scored.all()):
+        return float(nis.mean().item())
+    return float(nis[scored].mean().item())
 
 
 class SurpriseMonitor:
@@ -91,26 +115,41 @@ class SurpriseMonitor:
     @staticmethod
     def _innovation(x_pred: Tensor, sigma: Tensor, y: Tensor,
                     C: Tensor, R: Tensor):
+        """(ν, S, L, scored). When every row is finite, L is the batched Cholesky of S, exactly as before, and
+        scored is None. Otherwise scored marks the rows whose x̂, Σ, ν and S are finite, and every other row's
+        S is swapped for I before the factorization, so a NaN or inf never reaches it."""
         nu = y - (C @ x_pred.unsqueeze(-1)).squeeze(-1)        # (B, m)
         S = C @ sigma @ C.transpose(-1, -2) + R                # (B, m, m)
-        L = torch.linalg.cholesky(S)
-        return nu, S, L
+        scored = (_rows_finite(nu, 1) & _rows_finite(S, 2)
+                  & _rows_finite(x_pred, 1) & _rows_finite(sigma, 2))
+        if bool(scored.all()):
+            return nu, S, torch.linalg.cholesky(S), None
+        eye = torch.eye(S.shape[-1], dtype=S.dtype, device=S.device)
+        return nu, S, torch.linalg.cholesky(torch.where(scored[..., None, None], S, eye)), scored
 
     def evaluate(self, x_pred: Tensor, sigma: Tensor, y: Tensor,
                  C: Tensor, R: Tensor) -> Dict[str, Tensor]:
-        """Read the surprise of observation y against prediction (x_pred, Σ)."""
-        nu, S, L = self._innovation(x_pred, sigma, y, C, R)
+        """Read the surprise of observation y against prediction (x_pred, Σ).
+
+        A row whose x̂, Σ, ν or S holds a NaN or inf is not scored: it stays out of the batched Cholesky, its
+        "nis" and "surprise" read NaN, and it never spooks, since NaN exceeds no threshold. Each other row reads
+        what it reads alone. The rolling mean that sigma0_proximity reads gets the scored rows only."""
+        nu, S, L, scored = self._innovation(x_pred, sigma, y, C, R)
         m = C.shape[-2]
         sinv_nu = torch.cholesky_solve(nu.unsqueeze(-1), L)    # (B, m, 1)
         nis = (nu.unsqueeze(-2) @ sinv_nu).squeeze(-1).squeeze(-1)   # (B,)
+        if scored is not None:                                 # a row not scored has no NIS
+            nis = torch.where(scored, nis, torch.full_like(nis, math.nan))
         logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(-1)
         surprise = 0.5 * (nis + logdet + m * math.log(2.0 * math.pi))
         threshold = m + self.spook_sigmas * math.sqrt(2.0 * m)
         result = {"nis": nis, "surprise": surprise, "dof": m,
                   "spook_threshold": threshold, "spook": nis > threshold,
                   "innovation_norm": nu.norm(dim=-1)}
-        # Record mean NIS across batch for proximity tracking
-        self._nis_history.append(float(nis.mean().item()))
+        # Record the mean NIS of the scored rows for proximity tracking (see sigma0_proximity)
+        mean = scored_mean(nis)
+        if mean is not None:
+            self._nis_history.append(mean)
         return result
 
     def record_state(self, state: Dict[str, Any]) -> None:
@@ -127,6 +166,12 @@ class SurpriseMonitor:
         """Compute Σ₀ proximity score from recent NIS history.
 
         proximity = clip((mean_nis - baseline) / (collapse_threshold - baseline), 0, 1)
+
+        Each evaluate adds one value to the window: the mean NIS of the rows it scored. A row it did not
+        score, whose NIS is NaN, stays out of that mean, and an evaluate that scored no row adds nothing. So
+        one broken trajectory neither raises nor lowers the proximity the other rows report. Letting its NaN
+        in would not read as NaN: max(0, min(1, NaN)) is 1.0 in Python, so the window would report
+        proximity 1.0, an alert, until the NaN left it nis_window evaluations later.
 
         Returns
         -------
@@ -189,11 +234,18 @@ class SurpriseMonitor:
 
     def update(self, x_pred: Tensor, sigma: Tensor, y: Tensor,
                C: Tensor, R: Tensor) -> tuple[Tensor, Tensor]:
-        """Measurement update: fuse y into the belief (the correction)."""
-        nu, S, L = self._innovation(x_pred, sigma, y, C, R)
+        """Measurement update: fuse y into the belief (the correction).
+
+        A row that evaluate would not score is not updated. Its posterior is its prior, x̂ and Σ as they came
+        in, with Σ symmetrized as every posterior is. For a row whose observation is not finite, that is the
+        Kalman filter's step for a missing measurement. A prior that is not finite is passed on as it is."""
+        nu, S, L, scored = self._innovation(x_pred, sigma, y, C, R)
         sig_ct = sigma @ C.transpose(-1, -2)                   # (B, d, m)
         sinv_nu = torch.cholesky_solve(nu.unsqueeze(-1), L)    # (B, m, 1)
         x_upd = x_pred + (sig_ct @ sinv_nu).squeeze(-1)
         sinv_csig = torch.cholesky_solve(C @ sigma, L)         # S⁻¹ C Σ  (B, m, d)
         sigma_upd = sigma - sig_ct @ sinv_csig
+        if scored is not None:                                 # a row not scored keeps its prior
+            x_upd = torch.where(scored[..., None], x_upd, x_pred)
+            sigma_upd = torch.where(scored[..., None, None], sigma_upd, sigma)
         return x_upd, 0.5 * (sigma_upd + sigma_upd.transpose(-1, -2))
