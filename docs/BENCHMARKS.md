@@ -89,6 +89,7 @@ The commonly-cited range is **10–26 points** ([NxCode](https://www.nxcode.io/r
 | **LongMemEval** | Remember | Memory retrieval recall@k / MRR over long multi-session histories | `experiments/longmemeval_harness.py` | ✅ Run | Real `longmemeval_s` (n=189, k=5): multi-signal recall@5 **0.709** / MRR **0.486** vs keyword **0.222** / 0.098 — `data/longmemeval/runs.jsonl` (2026-07-01) |
 | **Retrieval A/B (internal)** | Remember | Recall@{5,10} / MRR@{3,10} of OUR production retrieval arms (lexical-idf, BM25-okapi, nomic-dense, hybrid-α, **RRF** rank-fusion, +cross-encoder) on a known-item set, split by lexical-overlap band, plus an `oracle-band-best` diagnostic ceiling — the A/B that gates the reranker decision (#2355) in evidence, not borrowed numbers | `scripts/eval_retrieval_ab.js` | 🟡 Partial | **Ollama-equipped arXiv run (#2389)**, corpus=1000 docs: on the low-overlap **hard-QA set** (n=175) overall MRR@10 — bm25 0.894, dense 0.942, hybrid-α0.5 0.943, **RRF 0.944** (RRF ≈ hybrid, both edge dense). But in the **low-overlap band** (n=9, still thin) **dense alone** R@5 **0.889** beats RRF/hybrid (0.667): rank-fusion drags dense's strong low-band hits back toward the weak lexical arms, so **RRF does NOT beat the oracle single-arm** — a per-query router that picks dense in the low band is the real lever. Title known-item set (n=300, high-overlap control) saturates (RRF MRR@10 0.976). `hybrid+rerank` still skip-logged pending #2355 endpoint — `data/eval/retrieval/runs.jsonl` (#2356, #2389) |
 | **HaluEval-QA** | Verify | Hallucination rate; grounded A/B for the ADR-0017 accept gate (≥20% rel. reduction) | `experiments/halueval_ab.py` (+ `data/eval/halueval-qa-subset.jsonl`) | 🟡 Partial | Real HaluEval (RUCAIBox), GPT-4o-mini n=40: grounding cuts hallucination **55% → 20%** (**64% rel.**, ≥ 20% gate ✓) — `data/eval/halueval_ab_results.json`; local closed-book (Ouro): base **0.05** → +honesty adapter **0.40** accuracy (n=40, 2026-07-05) — `data/eval/halueval-local/` |
+| **BED-LLM 20 Questions (Animals)** | Reason / Converge | Information gathering: name a hidden animal (one of BED-LLM's 100 Animals targets) in at most 20 yes/no questions | `experiments/question_machine_20q.py` | 🟡 Partial (30 of 100 targets) | **2026-11-06, gpt-4o-mini as questioner and answerer, n = 30: the Question Machine (exact information-gain questions, `ask_by_information`) solved 67% ± 9, the paper's Prompt-Only baseline 60% ± 9. No significant difference (8 wins, 6 losses, 16 ties; sign test p = 0.79), at 22× the cost per game.** Paper, Table 1 (gpt-4o-mini, n = 100, `harness-different`): Prompt-Only 44%, BED-LLM 88% — `data/question_machine/20q_pilot_gpt-4o-mini.json` |
 | **SimpleQA-Verified** | Verify | Short-form factual honesty: F1 of accuracy × attempt-rate on 1000 sourced Qs (rewards calibrated abstention over confabulation) | — (Kaggle dataset + F1/attempted/hedged grader; extend `sigma0_live_bench.py`) | 📋 Planned | Live [Kaggle/DeepMind board](https://www.kaggle.com/benchmarks/deepmind/simpleqa-verified) (re-validated 2026-07-17, 37 models): SOTA has **jumped to Gemini 3.1 Pro Preview 77.5** F1 (**+21.9** over the paper's Sept-2025 55.6) > Gemini 3 Pro 72.1 > Gemini 3.5 Flash 70.4; top open-weight Qwen 3 235B **53.7**, o3 52.3 (OpenAI's best — GPT-5 fell out of the top 10), Claude Opus 4.8 44.5 (#8). [Epoch AI](https://epoch.ai/benchmarks/simple-qa-verified) corroborates (~77% acc). **Ours not yet run** |
 | **SWE-bench Verified** | Act / Verify | Human-validated SWE-bench subset, resolved% | — (extend `eval_swebench_chat.py` `--dataset`) | 📋 Planned | reference target, `data/benchmarks/agi-capability-matrix.json` |
 | **PersonaMem** | Remember | Persona-consistent long-memory recall (MemOS comparison set) | — | 📋 Planned | paired with LongMemEval (MemOS publishes both) |
@@ -152,6 +153,34 @@ The commonly-cited range is **10–26 points** ([NxCode](https://www.nxcode.io/r
 - **Local closed-book rows (2026-07-05, `data/eval/halueval-local/`):** Ouro-1.4B base accuracy **0.05** (hallucination 0.95); + honesty-balanced adapter **0.40** (hallucination 0.60), n=40, deterministic contains-gold. This is the local lane's closed-book floor, not the grounded product.
 - **Gate face-off (2026-07-05, `data/eval/halueval_gates_compare_results.json`):** by detection AUROC, council_delta **0.909** > logprob **0.861** > self-consistency **0.851** — but logprob keeps the best *routing* edge (0.0585 vs council's 0.0457): rank ≠ route. Ouro hidden-state canaries (`ouro_canary_vs_logprob_results.json`): unsupervised AUROC ≤ **0.661** with **negative** routing edge — the current canaries detect weakly and don't route at all.
 - **Public detection SOTA (re-validated 2026-07-17):** supervised hidden-state probing reaches **98.4–98.6% AUROC** on HaluEval with 7B open models ([MultiHaluDet, ACL 2026](https://aclanthology.org/2026.mellm-1.6/), [arXiv:2605.24919](https://arxiv.org/abs/2605.24919)), now nudged to **~0.998** by a plain quantized linear probe ([arXiv:2606.02628](https://arxiv.org/html/2606.02628)) — ceiling saturation. **⚠️ But that number is largely a teacher-forced *artifact*:** [PARALLAX (arXiv:2605.17028)](https://arxiv.org/html/2605.17028) shows a text-similarity baseline with no model internals hits **0.98** on HaluEval, and on **live-generated** (non-teacher-forced) responses a top probe collapses **0.96 → 0.62** — right where our unsupervised Ouro canary (≤0.661) already sits; on genuinely hard benches (HaluBench, RAGTruth) supervised probes reach only ~0.91. So the "98.6 vs 0.66" gap is mostly benchmark construction, not capability. A clean held-out probe on Ouro hidden states is still the catch-up run, but the honest target on realistic text is **~0.9 (hard-bench), not 0.986**.
+
+### BED-LLM 20 Questions — 🟡 Partial
+- **Source:** Choudhury et al., "BED-LLM: Intelligent Information Gathering with LLMs and Bayesian
+  Experimental Design", ICLR 2026, [arXiv:2508.21184](https://arxiv.org/abs/2508.21184). Code and targets
+  are at [DeeproChoudhury/BED-LLM](https://github.com/DeeproChoudhury/BED-LLM) (MIT). It has three sets,
+  Animals, Celebrities and Things, with 100 targets each. A game allows up to 20 yes/no questions and
+  succeeds if the right target is named by its end.
+- **What we run:** Animals only, 30 targets (seed 0), with gpt-4o-mini as questioner and answerer.
+  - The paper's Prompt-Only baseline, with its prompt verbatim.
+  - The Question Machine. It uses the paper's candidate sampling and 0.2 filter, and chooses each
+    question from 15 the model proposes, by exact expected information gain through
+    `QuestionMachine.ask_by_information` (G2's selector, ported).
+- **Harness differences, so harness swing applies:**
+  - Our answerer, question-proposal and final-guess prompts are our own. The paper's answerer prompt is
+    not in its text.
+  - Names are matched strictly after normalising, with the list's own aliases.
+  - A Prompt-Only reply without its `<question>` tag gets one format reminder.
+  - A guess that does not end the game is not asked again.
+
+  Compare our two arms with each other. Compare either one to the paper's Table 1 only as
+  `harness-different`.
+- **Result (2026-11-06):** Question Machine 20/30 (67% ± 9), Prompt-Only 18/30 (60% ± 9). The
+  per-target sign test gives p = 0.79, so there is no measured difference. Cost per game was $0.038
+  against $0.0017, from 655 model calls against 42. The machine's main failure is the paper's hard
+  filter: it emptied the candidate pool on 32 turns. Full write-up:
+  [`docs/research/question-machine.md`](research/question-machine.md) §9.
+- **Not yet run:** the other 70 targets, the Celebrities and Things sets, more than one game per target,
+  and any other model.
 
 ### SimpleQA-Verified — 📋 Planned
 - **Source:** Google DeepMind, [arXiv:2509.07968](https://arxiv.org/abs/2509.07968) (Sept 2025) — a 1,000-prompt cleaned/reconciled subset of OpenAI's SimpleQA (de-duplicated, topic-balanced, label-corrected). Dataset + grader on Kaggle. Public.
