@@ -686,7 +686,9 @@ def test_a_spook_excites_only_its_own_trajectory():
 @pytest.mark.parametrize("case", ["kick", "budget"])
 def test_a_batch_is_independent_trajectories(case):
     """Row i of a batched run is the same run on row i alone: the gate, the kick, the bump, the budget and
-    the receipts all belong to the trajectory. Both operators attached, three interventions each.
+    the receipts all belong to the trajectory. Both operators attached, three interventions each. Bit for bit
+    at these inputs; in general only to rounding, since Tensor.std can round one row differently from the
+    same row in a batch (in the "kick" case at Σ0[1] = 3·I, row 1 is no longer bit-identical).
     "kick": the real operator on a non-normal rank-1 A, with noise. "budget": the covariance leg alone on
     A = 0, which clears the gate without moving the state, so it re-fires as Σ relaxes and the two
     near-target rows, at different Σ scales, fire at different steps and run out at different times."""
@@ -961,3 +963,262 @@ def test_switched_mode_diagnostics_reports_certificate_and_gramian():
     assert report["stability_certificate"]["valid"]
     assert report["excitation_positive_definite"]
     assert report["excitation_min_eigenvalue"] == pytest.approx(0.0064)
+
+
+# ── a trajectory that is not finite (independent review of #3814) ────────────────────────────────
+
+class _Kinked(LinearDynamics):
+    """f(x) = c·b(x₄)·e₁ with b = ∛x₄ ("inf") or √(x₄²) ("nan"). The drift is finite on x₄ ≥ 0, but at x₄ = 0
+    the derivative is +inf, or (1/0)·0 = NaN. vmap takes each sample's derivative on its own, so a trajectory
+    sitting exactly on x₄ = 0 has a non-finite Jacobian while every other one's is finite."""
+
+    def __init__(self, kind, c=1e-3, d=4):
+        super().__init__(torch.zeros(d, d, dtype=torch.float64), B=torch.zeros(d, 2, dtype=torch.float64),
+                         noise=0.002)
+        self.kind, self.c = kind, c
+
+    def drift(self, x, u):
+        x4 = x[..., 3:]
+        bend = x4.pow(1.0 / 3.0) if self.kind == "inf" else torch.sqrt(x4 * x4)
+        return x @ self.A.T + u @ self.B.T + self.c * torch.nn.functional.pad(bend, (0, x.shape[-1] - 1))
+
+
+@pytest.mark.parametrize("kind", ["inf", "nan"])
+def test_a_trajectory_with_a_non_finite_jacobian_fails_no_other(kind):
+    """Row 0 is collapsed, row 1 sits on the kink, row 2 is far from target. One batched decomposition used to
+    fail all three: the covariance step's eigh raised first, and behind it the gate's SVDs raised on a NaN, and
+    read an inf's NaN singular values as rank 0, i.e. collapsed. Now row 1 is never acted on, and each row of the
+    batch, row 1 included, is the step it gets alone, bit for bit."""
+    from src.cio_sde.engine import drift_jacobian
+    m = CIO_SDE(dim=4, ctrl_dim=2, hidden=4).double()
+    _zero_policy(m)
+    m.graph.active = _Kinked(kind).double()
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.collapse_op = SemanticCollapseOperator()
+    x = torch.tensor([[1e-4, -1e-4, 5e-5, 1e-4], [1e-4, 1e-4, -5e-5, 0.0], [0.5, 0.5, 0.5, 0.5]],
+                     dtype=torch.float64)
+    sigma = torch.eye(4, dtype=torch.float64).expand(3, 4, 4).clone()
+    noise = torch.tensor([[0.3, -1.2, 0.8, 0.5], [1.0, 0.4, -0.7, 0.2], [-0.4, 0.9, 0.1, -1.5]],
+                         dtype=torch.float64)
+    A = drift_jacobian(m.graph.active, x, torch.zeros(3, 2, dtype=torch.float64))
+    broken = torch.isinf(A) if kind == "inf" else torch.isnan(A)
+    assert broken.flatten(1).any(-1).tolist() == [False, True, False]
+    assert torch.isfinite(A).flatten(1).all(-1).tolist() == [True, False, True]
+
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+    assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "excite")]
+    assert info["sigma0_proximity_per_sample"][1] == 0.0
+    signals = m.anti_collapse_op.detector._signals(m, x, info["u"], sigma, A)
+    assert all(math.isnan(float(v[1])) for v in signals.values())     # none reads below its threshold
+    assert not bool(torch.isfinite(sigma_next[1]).all())               # its Σ is passed on, not made up
+    for i in range(3):
+        m.reset_intervention_count()
+        xi, si, alone = m.forward_step(x[i:i + 1], sigma[i:i + 1], 0.05, noise[i:i + 1], step=0)
+        torch.testing.assert_close(xi[0], x_next[i], rtol=0, atol=0, equal_nan=True)
+        torch.testing.assert_close(si[0], sigma_next[i], rtol=0, atol=0, equal_nan=True)
+        assert [r.kind for r in alone["intervention_receipts"]] == (["excite"] if i == 0 else [])
+
+
+_HADAMARD = torch.tensor([[1.0, 1, 1, 1], [1, -1, 1, -1], [1, 1, -1, -1], [1, -1, -1, 1]])
+
+
+@pytest.mark.parametrize("broken", ["jacobian inf", "jacobian nan", "jacobian overflow", "covariance nan"])
+def test_a_row_that_is_not_finite_reads_nan_and_never_fires(broken):
+    """The trap: _numerical_rank counts NaN or inf singular values as rank 0. The SVD of an inf Jacobian returns
+    NaN singular values without raising, so that row read as collapsed and, with its other signals at rest,
+    fired. So did a FINITE full-rank Jacobian, 0.6·max·H₄ in float32, whose singular values overflow to inf. A
+    NaN Jacobian made the SVD raise for the whole batch, and an all-NaN Σ made the gate's eigvalsh raise. Now
+    every signal of such a row is NaN, it never fires, and the other rows are decided as they are alone."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    det, op = m.anti_collapse_op.detector, m.anti_collapse_op
+    A = torch.zeros(3, d, d)
+    A[0, 0, 0] = 1.0                          # rank 1: collapsed
+    A[1, 0, 0] = 1.0                          # row 1 is broken below, with every other signal of it at rest
+    A[2] = torch.eye(d)                       # full rank: healthy
+    x, u = torch.full((3, d), 1e-4), torch.zeros(3, 2)   # every row near target
+    sigma = torch.eye(d).expand(3, d, d).clone()
+    if broken == "jacobian overflow":
+        A[1] = 0.6 * torch.finfo(torch.float32).max * _HADAMARD
+        assert bool(torch.isfinite(A[1]).all()) and not bool(torch.isfinite(torch.linalg.svdvals(A[1])).all())
+    elif broken == "covariance nan":
+        sigma[1] = float("nan")
+    else:
+        A[1, 0, 0] = float(broken.split()[1])
+    res = det.evaluate(m, x, u, sigma, A)
+    assert res.mask.tolist() == [True, False, False]
+    for name in ("grad_norm", "eff_rank", "anisotropy", "ctrl_sens"):
+        assert math.isnan(float(res.metrics[name][1])), name
+    assert res.metrics["eff_rank"][0] == 1.0 and res.metrics["eff_rank"][2] == d
+    assert torch.equal(res.x_star[1], x[1])
+    p = op.proximity(m, x, u, sigma, A)
+    assert float(p[0]) > 0.0 and p[1:].tolist() == [0.0, 0.0]
+    for i in (0, 2):
+        alone = det.evaluate(m, x[i:i + 1], u[i:i + 1], sigma[i:i + 1], A[i:i + 1])
+        assert alone.mask.tolist() == [bool(res.mask[i])] and torch.equal(alone.x_star[0], res.x_star[i])
+        assert torch.equal(op.proximity(m, x[i:i + 1], u[i:i + 1], sigma[i:i + 1], A[i:i + 1])[0], p[i])
+
+
+@pytest.mark.parametrize("bad", [float("inf"), float("nan")])
+def test_an_operator_asked_to_act_on_a_non_finite_row_refuses_and_names_it(bad):
+    """Asked directly to project or excite a broken row, the operators refuse with an error naming that row,
+    instead of LAPACK's error for the whole batch (NaN) or a kick basis built from NaN singular values (inf).
+    Outside the mask a broken row is not decomposed, so it fails nothing."""
+    d = 4
+    A = torch.zeros(2, d, d)
+    A[:, 0, 0] = 1.0
+    A[1, 0, 1] = bad
+    det, op = SemanticCollapseOperator(), AntiCollapseOperator(strength=0.5)
+    x, sigma = torch.zeros(2, d), torch.eye(d).expand(2, d, d).clone()
+    with pytest.raises(ValueError, match="sample 1: the Jacobian holds a NaN or inf"):
+        det._collapse_state(x, A)
+    with pytest.raises(ValueError, match="sample 1: the Jacobian holds a NaN or inf"):
+        op.excite(x, sigma, A, 0.5, torch.ones(2, d))
+    x_star, _ = det._collapse_state(x + 1.0, A, mask=torch.tensor([True, False]))
+    assert torch.allclose(x_star[0], torch.tensor([0.0, 1.0, 1.0, 1.0]), atol=1e-6)   # onto null(e₁e₁ᵀ)
+    assert torch.equal(x_star[1], x[1] + 1.0)                                         # untouched
+    sick = sigma.clone()
+    sick[1, 2, 2] = bad
+    with pytest.raises(ValueError, match="sample 1: the covariance holds a NaN or inf"):
+        op.excite(x, sick, A[:1].expand(2, d, d), 0.5, torch.ones(2, d))
+    huge = A.clone()
+    huge[1] = 0.6 * torch.finfo(torch.float32).max * _HADAMARD     # finite, but its singular values overflow
+    with pytest.raises(ValueError, match="sample 1: the Jacobian's singular values overflow"):
+        op.excite(x, sigma, huge, 0.5, torch.ones(2, d))
+
+
+def test_the_covariance_projections_pass_a_non_finite_sample_through():
+    """Both projections decomposed every Σ of the batch at once, so one Σ holding an inf came back as NaN or
+    raised, and could take the others with it. A finite Σ is now projected as it is alone, and one that is not
+    finite comes back unprojected: there is nothing to project it onto."""
+    cov = CovarianceField(4)
+    good = torch.diag(torch.tensor([2000.0, 1.0, 1e-9, 3.0], dtype=torch.float64))   # clipped to [eps, σ_max]
+    batch = torch.stack([good, good.clone()])
+    batch[1, 0, 1] = batch[1, 1, 0] = float("inf")
+    for project in (cov._project_psd, cov.project_preserving_shape):
+        out = project(batch)
+        assert torch.equal(out[0], project(good.unsqueeze(0))[0]), project.__name__
+        torch.testing.assert_close(out[1], batch[1], rtol=0, atol=0, equal_nan=True)
+
+
+class _LoudRow(LinearDynamics):
+    """Diffusion gain 1e20 on rows with x₄ < 0 and 0.002 elsewhere. In float32 g² overflows, so such a row's
+    covariance step returns inf from finite inputs, and the gate, which reads the inputs, still fires on it."""
+
+    def diffusion(self, x):
+        loud = x[..., 3:] < 0
+        return torch.where(loud, torch.full_like(x[..., 3:], 1e20), torch.full_like(x[..., 3:], 0.002)).expand_as(x)
+
+
+def test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other():
+    """Both rows are collapsed and finite, so the gate fires on both; row 1's covariance step overflows. The
+    kick's floor then refused, or LAPACK raised, for the whole batch, and named row 1 by its place among the
+    fired rows. Row 1 is now blocked, with a receipt saying why, after the gain guard checked it; row 0 is kicked."""
+    d = 4
+    m = _armed_on(_LoudRow(torch.diag(torch.tensor([-0.5, 0.0, 0.0, 0.0])), B=torch.zeros(d, 2), noise=0.0))
+    x = 1e-4 * torch.tensor([[1.0, -1.0, 0.5, 1.0], [1.0, 1.0, -0.5, -1.0]])
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    plain_x, plain_sigma, _ = _plain_step(m, x, sigma, torch.zeros(2, d))
+    assert bool(torch.isfinite(plain_sigma[0]).all()) and not bool(torch.isfinite(plain_sigma[1]).all())
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    receipts = info["intervention_receipts"]
+    assert [(r.sample, r.kind) for r in receipts] == [(0, "excite"), (1, "blocked")]
+    assert "not finite after the step" in receipts[1].policy_reason
+    assert torch.equal(x_next[1], plain_x[1])                  # row 1 is the plain step, not kicked
+    assert m._intervention_counts.tolist() == [1, 0]           # and it spent nothing
+
+
+def test_a_spook_on_a_row_that_is_not_finite_does_not_excite_it():
+    """At d = 1 a row that has gone to +inf has an infinite innovation, NIS = inf spooks, and the anti-collapse
+    trigger kicked that row and spent its budget; from a gain computed on the broken state, the gain guard
+    raised for the batch instead. A row that is not finite is now never selected, by a spook or otherwise."""
+    from src.cio_sde import SurpriseMonitor
+    d = 1
+    m = CIO_SDE(dim=d, ctrl_dim=1, hidden=4)
+    _zero_policy(m)
+    m.graph.active = LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 1), noise=0.0)
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.surprise_monitor = SurpriseMonitor(anti_collapse_trigger=True)
+    x = torch.tensor([[0.5], [float("inf")]])                  # row 0 far from target, row 1 broken
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    m._surprise_pred_mean, m._surprise_pred_cov = torch.zeros(2, d), sigma.clone()
+    _, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    assert info["surprise_spook"] is True                      # the monitor did spook, on row 1
+    assert info["intervention_receipts"] == [] and not bool(info["anti_collapse_fired"].any())
+
+
+def test_a_batch_wide_operator_cannot_select_a_row_that_is_not_finite():
+    """A batch-wide proximity names every row, including one whose Σ is NaN, so its dilation and gain are NaN,
+    and the gain guard raised for the batch. That row is now left alone, and the other one is kicked."""
+    d = 4
+    m = _armed_on(LinearDynamics(torch.zeros(d, d), B=torch.zeros(d, 2), noise=0.0))
+    m.anti_collapse_op = _BatchWide(0.25)
+    x = torch.zeros(2, d)
+    sigma = torch.eye(d).expand(2, d, d).clone()
+    sigma[1] = float("nan")
+    plain_x, _, _ = _plain_step(m, x, sigma, torch.zeros(2, d))
+    x_next, _, info = m.forward_step(x, sigma, 0.05, torch.zeros(2, d), step=0)
+    assert [(r.sample, r.kind) for r in info["intervention_receipts"]] == [(0, "excite")]
+    assert torch.allclose((x_next[0] - plain_x[0]).detach(), torch.full((d,), 0.25))
+    torch.testing.assert_close(x_next[1], plain_x[1], rtol=0, atol=0, equal_nan=True)
+
+
+# ── the post-merge review of #3814 ───────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("shape", ["(1,d,d)", "(d,d)"])
+def test_a_covariance_shared_by_the_batch_gives_each_row_its_receipt(shape):
+    """_signals reads a Σ given once for the batch as every row's, but the receipts indexed Σ by row, so any
+    receipt for a row past the first raised IndexError. Only a rollout's first step can see such a Σ, since
+    the covariance step returns one per row."""
+    d = 4
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4).double()
+    _zero_policy(m)
+    m.graph.active = LinearDynamics(torch.diag(torch.tensor([-0.5, 0.0, 0.0, 0.0], dtype=torch.float64)),
+                                    B=torch.zeros(d, 2, dtype=torch.float64), noise=0.0).double()
+    m.intervention_policy = InterventionPolicy(observe_only=False, max_interventions=10)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    x = 1e-4 * torch.tensor([[1.0, -1.0, 0.5, 2.0], [2.0, 1.0, -0.5, 1.0]], dtype=torch.float64)
+    eye = torch.eye(d, dtype=torch.float64)
+    sigma = eye.unsqueeze(0) if shape == "(1,d,d)" else eye
+    x_next, sigma_next, info = m.forward_step(x, sigma, 0.05, torch.zeros_like(x), step=0)
+    receipts = info["intervention_receipts"]
+    assert [(r.sample, r.kind) for r in receipts] == [(0, "excite"), (1, "excite")]
+    assert all(r.pre_sigma_tr == pytest.approx(d) for r in receipts)
+    m.reset_intervention_count()                       # the same step with Σ given per row
+    x_rows, sigma_rows, info_rows = m.forward_step(x, eye.expand(2, d, d).clone(), 0.05,
+                                                   torch.zeros_like(x), step=0)
+    assert torch.allclose(x_next, x_rows, rtol=0, atol=1e-15)
+    assert torch.allclose(sigma_next, sigma_rows, rtol=0, atol=1e-12)
+    assert [r.to_dict() for r in receipts] == [r.to_dict() for r in info_rows["intervention_receipts"]]
+
+
+def test_the_neural_node_matches_its_lone_runs_to_rounding():
+    """A regression pin, not a gap. A batch run agrees with its rows run alone to rounding, and bit for bit only
+    where nothing rounds differently: Tensor.std rounds one row differently from the same row in a batch, and
+    the neural node's matrix products do too, about 1e-15 in float64. This pins the agreement for the default
+    node with both operators armed. It does not ask the rows to differ: whether they do depends on the library."""
+    torch.manual_seed(0)
+    m = CIO_SDE(dim=4, ctrl_dim=2, hidden=64).double()
+    m.graph.active.double()                            # the graph node is not a registered submodule
+    m.intervention_policy = InterventionPolicy(**ARMED)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.collapse_op = SemanticCollapseOperator()
+    g = torch.Generator().manual_seed(1)
+    x0 = torch.randn(8, 4, generator=g, dtype=torch.float64)
+    s0 = torch.eye(4, dtype=torch.float64).expand(8, 4, 4).clone()
+    noise = torch.randn(30, 8, 4, generator=g, dtype=torch.float64)
+
+    def run(rows):
+        m.reset_intervention_count()
+        x, s = x0[rows], s0[rows]
+        for t in range(30):
+            x, s, _ = m.forward_step(x, s, 0.05, noise[t, rows], step=t)
+        return x.detach(), s.detach()
+
+    xb, sb = run(list(range(8)))
+    for i in range(8):
+        xi, si = run([i])
+        torch.testing.assert_close(xi[0], xb[i], rtol=0, atol=1e-12)
+        torch.testing.assert_close(si[0], sb[i], rtol=0, atol=1e-12)

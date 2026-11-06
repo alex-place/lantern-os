@@ -97,8 +97,8 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 
 | Claim | Class | Verify with |
 |---|---|---|
-| Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 46 passed |
-| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 63 passed |
+| Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 54 passed |
+| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (to rounding; bit for bit at the tested inputs), a non-finite row left alone, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 78 passed |
 | C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, machine-checked (Lean 4 + Mathlib; standard axioms only; six false variants rejected) | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
 | The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing, through all three branches of the lift's projection, and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 26 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
@@ -986,7 +986,9 @@ Four engine defects stood between the lemma and this statement:
 `M = D + κP`. By Weyl, `M ⪰ κP` gives `M` at least `m` eigenvalues `≥ κ`, so `‖Mξ‖ ≥ κ·χ_m` in distribution, and `χ_m` is
 stochastically increasing in `m`. With `c = x + f·dt − x_target` and `r = ε_g/2`, each firing leaves `{‖∇ₓL‖ < ε_g}` with
 probability ≥ ½, for any drift and any `p`. That reads three hypotheses onto the engine. `ξ` must be standard normal, which
-`rollout` draws and a direct caller of `forward_step` must supply. `‖∇ₓL‖ = 2‖x − x_target‖` holds for the engine's quadratic
+`rollout` draws and a direct caller of `forward_step` must supply. `rollout` draws float32 normals in every dtype and casts
+them to the state's, so a float64 run uses the float32 draw exactly. It used to pass the draw on uncast, which made the kick
+raise under a float64 model. `‖∇ₓL‖ = 2‖x − x_target‖` holds for the engine's quadratic
 stage cost, and another cost needs its own argument. And `D ⪰ 0` is required, not a convenience: `dW` and the kick share `ξ`, and at
 `D = −(κ/2)·I` with `m = 1` the probability is `exp(−2·median(χ₁)²) ≈ 0.40`. So `LinearDynamics` rejects negative noise (found
 by `lantern-os-research` PR #14), and `forward_step` refuses to kick any row whose gain on `ξ`, `g·dilation`, is negative or not
@@ -1013,8 +1015,19 @@ directions had `‖Av‖ = 1/√2`. Both are now changed in the operator itself,
   anti-collapse operator kicks and bumps exactly those rows, the collapse operator overwrites exactly the triggered rows it
   did not excite, and a surprise spook raises only its own row. Every other row keeps the plain SDE step. Each row that fires
   gets its own receipt, and each trajectory spends its own budget, so whether a row may change never depends on another row.
-  A batch is therefore `B` independent trajectories: row `i` of a batched run equals the same run on row `i` alone, bit for
-  bit (`test_a_batch_is_independent_trajectories`). `e₁e₁ᵀ` and `e₂e₂ᵀ` now trigger together as they do alone, a collapsed
+  As far as the operators go, a batch is therefore `B` independent trajectories: the gate, the kick, the bump, the budget and
+  the receipts are each row's own. In numbers, a batched run agrees with the same run on each row alone only to rounding
+  (corrected in the post-merge review of #3814 and its follow-up). `Tensor.std`, which the anisotropy and the C3 floor use,
+  rounds one row differently from the same row in a batch (for 260 of 500 random float64 rows at `d = 4`), so even with
+  `LinearDynamics` the rows match bit for bit only where nothing rounds differently, as at the inputs of
+  `test_a_batch_is_independent_trajectories`; with `Σ0[1] = 3·I` its row 1 differs. The neural `Dynamics` adds its matrix
+  products: over 30 steps of a batch of 8 with both operators armed, every row differed from its lone run, by up to
+  4.4·10⁻¹⁵ in float64 and 1.4·10⁻⁶ in float32. So a row within rounding of a threshold can decide differently in a batch
+  than alone: `Σ = diag(0.9419052498068875, 0.9806350832689616, 1.019364916731036, 1.05809475019311)` reads
+  `a = 0.05000000000000005` alone and `0.049999999999999996` beside a copy of itself, either side of `ε_a = 0.05`.
+  Independence also assumes the drift, diffusion, policy and stage cost treat rows separately, and nothing checks that. Since the same review, a `Σ` given once
+  for the batch, `(1, d, d)` or `(d, d)`, is read as every row's in the receipts too; before, any receipt for a row past the
+  first raised `IndexError`. `e₁e₁ᵀ` and `e₂e₂ᵀ` now trigger together as they do alone, a collapsed
   member is caught beside a healthy one when the batch mean of `‖∇ₓL‖` is about 100·`ε_g`, and a batch whose rows have the
   Jacobians `e₁e₂ᵀ` and `diag(0, 0, −½, 0)`, which never fired as a batch, now fires and holds C3 for every row.
 - **The kick lies in `null(A)`.** Each sample's kick basis is the right singular vectors of its own `A` for its small
@@ -1023,6 +1036,21 @@ directions had `‖Av‖ = 1/√2`. Both are now changed in the operator itself,
   floored at its own `m`. When the gate fires, every counted singular value is at most `eig_eps·max(1, ‖A‖₂)` at the default
   thresholds, so `‖A·P‖₂` is too: neither the kick nor the bump points along a direction that the linear drift moves. Under
   `A = e₁e₂ᵀ`, `A·kick = 0` now.
+- **A trajectory that is not finite is left alone (2026-11-05, from #3814's independent review).** The gate's SVDs and the
+  covariance step's `eigh` each decompose the whole batch in one call, so one row could decide for all of them. A NaN in one
+  row's Jacobian made the SVD raise for every row, and the covariance step raised before the gate was even reached; an
+  all-NaN `Σ` made the gate's own `eigvalsh` raise. An inf was worse: the SVD returned NaN singular values without raising,
+  `_numerical_rank` counted them as rank 0, and the row read as collapsed and fired with its other signals at rest. So did
+  a finite, full-rank Jacobian whose singular values overflow (`0.6·max·H₄` in float32 reads rank 0, not 4). Now a row
+  whose state, control, covariance or Jacobian holds a NaN or inf, or whose singular values overflow, reads NaN on all four
+  signals, which is below no threshold, so its gate is false. Neither a surprise spook nor a batch-wide proximity can
+  select it either, so no operator acts on it; a spook on a row gone to `+inf` at `d = 1` used to kick it. No batched
+  decomposition sees it: its `Σ` passes through the covariance step unprojected, and it cannot make a decomposition raise
+  for the other rows or change what they read. A row whose inputs are finite but whose covariance step overflows is not
+  kicked either: it gets a `blocked` receipt saying so, after the gain guard has checked it. In the tested cases a batch
+  holding a broken row equals its rows run alone, the broken row included, bit for bit. An operator asked directly to
+  project or kick such a row refuses with an error naming it (`test_a_trajectory_with_a_non_finite_jacobian_fails_no_other`,
+  `test_a_row_that_is_not_finite_reads_nan_and_never_fires`, `test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other`).
 
 What this does not change, and what is still not proven. L2′ and S1 allow any projector, so the proofs of C3 and S1 are
 untouched: they are now statements about each trajectory the operator acts on, and still about one step under one `A`.
@@ -1031,7 +1059,9 @@ step's `A` can differ, which is how `test_a_switching_jacobian_can_erase_the_kic
 state retains the kick. Each trajectory is changed at most `max_interventions` times per rollout, as each row was under
 the batch gate, but the rows no longer change on the same steps. The gate now costs one SVD per sample per step rather
 than one per batch. And the §2 trigger calibration ([#1990]) measured the batch gate, so its precision and recall need a
-re-run before they describe this one. Its script is in the research repo and has to score each row first (§2).
+re-run before they describe this one. Its script is in the research repo and has to score each row first (§2). A broken
+row is isolated from the gate and the covariance step only: an attached surprise monitor still factors every row's `S` in
+one batched Cholesky, which a non-finite row can make raise for the batch.
 
 **Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite on every row the operator fired on, and
 `proximity > 0` is exactly that row's trigger condition, so an attached operator records zero overwrites by construction. The
@@ -2369,6 +2399,7 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-11-05 | a batch "reports the worst member" | the bounds and gates came from one member, so a batch could read `proven_contracting` beside a diverging member, or quote one member's bound for another's 1000× transient, depending on order. Gates are now ANDed and each bound is the worst of any member's | `_worst_fate`, `_worst_collapse` |
 | 2026-11-05 | `reconcile` as first written | it said "act" on a plan 4 from its goal at `dt = 10⁻³` (the seam carries a factor of `dt`), on a drift wrong by `5·x` at small `dt`, on a fully denied plan, and on a mirror's answers; and `run` scored observations against controls it had just re-optimised, which blames the model for the plan moving. Signals are now per unit time; `blocked` is a separate outcome; answers below `min_confidence`, or from sources that disagree, stay unresolved; plans respect `u_max`; a trajectory must come with the controls actually applied, and supports acting only if it ran this plan. Still unchecked, and stated: whether the goal is reachable at all, and whether a channel's self-reported confidence is honest | `src/cio_sde/question.py` |
 | 2026-11-05 | the anti-collapse gate as one decision for the batch, and its kick subspace from `A_s` (both stated as limits and pinned in the first round) | **lifted** (the design limits found by `lantern-os-research` PR #14): each trajectory is gated on its own four signals and its own Jacobian, and only the rows that fire are kicked, bumped or overwritten, each with its own receipt and budget; a batch run equals its rows run alone. The kick basis is the right singular vectors of each sample's own `A` for its small singular values, so `‖A·P‖₂ ≤ eig_eps·max(1, ‖A‖₂)` when the gate fires. C3 and S1 are unchanged and now hold per trajectory; neither says the state keeps the kick, and the #1990 calibration needs a re-run. An independent review of the first version of this change broke it through the engine. The S1 gain guard indexed a gain shared by all rows by row number, and let a negative gain through. An operator written for the batch gate crashed when its outputs broadcast, and with such an operator a spook on one row raised another row's kick. Signals were compared with float32-rounded thresholds, one ulp from master. All four are fixed and pinned | [§3](#3-the-anti-collapse-operator-σ₀¹) |
+| 2026-11-05 | the per-trajectory gate (#3814): "a batch run equals its rows run alone", bit for bit, and one row cannot decide for another | to rounding only. `Tensor.std` rounds one row differently from the same row in a batch, even under `LinearDynamics`, and the neural node's matrix products do too (up to 4.4·10⁻¹⁵ in float64 and 1.4·10⁻⁶ in float32 over 30 steps), so a row within rounding of a threshold can decide differently in a batch; a `Σ` with `a = 0.05000000000000005` alone reads `0.049999999999999996` in a batch. And one row still decided for all: a NaN in its Jacobian or `Σ` made the batched SVD, `eigvalsh` or the covariance step's `eigh` raise for every row; an inf Jacobian, or a finite one whose singular values overflow, read rank 0 and fired; a spook or a batch-wide proximity could still kick a broken row, and a covariance step that overflowed made the kick fail the batch; and a `Σ` shared by the batch crashed the receipts past row 0. A non-finite row now reads NaN and is never acted on, an overflowed one is blocked with a receipt, and the receipts read a shared `Σ` as every row's (post-merge review of #3814, and a review of this fix) | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
 | 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
 | 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |

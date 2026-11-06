@@ -1,10 +1,12 @@
 """Tests for the CIO Neural SDE engine — issue #392."""
+import math
+
 import pytest
 
 torch = pytest.importorskip("torch")
 
 from src.cio_sde import (
-    CIO_SDE, Dynamics, LinearDynamics, rollout, analyze_trajectory,
+    CIO_SDE, Dynamics, LinearDynamics, GraphController, rollout, analyze_trajectory,
     free_energy, gaussian_kl,
     SemanticCollapseOperator, CollapseOutcome,
     collapse_certificate, lyapunov_value, AntiCollapseOperator,
@@ -105,6 +107,75 @@ def test_different_seed_different_trajectory():
     assert not torch.allclose(xf1, xf2, atol=1e-4)
 
 
+def _kicking_float64_model(d=4):
+    """A float64 model that reaches the kick: rank-1 non-normal A, zero policy, armed, near target."""
+    A = torch.zeros(d, d, dtype=torch.float64)
+    A[0, 0], A[0, 1] = -0.5, 1.0
+    m = CIO_SDE(dim=d, ctrl_dim=2, hidden=4).double()
+    for p in m.pcsf.parameters():
+        torch.nn.init.zeros_(p)
+    m.graph.active = LinearDynamics(A, B=torch.zeros(d, 2, dtype=torch.float64), noise=0.002).double()
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.collapse_op = SemanticCollapseOperator()
+    return _acting(m)
+
+
+def test_a_float64_rollout_reaches_the_kick_and_replays():
+    """rollout drew float32 noise whatever the model's dtype, so a float64 model with the anti-collapse operator
+    attached raised in excite, at `noise @ P` (Float against Double). The draw is now cast to the state's dtype:
+    the run goes through, replays from base_seed (invariant 2), and its ξ is exactly the float32 draw."""
+    d, steps = 4, 30
+    m = _kicking_float64_model(d)
+    x0 = 1e-4 * torch.randn(3, d, generator=torch.Generator().manual_seed(4), dtype=torch.float64)
+    s0 = torch.eye(d, dtype=torch.float64).expand(3, d, d).clone()
+    (xa, sa, ta), (xb, sb, tb), (xc, _, _) = (rollout(m, x0, s0, steps=steps, base_seed=s) for s in (7, 7, 8))
+    assert xa.dtype == torch.float64
+    assert any(r.kind == "excite" for r in ta.interventions)          # the kick ran, in float64
+    assert torch.equal(xa, xb) and torch.equal(sa, sb)                # same base_seed, same trajectory
+    assert [r.to_dict() for r in ta.interventions] == [r.to_dict() for r in tb.interventions]
+    assert not torch.equal(xa, xc)
+    m.reset_intervention_count()                                      # the same run, driven by hand
+    x, s = x0, s0
+    for t in range(steps):
+        draw = torch.randn(x.shape, generator=torch.Generator().manual_seed(7 + t))   # float32
+        x, s, _ = m.forward_step(x, s, 0.05, draw.double(), step=t)
+    assert torch.equal(x, xa) and torch.equal(s, sa)
+
+
+def test_float32_noise_drives_the_kick_of_a_float64_model():
+    """A direct caller of forward_step passing float32 noise to a float64 model hit the same mismatch. The kick now
+    reads ξ in x's dtype, and float32 → float64 is exact, so the step is the one the same noise in float64 gives."""
+    d = 4
+    m = _kicking_float64_model(d)
+    x = 1e-4 * torch.tensor([[1.0, -1.0, 0.5, 2.0]], dtype=torch.float64)
+    sigma = torch.eye(d, dtype=torch.float64).unsqueeze(0)
+    noise = torch.randn(1, d, generator=torch.Generator().manual_seed(2))         # float32
+    x1, s1, info = m.forward_step(x, sigma, 0.05, noise, step=0)
+    assert info["anti_collapse_p"] > 0.0
+    m.reset_intervention_count()
+    x2, s2, _ = m.forward_step(x, sigma, 0.05, noise.double(), step=0)
+    assert torch.equal(x1, x2) and torch.equal(s1, s2)
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_the_cast_leaves_every_run_that_worked_bit_identical(dtype):
+    """A regression pin, not a gap: it passes on the code before the cast too. A float32 run draws what it drew,
+    and a float64 run that never reaches the kick gets the float32 draw promoted exactly, as its float64
+    arithmetic did when rollout passed the draw on uncast."""
+    m = _model()
+    x0, s0 = _init_state()
+    if dtype == torch.float64:          # the graph node is not a registered submodule: convert it too
+        m, x0, s0 = m.double(), x0.double(), s0.double()
+        m.graph.active.double()
+    xf, sf, _ = rollout(m, x0, s0, steps=20, base_seed=3)
+    x, s = x0, s0
+    for t in range(20):
+        draw = torch.randn(x.shape, generator=torch.Generator().manual_seed(3 + t))   # float32, uncast
+        x, s, _ = m.forward_step(x, s, 0.05, draw, step=t)
+    assert xf.dtype == dtype
+    assert torch.equal(xf, x) and torch.equal(sf, s)
+
+
 # ── Free energy ──────────────────────────────────────────────────────────────
 
 def test_gaussian_kl_zero_for_identical():
@@ -169,6 +240,84 @@ def test_hot_swap_rejects_divergent_node():
     rec = m.graph.hot_swap(stranger, x0, u, step=0)
     assert not rec.accepted
     assert m.graph.active is original                    # unchanged on reject
+
+
+def test_hot_swap_is_decided_per_trajectory():
+    """A candidate that flips one trajectory's drift passed on the batch norm: row 0's drift is ten times row
+    1's, so the pooled ‖Δf‖/‖f‖ is 2/√101 ≈ 0.2, under tol, while row 1's own is 2. Through rollout's swap path,
+    every trajectory now has to accept the swap, as it would alone."""
+    d = 4
+    old = LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0)
+    flip = torch.eye(d)
+    flip[1, 1] = -1.0
+    candidate = LinearDynamics(flip, B=torch.zeros(d, 2), noise=0.0)
+    x0 = torch.tensor([[10.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+    s0 = torch.eye(d).expand(2, d, d).clone()
+
+    def swap(rows):
+        m = _model()
+        m.graph.active = old
+        _, _, tr = rollout(m, x0[rows], s0[rows], steps=2, base_seed=0, swap_schedule={0: candidate})
+        return m, tr.swaps[0]
+
+    pooled = float((x0 @ (old.A - flip).T).norm() / (x0 @ old.A.T).norm())
+    m, rec = swap([0, 1])
+    assert pooled < m.graph.tol                                   # what the batch norm read
+    assert not rec.accepted and m.graph.active is old
+    assert rec.row_deltas == pytest.approx([0.0, 2.0]) and rec.worst_row == 1
+    assert rec.drift_delta == rec.row_deltas[1] and "trajectory 1 of 2" in rec.reason
+    alone = [swap([i])[1] for i in (0, 1)]
+    assert [r.accepted for r in alone] == [True, False]           # the batch is the AND of the rows alone
+    assert [r.drift_delta for r in alone] == rec.row_deltas
+
+
+def test_a_hot_swap_probe_row_that_is_not_finite_counts_as_changed():
+    """δᵢ = NaN is below no tol, so the swap is refused, and the record names that row as the worst."""
+    d = 4
+    graph = GraphController(LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0))
+    twin = LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0)
+    x = torch.tensor([[1.0, 0.0, 0.0, 0.0], [float("nan"), 0.0, 0.0, 0.0], [0.0, 5.0, 0.0, 0.0]])
+    rec = graph.hot_swap(twin, x, torch.zeros(3, 2), step=0)
+    assert not rec.accepted and rec.worst_row == 1 and math.isnan(rec.drift_delta)
+    assert rec.row_deltas[0] == 0.0 and rec.row_deltas[2] == 0.0
+
+
+def test_a_float16_probe_with_a_still_row_does_not_divide_by_zero():
+    """In float16 1e-8 rounds to 0, so a probe row whose old drift is exactly 0 divided by 0 once each row
+    was its own ratio. The floor is kept in double there. An empty probe is decided as the batch norm
+    decided it: δ = 0 against tol."""
+    d = 4
+    half = lambda t: t.to(torch.float16)
+    graph = GraphController(LinearDynamics(half(torch.eye(d)), B=half(torch.zeros(d, 2)), noise=0.0))
+    cand = LinearDynamics(half(1.01 * torch.eye(d)), B=half(torch.zeros(d, 2)), noise=0.0)
+    x = half(torch.tensor([[1.0, 2.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]))
+    rec = graph.hot_swap(cand, x, half(torch.zeros(2, 2)), step=0)
+    assert rec.accepted and rec.row_deltas[1] == 0.0 and rec.worst_row == 0
+    for tol, accepted in ((0.25, True), (0.0, False)):
+        empty = GraphController(LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0), equivalence_tol=tol)
+        r = empty.hot_swap(LinearDynamics(torch.eye(d), B=torch.zeros(d, 2), noise=0.0),
+                           torch.zeros(0, d), torch.zeros(0, 2), step=0)
+        assert r.accepted is accepted and r.drift_delta == 0.0 and r.row_deltas == []
+
+
+def test_a_one_trajectory_hot_swap_is_decided_as_before():
+    """A regression pin, not a gap: it passes on the batch-norm code too. With one trajectory the row's ratio is
+    the batch norm's, in the same operations, so drift_delta and the decision are what they were, bit for bit,
+    in every dimension tried, on both sides of tol."""
+    g = torch.Generator().manual_seed(17)
+    seen = set()
+    for d in (2, 4, 64, 1000):
+        for scale in (0.02, 0.15, 0.3, 1.0):
+            A = torch.randn(d, d, generator=g)
+            graph = GraphController(LinearDynamics(A, B=torch.zeros(d, 2), noise=0.0))
+            cand = LinearDynamics(A + scale * torch.randn(d, d, generator=g), B=torch.zeros(d, 2), noise=0.0)
+            x, u = torch.randn(1, d, generator=g), torch.zeros(1, 2)
+            f_old, f_new = graph.active.drift(x, u), cand.drift(x, u)
+            before = (f_old - f_new).norm().item() / (f_old.norm() + 1e-8).item()   # the batch-norm rule
+            rec = graph.hot_swap(cand, x, u, step=0)
+            assert rec.drift_delta == before and rec.accepted == (before < 0.25)
+            seen.add(rec.accepted)
+    assert seen == {True, False}                                  # both decisions were exercised
 
 
 # ── Σ₀ Semantic Collapse Operator ────────────────────────────────────────────
