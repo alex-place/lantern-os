@@ -20,5 +20,15 @@ permissive licenses (Apache-2.0 / MIT / BSD).
 
 ## Components
 
-None at present. The Aider-derived repository map (`src/keystone/repo_map.py`, clean-room,
-Apache-2.0 concept) was removed with `src/keystone/` on 2026-09-29.
+### BED-LLM Animals targets (data, copied verbatim)
+
+- **Source:** [DeeproChoudhury/BED-LLM](https://github.com/DeeproChoudhury/BED-LLM),
+  `bedllm_20q/data/animals.txt` at commit `476d6df917d7b91ad8869667192b06a2e0f22b80`.
+- **License:** MIT, Copyright (c) 2025 Deepro Choudhury. The license text is in
+  `data/question_machine/BEDLLM-LICENSE.txt`, under a header that names the source.
+- **What was taken:** the list of 100 animals, used as the 20 Questions targets.
+- **Where it lives:** `data/question_machine/bedllm_animals.txt`, read by
+  `experiments/question_machine_20q.py`. It is not under `vendor/`.
+
+The Aider-derived repository map (`src/keystone/repo_map.py`, clean-room, Apache-2.0 concept)
+was removed with `src/keystone/` on 2026-09-29.

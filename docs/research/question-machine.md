@@ -210,8 +210,9 @@ What it shows:
     standardised residual over all the data to exceed 1.8. That is too blunt to see a misfit
     confined to one coordinate during one probe. This is the "knows when it doesn't know" failure,
     measured.
-  - *At coupling 0.1 and σ = 0.05 nothing works.* The passive run never refutes h0, and a right
-    prior is confirmed in only 42% of null worlds.
+  - *At coupling 0.1 and σ = 0.05 nothing works.* The passive run never refutes h0. Information
+    gain then confirms a right prior in only 42% of null worlds and concludes correctly in 7% of
+    wrong-prior ones. The seam keeps a right prior in 94%, but concludes correctly on no wrong one.
   - *The same rule false-alarms.* It refutes all four on the passive run in 1% of worlds (2 of 200
     in every arm at the main setting). That is the price of judging 30 residuals against 1.8.
   - *The seam concluded correctly in 0% of wrong-prior worlds in every cell.*
