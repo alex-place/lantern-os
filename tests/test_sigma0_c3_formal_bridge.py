@@ -134,31 +134,53 @@ def test_cov_floor_is_the_lean_hypothesis_hb(d):
     assert math.sqrt(m * (d - m)) - eps_t * m >= 0.5 * math.sqrt(m * (d - m)) - 1e-12
 
 
+def _one_per_branch(d, cov, gen):
+    """One X for each branch of project_preserving_shape, so every platform covers all three:
+    identity (top 0.5σ_max), scale (top 2σ_max: halving keeps the bottom, 1, above eps) and clamp
+    (top 10σ_max: a tenth of the bottom, 2eps, is below eps)."""
+    for lo, hi in ((2 * cov.eps, 0.5 * cov.sigma_max), (1.0, 2 * cov.sigma_max),
+                   (2 * cov.eps, 10 * cov.sigma_max)):
+        q, _ = torch.linalg.qr(torch.randn(d, d, generator=gen, dtype=torch.float64))
+        ev = torch.logspace(math.log10(lo), math.log10(hi), d, dtype=torch.float64)
+        yield (q * ev) @ q.T
+
+
 @pytest.mark.parametrize("d", [2, 3, 4, 8, 32])
 def test_shape_projection_is_identity_or_scaled_plus_floor_correction(d):
     gen = torch.Generator().manual_seed(400 + d)
     cov = CovarianceField(d)
-    seen = set()
+    fuzz = []
     for trial in range(40):
         lo, hi = (-4.0, 4.0) if trial % 2 else (-1.0, 2.9)
         X = _random_spd(d, gen, lo=lo, hi=hi)[0]
-        X = X + cov.eps * torch.eye(d, dtype=X.dtype)    # the engine's X is ⪰ eps·I
+        fuzz.append(X + cov.eps * torch.eye(d, dtype=X.dtype))    # the engine's X is ⪰ eps·I
+    seen = set()
+    for X in [*fuzz, *_one_per_branch(d, cov, gen)]:
         out = cov.project_preserving_shape(X.unsqueeze(0))[0]
-        top = float(torch.linalg.eigvalsh(X).max())
+        assert float(torch.linalg.eigvalsh(0.5 * (out + out.T)).min()) >= cov.eps * (1 - 1e-6)
+        ev_x = torch.linalg.eigvalsh(X)
+        top = float(ev_x.max())
         if top <= cov.sigma_max:
             assert torch.allclose(out, X, rtol=1e-9, atol=1e-12)
             seen.add("identity")
             continue
         c = cov.sigma_max / top
+        assert float(torch.trace(c * X)) >= cov.sigma_max * (1 - 1e-12)
+        # The spectrum decides the branch. tr D does not: with no clamp D is zero up to rounding,
+        # and the rounding takes either sign, differently on different platforms.
+        if c * float(ev_x.min()) >= cov.eps:
+            err = float(torch.linalg.matrix_norm(out - c * X))
+            assert err <= 1e-10 * float(torch.linalg.matrix_norm(c * X))    # out = c·X, D = 0
+            seen.add("scale")
+            continue
         D = out - c * X
         D = 0.5 * (D + D.T)
         ev_d = torch.linalg.eigvalsh(D)
         assert float(ev_d.min()) >= -1e-9 and float(ev_d.max()) <= cov.eps * (1 + 1e-6)
         tr_d = float(torch.trace(D))
         assert float((D * D).sum()) <= cov.eps * tr_d + 1e-15
-        assert float(torch.trace(c * X)) >= cov.sigma_max * (1 - 1e-12)
-        seen.add("clamp" if tr_d > 0 else "scale")
-    assert {"identity", "scale"} <= seen
+        seen.add("clamp")
+    assert seen == {"identity", "scale", "clamp"}
 
 
 def test_code_constants_are_the_proof_constants():
