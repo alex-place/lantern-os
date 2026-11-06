@@ -462,13 +462,16 @@ class CIO_SDE(nn.Module):
         change never depends on the other rows. Each row that fires gets its own receipt, whose
         `sample` is its index. So as far as the operators go, a batch is B independent trajectories:
         the gate, the kick, the bump, the budget and the receipt of row i are row i's own. In numbers,
-        a batched step agrees with the step on row i alone, given the same noise, only to rounding:
-        Tensor.std rounds one row differently from the same row in a batch (the anisotropy and the C3
-        floor use it), and the neural Dynamics' matrix products do too (about 1e-15 in float64, 1e-6 in
-        float32). It is bit for bit where nothing rounds differently, as in
-        test_a_batch_is_independent_trajectories, and a row within rounding of a threshold can decide
-        differently in a batch than alone. Independence also assumes the drift, diffusion, policy and
-        stage cost treat rows separately; nothing checks it.
+        the operators' reductions over a row give it the same bits alone as in a batch on CPU, the
+        anisotropy and the C3 floor included (collapse._unbiased_std; Tensor.std did not), and so did
+        their decompositions in every case measured. Matrix products do not: torch rounds a row of a
+        product such as x·Aᵀ, or of the neural Dynamics' or the policy's layers, differently from the
+        same row alone (about 1e-15 in float64, 1e-6 in float32), and with MKL, from d ≈ 50, the
+        batched products of the covariance step and of the operators too. So a batched step equals the
+        step on row i alone, given the same noise, bit for bit where those products are exact, as in
+        test_a_batch_is_independent_trajectories, and otherwise only to rounding, where a row within
+        rounding of a threshold can decide differently in a batch than alone. Independence also assumes
+        the drift, diffusion, policy and stage cost treat rows separately; nothing checks it.
 
         info["intervention_receipts"] lists every receipt of the step, and
         info["intervention_receipt"] is the first of them, for callers that read one. The

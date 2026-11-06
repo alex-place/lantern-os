@@ -76,6 +76,22 @@ def _numerical_rank(s: Tensor, eig_eps: float) -> Tensor:
     return (s > eig_eps * s.max(dim=-1, keepdim=True).values).sum(dim=-1)
 
 
+def _unbiased_std(ev: Tensor) -> Tensor:
+    """The unbiased std of each row of ev (..., d), d ≥ 2: √(Σᵢ(λᵢ − μ)²/(d − 1)), μ the row's mean.
+
+    On CPU a row reads the same bits alone as in any batch, which Tensor.std does not give. There, std takes a tensor
+    it reduces to one value (a batch of one) in two passes and each row of a larger batch by Welford's update,
+    so in float64 one Σ read a different a(Σ) alone than beside a copy of itself (260 of 500 random rows at
+    d = 4), on either side of ε_a. Here every row takes the two passes, from `mean` and a `sum`, which reduce
+    a row with the same kernel whatever the batch (for rows shorter than 32 768 entries, far past any Σ here).
+    It accumulates in float64, as std does, so a float32 row reads what std gave it (all of 20 000 random
+    rows did).
+    """
+    e = ev.double()
+    mu = e.mean(dim=-1, keepdim=True)
+    return ((e - mu).square().sum(dim=-1) / (e.shape[-1] - 1)).sqrt().to(ev.dtype)
+
+
 # ── non-finite samples ──────────────────────────────────────────────────────────────────────
 # LAPACK's batched decompositions are undefined on a NaN or inf, and one bad matrix reaches every
 # other: an SVD raises for the whole batch on a NaN and returns NaN singular values for an inf, and
@@ -174,15 +190,16 @@ class SemanticCollapseOperator:
     @torch.no_grad()
     def _anisotropy_per_sample(self, sigma: Tensor) -> Tensor:
         # spread of Σ eigenvalues, normalized — low ⇒ isotropic flatness. Unbiased std, so
-        # a(Σ)·μ·√(d−1) = ‖Σ−μI‖_F, the form the lift proof uses. NaN for a Σ that holds a NaN or inf:
-        # eigvalsh can return finite numbers for a NaN matrix, which could read as flat.
+        # a(Σ)·μ·√(d−1) = ‖Σ−μI‖_F, the form the lift proof uses, and the same bits alone or in a batch
+        # (_unbiased_std). NaN for a Σ that holds a NaN or inf: eigvalsh can return finite numbers for a
+        # NaN matrix, which could read as flat.
         sym = 0.5 * (sigma + sigma.transpose(-1, -2))
         ok = _finite_matrices(sym)
         ev = torch.linalg.eigvalsh(_finite_part(sym, ok)).clamp_min(1e-12)
         if ev.shape[-1] < 2:                     # one eigenvalue has no spread; std would read NaN
             a = torch.zeros_like(ev[..., 0])
         else:
-            a = ev.std(dim=-1) / ev.mean(dim=-1)
+            a = _unbiased_std(ev) / ev.mean(dim=-1)
         return torch.where(ok, a, torch.full_like(a, float("nan")))
 
     @torch.no_grad()
@@ -1515,7 +1532,7 @@ class AntiCollapseOperator:
         _refuse_nonfinite(_finite_matrices(sym), "the covariance holds a NaN or inf")
         ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
         mu = ev.mean(dim=-1)
-        a = ev.std(dim=-1) / mu
+        a = _unbiased_std(ev) / mu              # the gate's a(Σ), the same bits alone or in a batch
         return (eps + a) * mu * d / denom
 
     def _kick_scale(self, p):

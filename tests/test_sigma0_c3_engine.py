@@ -13,7 +13,7 @@ it matters the shipped `forward_step`, rather than an idealised update:
   - x* was not an equilibrium of the real flow for non-normal A
   - the gate was one decision for the batch, on mean signals and the mean Jacobian, so a collapsed
     member could hide among healthy ones; it now decides each trajectory, and a batch run equals
-    its rows run alone
+    its rows run alone, bit for bit where its matrix products are exact (Tensor.std used to stop that)
   - the kick's subspace came from A_s, partly along directions the drift moves; it is now each
     sample's own null(A)
 
@@ -683,12 +683,13 @@ def test_a_spook_excites_only_its_own_trajectory():
     assert torch.equal(x_next[1], plain_x[1]) and torch.equal(sigma_next[1], plain_sigma[1])
 
 
-@pytest.mark.parametrize("case", ["kick", "budget"])
-def test_a_batch_is_independent_trajectories(case):
+@pytest.mark.parametrize("case,scale", [("kick", 5.0), ("kick", 3.0), ("kick", 2.0), ("budget", 5.0)])
+def test_a_batch_is_independent_trajectories(case, scale):
     """Row i of a batched run is the same run on row i alone: the gate, the kick, the bump, the budget and
-    the receipts all belong to the trajectory. Both operators attached, three interventions each. Bit for bit
-    at these inputs; in general only to rounding, since Tensor.std can round one row differently from the
-    same row in a batch (in the "kick" case at Σ0[1] = 3·I, row 1 is no longer bit-identical).
+    the receipts all belong to the trajectory. Both operators attached, three interventions each. Bit for bit:
+    this A's products are exact (−½ and 1 against zeros), so nothing else here rounds a row differently in a
+    batch. At Σ0[1] = 3·I and 2·I row 1 used to differ from its lone run, since Tensor.std rounded the anisotropy
+    and the C3 floor of a lone row differently; both now come from _unbiased_std.
     "kick": the real operator on a non-normal rank-1 A, with noise. "budget": the covariance leg alone on
     A = 0, which clears the gate without moving the state, so it re-fires as Σ relaxes and the two
     near-target rows, at different Σ scales, fire at different steps and run out at different times."""
@@ -711,7 +712,7 @@ def test_a_batch_is_independent_trajectories(case):
     x0 = torch.cat([1e-4 * torch.randn(2, d, generator=g, dtype=torch.float64),
                     torch.full((1, d), 0.5, dtype=torch.float64)])        # rows 0, 1 near target; row 2 not
     eye = torch.eye(d, dtype=torch.float64)
-    s0 = torch.stack([eye, 5.0 * eye, eye])
+    s0 = torch.stack([eye, scale * eye, eye])
     noise = torch.randn(steps, 3, d, generator=g, dtype=torch.float64)
 
     def run(rows):
@@ -732,6 +733,44 @@ def test_a_batch_is_independent_trajectories(case):
         assert fired[0] != fired[1]                             # decided apart, not as one batch
         assert len(fired[0]) == len(fired[1]) == 3
         assert any(k == "blocked" for _, _, k in logb)          # a trajectory's own budget ran out
+
+
+@pytest.mark.parametrize("d", [2, 3, 4, 8, 17])
+def test_the_anisotropy_and_the_c3_floor_read_a_row_the_same_alone_and_in_a_batch(d):
+    """Tensor.std reduced a batch of one in two passes and a row of a larger batch by Welford's update, so one Σ
+    read a different a(Σ), and a different C3 floor, alone than in a batch (260 of 500 random float64 rows at
+    d = 4). Every row now reads the same bits alone, beside a copy of itself and in the batch of 500. In float32
+    std accumulated in float64 and agreed with itself, and the values are still the ones it gave. Σ is diagonal,
+    so eigvalsh returns its diagonal exactly, sorted, on any LAPACK, and only the reduction is under test."""
+    g = torch.Generator().manual_seed(d)
+    ev = (1.0 + 0.05 * torch.randn(500, d, generator=g, dtype=torch.float64)).clamp_min(0.5)   # a near ε_a
+    sigma = torch.diag_embed(ev)
+    op = AntiCollapseOperator()
+    det, m = op.detector, op._max_lift_rank(d)
+    a, floor = det._anisotropy_per_sample(sigma), op._cov_floor(sigma, d, m)
+    for i in range(500):
+        one, two = sigma[i:i + 1], sigma[i:i + 1].expand(2, d, d).clone()
+        assert torch.equal(det._anisotropy_per_sample(one), a[i:i + 1]), i
+        assert torch.equal(det._anisotropy_per_sample(two), a[i].expand(2)), i
+        assert torch.equal(op._cov_floor(one, d, m), floor[i:i + 1]), i
+        assert torch.equal(op._cov_floor(two, d, m), floor[i].expand(2)), i
+    s32 = sigma.float()
+    ev32 = torch.linalg.eigvalsh(0.5 * (s32 + s32.transpose(-1, -2))).clamp_min(1e-12)
+    a32 = det._anisotropy_per_sample(s32)
+    assert torch.equal(a32, ev32.std(dim=-1) / ev32.mean(dim=-1))       # float32: what std gave
+    assert all(torch.equal(det._anisotropy_per_sample(s32[i:i + 1]), a32[i:i + 1]) for i in range(500))
+
+
+def test_a_sigma_at_the_flatness_threshold_reads_the_same_alone_and_beside_a_copy():
+    """With Tensor.std this Σ read a = 0.05000000000000005 alone and 0.049999999999999996 beside a copy of itself,
+    either side of ε_a = 0.05, so its flatness signal held in a batch and not alone."""
+    sigma = torch.diag(torch.tensor([0.9419052498068875, 0.9806350832689616, 1.019364916731036,
+                                     1.05809475019311], dtype=torch.float64)).unsqueeze(0)
+    det = SemanticCollapseOperator()
+    alone = det._anisotropy_per_sample(sigma)
+    assert abs(float(alone[0]) - det.anisotropy_eps) < 1e-15             # it does sit on the threshold
+    for b in (2, 3, 8):
+        assert torch.equal(det._anisotropy_per_sample(sigma.expand(b, 4, 4).clone()), alone.expand(b))
 
 
 # ── the kick lies in null(A) (lantern-os-research PR #14, design limit 2) ─────────────────────────
@@ -1307,10 +1346,10 @@ def test_a_covariance_shared_by_the_batch_gives_each_row_its_receipt(shape):
 
 
 def test_the_neural_node_matches_its_lone_runs_to_rounding():
-    """A regression pin, not a gap. A batch run agrees with its rows run alone to rounding, and bit for bit only
-    where nothing rounds differently: Tensor.std rounds one row differently from the same row in a batch, and
-    the neural node's matrix products do too, about 1e-15 in float64. This pins the agreement for the default
-    node with both operators armed. It does not ask the rows to differ: whether they do depends on the library."""
+    """A regression pin, not a gap. The operators' reductions read a row the same alone as in a batch, but the
+    neural node's matrix products round a row differently in a batch, about 1e-15 in float64, so its batch run
+    agrees with its rows run alone only to rounding. This pins that agreement for the default node with both operators armed.
+    It does not ask the rows to differ: whether they do depends on the library."""
     torch.manual_seed(0)
     m = CIO_SDE(dim=4, ctrl_dim=2, hidden=64).double()
     m.graph.active.double()                            # the graph node is not a registered submodule
