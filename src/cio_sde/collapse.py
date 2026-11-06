@@ -1331,6 +1331,10 @@ class AntiCollapseOperator:
     # the covariance floor. With ρ = d·eps/sigma_max, a(Σ_next) ≥ (a(Σ⁺) − ½√(d/(d−1))·ρ)/(1+ρ), which
     # holds it whenever ρ ≤ 9e-4, for every d ≥ 2 (d up to 9000 at the defaults).
     LIFT_MARGIN = 1.02
+    # The hypothesis that bound needs, enforced by the engine when the operator acts:
+    # ρ = d·eps/sigma_max ≤ RHO_MAX. Machine-checked with these constants in
+    # docs/formal/C3EngineLift.lean (`shipped_constants`, `C3_engine`).
+    RHO_MAX = 9e-4
 
     def __init__(self, detector: Optional[SemanticCollapseOperator] = None,
                  strength: float = 0.5, eig_eps: float = 1e-2) -> None:
