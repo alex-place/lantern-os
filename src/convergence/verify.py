@@ -91,7 +91,15 @@ def verify_with_surprise(record: ConvergenceRecord, nis: float, dof: int,
 
     G9: keyed on ``(record_id, evidence_hash)`` — replaying the same NIS reading is
     idempotent, so a repeated "consistent" reading can't nudge confidence to 1.0.
+
+    A NaN NIS is no evidence. SurpriseMonitor reads NaN for a row it could not score, one
+    whose prediction, covariance or observation holds a NaN or inf, and ``NaN > threshold``
+    is False, so such a reading used to fold in as "consistent". Now only the note changes:
+    confidence, ``verified`` and the applied evidence are left as they were.
     """
+    if math.isnan(float(nis)):
+        record.verification_notes = "NIS is NaN: the observation could not be scored, so it is not evidence"
+        return record
     key = evidence_key or _evidence_hash("surprise", record.id, round(float(nis), 6), int(dof))
     if not _fold_once(record, key):
         record.verified = True

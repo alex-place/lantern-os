@@ -98,7 +98,7 @@ suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem —
 | Claim | Class | Verify with |
 |---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, §7.1 σ-axis, §2 operator behavior (Part I) | PROVEN in-regime | `python -m pytest tests/test_cio_sde.py -q` → 54 passed |
-| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (to rounding; bit for bit at the tested inputs), a non-finite row left alone, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 78 passed |
+| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (to rounding; bit for bit at the tested inputs), a non-finite row left alone and kept out of the surprise monitor's Cholesky, the placebo pin, and the scope limit (§2–§3) | PROVEN in-regime + engine tests | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 86 passed |
 | C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, machine-checked (Lean 4 + Mathlib; standard axioms only; six false variants rejected) | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
 | The bridge from that proof to the engine: `cv` is the engine's `std/mean`, `P` is projector-like in Frobenius, `_cov_floor` is the proof's hypothesis, `project_preserving_shape` is `X` or `c·X + D` with `‖D‖² ≤ eps·tr D`, the constants match; then C3 through `forward_step` under fuzzing, through all three branches of the lift's projection, and the `ρ` hypothesis enforced (§3) | tested (spectral identities, not formalized) | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 26 passed |
 | Certificate boundary cases checked against the actual flow, in any basis and next to large modes: rotation, Jordan blocks, growth inside the null band, coupling transient, batches (§1) | tested | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
@@ -1051,6 +1051,20 @@ directions had `‖Av‖ = 1/√2`. Both are now changed in the operator itself,
   holding a broken row equals its rows run alone, the broken row included, bit for bit. An operator asked directly to
   project or kick such a row refuses with an error naming it (`test_a_trajectory_with_a_non_finite_jacobian_fails_no_other`,
   `test_a_row_that_is_not_finite_reads_nan_and_never_fires`, `test_a_row_whose_covariance_step_overflows_is_not_excited_and_fails_no_other`).
+- **The surprise monitor does not score a trajectory that is not finite (2026-11-05, the gap the previous item
+  left).** `SurpriseMonitor` factored every row's `S = CΣCᵀ + R` in one batched Cholesky. So with it attached, one
+  row whose `Σ` held a NaN made `forward_step` raise for every row on the next step, the first to score the prediction
+  that `Σ` fed. A row gone to `+inf` could read `NIS = inf` and spook. Now a row whose prediction, covariance, innovation
+  or `S` holds a NaN or inf (one in its observation, `C` or `R` reaches `ν` or `S`) is not scored. It never reaches
+  the factorization, its NIS reads NaN, which exceeds no threshold, so it never spooks, and its posterior is its prior,
+  the Kalman step for a missing measurement. Each other row reads what it reads alone, and a batch whose rows are all
+  finite takes the old code path unchanged. Three readers of NIS had to say what a NaN means, and for each it is no
+  evidence. `sigma0_proximity` averages the scored rows, and an evaluation that scored none adds nothing. A NaN in its
+  window read as proximity 1.0, an alert, because `max(0, min(1, NaN))` is 1.0 in Python. `info["surprise_nis"]` is
+  the same mean, and NaN only when no row was scored. And `verify_with_surprise` no longer folds a NaN in: it read
+  `NaN > threshold` as false, a consistent observation, and raised confidence
+  (`test_a_row_that_is_not_finite_stays_out_of_the_surprise_monitors_cholesky`,
+  `test_the_surprise_monitor_scores_each_finite_row_as_it_does_alone`, `test_a_nan_nis_is_no_evidence`).
 
 What this does not change, and what is still not proven. L2′ and S1 allow any projector, so the proofs of C3 and S1 are
 untouched: they are now statements about each trajectory the operator acts on, and still about one step under one `A`.
@@ -1060,8 +1074,9 @@ state retains the kick. Each trajectory is changed at most `max_interventions` t
 the batch gate, but the rows no longer change on the same steps. The gate now costs one SVD per sample per step rather
 than one per batch. And the §2 trigger calibration ([#1990]) measured the batch gate, so its precision and recall need a
 re-run before they describe this one. Its script is in the research repo and has to score each row first (§2). A broken
-row is isolated from the gate and the covariance step only: an attached surprise monitor still factors every row's `S` in
-one batched Cholesky, which a non-finite row can make raise for the batch.
+row is now isolated from the gate, the covariance step and the surprise monitor. What this does not cover: a finite row
+whose `S` is not positive definite still makes the monitor's one batched Cholesky raise for every row, and `rollout`'s
+trace and running cost are norms and means over the batch, so they read NaN once any row is broken.
 
 **Retired: the "900/900 prevented" figure.** `engine.forward_step` skips the overwrite on every row the operator fired on, and
 `proximity > 0` is exactly that row's trigger condition, so an attached operator records zero overwrites by construction. The

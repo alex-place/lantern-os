@@ -53,6 +53,19 @@ def test_verify_with_monitor_reads_dict():
     assert r.confidence < 0.7  # a spook contradicts the claim
 
 
+def test_a_nan_nis_is_no_evidence():
+    """SurpriseMonitor reads NaN for a row it could not score. NaN > threshold is False, so the reading
+    folded in as "consistent" and raised confidence. It now leaves the record as it was, but for a note."""
+    for fold in (lambda r: verify_with_surprise(r, nis=float("nan"), dof=4),
+                 lambda r: verify_with_monitor(r, {"nis": float("nan"), "dof": 4})):
+        r = fold(_rec(0.6))
+        assert r.confidence == 0.6 and r.verified is False and r.applied_evidence == []
+        assert "not evidence" in r.verification_notes
+    r = _rec(0.6)
+    verify_with_surprise(r, nis=float("nan"), dof=4)
+    assert verify_with_surprise(r, nis=4.0, dof=4).confidence > 0.6   # a real reading still counts
+
+
 # ── #764 G9 — deterministic-reverification ratchet is closed ───────────────────
 
 def test_replaying_same_passing_test_is_idempotent():
