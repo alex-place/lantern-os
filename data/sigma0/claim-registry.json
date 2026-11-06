@@ -22,18 +22,18 @@
     },
     {
       "id": "measured-anti-collapse-sweep",
-      "label": "Anti-collapse performance over forced-collapse regime sweep",
+      "label": "Anti-collapse operator against a placebo, per trajectory",
       "status": "measured",
       "scope": "simulation",
-      "description": "Anti-collapse operator reduces collapse events in a forced-collapse scenario sweep (documented in docs/SIGMA0-COLLAPSE-CERTIFICATE.md).",
+      "description": "Placebo-controlled measurement (docs/SIGMA0-COLLAPSE-CERTIFICATE.md §3): under the real operator no trajectory's four-signal gate stays true for two consecutive steps, against runs of 60 for a placebo that fires and does nothing, and only the state kick moves the state beyond what noise does. It replaces the forced-collapse sweep's 900/900 figure, retired on 2026-11-05 because its metric could not fail.",
       "assumptions": [
-        "forced-collapse regime as defined in the certificate",
-        "specific Dynamics and parameter range from the sweep",
-        "results do not transfer to arbitrary dynamics outside the sweep"
+        "the 18 rank-1 cells over alpha, non-normality and noise in experiments/sigma0_placebo_control.py",
+        "the operator armed (InterventionPolicy observe_only=False); the live engine defaults to observe-only",
+        "synthetic SDE only; results do not transfer to a real model"
       ],
       "code_entry_point": "src/cio_sde/engine.py::CIO_SDE.forward_step",
-      "test_artifact": "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
-      "invalidation_condition": "dynamics outside sweep range; different noise regime; non-symmetric A",
+      "test_artifact": "experiments/sigma0_placebo_control.py",
+      "invalidation_condition": "a placebo matching the real operator on gate-true runs; dynamics outside the measured cells",
       "owning_issue": "#1135",
       "owning_pr": null
     },
