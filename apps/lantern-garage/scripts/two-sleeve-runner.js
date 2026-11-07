@@ -66,6 +66,8 @@
  * "scan": "monthend" (2026-11-07, draft): the month-end bond book (lib/two-sleeve/monthend-scan.js) over the sleeve s universe —
  * its bond fund (TLT) held from the 15:55 print of the month's third-to-last session to the 15:55 print of its last;
  * TRADER_MONTHEND_SHADOW=1 = journal-only. See scripts/two-sleeve.config.monthend.example.json.
+ * Any of these four custom scans may set TRADER_BARS_ALPACA_FALLBACK in its env (2026-11-07, off by default): '1' appends Alpaca's
+ * 5m bars to Yahoo's when Yahoo runs late inside the session, 'shadow' journals what it would append (lib/two-sleeve/bars-fallback.js).
  *        TRADER_EXTENDED_EXITS=1 (protective-only ticks pre/post market, as the server does).
  * A top-level "reserve" block (2026-10-27, lib/two-sleeve/reserve.js) parks a share of equity in one cash-like fund owned by
  * the pseudo-owner RESERVE, which no sleeve sees or sells: { "symbol": "BOXX", "pct": 30, "bandPct": 10, "minCashPct": 5,

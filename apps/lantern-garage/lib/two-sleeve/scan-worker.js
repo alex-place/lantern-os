@@ -43,6 +43,11 @@
  * sleeve s universe (required). TRADER_MONTHEND_SHADOW=1 offers nothing and journals the reads it would have traded
  * (monthend_shadow / monthend_shadow_exit rows in the worker's own log); a window that never opened gets a
  * monthend_window_missed row after the close. The reply's `monthend` field carries the day's role and the per-name reads.
+ *
+ * TRADER_BARS_ALPACA_FALLBACK (2026-11-07, off by default; the four custom scans above): '1' appends Alpaca's 5m bars to Yahoo's when
+ * Yahoo's run late inside the session, as on 10-30; 'shadow' reads Alpaca the same way, journals what it would append (bars_fallback_shadow
+ * rows in the worker's own log) and changes nothing. Yahoo's bars are never changed or dropped; see lib/two-sleeve/bars-fallback.js.
+ * TRADER_BARS_ALPACA_FEED: 'iex' (the default, the free plan's real-time feed) or 'sip'. The ready message reports it as barsFallback.
  */
 const path = require('path');
 
@@ -57,6 +62,23 @@ let draining = false;
 const gateKnob = (v) => { const k = String(v || '').trim().toLowerCase(); return k === '1' ? 'armed' : k === 'shadow' ? 'shadow' : null; };
 // The clock the custom scans read: the real one, or a dry run's pin (TWO_SLEEVE_WORKER_FAKE_NOW, set by the runner only with --dry).
 const clock = () => { const f = Date.parse(process.env.TWO_SLEEVE_WORKER_FAKE_NOW || ''); return Number.isFinite(f) ? f : Date.now(); };
+// The 5m feed a custom scan reads: Yahoo's, and with TRADER_BARS_ALPACA_FALLBACK Alpaca's behind it (see the header). The module is this
+// tree's, beside the worker, whatever the sleeve's app tree is. { getBars, seed(symbols), barsFallback } — barsFallback for the ready row.
+function feedFor(yahoo) {
+  const plain = (s, tf) => yahoo.getBars(s, tf);
+  const knob = gateKnob(process.env.TRADER_BARS_ALPACA_FALLBACK);
+  if (!knob) return { getBars: plain, seed: () => {}, barsFallback: null };
+  const headers = require('../entry-tags').serverNewsHeaders(process.env);
+  if (!headers) return { getBars: plain, seed: () => {}, barsFallback: `${knob}: no Alpaca keys, inert` };
+  const { createBarsFallback } = require('./bars-fallback');
+  const ownLog = process.env.TRADER_TRADES_LOG || null;
+  const fq = ownLog ? require('../file-queue') : null;
+  const want = String(process.env.TRADER_BARS_ALPACA_FEED || '').trim().toLowerCase();
+  const feed = want === 'sip' ? 'sip' : 'iex';
+  const fb = createBarsFallback({ getBars: plain, headers, feed, shadow: knob === 'shadow', now: clock,
+    log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
+  return { getBars: fb.getBars, seed: fb.seed, barsFallback: `${knob} (${feed})` };
+}
 
 process.on('message', (m) => {
   if (!m) return;
@@ -113,17 +135,20 @@ async function drain() {
       if (ctxKnob && !ctxDir) throw new Error('TRADER_NOISE_CONTEXT_GATE needs TRADER_ENTRY_TAGS_DIR (the shared gex.json)');
       const ctxLogFile = ctxKnob ? process.env.TRADER_TRADES_LOG || null : null;
       const ctxFq = ctxLogFile ? require(path.join(app, 'lib', 'file-queue')) : null;
+      const feed = feedFor(yahoo);
       noise = createNoiseScan({
         pairs: process.env.TRADER_NOISE_LEG_PAIRS || '',
-        getBars: (s, tf) => yahoo.getBars(s, tf),
+        getBars: feed.getBars,
         getHistory: typeof yahoo.getBarsWindow === 'function' ? (s, from, to) => yahoo.getBarsWindow(s, '5m', from, to) : null,
         lateGate,
         contextGate: ctxKnob ? { dir: ctxDir, shadow: ctxKnob === 'shadow', log: (row) => { if (ctxFq) ctxFq.appendJsonlQueued(ctxLogFile, { ts: new Date().toISOString(), ...row }).catch(() => {}); } } : null,
       });
       if (!noise.pairs.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=noise needs TRADER_NOISE_LEG_PAIRS (proxy:long:inverse,...)');
+      feed.seed(noise.pairs.flatMap((p) => [p.proxy, p.up, p.dn]));
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'noise', watchlist: noise.pairs.length * 2,
         pairs: noise.pairs.map((p) => `${p.proxy}:${p.up}:${p.dn}`).join(','), ibsMax: null, pMin: null, shortEdge: null,
-        lateGate: lateGate ? (lateGate.armed ? 'armed' : 'shadow') : null, stateFile: lateGate ? lateGate.stateFile : null, contextGate: ctxKnob });
+        lateGate: lateGate ? (lateGate.armed ? 'armed' : 'shadow') : null, stateFile: lateGate ? lateGate.stateFile : null, contextGate: ctxKnob,
+        barsFallback: feed.barsFallback });
       drain();
       return;
     }
@@ -140,11 +165,14 @@ async function drain() {
       const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;   // armed too: the missed-night row
       const trendN = process.env.TRADER_OVERNIGHT_TREND_N ? Number(process.env.TRADER_OVERNIGHT_TREND_N) : TREND_N;
       const bondKnob = gateKnob(process.env.TRADER_OVERNIGHT_BOND_GATE);
-      overnight = createOvernightScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), trendN, shadow, greenShadow,
+      const feed = feedFor(yahoo);
+      feed.seed(universe);
+      overnight = createOvernightScan({ symbols: universe, getBars: feed.getBars, trendN, shadow, greenShadow,
         bondGate: bondKnob ? { shadow: bondKnob === 'shadow' } : null,
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'overnight', watchlist: overnight.symbols.length,
-        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : (greenShadow ? 'armed+green-shadow' : 'armed'), trendN, ibsMax: null, pMin: null, shortEdge: null, bondGate: bondKnob });
+        symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : (greenShadow ? 'armed+green-shadow' : 'armed'), trendN, ibsMax: null, pMin: null, shortEdge: null, bondGate: bondKnob,
+        barsFallback: feed.barsFallback });
       drain();
       return;
     }
@@ -157,10 +185,13 @@ async function drain() {
       const shadow = process.env.TRADER_MONTHEND_SHADOW === '1';
       const ownLog = process.env.TRADER_TRADES_LOG || null;
       const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;   // armed too: the missed-window row
-      monthend = createMonthEndScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), holdSessions: HOLD_SESSIONS, shadow,
+      const feed = feedFor(yahoo);
+      feed.seed(universe);
+      monthend = createMonthEndScan({ symbols: universe, getBars: feed.getBars, holdSessions: HOLD_SESSIONS, shadow,
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'monthend', watchlist: monthend.symbols.length,
-        symbols: monthend.symbols.join(','), monthend: shadow ? 'shadow' : 'armed', holdSessions: monthend.holdSessions, ibsMax: null, pMin: null, shortEdge: null });
+        symbols: monthend.symbols.join(','), monthend: shadow ? 'shadow' : 'armed', holdSessions: monthend.holdSessions, ibsMax: null, pMin: null, shortEdge: null,
+        barsFallback: feed.barsFallback });
       drain();
       return;
     }
@@ -175,11 +206,13 @@ async function drain() {
       if (gateOn && !newsGateDir) throw new Error('TRADER_CLOSE_IBS_NEWS_GATE=1 needs TRADER_ENTRY_TAGS_DIR (the shared gex.json and news.json)');
       const ownLog = process.env.TRADER_TRADES_LOG || null;
       const fq = gateOn && ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;
-      closeIbs = createCloseIbsScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), ibsMax, newsGateDir,
+      const feed = feedFor(yahoo);
+      feed.seed(universe);
+      closeIbs = createCloseIbsScan({ symbols: universe, getBars: feed.getBars, ibsMax, newsGateDir,
         ...(oneBar ? { decisionBars: ONE_DECISION_BAR } : {}),
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'closeibs', watchlist: closeIbs.symbols.length,
-        symbols: closeIbs.symbols.join(','), ibsMax, oneBar, newsGate: gateOn, pMin: null, shortEdge: null });
+        symbols: closeIbs.symbols.join(','), ibsMax, oneBar, newsGate: gateOn, pMin: null, shortEdge: null, barsFallback: feed.barsFallback });
       drain();
       return;
     }
