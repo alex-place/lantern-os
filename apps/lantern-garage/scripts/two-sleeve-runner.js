@@ -63,6 +63,9 @@
  * "scan": "overnight" (2026-10-09, draft): the overnight book (lib/two-sleeve/overnight-scan.js) over the sleeve s universe —
  * its index funds held from the 15:55 print to the 09:40 print when above their 200-session mean, weekends held;
  * TRADER_OVERNIGHT_SHADOW=1 = journal-only. See scripts/two-sleeve.config.overnight.example.json.
+ * "scan": "monthend" (2026-11-07, draft): the month-end bond book (lib/two-sleeve/monthend-scan.js) over the sleeve s universe —
+ * its bond fund (TLT) held from the 15:55 print of the month's third-to-last session to the 15:55 print of its last;
+ * TRADER_MONTHEND_SHADOW=1 = journal-only. See scripts/two-sleeve.config.monthend.example.json.
  *        TRADER_EXTENDED_EXITS=1 (protective-only ticks pre/post market, as the server does).
  * A top-level "reserve" block (2026-10-27, lib/two-sleeve/reserve.js) parks a share of equity in one cash-like fund owned by
  * the pseudo-owner RESERVE, which no sleeve sees or sells: { "symbol": "BOXX", "pct": 30, "bandPct": 10, "minCashPct": 5,

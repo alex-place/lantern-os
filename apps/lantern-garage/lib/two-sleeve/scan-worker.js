@@ -37,6 +37,12 @@
  * Armed or shadow, a night the entry window never opened gets an overnight_entry_missed row after the close (2026-10-30).
  * TRADER_OVERNIGHT_BOND_GATE=1 (2026-11-04) refuses the night's entries when TLT is down more than 0.30 % at the entry bar, 'shadow' journals the
  * same read; one overnight_bond_gate row a day in the worker's own log.
+ *
+ * TWO_SLEEVE_WORKER_SCAN=monthend (2026-11-07, draft): the month-end bond book. The sleeve holds its bond fund (TLT) from the
+ * 15:55 print of the month's third-to-last session to the 15:55 print of its last (lib/two-sleeve/monthend-scan.js) over the
+ * sleeve s universe (required). TRADER_MONTHEND_SHADOW=1 offers nothing and journals the reads it would have traded
+ * (monthend_shadow / monthend_shadow_exit rows in the worker's own log); a window that never opened gets a
+ * monthend_window_missed row after the close. The reply's `monthend` field carries the day's role and the per-name reads.
  */
 const path = require('path');
 
@@ -45,6 +51,7 @@ let agent = null;
 let noise = null;   // the noise-area leg s scan when TWO_SLEEVE_WORKER_SCAN=noise
 let closeIbs = null;   // the close-IBS sleeve s scan when TWO_SLEEVE_WORKER_SCAN=closeibs
 let overnight = null;   // the overnight book s scan when TWO_SLEEVE_WORKER_SCAN=overnight
+let monthend = null;   // the month-end bond book s scan when TWO_SLEEVE_WORKER_SCAN=monthend
 let draining = false;
 // A gate knob: '1' armed, 'shadow' journal-only, anything else off.
 const gateKnob = (v) => { const k = String(v || '').trim().toLowerCase(); return k === '1' ? 'armed' : k === 'shadow' ? 'shadow' : null; };
@@ -58,7 +65,7 @@ process.on('message', (m) => {
 });
 
 async function drain() {
-  if ((!agent && !noise && !closeIbs && !overnight) || draining) return;
+  if ((!agent && !noise && !closeIbs && !overnight && !monthend) || draining) return;
   draining = true;
   try {
     while (queue.length) {
@@ -68,6 +75,7 @@ async function drain() {
         if (noise) scan = await noise.scan(clock());
         else if (closeIbs) scan = await closeIbs.scan(clock());
         else if (overnight) scan = await overnight.scan(clock());
+        else if (monthend) scan = await monthend.scan(clock());
         else {
           if (agent.cache) agent.cache.market_scan = null;   // every tick scans fresh; the bar cache inside the engine persists
           scan = await agent.scanMarket();
@@ -137,6 +145,22 @@ async function drain() {
         log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
       process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'overnight', watchlist: overnight.symbols.length,
         symbols: overnight.symbols.join(','), overnight: shadow ? 'shadow' : (greenShadow ? 'armed+green-shadow' : 'armed'), trendN, ibsMax: null, pMin: null, shortEdge: null, bondGate: bondKnob });
+      drain();
+      return;
+    }
+    if (String(process.env.TWO_SLEEVE_WORKER_SCAN || '').toLowerCase() === 'monthend') {
+      // THE MONTH-END BOND BOOK (2026-11-07, draft): the sleeve holds its bond fund from the 15:55 print of the month's
+      // third-to-last session to the 15:55 print of its last; TRADER_MONTHEND_SHADOW=1 journals what it would do instead.
+      const yahoo = require(path.join(app, 'lib', 'market-data-yahoo'));
+      const { createMonthEndScan, HOLD_SESSIONS } = require(path.join(app, 'lib', 'two-sleeve', 'monthend-scan'));
+      if (!Array.isArray(universe) || !universe.length) throw new Error('TWO_SLEEVE_WORKER_SCAN=monthend needs the sleeve s universe (its bond fund)');
+      const shadow = process.env.TRADER_MONTHEND_SHADOW === '1';
+      const ownLog = process.env.TRADER_TRADES_LOG || null;
+      const fq = ownLog ? require(path.join(app, 'lib', 'file-queue')) : null;   // armed too: the missed-window row
+      monthend = createMonthEndScan({ symbols: universe, getBars: (s, tf) => yahoo.getBars(s, tf), holdSessions: HOLD_SESSIONS, shadow,
+        log: (row) => { if (fq) fq.appendJsonlQueued(ownLog, { ts: new Date().toISOString(), ...row }).catch(() => {}); } });
+      process.send({ ready: true, id: process.env.TWO_SLEEVE_WORKER_ID, app, scan: 'monthend', watchlist: monthend.symbols.length,
+        symbols: monthend.symbols.join(','), monthend: shadow ? 'shadow' : 'armed', holdSessions: monthend.holdSessions, ibsMax: null, pMin: null, shortEdge: null });
       drain();
       return;
     }

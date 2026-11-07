@@ -1,0 +1,3 @@
+### Added
+
+- trading: sleeve T, the month-end bond book, for the two-sleeve engine, off until a T block is added to the engine's config. `scan: "monthend"` (lib/two-sleeve/monthend-scan.js) buys its bond fund (TLT) in the 15:55 window of the month's third-to-last session and sells it in the same window of the month's last (the 12:55 window on a 13:00 close), holding nights and weekends in between. `TRADER_MONTHEND_SHADOW=1` journals what it would trade instead; a window that never opens journals a `monthend_window_missed` row. Example config: `scripts/two-sleeve.config.monthend.example.json` (10 % of the book, one slot, last in order).
