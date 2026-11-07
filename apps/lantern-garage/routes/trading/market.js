@@ -52,6 +52,45 @@ async function alpacaDayPnl(account, positions) {
   }
 }
 
+/* Banked apart from marked (lib/day-pnl-split, 2026-11-05). The split reads the server's own journals, so
+   it is attached only where they describe the account on screen: the account behind the server's keys on
+   Alpaca, and for IBKR a reader who may see the server's book. A user with their own broker gets no split:
+   neither another account's sleeves nor a figure that does not describe theirs. Reporting only: whatever
+   goes wrong here, the rest of the payload stands. */
+async function attachAlpacaDaySplit(account, uid) {
+  try {
+    const alpaca = require('../../lib/alpaca-adapter');
+    const auth = typeof alpaca._authFor === 'function' ? alpaca._authFor(uid) : null;
+    if (!auth || auth.source !== 'server-keys') return;
+    const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
+    const split = await require('../../lib/day-pnl-split').forAccount({
+      equity: account.equity,
+      prevEquity: account.last_equity,      // the two numbers the day figure itself is made from, so the sum lands on it
+      baselineDate: account.balance_asof,
+      sources: require('../../lib/day-pnl').tradesLedgerSources(dataDir),
+      now: Date.now(),
+      readHistory: () => alpaca.getPortfolioHistory(uid, '1D'),
+      historyKey: 'alpaca-server-keys',
+    });
+    if (split) account.day_split = split;
+  } catch (_e) { /* the day figure stands alone, as before the split */ }
+}
+async function attachIbkrDaySplit(account, req, uid, prevClose) {
+  try {
+    if (!require('../../lib/server-book').mayReadServerBook(req, uid)) return;
+    const dataDir = require('../../lib/app-paths').dataPath('lantern-garage', 'trading');
+    const split = await require('../../lib/day-pnl-split').forAccount({
+      equity: account.equity,
+      // Only when the day figure IS that equity change (reconcileDayPnl). A ledger or broker figure has no marks to split off.
+      prevEquity: account.pnl_today_source === 'broker_equity' && prevClose ? prevClose.equity : undefined,
+      baselineDate: prevClose && prevClose.date,
+      sources: require('../../lib/day-pnl').tradesLedgerSources(dataDir),
+      now: Date.now(),
+    });
+    if (split) account.day_split = split;
+  } catch (_e) { /* the day figure stands alone, as before the split */ }
+}
+
 module.exports = async function marketRoutes(req, res, url, ctx) {
   const { deps, sendJson, bridge, traderAgent, getPriceFeed, tradingMemory, getEffectiveUserId } = ctx;
 
@@ -327,6 +366,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         const ap = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
         alpacaAccount.unrealized = (ap.positions || []).reduce((s, p) => s + (Number(p.unrealized_pl) || 0), 0);
         await alpacaDayPnl(alpacaAccount, ap.positions || []);   // each row gets its Day P&L (#3520)
+        await attachAlpacaDaySplit(alpacaAccount, uid);
         sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
         return true;
       };
@@ -357,6 +397,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         // An EMPTY book still has a day (2026-10-26): trades closed today, commissions, the equity change
         // since the previous close. This block used to run only with positions open, which left IBKR's own
         // dpl (re-baselined at its ~17:15 ET reset) on screen whenever the book ended the day flat.
+        let _prevClose = null;
         {
           // REALIZED TODAY + DAY P&L. IBKR reports $0 realized on the paper CPAPI
           // (both `rpl` and the portfolio summary), so both come from the autopilot
@@ -397,6 +438,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             // the previous session's close as the trader recorded it in its own session row. On 10-26 the
             // ledger alone read -$899 (it booked short-opening XLE sells as long exits) on a +$1,627 day.
             const _prev = dayPnlLib.prevSessionEquity(_ledgerText, Date.now());
+            _prevClose = _prev;
             const _d = dayPnlLib.reconcileDayPnl(_d0, { equity: ibkrAccount.equity, prevEquity: _prev && _prev.equity, prevSource: _prev ? `the trader's ${_prev.date} session close` : '' });
             ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
             ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
@@ -427,6 +469,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             ibkrAccount.realized_today = null;   // the paper API's rpl is a known constant $0, not a measurement
           }
         }
+        await attachIbkrDaySplit(ibkrAccount, req, uid, _prevClose);
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
       }
@@ -449,6 +492,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           // say $0. It was an inline duplicate of the primary computation, which
           // is exactly how it came to miss the carried-realized fix; both paths
           // now call the one module so they cannot drift apart again.
+          let _opPrevClose = null;
           try {
             const fs = require('fs'), path = require('path');
             const logPath = require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'autopilot-trades.jsonl');
@@ -465,6 +509,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'bars')),
             });
             const _opPrev = require('../../lib/day-pnl').prevSessionEquity(_opLedger, Date.now());
+            _opPrevClose = _opPrev;
             const _d = require('../../lib/day-pnl').reconcileDayPnl(_d0, { equity: opAccount.equity, prevEquity: _opPrev && _opPrev.equity, prevSource: _opPrev ? `the trader's ${_opPrev.date} session close` : '' });
             opAccount.realized_today = _d.realized_today;
             opAccount.realized_booked = _d.realized_booked;
@@ -480,6 +525,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
             }
           } catch (_e) { /* ledger unreadable → keep the broker figures */ }
+          await attachIbkrDaySplit(opAccount, req, _sessionUid, _opPrevClose);
           // Flagged so the UI can never silently present the operator book as
           // the viewer's own account.
           sendJson(res, { positions: opPositions, account: opAccount, operator_view: true }, 200);

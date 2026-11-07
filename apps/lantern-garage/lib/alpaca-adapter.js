@@ -209,6 +209,7 @@ async function getAccount(userId) {
     realized_today: 0,
     pnl_today: day,
     last_equity: lastEquity,                // the previous close: lib/day-pnl reconcileDayPnl measures the day from it
+    balance_asof: a.balance_asof || null,   // that close's date: it does not roll at midnight ET (lib/day-pnl-split)
     pnl_pct: equity ? (day / equity) * 100 : 0,
     buying_power: Number(a.buying_power) || 0,
     mode: auth.env === 'live' ? 'live' : 'paper',
