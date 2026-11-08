@@ -53,6 +53,26 @@ const COUNCIL_REVIEWS = path.resolve(repoRoot, "data/convergence/council-reviews
 // substantive disagreements between member lenses is already "highly contested".
 const DISSENT_SCALE = 3;
 
+// COUNCIL_STRICT_GROUNDING=1: agreement is not grounding. Without it, an uncontested reply with
+// no anchor and no execution check is stamped grounded by `low_delta` alone, which is the
+// coherent-but-jointly-wrong mirror the header warns about (272 of 415 local reviews were
+// grounded that way, 2026-11-08). Under the flag such a reply is grounded only when it makes no
+// real claims; a reply that does assert things (canary assertiveness >= COUNCIL_STRICT_ASSERT_MIN)
+// gets the honest unverified verdict (seam_open, or pin when nothing external is reachable).
+// Off by default: it would mark many more replies "unverified" in the UI, so measure first.
+const STRICT_ASSERT_MIN_DEFAULT = 0.2;
+
+function strictGroundingEnabled(opts) {
+  if (opts && typeof opts.strictGrounding === "boolean") return opts.strictGrounding;
+  return process.env.COUNCIL_STRICT_GROUNDING === "1";
+}
+
+function strictAssertMin(opts) {
+  const raw = opts && opts.strictAssertMin != null ? opts.strictAssertMin : process.env.COUNCIL_STRICT_ASSERT_MIN;
+  const n = Number(raw);
+  return Number.isFinite(n) && raw !== "" && raw != null ? n : STRICT_ASSERT_MIN_DEFAULT;
+}
+
 /**
  * Review one decision/reply across both council faces, derive Δ, and classify answerability.
  *
@@ -107,6 +127,16 @@ function councilReview(reply, opts = {}) {
   // Execution verdict, if a check actually ran. Ground truth — overrides the text Δ.
   const exec = opts.execVerdict && opts.execVerdict.ran ? opts.execVerdict : null;
 
+  // How much the reply actually asserts (claims with numbers or named things, damped by
+  // hedges). A reply that asserts nothing has nothing to ground; one that does needs more
+  // than the faces agreeing.
+  const assertiveness = grounded.signals && typeof grounded.signals.assertiveness === "number"
+    ? grounded.signals.assertiveness : 0;
+  const strict = strictGroundingEnabled(opts);
+  // The only route to "grounded" here is that the two faces agree: no execution check, no
+  // anchor, no self-disclaimer. Logged in every mode so the strict flag's effect is measurable.
+  const agreementOnly = !exec && !contested && !grounded.selfUngrounded && !grounded.anchored;
+
   // The answerability gate. Execution decides grounded-vs-refuted when it ran; otherwise the
   // text Δ + reachability decide grounded / seam_open / pin.
   let verdict, recommend, groundedBy;
@@ -119,6 +149,12 @@ function councilReview(reply, opts = {}) {
     // attached — self-consistency is not grounding (SIGMA0-COLLAPSE-CERTIFICATE §2).
     // Never stamp "✓ Σ₀ grounded" on a self-declared-ungrounded reply; route it to the
     // honest unverified state (seam_open when the operator is reachable, else pin).
+    verdict = reachable ? "seam_open" : "pin";
+    recommend = reachable ? "escalate" : "name_unknown";
+    groundedBy = "none";
+  } else if (!contested && strict && agreementOnly && assertiveness >= strictAssertMin(opts)) {
+    // Strict mode: the reply makes claims and the only thing behind them is agreement.
+    // Coherence is free; correctness costs a check, so this is unverified, not grounded.
     verdict = reachable ? "seam_open" : "pin";
     recommend = reachable ? "escalate" : "name_unknown";
     groundedBy = "none";
@@ -140,6 +176,9 @@ function councilReview(reply, opts = {}) {
     escalated,
     groundedBy,                           // how it grounded: execution > anchor > low_delta > none
     anchored: grounded.anchored,          // answer-with-cite hint for the grounded verdict
+    agreementOnly,                        // nothing but the faces agreeing stood behind the reply
+    strictGrounding: strict,              // whether agreement alone was allowed to ground it
+    assertiveness: Number(assertiveness.toFixed(4)),
     reachable,
     deltaVerify: Number(deltaVerify.toFixed(4)),
     deltaReason: Number(deltaReason.toFixed(4)),
@@ -172,13 +211,15 @@ function councilReview(reply, opts = {}) {
       groundedBy,
       reachable,
       anchored: grounded.anchored,
+      agreementOnly,
+      strictGrounding: strict,
       execRan: !!exec,
       execPassed: exec ? !!exec.passed : null,
       deltaVerify: review.deltaVerify,
       deltaReason: review.deltaReason,
       dissentCount: dissent.length,
       collapse: { proximity: collapse.proximity },
-      grounded: { risk: grounded.risk, anchored: grounded.anchored },
+      grounded: { risk: grounded.risk, anchored: grounded.anchored, assertiveness: review.assertiveness },
       text_length: text.length,
       // Execution-grounded outcome when a check ran; otherwise null, to be filled later by
       // labelCouncilOutcome() (revert / merge / operator action). This slot is what turns the
@@ -273,4 +314,6 @@ module.exports = {
   foldCouncilOutcomes,
   COUNCIL_REVIEWS,
   DISSENT_SCALE,
+  STRICT_ASSERT_MIN_DEFAULT,
+  strictGroundingEnabled,
 };

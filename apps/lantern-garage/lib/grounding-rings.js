@@ -24,6 +24,16 @@ const https = require("https");
 
 const csfMemory = require("./csf-memory");
 const { meshPeerSource, asRing } = require("./mesh-grounding");
+const { isSelfTurnRole, isSelfAuthoredRecord } = require("./csf-memory-writer");
+
+// GROUNDING_EXCLUDE_SELF=1: unisona's own earlier output (its recalled chat turns, the
+// council's stored answers, its agents' signals) is not evidence for a claim. Counted as a
+// corroborating source it is an echo: the noisy-OR in mergeEvidence treats it as independent,
+// so the system's own past answer plus one web hit reads as two witnesses. Off by default
+// while the effect on live turns is measured (ADR-0012 step 4: flag first, measure, then default).
+function excludeSelfEvidence() {
+  return process.env.GROUNDING_EXCLUDE_SELF === "1";
+}
 
 // Mirror of csf-memory.relevanceScore (not exported there) — keyword overlap in [0,1].
 function overlapConfidence(text, query) {
@@ -41,9 +51,11 @@ const text120 = (s) => String(s || "").replace(/\s+/g, " ").trim();
 function localMemoryRing() {
   return asRing("local-memory", async (question) => {
     const out = [];
+    const excludeSelf = excludeSelfEvidence();
     try {
       // Cross-session chat turns already carry a relevance score (0..1).
       for (const c of csfMemory.queryConversationMemory(question, 4)) {
+        if (excludeSelf && isSelfTurnRole(c.role)) continue; // the assistant's own past answer is not a witness
         out.push({
           claim: text120(c.text),
           evidence: `recalled ${c.role === "lantern" ? "unisona.ai" : "user"} turn${c.at ? " @ " + c.at : ""}`,
@@ -54,6 +66,7 @@ function localMemoryRing() {
     } catch { /* fail-safe: a dead source contributes nothing */ }
     try {
       for (const m of csfMemory.queryMemories(question, 3)) {
+        if (excludeSelf && isSelfAuthoredRecord(m)) continue; // council answers, agent signals
         const t = text120(m.content?.text || m.content?.raw_input || (m.tags || []).join(" "));
         if (!t) continue;
         out.push({ claim: t, evidence: "convergence memory record", confidence: overlapConfidence(t, question), source: "local-memory" });
@@ -190,4 +203,5 @@ module.exports = {
   localServeRings,
   httpPostJson,
   overlapConfidence,
+  excludeSelfEvidence,
 };

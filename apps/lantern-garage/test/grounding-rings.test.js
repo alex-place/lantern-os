@@ -55,6 +55,67 @@ test("localMemoryRing maps conversation turns, carrying their relevance score as
   assert.ok(out.every((e) => typeof e.claim === "string" && e.claim.length));
 });
 
+// GROUNDING_EXCLUDE_SELF=1: unisona's own earlier output is not evidence. Its recalled turns,
+// the council's stored answers and its agents' signals are dropped; the user's own statements
+// and outside records stay. Unset, the ring is unchanged (the test above keeps a "lantern" turn).
+async function withExcludeSelf(value, fn) {
+  const saved = process.env.GROUNDING_EXCLUDE_SELF;
+  if (value === undefined) delete process.env.GROUNDING_EXCLUDE_SELF;
+  else process.env.GROUNDING_EXCLUDE_SELF = value;
+  try { return await fn(); }
+  finally {
+    if (saved === undefined) delete process.env.GROUNDING_EXCLUDE_SELF;
+    else process.env.GROUNDING_EXCLUDE_SELF = saved;
+  }
+}
+
+function mixedMemory() {
+  _csf.queryConversationMemory = () => [
+    { role: "lantern", text: "the deploy went green at 16:23", score: 0.83, at: "2026-06-27" },
+    { role: "user", text: "I saw the deploy go green at 16:23 on the dashboard", score: 0.7, at: "2026-06-27" },
+  ];
+  _csf.queryMemories = () => [
+    // a stored council answer, written before provenance existed (role only)
+    { content: { text: "council: the deploy went green", role: "convergance" }, actor_type: "system", tags: ["convergance"] },
+    // a stored agent signal with provenance
+    { content: { text: "agent says deploy green", role: "agent" }, actor_type: "agent", metadata: { provenance: "self" }, tags: [] },
+    // a user life fact with provenance
+    { content: { text: "user deploys on fridays", role: "user" }, actor_type: "user", metadata: { provenance: "user" }, tags: [] },
+    // a system event with provenance: kept even though content.role would read as self
+    { content: { text: "deploy event recorded", role: "agent" }, actor_type: "system", metadata: { provenance: "system" }, tags: [] },
+  ];
+}
+
+test("GROUNDING_EXCLUDE_SELF unset: own turns and stored answers still count (behaviour unchanged)", async () => {
+  resetStubs();
+  mixedMemory();
+  const out = await withExcludeSelf(undefined, () => rings.localMemoryRing().source("did the deploy go green?"));
+  assert.equal(out.length, 6);
+  assert.equal(rings.excludeSelfEvidence(), false);
+});
+
+test("GROUNDING_EXCLUDE_SELF=1: the assistant's turns, council answers and agent signals are dropped", async () => {
+  resetStubs();
+  mixedMemory();
+  const out = await withExcludeSelf("1", () => rings.localMemoryRing().source("did the deploy go green?"));
+  const claims = out.map((e) => e.claim);
+  assert.deepEqual(claims.sort(), [
+    "I saw the deploy go green at 16:23 on the dashboard",
+    "deploy event recorded",
+    "user deploys on fridays",
+  ].sort());
+  assert.ok(!claims.some((c) => /^the deploy went green/.test(c)), "own recalled turn excluded");
+  assert.ok(!claims.some((c) => /^council:/.test(c)), "legacy council answer excluded by role");
+  assert.ok(!claims.some((c) => /^agent says/.test(c)), "agent signal excluded by provenance");
+});
+
+test("GROUNDING_EXCLUDE_SELF only accepts \"1\" (any other value leaves the ring unchanged)", async () => {
+  resetStubs();
+  mixedMemory();
+  const out = await withExcludeSelf("true", () => rings.localMemoryRing().source("did the deploy go green?"));
+  assert.equal(out.length, 6);
+});
+
 test("localMemoryRing is fail-safe — a throwing retriever contributes nothing, not a crash", async () => {
   resetStubs();
   _csf.queryConversationMemory = () => { throw new Error("disk gone"); };
