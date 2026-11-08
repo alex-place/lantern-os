@@ -2282,6 +2282,30 @@ function tagEntry(entry) {
     if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (_e) { /* journal only: a tag never touches an entry */ }
 }
+// A TRADE PLAN ON EVERY ENTRY (2026-11-08). lib/trade-plan.js writes one trade_plan row after every placed entry: the thesis
+// (the sleeve's signal, its own reading, the entry tags' context read from the shared files), the expected move by the planned
+// exit, the sleeve's exit rules as configured, and the in-between checkpoints with the levels a time/progress rule would read.
+// The in-between action is HOLD (ledger plan-tier0-in-between-time-progress-2010-2026: no such rule passed its static test),
+// so the plan is journaled to be scored forward and acts on nothing. Enabled by TRADER_TRADE_PLAN=shadow. Same
+// contract as the tags: journal only, never awaited, rows under the user 'trade-plan'. The knobs are copied here,
+// synchronously, while this sleeve's env is the process env (the engine swaps env per sleeve).
+function planEntry(entry, signal, scan) {
+  try {
+    const tp = require('./trade-plan');
+    if (!tp.enabled()) return;
+    const env = {};
+    for (const k of Object.keys(process.env)) if (/^TRADER_/.test(k) || k === 'TWO_SLEEVE_FAKE_NOW') env[k] = process.env[k];
+    const tdir = String(process.env.TRADER_ENTRY_TAGS_DIR || '').trim();
+    const dir = tdir ? path.resolve(tdir) : path.join(path.dirname(TRADES_LOG), 'entry-tags');
+    const p = tp.write(entry, {
+      log: (rec) => logTrade({ user: 'trade-plan', ...rec }),
+      getBars: (s, tf) => yahoo.getBars(s, tf),
+      readContext: () => require('./entry-tags').readContext(dir, entry.now),
+      env, signal, scan,
+    });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* journal only: a plan never touches an entry */ }
+}
 
 async function runAutoTrade(scan, opts = {}) {
   return _onePassPerAccount(opts,
@@ -3874,6 +3898,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       } catch (_e) { /* the judge must never touch an entry */ }
       _riseShadowTag({ symbol: sym, account: userId, qty, price, now });   // journal only, never awaited (lib/rise-shadow.js)
       tagEntry({ symbol: sym, account: userId, qty, price, now, order_id: r.order_id ?? r.orderId, source: 'trader' });   // journal only, never awaited (lib/entry-tags.js)
+      planEntry({ symbol: sym, account: userId, qty, price, now, order_id: r.order_id ?? r.orderId, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null }, s, scan);   // journal only, never awaited (lib/trade-plan.js)
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
