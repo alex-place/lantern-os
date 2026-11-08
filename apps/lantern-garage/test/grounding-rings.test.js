@@ -41,23 +41,10 @@ function resetStubs() {
 
 // ── local-memory ring ─────────────────────────────────────────────────────────
 
-test("localMemoryRing maps conversation turns, carrying their relevance score as confidence", async () => {
-  resetStubs();
-  _csf.queryConversationMemory = () => [
-    { role: "lantern", text: "the deploy went green at 16:23", score: 0.83, at: "2026-06-27" },
-  ];
-  _csf.queryMemories = () => [{ content: { text: "user prefers concise answers" }, tags: ["pref"] }];
-  const out = await rings.localMemoryRing().source("did the deploy go green?");
-  assert.equal(out.length, 2);
-  const conv = out.find((e) => /deploy went green/.test(e.claim));
-  assert.ok(conv && conv.confidence === 0.83, "conversation score becomes confidence");
-  assert.equal(conv.source, "local-memory");
-  assert.ok(out.every((e) => typeof e.claim === "string" && e.claim.length));
-});
-
 // GROUNDING_EXCLUDE_SELF=1: unisona's own earlier output is not evidence. Its recalled turns,
 // the council's stored answers and its agents' signals are dropped; the user's own statements
-// and outside records stay. Unset, the ring is unchanged (the test above keeps a "lantern" turn).
+// and outside records stay. Unset, the ring is unchanged. Every ring test pins the flag, so the
+// suite passes whatever the shell running it has exported.
 async function withExcludeSelf(value, fn) {
   const saved = process.env.GROUNDING_EXCLUDE_SELF;
   if (value === undefined) delete process.env.GROUNDING_EXCLUDE_SELF;
@@ -68,6 +55,20 @@ async function withExcludeSelf(value, fn) {
     else process.env.GROUNDING_EXCLUDE_SELF = saved;
   }
 }
+
+test("localMemoryRing maps conversation turns, carrying their relevance score as confidence", async () => {
+  resetStubs();
+  _csf.queryConversationMemory = () => [
+    { role: "lantern", text: "the deploy went green at 16:23", score: 0.83, at: "2026-06-27" },
+  ];
+  _csf.queryMemories = () => [{ content: { text: "user prefers concise answers" }, tags: ["pref"] }];
+  const out = await withExcludeSelf(undefined, () => rings.localMemoryRing().source("did the deploy go green?"));
+  assert.equal(out.length, 2);
+  const conv = out.find((e) => /deploy went green/.test(e.claim));
+  assert.ok(conv && conv.confidence === 0.83, "conversation score becomes confidence");
+  assert.equal(conv.source, "local-memory");
+  assert.ok(out.every((e) => typeof e.claim === "string" && e.claim.length));
+});
 
 function mixedMemory() {
   _csf.queryConversationMemory = () => [
@@ -89,9 +90,43 @@ function mixedMemory() {
 test("GROUNDING_EXCLUDE_SELF unset: own turns and stored answers still count (behaviour unchanged)", async () => {
   resetStubs();
   mixedMemory();
-  const out = await withExcludeSelf(undefined, () => rings.localMemoryRing().source("did the deploy go green?"));
+  const [out, flag] = await withExcludeSelf(undefined, async () => [
+    await rings.localMemoryRing().source("did the deploy go green?"),
+    rings.excludeSelfEvidence(),
+  ]);
   assert.equal(out.length, 6);
-  assert.equal(rings.excludeSelfEvidence(), false);
+  assert.equal(flag, false);
+});
+
+test("GROUNDING_EXCLUDE_SELF=1: a user turn ranked below the assistant's own turns is still returned", async () => {
+  resetStubs();
+  // A retriever that honours its limit, like csf-memory: four own turns outrank the user's.
+  const turns = [
+    { role: "lantern", text: "deploy green one", score: 0.9 },
+    { role: "lantern", text: "deploy green two", score: 0.88 },
+    { role: "lantern", text: "deploy green three", score: 0.86 },
+    { role: "lantern", text: "deploy green four", score: 0.84 },
+    { role: "operator", text: "the dashboard showed the deploy green", score: 0.5 },
+  ];
+  _csf.queryConversationMemory = (_q, limit) => turns.slice(0, limit);
+  const off = await withExcludeSelf(undefined, () => rings.localMemoryRing().source("deploy green?"));
+  assert.equal(off.length, 4, "unset: the top four, as before");
+  const on = await withExcludeSelf("1", () => rings.localMemoryRing().source("deploy green?"));
+  assert.deepEqual(on.map((e) => e.claim), ["the dashboard showed the deploy green"]);
+  assert.match(on[0].evidence, /recalled user turn/);
+});
+
+test("GROUNDING_EXCLUDE_SELF=1: trading signals stored before provenance existed are dropped too", async () => {
+  resetStubs();
+  // The shape lib/trading-memory.js wrote before it stamped provenance: actor "system", no role.
+  _csf.queryMemories = () => [
+    { memory_id: "trading_signal_ab12", content: { text: "Signal (scanner): BUY [AAPL]", signal_id: "s1" },
+      actor_type: "system", metadata: {}, tags: ["trading", "signal", "scanner", "AAPL"] },
+    { memory_id: "trading_order_cd34", content: { text: "Order filled: BUY 1 AAPL" },
+      actor_type: "system", metadata: {}, tags: ["trading", "order", "AAPL"] },
+  ];
+  const out = await withExcludeSelf("1", () => rings.localMemoryRing().source("AAPL buy"));
+  assert.deepEqual(out.map((e) => e.claim), ["Order filled: BUY 1 AAPL"], "the order (a system event) stays");
 });
 
 test("GROUNDING_EXCLUDE_SELF=1: the assistant's turns, council answers and agent signals are dropped", async () => {
@@ -120,9 +155,11 @@ test("localMemoryRing is fail-safe — a throwing retriever contributes nothing,
   resetStubs();
   _csf.queryConversationMemory = () => { throw new Error("disk gone"); };
   _csf.queryMemories = () => [{ content: { text: "still here" }, tags: [] }];
-  const out = await rings.localMemoryRing().source("q");
-  assert.equal(out.length, 1);
-  assert.equal(out[0].claim, "still here");
+  for (const flag of [undefined, "1"]) {
+    const out = await withExcludeSelf(flag, () => rings.localMemoryRing().source("q"));
+    assert.equal(out.length, 1, `flag=${flag}`);
+    assert.equal(out[0].claim, "still here");
+  }
 });
 
 // ── knowledge-center ring ──────────────────────────────────────────────────────

@@ -55,11 +55,15 @@ const DISSENT_SCALE = 3;
 
 // COUNCIL_STRICT_GROUNDING=1: agreement is not grounding. Without it, an uncontested reply with
 // no anchor and no execution check is stamped grounded by `low_delta` alone, which is the
-// coherent-but-jointly-wrong mirror the header warns about (272 of 415 local reviews were
-// grounded that way, 2026-11-08). Under the flag such a reply is grounded only when it makes no
-// real claims; a reply that does assert things (canary assertiveness >= COUNCIL_STRICT_ASSERT_MIN)
-// gets the honest unverified verdict (seam_open, or pin when nothing external is reachable).
-// Off by default: it would mark many more replies "unverified" in the UI, so measure first.
+// coherent-but-jointly-wrong mirror the header warns about. Under the flag such a reply is
+// grounded only when it makes no real claims; a reply that does assert things (canary
+// assertiveness >= COUNCIL_STRICT_ASSERT_MIN) gets the honest unverified verdict (seam_open, or
+// pin when nothing external is reachable). Off by default until its effect is measured on real
+// traffic: every review records agreementOnly / strictGrounding / assertiveness for that. (The
+// local dev ledger can't estimate it: its agreement-only verdicts are almost all a health probe's
+// replies, too short for the canary to score.) Known limits: the "anchor" it defers to is the
+// canary's lexical context overlap, so a turn that had ANY injected context usually counts as
+// anchored; and it is process-wide, so autowork runs with no tests and no anchor get it too.
 const STRICT_ASSERT_MIN_DEFAULT = 0.2;
 
 function strictGroundingEnabled(opts) {
@@ -67,10 +71,13 @@ function strictGroundingEnabled(opts) {
   return process.env.COUNCIL_STRICT_GROUNDING === "1";
 }
 
+// Only a minimum in (0, 1] is meaningful (the same guard canary.js uses for KEYSTONE_GROUND_HIGH):
+// 0 or below would flag replies that assert nothing, above 1 would never flag anything.
 function strictAssertMin(opts) {
   const raw = opts && opts.strictAssertMin != null ? opts.strictAssertMin : process.env.COUNCIL_STRICT_ASSERT_MIN;
+  if (typeof raw !== "number" && (typeof raw !== "string" || raw.trim() === "")) return STRICT_ASSERT_MIN_DEFAULT;
   const n = Number(raw);
-  return Number.isFinite(n) && raw !== "" && raw != null ? n : STRICT_ASSERT_MIN_DEFAULT;
+  return Number.isFinite(n) && n > 0 && n <= 1 ? n : STRICT_ASSERT_MIN_DEFAULT;
 }
 
 /**

@@ -27,13 +27,25 @@ const { meshPeerSource, asRing } = require("./mesh-grounding");
 const { isSelfTurnRole, isSelfAuthoredRecord } = require("./csf-memory-writer");
 
 // GROUNDING_EXCLUDE_SELF=1: unisona's own earlier output (its recalled chat turns, the
-// council's stored answers, its agents' signals) is not evidence for a claim. Counted as a
-// corroborating source it is an echo: the noisy-OR in mergeEvidence treats it as independent,
-// so the system's own past answer plus one web hit reads as two witnesses. Off by default
+// council's stored answers, its agents' signals) is not evidence for a claim. Today it is: an
+// earlier reply recalled by keyword overlap becomes the evidence itself, its overlap score
+// becomes its confidence, so on its own it can clear the resolver's answer threshold, get cited
+// as "grounded evidence", and at 0.8+ stop the walk before outer rings (web) are consulted.
+// Replayed on the local log, 18 of 32 real chat turns that the ring grounded rested only on the
+// assistant's earlier replies. With the flag the ring drops them, filtering before the top-k
+// cut so a relevant user turn ranked just below them is still returned. The user's own turns and
+// outside records still count. Also changes what this node serves peers (/api/mesh/ground uses
+// the same ring) and can send /api/grounding/resolve to its web ring more often. Off by default
 // while the effect on live turns is measured (ADR-0012 step 4: flag first, measure, then default).
 function excludeSelfEvidence() {
   return process.env.GROUNDING_EXCLUDE_SELF === "1";
 }
+
+// How many results each local retriever contributes to the ring (unchanged by the flag).
+const CONVERSATION_K = 4;
+const MEMORY_K = 3;
+// With the flag on, over-fetch so filtering happens before the cut, not after it.
+const SELF_FILTER_OVERFETCH = 3;
 
 // Mirror of csf-memory.relevanceScore (not exported there) — keyword overlap in [0,1].
 function overlapConfidence(text, query) {
@@ -52,10 +64,15 @@ function localMemoryRing() {
   return asRing("local-memory", async (question) => {
     const out = [];
     const excludeSelf = excludeSelfEvidence();
+    const fetchK = (k) => (excludeSelf ? k * SELF_FILTER_OVERFETCH : k);
     try {
       // Cross-session chat turns already carry a relevance score (0..1).
-      for (const c of csfMemory.queryConversationMemory(question, 4)) {
-        if (excludeSelf && isSelfTurnRole(c.role)) continue; // the assistant's own past answer is not a witness
+      let turns = csfMemory.queryConversationMemory(question, fetchK(CONVERSATION_K));
+      if (excludeSelf) {
+        // the assistant's own past answer is not a witness
+        turns = turns.filter((c) => !isSelfTurnRole(c.role)).slice(0, CONVERSATION_K);
+      }
+      for (const c of turns) {
         out.push({
           claim: text120(c.text),
           evidence: `recalled ${c.role === "lantern" ? "unisona.ai" : "user"} turn${c.at ? " @ " + c.at : ""}`,
@@ -65,8 +82,12 @@ function localMemoryRing() {
       }
     } catch { /* fail-safe: a dead source contributes nothing */ }
     try {
-      for (const m of csfMemory.queryMemories(question, 3)) {
-        if (excludeSelf && isSelfAuthoredRecord(m)) continue; // council answers, agent signals
+      let records = csfMemory.queryMemories(question, fetchK(MEMORY_K));
+      if (excludeSelf) {
+        // council answers, agent signals
+        records = records.filter((m) => !isSelfAuthoredRecord(m)).slice(0, MEMORY_K);
+      }
+      for (const m of records) {
         const t = text120(m.content?.text || m.content?.raw_input || (m.tags || []).join(" "));
         if (!t) continue;
         out.push({ claim: t, evidence: "convergence memory record", confidence: overlapConfidence(t, question), source: "local-memory" });

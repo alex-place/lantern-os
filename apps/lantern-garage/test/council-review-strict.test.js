@@ -121,6 +121,19 @@ check("env: COUNCIL_STRICT_GROUNDING=1 turns strict mode on; opts.strictGroundin
   }
 });
 
+check("strict: a minimum outside (0, 1] falls back to the default, so plain and short replies are never flagged", () => {
+  for (const bad of [" ", "\t", "0", "0x0", "-1", "2", "abc", true, false, 0, -0.5, 1.5]) {
+    const plain = councilReview(PLAIN, { emit: false, strictGrounding: true, strictAssertMin: bad });
+    const short = councilReview("Sounds good to me.", { emit: false, strictGrounding: true, strictAssertMin: bad });
+    const claims = councilReview(CLAIMS, { emit: false, strictGrounding: true, strictAssertMin: bad });
+    assert.strictEqual(plain.verdict, "grounded", `min=${JSON.stringify(bad)} plain`);
+    assert.strictEqual(short.verdict, "grounded", `min=${JSON.stringify(bad)} short`);
+    assert.strictEqual(claims.verdict, "seam_open", `min=${JSON.stringify(bad)} falls back to 0.2`);
+  }
+  assert.strictEqual(councilReview(CLAIMS, { emit: false, strictGrounding: true, strictAssertMin: " 0.3 " }).verdict, "grounded", "a padded valid value is used");
+  assert.strictEqual(councilReview(CLAIMS, { emit: false, strictGrounding: true, strictAssertMin: 1 }).verdict, "grounded", "1 is the largest valid minimum");
+});
+
 if (savedEnv.strict !== undefined) process.env.COUNCIL_STRICT_GROUNDING = savedEnv.strict;
 if (savedEnv.min !== undefined) process.env.COUNCIL_STRICT_ASSERT_MIN = savedEnv.min;
 

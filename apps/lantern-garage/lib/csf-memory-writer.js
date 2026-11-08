@@ -131,7 +131,9 @@ async function _persist(basePath, record) {
 // produced it, in the schema's existing fields (MemoryRecord.from_dict() takes exactly the
 // dataclass fields, so no new top-level key):
 //   actor_type          "user" | "agent" | "system"   (MemoryRecord's own vocabulary)
-//   actor_id            which user/agent/system, when known
+//   actor_id            which agent/system; for a user only a server-resolved id (fact.userId),
+//                       never a client-supplied name. The chat callers don't pass one yet, so
+//                       life facts carry actor_id "".
 //   metadata.provenance "user"   — said by the user
 //                       "self"   — produced by unisona itself (the council's answer, an agent's signal)
 //                       "system" — a system event (an order recorded by the trading store)
@@ -148,15 +150,20 @@ function isSelfTurnRole(role) {
 
 /**
  * True when a CSF memory record holds unisona's own output rather than outside evidence.
- * Reads the provenance written above, and falls back to content.role for records written
- * before provenance existed (those all carry actor_type "system").
+ * Reads the provenance stamped at write time (this writer and trading-memory.js). For records
+ * without it (written before provenance existed, or by a writer that doesn't stamp it) it falls
+ * back to the shapes unisona's own output has always had: a self role in content.role, or a
+ * trading signal (tags "trading" + "signal"), which trading-memory.js used to write as
+ * actor_type "system" with no role.
  */
 function isSelfAuthoredRecord(record) {
   if (!record || typeof record !== "object") return false;
   const prov = record.metadata && record.metadata.provenance;
   if (prov) return prov === PROVENANCE.SELF;
   if (record.actor_type === "agent") return true;
-  return isSelfTurnRole(record.content && record.content.role);
+  if (isSelfTurnRole(record.content && record.content.role)) return true;
+  const tags = Array.isArray(record.tags) ? record.tags : [];
+  return tags.includes("trading") && tags.includes("signal");
 }
 
 /**
