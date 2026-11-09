@@ -85,7 +85,7 @@ test('the leg: thesis, expected path, its own exits, and the in-between checkpoi
   assert.strictEqual(p.thesis.context.tags_ref, 'o-1'); assert.strictEqual(p.thesis.context.why, 'no entry-tags reading');
   assert.strictEqual(p.expected.exit_by, new Date(at(DAY, 15, 55)).toISOString());
   assert.strictEqual(p.expected.move, 0.01775); assert.strictEqual(p.expected.target, 50.8875);
-  assert.match(p.if_expected.rule, /carried overnight instead when SPY's session is at or below -1.5 %/);
+  assert.doesNotMatch(p.if_expected.rule, /carried overnight/, 'the down-day carry is for the inverse wrappers only');
   assert.match(p.if_expected.rule, /late-reversal gate/); assert.match(p.if_expected.rule, /flat before a weekend/);
   assert.strictEqual(p.if_wrong.stop, 46); assert.strictEqual(p.if_wrong.stop_pct, 8); assert.match(p.if_wrong.invalidation, /noise band/);
   assert.strictEqual(p.if_neither.action, 'HOLD'); assert.strictEqual(p.if_neither.tested, tp.TESTED);
@@ -138,7 +138,7 @@ test('the write contract: off unless shadow, silent on a replay clock, never thr
   assert.deepStrictEqual([rows.length, asked.length], [0, 0], 'a pass off the real clock (a replay) writes nothing and reads nothing');
   const env = { ...LEG_ENV, TWO_SLEEVE_FAKE_NOW: new Date(entry.now).toISOString() };
   await tp.write(entry, { log: (r) => rows.push(r), getBars, env, signal: legSignal });
-  assert.deepStrictEqual(asked, [['TQQQ', '5m']]);
+  assert.deepStrictEqual(asked, [['TQQQ', '5m'], ['QQQ', '5m']], 'the fund, then the leg\'s proxy for its band');
   assert.strictEqual(rows.length, 1); assert.strictEqual(rows[0].event, 'trade_plan'); assert.strictEqual(rows[0].order_id, '9');
   assert.strictEqual(rows[0].expected.why, 'no bars from the feed');
   await tp.write(entry, { log: (r) => rows.push(r), getBars: async () => { throw new Error('boom'); }, env, signal: legSignal });
@@ -204,6 +204,10 @@ test('the brain: off by default; on, the entry places as before and the plan lan
   assert.deepStrictEqual(p.if_neither.checks.map((c) => c.id), ['C@10:00', 'C@12:00', 'C@14:00']);
   assert.strictEqual(p.if_neither.checks[0].at, new Date(at('2026-09-23', 10, 0)).toISOString());
   assert.deepStrictEqual(barsAsked, [['QQQ', '5m']]);
+  assert.strictEqual(p.v, 2);
+  assert.ok(p.exits.some((x) => x.rule === 'loss_cap') && p.exits.some((x) => x.rule === 'max_hold'), 'every exit rule, with its level');
+  assert.strictEqual(p.scenarios.n, 0, 'the sleeve journal was read (no closed trades in it yet)');
+  assert.strictEqual(p.today.entries_before, 0, 'the entry itself is not an earlier try');
   const real = rows().find((r) => r.event === 'entry');
   assert.ok(real && real.user === 'local-owner' && real.kind === undefined, 'the entry row itself is untouched');
 
@@ -213,4 +217,105 @@ test('the brain: off by default; on, the entry places as before and the plan lan
   await new Promise((r) => setTimeout(r, 100));
   assert.ok(!rows().some((r) => r.event === 'trade_plan'), 'a replay writes no plan');
   delete process.env.TRADER_TRADE_PLAN;
+});
+
+// ---- version 2: every exit rule with its level, what usually happens, today's tries ------------------------------------------
+const { noiseBand } = require('../lib/trend-shadow');
+const inverseSignal = { symbol: 'SQQQ', direction: 'BULLISH', noise_leg: true, decision_context: { ibs: 0.8, noise: 'dn', noise_proxy: 'QQQ', noise_side: 'dn', noise_bar: '10:00', noise_decision: true }, convergence: { decision: 'ENTER', p_win: 0.6 } };
+
+test('v2: every exit rule of the leg, with the proxy band at each half hour and the cap that also sells in the extended hours', () => {
+  const days = [...sessionsBefore(DAY, 15), DAY];
+  const proxyBars = bars5m(days, legPx, 600);
+  const now = at(DAY, 10, 0) + 25000;
+  const p = tp.buildPlan({ entry: { symbol: 'SQQQ', price: 20, qty: 300, stop: 18.4, now, order_id: 'o-2' }, signal: inverseSignal, bars: bars5m(days, legPx, 600), proxyBars, history: [], env: LEG_ENV });
+  assert.strictEqual(p.v, 2);
+  assert.deepStrictEqual(p.exits.map((x) => x.rule), ['band_exit', 'stop', 'loss_cap', 'late_gate', 'decarry', 'carry_downday']);
+  const band = p.exits[0];
+  assert.match(band.when, /QQQ at or over its lower band/);
+  assert.deepStrictEqual(band.levels.map((x) => x.clock), ['10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30']);
+  const nb = noiseBand(proxyBars, DAY), p0 = tp.priceAt(tp.sessionsOf(proxyBars), DAY, 600);
+  assert.strictEqual(band.levels[0].proxy, Math.round(nb.at(625).lower * 1e4) / 1e4, 'the scan band at the 10:30 bar');
+  assert.strictEqual(band.levels[0].wrapper_approx, Math.round(20 * (1 - 3 * (nb.at(625).lower / p0 - 1)) * 1e4) / 1e4);
+  const cap = p.exits.find((x) => x.rule === 'loss_cap');
+  assert.strictEqual(cap.price, 18.4); assert.strictEqual(cap.pct, 8); assert.match(cap.acts, /extended hours/); assert.strictEqual(cap.in_replay, false);
+  assert.strictEqual(p.exits.find((x) => x.rule === 'late_gate').at, new Date(at(DAY, 15, 30)).toISOString());
+  assert.match(p.if_expected.rule, /carried overnight instead when SPY's session is at or below -1.5 %/);
+  assert.match(p.if_wrong.invalidation, /10:30 \d/); assert.match(p.if_wrong.loss_cap, /also sells in the extended hours/);
+  assert.strictEqual(p.if_neither.checks[0].band_exit_proxy, band.levels[0].proxy, 'the check at 10:30 names the band line it would face');
+  const rth = tp.buildPlan({ entry: { symbol: 'SQQQ', price: 20, qty: 1, now }, signal: inverseSignal, env: { ...LEG_ENV, TRADER_MAX_LOSS_RTH_ONLY: '1' } });
+  const cap2 = rth.exits.find((x) => x.rule === 'loss_cap');
+  assert.strictEqual(cap2.acts, 'regular hours only'); assert.strictEqual(cap2.in_replay, true);
+  assert.strictEqual(rth.exits[0].levels, null); assert.strictEqual(rth.exits[0].levels_why, 'no proxy bars');
+});
+
+test('v2: the Friday weekend flat: no weekend carry for the leg; first when it starts earlier; close-IBS bought Thursday meets it', () => {
+  const env = { ...LEG_ENV, TRADER_EOD_FLAT: 'weekend' };
+  // the leg's flat starts at its de-carry minute (TRADER_EOD_FLAT_MIN defaults to TRADER_DECARRY_MIN, 955 here): same time, and no carry
+  const fri = tp.buildPlan({ entry: { symbol: 'SQQQ', price: 20, qty: 1, now: at('2026-11-06', 10, 0) + 25000 }, signal: inverseSignal, env });
+  assert.strictEqual(fri.expected.exit_by, new Date(at('2026-11-06', 15, 55)).toISOString());
+  assert.deepStrictEqual(fri.exits.filter((x) => x.type === 'time').map((x) => [x.rule, x.at]), [['late_gate', new Date(at('2026-11-06', 15, 30)).toISOString()], ['decarry', new Date(at('2026-11-06', 15, 55)).toISOString()], ['weekend_flat', new Date(at('2026-11-06', 15, 55)).toISOString()]]);
+  const carry = fri.exits.find((x) => x.rule === 'carry_downday');
+  assert.strictEqual(carry.applies, false); assert.match(carry.why, /no weekend carry/);
+  assert.strictEqual(tp.buildPlan({ entry: { symbol: 'SQQQ', price: 20, qty: 1, now: at(DAY, 10, 0) + 25000 }, signal: inverseSignal, env }).exits.find((x) => x.rule === 'carry_downday').applies, true, 'a Tuesday can carry');
+  // a flat that starts before the de-carry becomes the exit
+  const early = tp.buildPlan({ entry: { symbol: 'TQQQ', price: 50, qty: 1, now: at('2026-11-06', 10, 0) + 25000 }, signal: legSignal, env: { ...env, TRADER_EOD_FLAT_MIN: '945' } });
+  assert.strictEqual(early.expected.exit_by, new Date(at('2026-11-06', 15, 45)).toISOString());
+  assert.match(early.expected.exit_rule, /Friday weekend flat at 15:45/);
+  assert.deepStrictEqual(early.if_neither.checks.map((c) => c.id), ['M+30', 'M+60', 'M+120']);
+  const tue = tp.buildPlan({ entry: { symbol: 'TQQQ', price: 50, qty: 1, now: at(DAY, 10, 0) + 25000 }, signal: legSignal, env });
+  assert.ok(!tue.exits.some((x) => x.rule === 'weekend_flat'), 'no flat on a Tuesday');
+  const thu = tp.buildPlan({ entry: { symbol: 'IWM', price: 220, qty: 10, now: at('2026-11-05', 15, 55) + 25000 }, signal: { symbol: 'IWM', close_ibs: true, decision_context: { close_ibs_bar: '15:55' } }, env: { TRADER_MAX_HOLD_SESSIONS: '1', TRADER_EOD_FLAT: 'weekend' } });
+  assert.strictEqual(thu.expected.exit_by, new Date(at('2026-11-06', 15, 50)).toISOString());
+  assert.match(thu.expected.exit_rule, /max-hold/);
+  assert.deepStrictEqual(thu.exits.filter((x) => x.type === 'time').map((x) => [x.rule, x.at]), [['max_hold', new Date(at('2026-11-06', 15, 50)).toISOString()], ['weekend_flat', new Date(at('2026-11-06', 15, 50)).toISOString()]]);
+});
+
+test('v2: what usually happens (the sleeve own closed trades by branch) and earlier tries on the same fund today', () => {
+  const d1 = '2026-09-17', d2 = '2026-09-18', d3 = '2026-09-21';
+  const row = (event, sym, day, hh, mm, ex = {}) => ({ ts: new Date(at(day, hh, mm) + 20000).toISOString(), user: 'local-owner', event, symbol: sym, ...ex });
+  const rows = [
+    row('entry', 'TQQQ', d1, 10, 0), row('exit', 'TQQQ', d1, 10, 20, { reason: 'signal_exit', pnl: -40, pnl_pct: -0.8 }),
+    row('entry', 'UPRO', d1, 11, 0), row('exit', 'UPRO', d1, 15, 30, { reason: 'signal_exit', pnl: 90, pnl_pct: 1.2 }),
+    row('entry', 'SOXL', d1, 15, 0), row('exit', 'SOXL', d1, 15, 55, { reason: 'eod_decarry (leveraged)', pnl: 120, pnl_pct: 2.0 }),
+    row('entry', 'SOXS', d1, 15, 0), row('exit', 'SOXS', d2, 9, 35, { reason: 'signal_exit', pnl: 300, pnl_pct: 4.0 }),
+    row('entry', 'SQQQ', d2, 15, 0), row('exit', 'SQQQ', d3, 4, 12, { reason: 'max_loss (-8.2% <= -8%)', pnl: -500, pnl_pct: -8.2 }),
+    row('entry', 'UPRO', d3, 10, 30), row('exit', 'UPRO', d3, 11, 5, { reason: 'broker fill', pnl: -310, pnl_pct: -8.0 }),
+    row('entry', 'SQQQ', DAY, 10, 0), row('exit', 'SQQQ', DAY, 10, 25, { reason: 'signal_exit', pnl: -50, pnl_pct: -0.9 }),
+    { ts: new Date(at(DAY, 10, 0) + 21000).toISOString(), user: 'local-owner', event: 'entry_fill', symbol: 'SQQQ' },
+    { ts: new Date(at(DAY, 10, 0) + 22000).toISOString(), user: 'trade-plan', event: 'trade_plan', symbol: 'SQQQ' },
+  ];
+  const h = tp.historyStats('M', rows, { now: at(DAY, 11, 0) + 25000, symbol: 'SQQQ' });
+  const by = Object.fromEntries(h.scenarios.branches.map((b) => [b.branch, b]));
+  assert.deepStrictEqual(Object.keys(by).sort(), ['band_exit', 'carried', 'carried_then_cap', 'decarry', 'late_gate', 'stop']);
+  assert.strictEqual(by.band_exit.n, 2); assert.strictEqual(by.band_exit.mean_pct, -0.85); assert.strictEqual(by.band_exit.win_rate, 0);
+  assert.strictEqual(by.band_exit.median_min, 23);   // 20 and 25 minutes
+  assert.strictEqual(h.scenarios.n, 7); assert.strictEqual(by.carried.median_min, 1115);
+  assert.deepStrictEqual(h.today, { entries_before: 1, same_fund_before: 1, reentry: true, same_fund_closed_pnl: -50, last_same_exit: { at: rows[13].ts, reason: 'signal_exit', pnl: -50 } });
+  // the journal text: only entry and exit rows are parsed, a torn line is skipped
+  const text = rows.map((r) => JSON.stringify(r)).join('\n') + '\n{"ts":"2026-09-22T14:00:00Z","event":"exit","sym';
+  assert.strictEqual(tp.parseHistory(text).length, 14);
+  // the overnight book's sales and close-IBS's own exits
+  assert.strictEqual(tp.branchOf('O', rows[0], { ...rows[1], reason: 'signal_exit' }), 'sale_0940');
+  assert.strictEqual(tp.branchOf('C', rows[0], { ...rows[1], reason: 'max_hold (1 sessions >= 1)' }), 'max_hold');
+  assert.strictEqual(tp.branchOf('C', rows[0], { ...rows[1], reason: 'eod_flat_weekend (no weekend holds, 2026-08-24)' }), 'weekend_flat');
+});
+
+test('v2: the writer reads the leg proxy (live and settled) and the sleeve journal; close-IBS reads no proxy', async () => {
+  const days = [...sessionsBefore(DAY, 15), DAY];
+  const asked = [], hist = []; let journalReads = 0;
+  const getBars = async (s, tf) => { asked.push([s, tf]); return { bars: bars5m(s === 'QQQ' ? days.slice(-9) : days, legPx, 600) }; };
+  const getHistory = async (s, from, to) => { hist.push([s, (to - from) / 86400000]); return { bars: bars5m(days.slice(0, 7), legPx, 960) }; };
+  const readJournal = async () => { journalReads++; return ''; };
+  const env = { ...LEG_ENV, TWO_SLEEVE_FAKE_NOW: 'x' }; const rows = [];
+  await tp.write({ symbol: 'SQQQ', price: 20, qty: 1, now: at(DAY, 10, 0) + 25000 }, { log: (r) => rows.push(r), getBars, getHistory, readJournal, env, signal: inverseSignal });
+  assert.deepStrictEqual(asked, [['SQQQ', '5m'], ['QQQ', '5m']]);
+  assert.deepStrictEqual(hist, [['QQQ', 21]], 'the settled window 28 -> 7 days back, as the noise scan merges it');
+  assert.strictEqual(journalReads, 1);
+  assert.strictEqual(rows[0].exits[0].levels.length, 11, 'live + settled sessions are enough for the band');
+  assert.strictEqual(rows[0].scenarios.why, 'no closed trades in the journal yet');
+  asked.length = 0; hist.length = 0;
+  await tp.write({ symbol: 'IWM', price: 220, qty: 1, now: at(DAY, 15, 55) + 25000 }, { log: (r) => rows.push(r), getBars, getHistory, readJournal, env, signal: { symbol: 'IWM', close_ibs: true, decision_context: { close_ibs_bar: '15:55' } } });
+  assert.deepStrictEqual(asked, [['IWM', '5m']]); assert.deepStrictEqual(hist, []); assert.strictEqual(journalReads, 2);
+  await tp.write({ symbol: 'IWM', price: 220, qty: 1, now: at(DAY, 15, 55) + 25000 }, { log: (r) => rows.push(r), getBars, readJournal: async () => { throw new Error('locked'); }, env, signal: { symbol: 'IWM', close_ibs: true } });
+  assert.match(rows[2].scenarios.why, /journal read failed: locked/);
 });
