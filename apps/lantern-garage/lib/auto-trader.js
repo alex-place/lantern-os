@@ -2302,6 +2302,8 @@ function planEntry(entry, signal, scan) {
       getBars: (s, tf) => yahoo.getBars(s, tf),
       // the leg's proxy band needs the settled sessions under the live feed, as the noise scan merges them (#3720)
       getHistory: typeof yahoo.getBarsWindow === 'function' ? (s, from, to) => yahoo.getBarsWindow(s, '5m', from, to) : null,
+      // ^VIX's dailies for the calm-VIX gate's read on an inverse leg entry (the plan reads them once a day)
+      getDaily: typeof yahoo.getBarsWindow === 'function' ? (s, from, to) => yahoo.getBarsWindow(s, '1d', from, to) : null,
       readJournal: () => fs.promises.readFile(TRADES_LOG, 'utf8'),   // this sleeve's own journal: the plan's scenarios and today's tries
       readContext: () => require('./entry-tags').readContext(dir, entry.now),
       env, signal, scan,
