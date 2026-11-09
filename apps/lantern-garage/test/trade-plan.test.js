@@ -204,7 +204,7 @@ test('the brain: off by default; on, the entry places as before and the plan lan
   assert.deepStrictEqual(p.if_neither.checks.map((c) => c.id), ['C@10:00', 'C@12:00', 'C@14:00']);
   assert.strictEqual(p.if_neither.checks[0].at, new Date(at('2026-09-23', 10, 0)).toISOString());
   assert.deepStrictEqual(barsAsked, [['QQQ', '5m']]);
-  assert.strictEqual(p.v, 2);
+  assert.strictEqual(p.v, tp.VERSION);
   assert.ok(p.exits.some((x) => x.rule === 'loss_cap') && p.exits.some((x) => x.rule === 'max_hold'), 'every exit rule, with its level');
   assert.strictEqual(p.scenarios.n, 0, 'the sleeve journal was read (no closed trades in it yet)');
   assert.strictEqual(p.today.entries_before, 0, 'the entry itself is not an earlier try');
@@ -228,7 +228,7 @@ test('v2: every exit rule of the leg, with the proxy band at each half hour and 
   const proxyBars = bars5m(days, legPx, 600);
   const now = at(DAY, 10, 0) + 25000;
   const p = tp.buildPlan({ entry: { symbol: 'SQQQ', price: 20, qty: 300, stop: 18.4, now, order_id: 'o-2' }, signal: inverseSignal, bars: bars5m(days, legPx, 600), proxyBars, history: [], env: LEG_ENV });
-  assert.strictEqual(p.v, 2);
+  assert.strictEqual(p.v, tp.VERSION);
   assert.deepStrictEqual(p.exits.map((x) => x.rule), ['band_exit', 'stop', 'loss_cap', 'late_gate', 'decarry', 'carry_downday']);
   const band = p.exits[0];
   assert.match(band.when, /QQQ at or over its lower band/);
@@ -368,7 +368,95 @@ test('retired: exits today\'s configuration cannot produce stay in the history, 
   assert.match(tp.retiredWhy('O', 'weekend_flat', tp.rulesOf('O', { TRADER_EOD_FLAT: 'off' }), { TRADER_EOD_FLAT: 'off' }), /weekend flat is off/);
   // the plan itself carries the labels: buildPlan passes the sleeve's rules
   const p = tp.buildPlan({ entry: { symbol: 'IWM', price: 220, qty: 10, now }, signal: { symbol: 'IWM', close_ibs: true, decision_context: { close_ibs_bar: '15:55' } }, history: rows, env });
-  assert.strictEqual(p.v, 2); assert.strictEqual(p.kind, 'C');
+  assert.strictEqual(p.v, tp.VERSION); assert.strictEqual(p.kind, 'C');
   assert.strictEqual(p.scenarios.branches.find((b) => b.branch === 'signal_exit').retired, true);
   assert.strictEqual(p.scenarios.current.n, 3); assert.strictEqual(p.scenarios.retired_n, 2);
+});
+
+// ---- version 3: what each entry rule said about the entry --------------------------------------------------------------------
+const vdays = sessionsBefore(DAY, 260);   // the ^VIX dailies' sessions, oldest first; index 259 is the prior close
+const vixDaily = (val) => vdays.map((d, i) => ({ timestamp: new Date(at(d, 9, 30)).toISOString(), open: val(i), high: val(i), low: val(i), close: val(i) }));
+
+test('v3 gates: each entry rule\'s verdict, armed or only recorded, from the scans\' own reads', () => {
+  assert.strictEqual(tp.VERSION, 3);
+  const now = at(DAY, 10, 0) + 25000;
+  const ctxSig = (open, score) => ({ ...legSignal, decision_context: { ...legSignal.decision_context, noise_context: { open, score, why: 'gamma MID, 5 of 8 sectors' } } });
+  const envLE = { ...LEG_ENV, TRADER_NOISE_CONTEXT_GATE: 'shadow' };
+  const leg = (signal, env, extra = {}) => tp.buildPlan({ entry: { symbol: signal.symbol, price: 50, qty: 10, now }, signal, env, history: [], ...extra });
+  // the leg's context gate: the signal's own read, by its knob
+  let g = leg(ctxSig(true, 1), envLE).gates;
+  assert.deepStrictEqual(g.map((x) => [x.id, x.status, x.verdict]), [['LE', 'shadow', 'pass']]);
+  assert.strictEqual(g[0].ledger, 'live-engine-winrate-gates-shadow-2026-11'); assert.strictEqual(g[0].reading.score, 1);
+  assert.strictEqual(leg(ctxSig(false, -1), envLE).gates[0].verdict, 'would_refuse');
+  assert.strictEqual(leg(ctxSig(true, null), envLE).gates[0].verdict, 'no_reading', 'no reading: the gate stays open and says so');
+  assert.strictEqual(leg(legSignal, envLE).gates[0].verdict, 'no_reading');
+  assert.strictEqual(leg(ctxSig(false, -1), { ...LEG_ENV, TRADER_NOISE_CONTEXT_GATE: '1' }).gates[0].status, 'armed');
+  assert.deepStrictEqual(leg(ctxSig(true, 1), LEG_ENV).gates, [], 'the knob off: no LE verdict');
+  // the calm-VIX skip: inverse leg entries only, the prior close against the 252 before it (strictly lower), calm below 0.33
+  const inv = (vixBars, vixWhy) => tp.buildPlan({ entry: { symbol: 'SQQQ', price: 20, qty: 10, now }, signal: inverseSignal, env: LEG_ENV, history: [], vixBars, vixWhy }).gates;
+  const calm = vixDaily((i) => (i === 259 ? 15 : i >= 7 && i < 87 ? 14 : 20));   // 80 of the 252 lower: rank 0.3175
+  g = inv(calm);
+  assert.deepStrictEqual(g.map((x) => [x.id, x.status, x.verdict]), [['CVI', 'offline', 'would_refuse']]);
+  assert.deepStrictEqual(g[0].reading, { as_of: vdays[259], vix: 15, n: 252, rank: 0.3175, calm: true });
+  assert.strictEqual(g[0].ledger, 'live-inverse-skip-calm-vix-forward-read-2027-01');
+  assert.strictEqual(inv(vixDaily((i) => (i === 259 ? 15 : i >= 7 && i < 97 ? 14 : 20)))[0].verdict, 'pass', '90 lower: rank 0.357');
+  assert.strictEqual(inv(vixDaily((i) => (i === 259 ? 15 : i < 7 ? 14 : 20)))[0].reading.rank, 0, 'closes older than the 252 do not count');
+  assert.strictEqual(inv(vixDaily(() => 20))[0].reading.rank, 0, 'a tie is not lower');
+  const short = inv(vixDaily(() => 20).slice(-150));
+  assert.strictEqual(short[0].verdict, 'no_reading'); assert.match(short[0].reading.why, /149 closes before it; the rank needs 202/);
+  assert.strictEqual(inv(null, 'VIX read failed: boom')[0].reading.why, 'VIX read failed: boom');
+  assert.strictEqual(inv([...calm, { timestamp: new Date(at(DAY, 9, 30)).toISOString(), close: 99 }])[0].reading.vix, 15, 'today\'s own bar is not the prior close');
+  assert.ok(!leg(legSignal, LEG_ENV, { vixBars: calm }).gates.some((x) => x.id === 'CVI'), 'a long leg entry has no calm-VIX verdict');
+  // the overnight book's bond gate: the scan's own read, by its knob
+  const oSig = { symbol: 'SPY', overnight: true, decision_context: { overnight_bar: '15:55', overnight_above: true } };
+  const o = (scan, env) => tp.buildPlan({ entry: { symbol: 'SPY', price: 500, qty: 5, now: at(DAY, 15, 55) + 30000 }, signal: oSig, scan, env, history: [] }).gates;
+  const bondScan = (open, ret) => ({ overnight: { bond: { open, ret_pct: ret, why: `TLT ${ret} % on the day`, shadow: true } } });
+  const shadowG1 = { TRADER_OVERNIGHT_BOND_GATE: 'shadow' };
+  assert.deepStrictEqual(o(bondScan(false, -0.7), shadowG1).map((x) => [x.id, x.status, x.verdict, x.reading.ret_pct]), [['G1', 'shadow', 'would_refuse', -0.7]]);
+  assert.strictEqual(o(bondScan(true, 0.4), shadowG1)[0].verdict, 'pass');
+  assert.strictEqual(o({ overnight: { bond: { open: true, ret_pct: null, why: 'no reading (no TLT bar)' } } }, shadowG1)[0].verdict, 'no_reading');
+  assert.strictEqual(o(null, shadowG1)[0].verdict, 'no_reading');
+  assert.deepStrictEqual(o(bondScan(false, -0.7), {}), [], 'the knob off: no G1 verdict');
+  // close-IBS: L25 (with the trades it added past the old bar) and the news gate C1, both armed, from the scan's reply
+  const cSig = (ibs) => ({ symbol: 'IWM', close_ibs: true, decision_context: { ibs, close_ibs_bar: '15:55' } });
+  const cEnv = { TRADER_MAX_HOLD_SESSIONS: '1', TRADER_CLOSE_IBS_MAX: '0.25', TRADER_CLOSE_IBS_NEWS_GATE: '1' };
+  const cScan = (gate) => ({ closeIbs: { ibsMax: 0.25, ...(gate ? { gate } : {}) } });
+  const c = (ibs, scan, env = cEnv) => tp.buildPlan({ entry: { symbol: 'IWM', price: 220, qty: 10, now: at(DAY, 15, 55) + 25000 }, signal: cSig(ibs), scan, env, history: [] }).gates;
+  g = c(0.2, cScan({ open: true, why: 'gamma LOW', shock: { tercile: 'MID' }, gamma: { tercile: 'LOW' } }));
+  assert.deepStrictEqual(g.map((x) => [x.id, x.status, x.verdict]), [['L25', 'armed', 'pass'], ['C1', 'armed', 'pass']]);
+  assert.strictEqual(g[0].band, 'added_by_l25'); assert.deepStrictEqual(g[0].reading, { ibs: 0.2, max: 0.25, old_max: 0.15 });
+  assert.deepStrictEqual(g[1].reading, { why: 'gamma LOW', shock: 'MID', gamma: 'LOW' }); assert.strictEqual(g[1].ledger, 'live-engine-l25-c1-armed-2026-11');
+  assert.strictEqual(c(0.1, cScan({ open: true, why: 'SHOCK HIGH' }))[0].band, 'inside_old_bar');
+  assert.strictEqual(c(0.15, cScan({ open: true, why: 'SHOCK HIGH' }))[0].band, 'inside_old_bar', 'the old bar took 0.15 itself');
+  assert.strictEqual(c(0.2, cScan({ open: false, why: 'SHOCK MID, gamma HIGH' }))[1].verdict, 'would_refuse', 'an armed gate read closed: a parity question');
+  assert.strictEqual(c(0.2, cScan({ open: true, why: 'no reading: no SHOCK rank' }))[1].verdict, 'no_reading');
+  assert.strictEqual(c(0.2, cScan(null))[1].verdict, 'no_reading');
+  assert.strictEqual(c(0.2, { closeIbs: {} }, { ...cEnv, TRADER_CLOSE_IBS_NEWS_GATE: '0' }).map((x) => x.id).join(), 'L25', 'the max from the env when the reply has none');
+  assert.deepStrictEqual(c(0.1, { closeIbs: { ibsMax: 0.15 } }, { TRADER_MAX_HOLD_SESSIONS: '1' }), [], 'neither L25 nor C1 armed: no verdicts');
+  // the month-end book has no entry rule to record
+  assert.deepStrictEqual(tp.buildPlan({ entry: { symbol: 'TLT', price: 90, qty: 10, now: at(DAY, 15, 55) + 25000 }, signal: { symbol: 'TLT', monthend: true, decision_context: { monthend_role: 'entry', monthend_bar: '15:55' } }, env: { TRADER_MAX_HOLD_SESSIONS: '4' }, history: [] }).gates, []);
+});
+
+test('v3 gates: the writer reads ^VIX\'s dailies once a day, for an inverse leg entry only', async () => {
+  tp._resetVixDaily();
+  const asked = [], rows = [];
+  const getDaily = async (s, from, to) => { asked.push([s, Math.round((to - from) / 86400000)]); return { bars: vixDaily((i) => (i === 259 ? 30 : 20)) }; };
+  const getBars = async () => ({ bars: [] });
+  const env = { ...LEG_ENV, TWO_SLEEVE_FAKE_NOW: 'x' };
+  const now = at(DAY, 10, 0) + 25000;
+  const soxs = { ...inverseSignal, symbol: 'SOXS', decision_context: { ...inverseSignal.decision_context, noise_proxy: 'SMH' } };
+  await tp.write({ symbol: 'TQQQ', price: 50, qty: 10, now }, { log: (r) => rows.push(r), getBars, getDaily, env, signal: legSignal });
+  assert.deepStrictEqual(asked, [], 'a long leg entry reads no VIX');
+  assert.ok(!rows[0].gates.some((x) => x.id === 'CVI'));
+  await tp.write({ symbol: 'SQQQ', price: 20, qty: 10, now }, { log: (r) => rows.push(r), getBars, getDaily, env, signal: inverseSignal });
+  await tp.write({ symbol: 'SOXS', price: 30, qty: 10, now: now + 60000 }, { log: (r) => rows.push(r), getBars, getDaily, env, signal: soxs });
+  assert.deepStrictEqual(asked, [['^VIX', 400]], 'one read a day, inverse leg entries only');
+  assert.strictEqual(rows[1].v, 3); assert.strictEqual(rows[1].gates[0].verdict, 'pass'); assert.strictEqual(rows[1].gates[0].reading.rank, 1);
+  assert.strictEqual(rows[2].gates[0].reading.as_of, vdays[259], 'the second entry used the same day\'s read');
+  tp._resetVixDaily();
+  await tp.write({ symbol: 'SQQQ', price: 20, qty: 10, now }, { log: (r) => rows.push(r), getBars, getDaily: async () => { throw new Error('down'); }, env, signal: inverseSignal });
+  assert.strictEqual(rows[3].gates[0].verdict, 'no_reading'); assert.match(rows[3].gates[0].reading.why, /VIX read failed: down/);
+  await tp.write({ symbol: 'SQQQ', price: 20, qty: 10, now }, { log: (r) => rows.push(r), getBars, env, signal: inverseSignal });
+  assert.strictEqual(rows[4].gates[0].reading.why, 'no daily reader');
+  tp._resetVixDaily();
 });

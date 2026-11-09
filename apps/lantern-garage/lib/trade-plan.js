@@ -30,6 +30,12 @@
  *                a rule switched off) stays in the history, labelled retired with the reason; `current` and share_current
  *                give the same trades without them, what usually happens under today's rules.
  *   today        the sleeve's entries earlier the same session (a re-entry flag on the same fund, and what the earlier tries made).
+ *   gates        (version 3) what each entry rule said about this entry, armed or only recorded, so every rule is scored trade
+ *                by trade on real fills: the leg's context gate LE (the signal's own read), the calm-VIX skip of inverse leg
+ *                entries CVI (the prior close's VIX ranked against its 252 sessions; offline, no knob), the overnight bond gate G1
+ *                (the scan's own read), close-IBS's L25 (the IBS bar, with the trades it added past the old 0.15 bar) and its
+ *                news gate C1 (the scan's own read). Each: status (armed / shadow / offline), verdict (pass / would_refuse /
+ *                no_reading), the rule, the reading, the ledger row that scores it. Nothing here refuses anything.
  *   if_neither   THE IN-BETWEEN BRANCH: checkpoints (the leg at + 30 / 60 / 120 minutes before 15:50; close-IBS at the next
  *                session's 10:00 / 12:00 / 14:00; the month-end book at + 1 / + 2 sessions), each with the expected move by then
  *                and the two levels a time/progress rule would read (below the entry; below half the expected move). Its action
@@ -42,12 +48,12 @@
  * 'trade-plan' (never entry/exit, so no P&L reader counts it), after the order; never awaited; a failure still writes the row,
  * with plan_why. A pass more than 10 minutes off the real clock (a replay) writes nothing, unless TWO_SLEEVE_FAKE_NOW is set
  * (the runner's dry rehearsal). Reads per entry: the traded fund's 5m bars; for the leg, the proxy's live and settled 5m bars;
- * the sleeve's own journal (entry and exit rows only).
+ * the sleeve's own journal (entry and exit rows only); for an inverse leg entry, ^VIX's daily closes (once a day).
  */
 const cal = require('./market-calendar');
 const { noiseBand, NOISE_DECISIONS } = require('./trend-shadow');
 
-const VERSION = 2;
+const VERSION = 3;
 const LOOKBACK = 14;                 // prior sessions' windows, as the noise band counts them
 const MIN_WINDOWS = 10;              // with both prices
 const BAR_MIN = 5;
@@ -64,6 +70,7 @@ const PROXY_OF = { UPRO: 'SPY', SPXL: 'SPY', SPXS: 'SPY', TQQQ: 'QQQ', SQQQ: 'QQ
 const INVERSE = new Set(['SPXS', 'SQQQ', 'SOXS', 'TZA', 'FAZ', 'SH', 'PSQ', 'SDS', 'QID']);
 const TESTED = 'plan-tier0-in-between-time-progress-2010-2026';
 const CLOCK_SKEW_MS = 10 * 60000;
+let _vixDaily = null;                // { day, bars }: ^VIX's dailies, read once a day for the calm-VIX gate
 
 const round = (x, d = 4) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d);
 const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -190,6 +197,77 @@ function contextOf(ctx, orderId) {
     const pick = (w) => (w ? { tercile: w.tercile || null, hours: w.hours != null ? w.hours : null, shock: ty(w, 'SHOCK'), rates: ty(w, 'RATES') } : null);
     out.news = { overnight: pick(n.overnight), session: pick(n.session), mix: n.mix || null };
   } else out.news = { why: n.why || 'no reading' };
+  return out;
+}
+
+// ---- what each entry rule said about this entry (journal only) ----------------------------------------------------------------
+const CVI_N = 252, CVI_MIN = Math.ceil(0.8 * CVI_N), CVI_CUT = 0.33;   // tier0-leg-inverse-skip-calm-vix-neighbours-2026-11: rank252 < 0.33
+const VIX_DAYS = 400;                                                 // calendar days of ^VIX dailies read: more than 253 sessions
+const L25_OLD_MAX = 0.15;                                             // close-IBS's IBS bar before L25 (the scan worker's default)
+const GATE_LEDGER = { LE: 'live-engine-winrate-gates-shadow-2026-11', G1: 'live-engine-winrate-gates-shadow-2026-11',
+  L25: 'live-engine-l25-c1-armed-2026-11', C1: 'live-engine-l25-c1-armed-2026-11', CVI: 'live-inverse-skip-calm-vix-forward-read-2027-01' };
+const gateStatus = (v) => { const s = String(v == null ? '' : v).trim().toLowerCase(); return s === '1' ? 'armed' : s === 'shadow' ? 'shadow' : 'off'; };
+/**
+ * The calm-VIX read for an entry on `day`: the prior session's VIX close ranked against the 252 closes before it (the share
+ * strictly lower, at least 80 % of them present), as the skip's static test ranked it. dailyBars = Yahoo-shaped ^VIX daily bars.
+ */
+function vixCalmRead(dailyBars, day) {
+  const by = new Map();
+  for (const b of dailyBars || []) {
+    const t = Date.parse(b && (b.timestamp != null ? b.timestamp : b.t)); const c = Number(b && (b.close != null ? b.close : b.c));
+    if (!Number.isFinite(t) || !(c > 0)) continue;
+    const d = cal.etOf(t).day; if (d < day) by.set(d, c);
+  }
+  const days = [...by.keys()].sort();
+  if (!days.length) return { why: 'no VIX closes before the entry day' };
+  const i = days.length - 1, prior = by.get(days[i]);
+  let lt = 0, n = 0; for (let k = Math.max(0, i - CVI_N); k < i; k++) { n++; if (by.get(days[k]) < prior) lt++; }
+  const base = { as_of: days[i], vix: round(prior, 2), n };
+  return n >= CVI_MIN ? { ...base, rank: round(lt / n, 4), calm: lt / n < CVI_CUT } : { ...base, why: `${n} closes before it; the rank needs ${CVI_MIN}` };
+}
+/**
+ * What each entry rule said about this entry, armed or only recorded: { id, status (armed | shadow | offline), verdict (pass |
+ * would_refuse | no_reading), rule, reading, ledger }. The reads are the scans' own (the leg's signal, the overnight and close-IBS
+ * replies), so an armed rule's would_refuse means the plan saw a read the scan did not act on: a parity question, not a decision.
+ */
+function gatesOf(kind, { signal, scan, env = process.env, symbol, vix = null } = {}) {
+  const dc = (signal && signal.decision_context) || {};
+  const out = [];
+  if (kind === 'M') {
+    const st = gateStatus(env.TRADER_NOISE_CONTEXT_GATE);
+    if (st !== 'off') {
+      const g = dc.noise_context || null;
+      out.push({ id: 'LE', status: st, verdict: !g || g.score == null ? 'no_reading' : g.open ? 'pass' : 'would_refuse',
+        rule: 'a leg break the market backs: prior-session dealer gamma (LOW +1, HIGH -1) plus the sectors moving with it (4 of 8 or fewer -1, 7 of 8 or more +1); a score below 0 takes no new entry',
+        reading: g ? { score: g.score != null ? g.score : null, why: g.why || null } : { why: 'the signal carried no context read' }, ledger: GATE_LEDGER.LE });
+    }
+    if (INVERSE.has(symbol)) {
+      out.push({ id: 'CVI', status: 'offline', verdict: !vix || vix.rank == null ? 'no_reading' : vix.calm ? 'would_refuse' : 'pass',
+        rule: `no inverse leg entry when the prior close's VIX ranks below ${CVI_CUT} of the ${CVI_N} closes before it`,
+        reading: vix || { why: 'no VIX read' }, ledger: GATE_LEDGER.CVI });
+    }
+  } else if (kind === 'O') {
+    const st = gateStatus(env.TRADER_OVERNIGHT_BOND_GATE);
+    if (st !== 'off') {
+      const b = scan && scan.overnight && scan.overnight.bond ? scan.overnight.bond : null;
+      out.push({ id: 'G1', status: st, verdict: !b || b.ret_pct == null ? 'no_reading' : b.open ? 'pass' : 'would_refuse',
+        rule: 'no overnight entry when TLT at 15:55 is down 0.30 % or more on the day',
+        reading: b ? { ret_pct: b.ret_pct, why: b.why || null } : { why: 'the scan carried no bond read' }, ledger: GATE_LEDGER.G1 });
+    }
+  } else if (kind === 'C') {
+    const ci = scan && scan.closeIbs ? scan.closeIbs : null;
+    const max = num(ci && ci.ibsMax, num(env.TRADER_CLOSE_IBS_MAX, L25_OLD_MAX)), ibs = num(dc.ibs, null);
+    if (max > L25_OLD_MAX) out.push({ id: 'L25', status: 'armed', verdict: ibs == null ? 'no_reading' : ibs <= max ? 'pass' : 'would_refuse',
+      rule: `close-IBS buys at an IBS of ${max} or less (the bar was ${L25_OLD_MAX})`,
+      reading: { ibs, max, old_max: L25_OLD_MAX }, band: ibs == null ? null : ibs > L25_OLD_MAX ? 'added_by_l25' : 'inside_old_bar', ledger: GATE_LEDGER.L25 });
+    if (String(env.TRADER_CLOSE_IBS_NEWS_GATE || '').trim() === '1') {
+      const g = ci && ci.gate ? ci.gate : null;
+      out.push({ id: 'C1', status: 'armed', verdict: !g ? 'no_reading' : !g.open ? 'would_refuse' : /^no reading/.test(String(g.why || '')) ? 'no_reading' : 'pass',
+        rule: 'no close-IBS entry unless the session\'s SHOCK headlines rank HIGH or the prior session\'s dealer gamma is LOW',
+        reading: g ? { why: g.why || null, shock: g.shock && g.shock.tercile ? g.shock.tercile : null, gamma: g.gamma && g.gamma.tercile ? g.gamma.tercile : null } : { why: 'the scan carried no news-gate read' },
+        ledger: GATE_LEDGER.C1 });
+    }
+  }
   return out;
 }
 
@@ -375,7 +453,7 @@ function historyStats(kind, rows, { now, symbol, r = null, env = process.env }) 
  * entered on; scan = the scan (for the leg's band at the entry bar); bars = the traded fund's 5m bars; proxyBars = the leg proxy's
  * live + settled 5m bars; history = the sleeve's journal rows (entry and exit); ctx = readContext().
  */
-function buildPlan({ entry, signal, scan = null, bars = null, proxyBars = null, history = null, ctx = null, env = process.env, barsWhy = null, proxyWhy = null, historyWhy = null } = {}) {
+function buildPlan({ entry, signal, scan = null, bars = null, proxyBars = null, history = null, ctx = null, env = process.env, barsWhy = null, proxyWhy = null, historyWhy = null, vixBars = null, vixWhy = null } = {}) {
   const e = entry || {};
   const kind = kindOf(signal);
   const now = Number(e.now) || Date.now();
@@ -396,6 +474,9 @@ function buildPlan({ entry, signal, scan = null, bars = null, proxyBars = null, 
   const plan = { event: 'trade_plan', v: VERSION, mode: 'shadow', kind, symbol, account: e.account || null, order_id: e.order_id != null ? String(e.order_id) : null,
     entry: { at: new Date(now).toISOString(), day: et.day, clock: hhmm(entryClock), price: round(price, 4), qty: Number(e.qty) || null, notional: price > 0 && e.qty ? Math.round(price * e.qty) : null, stop },
     thesis: { ...thesisOf(kind, symbol, signal, scan), context: contextOf(ctx, e.order_id) } };
+  // what each entry rule said (gatesOf keeps the calm-VIX read for an inverse leg entry only)
+  const vix = kind === 'M' ? (vixBars ? vixCalmRead(vixBars, et.day) : { why: vixWhy || 'no VIX bars' }) : null;
+  plan.gates = gatesOf(kind, { signal, scan, env, symbol, vix });
   // expected path
   const expected = { exit_by: isoAt(exit.day, exit.clock), exit_rule: exit.why, basis: `the median |return| of ${symbol} over the same window in the ${LOOKBACK} prior sessions (at least ${MIN_WINDOWS})` };
   if (!S) expected.why = barsWhy || 'no bars';
@@ -483,7 +564,7 @@ function parseHistory(text) {
 
 /**
  * Write one plan for a placed entry; never awaited by the caller. opts = { log(row), getBars(sym, tf), getHistory(sym, from, to),
- * readJournal() -> text, readContext(), env, signal, scan }. The env is captured by the caller synchronously (the engine swaps env per
+ * getDaily(sym, from, to), readJournal() -> text, readContext(), env, signal, scan }. The env is captured by the caller synchronously (the engine swaps env per
  * sleeve), so a late read cannot see another sleeve's knobs.
  */
 async function write(entry, opts = {}) {
@@ -509,13 +590,24 @@ async function write(entry, opts = {}) {
   }
   if (typeof readJournal === 'function') { try { history = parseHistory(await readJournal()); } catch (e) { history = null; historyWhy = `journal read failed: ${e && e.message}`; } }
   try { ctx = typeof readContext === 'function' ? readContext() : null; } catch (_e) { ctx = null; }
+  // the calm-VIX read: ^VIX's dailies, once a day, for an inverse leg entry only
+  let vixBars = null, vixWhy = null;
+  if (kindOf(opts.signal) === 'M' && INVERSE.has(String((entry && entry.symbol) || '').toUpperCase())) {
+    const now0 = Number(entry.now) || Date.now(), day = cal.etOf(now0).day;
+    if (_vixDaily && _vixDaily.day === day) vixBars = _vixDaily.bars;
+    else if (typeof opts.getDaily === 'function') {
+      const v = await read(() => opts.getDaily('^VIX', now0 - VIX_DAYS * 86400000, now0));
+      if (v.bars && v.bars.length) { vixBars = v.bars; _vixDaily = { day, bars: v.bars }; } else vixWhy = v.err ? `VIX read failed: ${v.err}` : 'no VIX bars from the feed';
+    } else vixWhy = 'no daily reader';
+  }
   let row;
-  try { row = buildPlan({ entry, signal: opts.signal, scan: opts.scan, bars, proxyBars, history, ctx, env, barsWhy, proxyWhy, historyWhy }); }
+  try { row = buildPlan({ entry, signal: opts.signal, scan: opts.scan, bars, proxyBars, history, ctx, env, barsWhy, proxyWhy, historyWhy, vixBars, vixWhy }); }
   catch (e3) { row = { event: 'trade_plan', v: VERSION, mode: 'shadow', symbol: String((entry && entry.symbol) || '').toUpperCase(), order_id: entry && entry.order_id != null ? String(entry.order_id) : null, plan_why: `plan failed: ${e3 && e3.message}` }; }
   try { log(row); } catch (_e) { /* journal only */ }
   return row;
 }
 
 module.exports = { buildPlan, write, enabled, knob, kindOf, sessionsOf, priceAt, expectedMove, plannedExit, checkpointsOf, rulesOf, liveClock, msOf, sessionsLeft,
-  weekendFlatAt, bandLevels, exitsOf, branchOf, retiredWhy, closedTrades, historyStats, parseHistory,
-  VERSION, LOOKBACK, MIN_WINDOWS, LEG_CHECKS, C_CHECKS, T_CHECKS, LEG_LAST_CHECK, HISTORY_N, TESTED };
+  weekendFlatAt, bandLevels, exitsOf, branchOf, retiredWhy, closedTrades, historyStats, parseHistory, gatesOf, gateStatus, vixCalmRead,
+  _resetVixDaily: () => { _vixDaily = null; },
+  VERSION, LOOKBACK, MIN_WINDOWS, LEG_CHECKS, C_CHECKS, T_CHECKS, LEG_LAST_CHECK, HISTORY_N, TESTED, CVI_N, CVI_CUT, L25_OLD_MAX, GATE_LEDGER };
