@@ -319,3 +319,56 @@ test('v2: the writer reads the leg proxy (live and settled) and the sleeve journ
   await tp.write({ symbol: 'IWM', price: 220, qty: 1, now: at(DAY, 15, 55) + 25000 }, { log: (r) => rows.push(r), getBars, readJournal: async () => { throw new Error('locked'); }, env, signal: { symbol: 'IWM', close_ibs: true } });
   assert.match(rows[2].scenarios.why, /journal read failed: locked/);
 });
+
+test('retired: exits today\'s configuration cannot produce stay in the history, labelled, beside the same trades under today\'s rules', () => {
+  const row = (event, sym, day, hh, mm, ex = {}) => ({ ts: new Date(at(day, hh, mm) + 20000).toISOString(), user: 'local-owner', event, symbol: sym, ...ex });
+  // close-IBS: two signal exits from before TRADER_IBS_EXIT=1.01, then the max hold and a Friday flat
+  const rows = [
+    row('entry', 'SOXL', '2026-10-06', 15, 55), row('exit', 'SOXL', '2026-10-07', 10, 0, { reason: 'signal_exit', pnl: -726, pnl_pct: -5.8 }),
+    row('entry', 'TNA', '2026-10-14', 15, 55), row('exit', 'TNA', '2026-10-15', 10, 1, { reason: 'signal_exit', pnl: 90, pnl_pct: 1.5 }),
+    row('entry', 'XLK', '2026-10-22', 15, 55), row('exit', 'XLK', '2026-10-23', 15, 59, { reason: 'eod_flat_weekend (no weekend holds, 2026-08-24)', pnl: 52, pnl_pct: 0.6 }),
+    row('entry', 'TQQQ', '2026-11-02', 15, 55), row('exit', 'TQQQ', '2026-11-03', 15, 50, { reason: 'max_hold (1 sessions >= 1)', pnl: 69, pnl_pct: 1.8 }),
+    row('entry', 'IWM', '2026-11-03', 15, 55), row('exit', 'IWM', '2026-11-04', 15, 51, { reason: 'max_hold (1 sessions >= 1)', pnl: 125, pnl_pct: 1.6 }),
+  ];
+  const env = { TRADER_IBS_EXIT: '1.01', TRADER_MAX_HOLD_SESSIONS: '1', TRADER_EOD_FLAT: 'weekend' };
+  const now = at('2026-11-05', 15, 55) + 25000;
+  const h = tp.historyStats('C', rows, { now, symbol: 'SPY', r: tp.rulesOf('C', env), env });
+  const by = Object.fromEntries(h.scenarios.branches.map((b) => [b.branch, b]));
+  assert.strictEqual(h.scenarios.n, 5); assert.strictEqual(h.scenarios.mean_pct, -0.06, 'the history is kept as it happened');
+  assert.strictEqual(by.signal_exit.retired, true); assert.match(by.signal_exit.why, /TRADER_IBS_EXIT=1\.01/); assert.strictEqual(by.signal_exit.share, 0.4);
+  assert.strictEqual(by.signal_exit.share_current, undefined);
+  assert.strictEqual(by.max_hold.retired, undefined); assert.strictEqual(by.max_hold.share_current, 0.667); assert.strictEqual(by.weekend_flat.share_current, 0.333);
+  assert.strictEqual(h.scenarios.retired_n, 2);
+  assert.strictEqual(h.scenarios.current.n, 3); assert.strictEqual(h.scenarios.current.mean_pct, 1.333); assert.strictEqual(h.scenarios.current.win_rate, 1);
+  // the bounce exit on (0.6): the signal exits are a live rule, nothing is labelled; an old caller without the rules labels nothing
+  const env2 = { ...env, TRADER_IBS_EXIT: '0.6' };
+  const h2 = tp.historyStats('C', rows, { now, symbol: 'SPY', r: tp.rulesOf('C', env2), env: env2 });
+  assert.ok(h2.scenarios.branches.every((b) => !b.retired && b.share_current === undefined)); assert.strictEqual(h2.scenarios.current, undefined);
+  assert.strictEqual(tp.historyStats('C', rows, { now, symbol: 'SPY' }).scenarios.current, undefined);
+  // a reason no rule here names is shown as it is and never labelled retired
+  assert.strictEqual(tp.branchOf('C', rows[0], { ...rows[1], reason: 'momentum_exit (3 bearish scans)' }), 'other:momentum_exit');
+  assert.strictEqual(tp.branchOf('C', rows[0], { ...rows[1], reason: '' }), 'other');
+  assert.strictEqual(tp.retiredWhy('C', 'other:momentum_exit', tp.rulesOf('C', env), env), null);
+  // the leg: a rule switched off retires its branch; a carry is retired only when no rule carries
+  const mOn = { TRADER_NOISE_LATE_GATE: '1', TRADER_CARRY_DOWNDAY_SPY_PCT: '-1.5' };
+  for (const b of ['band_exit', 'late_gate', 'decarry', 'carried', 'carried_then_cap', 'stop', 'loss_cap']) assert.strictEqual(tp.retiredWhy('M', b, tp.rulesOf('M', mOn), mOn), null, b);
+  const mOff = {};   // no late gate, no down-day carry, the de-carry on
+  assert.match(tp.retiredWhy('M', 'late_gate', tp.rulesOf('M', mOff), mOff), /late gate is off/);
+  assert.match(tp.retiredWhy('M', 'carried', tp.rulesOf('M', mOff), mOff), /failed sale/);
+  assert.strictEqual(tp.retiredWhy('M', 'decarry', tp.rulesOf('M', mOff), mOff), null);
+  const noDecarry = { TRADER_EOD_DECARRY: '0' };
+  assert.match(tp.retiredWhy('M', 'decarry', tp.rulesOf('M', noDecarry), noDecarry), /de-carry is off/);
+  assert.strictEqual(tp.retiredWhy('M', 'carried', tp.rulesOf('M', noDecarry), noDecarry), null, 'without the de-carry the leg carries by design');
+  const noCap = { TRADER_MAX_LOSS_PCT: '0', TRADER_CARRY_DOWNDAY_SPY_PCT: '-1.5' };
+  assert.match(tp.retiredWhy('M', 'carried_then_cap', tp.rulesOf('M', noCap), noCap), /loss cap is off/);
+  assert.match(tp.retiredWhy('M', 'loss_cap', tp.rulesOf('M', noCap), noCap), /loss cap is off/);
+  // the overnight book: its max-hold backstop is live when set; the weekend flat retires when TRADER_EOD_FLAT is off
+  assert.strictEqual(tp.retiredWhy('O', 'max_hold', tp.rulesOf('O', { TRADER_MAX_HOLD_SESSIONS: '1' }), { TRADER_MAX_HOLD_SESSIONS: '1' }), null);
+  assert.match(tp.retiredWhy('O', 'max_hold', tp.rulesOf('O', {}), {}), /no max hold/);
+  assert.match(tp.retiredWhy('O', 'weekend_flat', tp.rulesOf('O', { TRADER_EOD_FLAT: 'off' }), { TRADER_EOD_FLAT: 'off' }), /weekend flat is off/);
+  // the plan itself carries the labels: buildPlan passes the sleeve's rules
+  const p = tp.buildPlan({ entry: { symbol: 'IWM', price: 220, qty: 10, now }, signal: { symbol: 'IWM', close_ibs: true, decision_context: { close_ibs_bar: '15:55' } }, history: rows, env });
+  assert.strictEqual(p.v, 2); assert.strictEqual(p.kind, 'C');
+  assert.strictEqual(p.scenarios.branches.find((b) => b.branch === 'signal_exit').retired, true);
+  assert.strictEqual(p.scenarios.current.n, 3); assert.strictEqual(p.scenarios.retired_n, 2);
+});

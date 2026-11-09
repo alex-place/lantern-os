@@ -1,0 +1,3 @@
+### Changed
+
+- trading: the trade plan's history (`scenarios`, journal only) labels the exits the sleeve's current configuration can no longer produce. Such a branch stays in the history as it happened, marked `retired: true` with the reason (for example close-IBS's signal exit, which cannot sell under `TRADER_IBS_EXIT=1.01`, a rule switched off, or a carry when no rule carries). Beside it, `current` (n, mean, win rate) and each live branch's `share_current` give the same trades without the retired ones: what usually happens under today's rules. A reason no rule names is now shown as `other:<reason>` instead of being counted as a signal exit, and it is never labelled retired.

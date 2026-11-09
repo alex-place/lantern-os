@@ -26,6 +26,9 @@
  *   scenarios    what usually happens: the sleeve's last closed trades in its own journal (up to 120), by the branch that closed
  *                them (the band exit, the late gate, the de-carry, a carry, the stop, the cap, the max hold, ...): the share, the
  *                mean result, the win rate and the median minutes held. The same classifier scores the forward read.
+ *                A branch the sleeve's CURRENT configuration can no longer produce (C's signal exit under TRADER_IBS_EXIT=1.01,
+ *                a rule switched off) stays in the history, labelled retired with the reason; `current` and share_current
+ *                give the same trades without them, what usually happens under today's rules.
  *   today        the sleeve's entries earlier the same session (a re-entry flag on the same fund, and what the earlier tries made).
  *   if_neither   THE IN-BETWEEN BRANCH: checkpoints (the leg at + 30 / 60 / 120 minutes before 15:50; close-IBS at the next
  *                session's 10:00 / 12:00 / 14:00; the month-end book at + 1 / + 2 sessions), each with the expected move by then
@@ -292,7 +295,29 @@ function branchOf(kind, entryRow, exitRow) {
   if (kind === 'M') { const m = Number.isFinite(tx) ? cal.etOf(tx).min : null; return m != null && m >= LATE_GATE_CLOCK && m < LATE_GATE_CLOCK + 5 ? 'late_gate' : 'band_exit'; }
   if (kind === 'O') return 'sale_0940';
   if (kind === 'T') return 'calendar';
-  return 'signal_exit';
+  if (/^signal_exit/.test(reason)) return 'signal_exit';   // the brain's own signal exit (on close-IBS, gated by TRADER_IBS_EXIT)
+  const tok = reason.trim().split(/[\s(]/)[0];
+  return tok ? `other:${tok}` : 'other';                    // a reason no rule here names: shown as it is, never labelled retired
+}
+/**
+ * Why the sleeve's CURRENT configuration can no longer produce this closing branch, or null when it can. The history keeps the
+ * old exits (they are what happened) and labels them, so what usually happens can be read under today's rules.
+ */
+function retiredWhy(kind, branch, r, env = process.env) {
+  if (!r) return null;
+  switch (branch) {
+    case 'loss_cap': return r.loss_cap_pct > 0 ? null : 'the loss cap is off now (TRADER_MAX_LOSS_PCT is 0)';
+    case 'weekend_flat': return r.eod_flat === 'weekend' || r.eod_flat === 'all' ? null : `the weekend flat is off now (TRADER_EOD_FLAT is ${r.eod_flat})`;
+    case 'max_hold': return num(env.TRADER_MAX_HOLD_SESSIONS, 0) > 0 ? null : 'no max hold now (TRADER_MAX_HOLD_SESSIONS is 0)';
+    case 'late_gate': return kind !== 'M' || r.late_gate ? null : 'the late gate is off now (TRADER_NOISE_LATE_GATE is not 1)';
+    case 'decarry': return kind !== 'M' || r.decarry ? null : 'the de-carry is off now (TRADER_EOD_DECARRY=0)';
+    case 'carried': case 'carried_then_cap':
+      if (kind !== 'M') return null;
+      if (r.decarry && r.carry_downday_spy_pct == null) return 'no rule carries a leg trade now (the de-carry is on, the down-day carry is off): a carry now means a failed sale';
+      return branch === 'carried_then_cap' && !(r.loss_cap_pct > 0) ? 'the loss cap is off now (TRADER_MAX_LOSS_PCT is 0)' : null;
+    case 'signal_exit': { const x = num(env.TRADER_IBS_EXIT, 0); return x > 1 ? `the brain's signal exit cannot sell now: TRADER_IBS_EXIT=${x} waits for a session IBS above 1, which never happens` : null; }
+    default: return null;   // band_exit, stop, sale_0940 and calendar are the sleeve's own rules; other:<reason> is shown as it is
+  }
 }
 /** Closed trades from journal rows (entry and exit rows, any order): each exit paired with the latest entry of its symbol before it. */
 function closedTrades(rows) {
@@ -306,21 +331,33 @@ function closedTrades(rows) {
   return out;
 }
 /** The scenarios (the sleeve's last HISTORY_N closed trades before `now`, by branch) and today's context for `symbol`. */
-function historyStats(kind, rows, { now, symbol }) {
+function historyStats(kind, rows, { now, symbol, r = null, env = process.env }) {
   const all = closedTrades(rows).filter((t) => tOfRow(t.exit) < now);
   const last = all.slice(-HISTORY_N);
   const pct = (t) => { const p = Number(t.exit.pnl_pct); if (Number.isFinite(p)) return p; const a = Number(t.exit.entry), b = Number(t.exit.exit); return a > 0 && b > 0 ? 100 * (b / a - 1) : null; };
+  const winRate = (p) => (p.length ? round(p.filter((v) => v > 0).length / p.length, 3) : null);
   const by = new Map();
   for (const t of last) { const k = branchOf(kind, t.entry, t.exit); if (!by.has(k)) by.set(k, []); by.get(k).push(t); }
+  // the exits today's configuration can no longer produce: kept, labelled
+  const retired = new Map(); for (const k of by.keys()) { const w = retiredWhy(kind, k, r, env); if (w) retired.set(k, w); }
+  const cur = last.filter((t) => !retired.has(branchOf(kind, t.entry, t.exit)));
   const branches = [...by.entries()].map(([branch, ts]) => {
     const p = ts.map(pct).filter((v) => v != null);
-    return { branch, n: ts.length, share: round(ts.length / last.length, 3), mean_pct: round(mean(p), 3), win_rate: p.length ? round(p.filter((v) => v > 0).length / p.length, 3) : null,
+    const b = { branch, n: ts.length, share: round(ts.length / last.length, 3), mean_pct: round(mean(p), 3), win_rate: winRate(p),
       median_min: round(median(ts.map((t) => (tOfRow(t.exit) - tOfRow(t.entry)) / 60000)), 0) };
+    if (retired.has(branch)) { b.retired = true; b.why = retired.get(branch); }
+    else if (retired.size && cur.length) b.share_current = round(ts.length / cur.length, 3);
+    return b;
   }).sort((a, b) => b.n - a.n);
   const pAll = last.map(pct).filter((v) => v != null);
   const scenarios = last.length
-    ? { basis: `the sleeve's last ${last.length} closed trades in its own journal`, from: last[0].exit.ts, n: last.length, mean_pct: round(mean(pAll), 3), win_rate: pAll.length ? round(pAll.filter((v) => v > 0).length / pAll.length, 3) : null, branches }
+    ? { basis: `the sleeve's last ${last.length} closed trades in its own journal`, from: last[0].exit.ts, n: last.length, mean_pct: round(mean(pAll), 3), win_rate: winRate(pAll), branches }
     : { why: 'no closed trades in the journal yet', n: 0, branches: [] };
+  if (retired.size) {
+    const pCur = cur.map(pct).filter((v) => v != null);
+    scenarios.retired_n = last.length - cur.length;
+    scenarios.current = { basis: 'the same trades without the retired branches: what usually happens under today\'s rules', n: cur.length, mean_pct: round(mean(pCur), 3), win_rate: winRate(pCur) };
+  }
   // today, before this entry
   const day = cal.etOf(now).day, sym = String(symbol || '').toUpperCase();
   const todays = (rows || []).filter((r) => r && r.event === 'entry' && r.user !== 'trade-plan' && tOfRow(r) < now - 1000 && cal.etOf(tOfRow(r)).day === day);
@@ -379,7 +416,7 @@ function buildPlan({ entry, signal, scan = null, bars = null, proxyBars = null, 
   plan.exits = exitsOf(kind, { r, symbol, price, stop, exit, flat, levels, entryDay: et.day, entryClock });
   // what usually happens, and today
   if (kind !== 'S') {
-    if (Array.isArray(history)) { const h = historyStats(kind, history, { now, symbol }); plan.scenarios = h.scenarios; plan.today = h.today; }
+    if (Array.isArray(history)) { const h = historyStats(kind, history, { now, symbol, r, env }); plan.scenarios = h.scenarios; plan.today = h.today; }
     else { plan.scenarios = { why: historyWhy || 'no journal read', n: 0, branches: [] }; plan.today = null; }
   }
   plan.if_expected = ifExpectedOf(kind, r, exit, symbol);
@@ -480,5 +517,5 @@ async function write(entry, opts = {}) {
 }
 
 module.exports = { buildPlan, write, enabled, knob, kindOf, sessionsOf, priceAt, expectedMove, plannedExit, checkpointsOf, rulesOf, liveClock, msOf, sessionsLeft,
-  weekendFlatAt, bandLevels, exitsOf, branchOf, closedTrades, historyStats, parseHistory,
+  weekendFlatAt, bandLevels, exitsOf, branchOf, retiredWhy, closedTrades, historyStats, parseHistory,
   VERSION, LOOKBACK, MIN_WINDOWS, LEG_CHECKS, C_CHECKS, T_CHECKS, LEG_LAST_CHECK, HISTORY_N, TESTED };
