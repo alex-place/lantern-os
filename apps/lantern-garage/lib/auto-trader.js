@@ -1756,6 +1756,7 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
         const _cdd = c.carryDownDayPct < 0 && c.carryDownDaySyms.has(sym) ? await _spySessionMovePct(now) : null;
         if (_cdd != null && _cdd <= c.carryDownDayPct) {
           out.skipped.push({ symbol: sym, price: cur, qty, why: `carry_downday — eod_decarry suppressed: SPY ${_cdd.toFixed(2)}% on the session (at or below ${c.carryDownDayPct}%); the inverse breakdown rides the gap (ledger tier0-inverse-carry-gated-by-entry-day)` });
+          _planCarryNote(sym, _cdd, now);   // the plan watchdog moves this trade's exit time to the next session (journal only)
         } else if (_isPinned(sym)) {
           out.skipped.push({ symbol: sym, why: 'pinned — eod_decarry suppressed by operator (#3318); carrying overnight deliberately' });
         } else {
@@ -2312,6 +2313,36 @@ function planEntry(entry, signal, scan) {
   } catch (_e) { /* journal only: a plan never touches an entry */ }
 }
 
+// THE PLAN WATCHDOG (lib/plan-watch.js, 2026-11-08, TRADER_PLAN_WATCH=alert, alert only): this pass's own broker reads (the
+// positions and the orders feed; no extra call) against the sleeve's open plans, journaled as plan_alert rows under the user
+// 'trade-plan', a fault also to the ALERTS file beside the journal. Never awaited; it places, cancels and changes nothing.
+function _planWatchKick(now, positions, orders) {
+  try {
+    const pw = require('./plan-watch');
+    if (!pw.enabled()) return;
+    const env = {};
+    for (const k of Object.keys(process.env)) if (/^TRADER_/.test(k)) env[k] = process.env[k];
+    const p = pw.check({ now, positions: Array.isArray(positions) ? positions.slice() : [], orders: Array.isArray(orders) ? orders.slice() : [],
+      journal: TRADES_LOG, sleeve: path.basename(TRADES_LOG).split('.')[0] || null, env,
+      alertsFile: String(process.env.TRADER_PLAN_WATCH_ALERTS || '').trim() || path.join(path.dirname(TRADES_LOG), 'plan-watch-ALERTS.log'),
+      log: (rec) => logTrade({ user: 'trade-plan', ...rec }) });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_e) { /* alert only: it never touches the pass */ }
+}
+// The down-day carry held a planned leg trade overnight: said once a day per symbol (plan_carry), so the watchdog moves the
+// trade's exit time to the next session's de-carry instead of calling the carry overdue.
+const _planCarrySaid = new Set();
+function _planCarryNote(sym, spyPct, now) {
+  try {
+    if (!require('./plan-watch').enabled()) return;
+    const day = marketCalendar.etOf(now).day, k = `${day}:${sym}`;
+    if (_planCarrySaid.has(k)) return;
+    if (_planCarrySaid.size > 500) _planCarrySaid.clear();
+    _planCarrySaid.add(k);
+    logTrade({ user: 'trade-plan', event: 'plan_carry', symbol: sym, day, spy_pct: Number.isFinite(Number(spyPct)) ? +Number(spyPct).toFixed(3) : null, why: 'the down-day carry suppressed the de-carry' });
+  } catch (_e) { /* journal only */ }
+}
+
 async function runAutoTrade(scan, opts = {}) {
   return _onePassPerAccount(opts,
     () => _pass.run({ user: (opts && opts.userId) || null }, () => _runAutoTradeInner(scan, opts)));
@@ -2467,6 +2498,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     logTrade({ ..._dr, feed_orders: (_ordersEarly || []).filter((o) => String(o.symbol || '').toUpperCase() === _dr.symbol)
       .map((o) => ({ id: o.orderId, side: o.side, type: o.orderType || o.type, qty: o.qty, status: o.status, price: o.price })).slice(0, 12) });
   }
+  _planWatchKick(now, positions, _ordersEarly);   // the plan watchdog: this pass's reads against the open plans (alert only, never awaited)
   // Partition sales are not this trader's exits: the reserve fund's, a sale of a name the overnight book holds (filled
   // at or after its buy), or one of the book's own sell orders. Their ids are remembered so no later pass books them.
   const _ordersMine = (_ordersEarly || []).filter((o) => {

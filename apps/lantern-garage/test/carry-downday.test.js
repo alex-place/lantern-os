@@ -111,3 +111,21 @@ test('the carry set is configurable: SOXS outside TRADER_CARRY_DOWNDAY_SYMBOLS i
     assert.ok(exited(out, 'SOXS'));
   } finally { delete process.env.TRADER_CARRY_DOWNDAY_SPY_PCT; delete process.env.TRADER_CARRY_DOWNDAY_SYMBOLS; }
 });
+
+test('with the plan watchdog on, the carry is journaled once a day (plan_carry) so the watchdog moves the exit; off, nothing', async () => {
+  const carries = () => fs.readFileSync(process.env.TRADER_TRADES_LOG, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.event === 'plan_carry');
+  process.env.TRADER_CARRY_DOWNDAY_SPY_PCT = '-1.5'; spyLast = 98; spyBars = true;
+  try {
+    _resetCooldowns(); book = [pos('SOXS', 300, 40)];
+    await scan(AT_1555 + 7);
+    assert.strictEqual(carries().length, 0, 'off: the earlier carries in this file wrote nothing either');
+    process.env.TRADER_PLAN_WATCH = 'alert';
+    _resetCooldowns();
+    const out = await scan(AT_1555 + 8);
+    assert.match(skip(out, 'SOXS'), /carry_downday/);
+    _resetCooldowns(); await scan(AT_1555 + 60000);
+    const c = carries();
+    assert.strictEqual(c.length, 1, 'once a day per symbol');
+    assert.deepStrictEqual([c[0].user, c[0].symbol, c[0].day, c[0].spy_pct], ['trade-plan', 'SOXS', '2026-08-17', -2]);
+  } finally { delete process.env.TRADER_CARRY_DOWNDAY_SPY_PCT; delete process.env.TRADER_PLAN_WATCH; }
+});
