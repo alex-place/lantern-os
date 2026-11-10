@@ -22,6 +22,7 @@
  *   GET  /portfolio/{acctId}/summary          equity / cash / pnl
  *   GET  /portfolio/{acctId}/positions/{page} positions (0-indexed pages)
  *   POST /iserver/secdef/search               symbol → conid
+ *   GET  /iserver/marketdata/history          a contract's bars (read-only; the stable box's bar fallback)
  *   POST /iserver/account/{acctId}/orders     place order (array body)
  *   POST /iserver/reply/{messageId}           confirm order reply ({confirmed:true})
  *   GET  /iserver/account/orders              live/working orders
@@ -580,6 +581,20 @@ class IbkrCpapi {
       symbol: match.symbol || sym,
       description: match.description || match.companyName || '',
     };
+  }
+
+  /**
+   * GET /iserver/marketdata/history: one contract's bars, read-only. Resolves the raw { ok, status, json, error } of
+   * _request (never rejects), so a caller can see IBKR's status (a 429 means its rate limit, which can hold the whole
+   * session). The body's `data` rows are { t (ms), o, h, l, c, v }, read as the bar's start; the fallback's probe checks
+   * that against Yahoo before anyone arms it. `mdAvailability` and `mktDataDelay` say whether the account's data is
+   * real-time or delayed. Used by lib/two-sleeve/bars-fallback.js (stableIbkrBars), which paces every call.
+   */
+  async getHistory(conid, { period = '1d', bar = '5min', outsideRth = false } = {}) {
+    const id = Number(conid);
+    if (!Number.isFinite(id) || id <= 0) return { ok: false, status: 0, json: null, error: 'bad_conid' };
+    const q = new URLSearchParams({ conid: String(id), period: String(period), bar: String(bar), outsideRth: outsideRth ? 'true' : 'false' });
+    return this._request('GET', `/iserver/marketdata/history?${q.toString()}`);
   }
 
   /**

@@ -286,9 +286,23 @@ async function _autoscanTick() {
           // THE OVERNIGHT BOOK (lib/overnight-book.js, 2026-10-28): the engine's sleeve O on this account. Buys SPY/QQQ/SMH
           // above their 200-session mean at the 15:55 print, sells them at the 09:40 print; a no-op (no market-data read)
           // outside those windows. The day-trader leaves the names it holds alone on its own (auto-trader's partition).
+          // THE IBKR BAR FALLBACK (lib/two-sleeve/bars-fallback.js stableIbkrBars, 2026-11-09; TRADER_BARS_IBKR_FALLBACK=shadow|1,
+          // off unless set, IBKR accounts only): the book's 5m bars from IBKR when Yahoo runs late, and three probes a session of
+          // what IBKR serves. The shadow never holds the pass; rows under the user 'bars-ibkr'.
+          const _yBars = (sym, tf) => require('../lib/market-data-yahoo').getBars(sym, tf);
+          let _bookBars = _yBars;
+          try {
+            const _ib = require('../lib/two-sleeve/bars-fallback').stableIbkrBars({ facade: resolved.facade, broker: resolved.broker, userId: uid,
+              getBars: _yBars, log: (row) => require('../lib/auto-trader').logTrade({ user: 'bars-ibkr', ...row }) });
+            if (_ib) {
+              _bookBars = _ib.getBars;
+              const _p = _ib.kick(Date.now());
+              if (_p && typeof _p.catch === 'function') _p.catch(() => {});
+            }
+          } catch (_e) { /* journal only: the fallback never breaks a pass */ }
           try {
             await require('../lib/overnight-book').maybeRun({ facade: resolved.facade, userId: uid, journal: _logRow,
-              getBars: (sym, tf) => require('../lib/market-data-yahoo').getBars(sym, tf),
+              getBars: _bookBars,
               quote: async (sym) => { const q = await require('../lib/market-data-yahoo').getQuotes([sym], { fresh: true }); return q && q[0] ? q[0].price : 0; },
               // the market-context tags (lib/entry-tags.js): journal only, never awaited
               onBuy: (b) => require('../lib/auto-trader').tagEntry({ ...b, source: 'overnight_book' }) });
