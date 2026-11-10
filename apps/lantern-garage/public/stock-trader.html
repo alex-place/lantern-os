@@ -650,6 +650,12 @@
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
   .tp-stat .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text0)}
   .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
+  /* Beside the Day P&L figure: banked, marks, after hours. Each row wraps by itself, so the sleeves drop under the number on a narrow pane. */
+  .tp-split{display:flex;flex-direction:column;justify-content:center;gap:1px;font-family:var(--mono);font-size:11px;line-height:14px;color:var(--text2)}
+  .tp-split-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
+  .tp-split .k{min-width:112px;font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  .tp-split .n{min-width:76px;text-align:right;font-weight:600;color:var(--text0)}
+  .tp-split .n.pos{color:var(--green)} .tp-split .n.neg{color:var(--red)} .tp-split .n.unk{font-weight:400;font-style:italic;color:var(--text2)}
   .tp-tabs{display:flex;gap:2px;padding:0 var(--hdr-px);border-bottom:1px solid var(--border);overflow-x:auto;height:var(--hdr-h);box-sizing:border-box;align-items:stretch}
   .tp-tab{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--hdr-fg);background:none;border:none;border-bottom:2px solid transparent;padding:0 11px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;transition:color .12s,border-color .12s}
   .tp-tab:hover{color:var(--text1)}
@@ -10538,14 +10544,14 @@ function _dayPnlTip(a){
   const otherTxt = (eqBasis && isFinite(other) && Math.abs(other) >= 0.01)
     ? ` ${(other>=0?'+ ':'- ')}$${fmt(Math.abs(other),2)} other (commissions, holdings the trade log did not record, short positions)`
     : '';
-  const decomp = (a && a.realized_today != null && a.unrealized_today != null)
+  const decomp = (a && a.realized_today != null && a.unrealized_today != null && !_tpJournalsUnknown(a))
     ? ` Today = Realized ${(a.realized_today>=0?'+':'-')}$${fmt(Math.abs(a.realized_today),2)} (closed trades) ${(a.unrealized_today>=0?'+ ':'- ')}$${fmt(Math.abs(a.unrealized_today),2)} move on open positions${otherTxt}.`
     : '';
   const base = (eqBasis
     ? "How much the account made TODAY: its equity change since the previous close."
     : "How much the account made TODAY — today’s move only, across both closed and open positions.") + decomp;
   const adj = Number(a && a.pnl_carry_adjustment) || 0;
-  if (!adj) return base;
+  if (!adj || _tpJournalsUnknown(a)) return base;
   const amt = '$' + fmt(Math.abs(adj), 2);
   return base + (adj > 0
     ? ` Excludes ${amt} that carried positions had already earned before today.`
@@ -10763,6 +10769,46 @@ function _tpRedraw(){
   renderPositionsTable(_lastPositions);
 }
 
+/* Banked apart from marked (lib/day-pnl-split, 2026-11-05). Sits beside the Day P&L figure, inside its tile, so it
+   shows wherever that figure does: a separate tile would stay hidden for anyone with saved Columns choices, and this
+   is the row that says whether a good-looking day was money or marks. No day_split from the server (an older server, or
+   an account the server's journals do not describe): nothing, and the figure alone as before. A null is different:
+   the server looked and could not tell, so it says unknown, never $0.00. */
+function _tpJournalsUnknown(a){
+  const journals = (a && a.day_split && a.day_split.realized && a.day_split.realized.journals) || [];
+  return journals.some((j) => j.status !== 'ok');
+}
+function _tpDaySplit(a){
+  const s = a && a.day_split;
+  if (!s) return '';
+  const esc = (x) => String(x).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const amount = (v) => (v < 0 ? '-' : '+') + '$' + fmt(Math.abs(v), 2);
+  const figure = (v) => v == null
+    ? '<span class="n unk">unknown</span>'
+    : `<span class="n ${v > 0 ? 'pos' : v < 0 ? 'neg' : ''}">${amount(v)}</span>`;
+  const row = (label, v, tip, extra) => `<div class="tp-split-row" title="${esc(tip)}"><span class="k">${esc(label)}</span>${figure(v)}${extra ? `<span class="s">${esc(extra)}</span>` : ''}</div>`;
+  const journals = (s.realized && s.realized.journals) || [];
+  const known = (j) => j.pnl != null && j.status === 'ok';
+  // One figure per sleeve that closed something or could not be read. Single-journal boxes need no breakdown unless it is the unknown one.
+  const shown = journals.filter((j) => !known(j) || (journals.length > 1 && j.exits > 0));
+  const sleeves = shown.map((j) => j.name + ' ' + (known(j) ? amount(j.pnl) : 'unknown')).join(' · ');
+  const notes = (s.notes || []).join(' ');
+  const idle = journals.filter((j) => known(j) && !j.exits).map((j) => j.name);
+  const banked = 'Closed trades, each counted whole from entry to exit: what they actually made or lost. Part of it can be gain made before this day, which is why the Realized P&L tile, today’s part only, can differ.'
+    + (idle.length ? ` No closed trades: ${idle.join(', ')}.` : '') + (notes ? ' ' + notes : '');
+  const marks = 'Not banked: the rest of the day’s change in account value. Today’s move on what is still open, less the gains closed trades already had in the previous close, plus anything the journals do not hold (fees, unrecorded holdings). It moves until the position closes.';
+  const when = s.close_source ? ` (${s.close_source})` : '';
+  const after = 'Not banked: account value now minus at the close' + when + '. It is marks on what the account carried past the close.';
+  const bankedLabel = (s.is_today === false && s.phase === 'after_close') ? 'Banked ' + String(s.session_date || '').slice(5) : 'Banked today';
+  const marksLabel = s.marks_include_after_hours ? 'Marks + after hrs' : s.phase === 'after_close' ? 'Marks at close' : 'Open marks';
+  const sum = 'Banked + marks' + (s.after_hours_applies ? ' + after hours' : '') + ' = Day P&L.';
+  return `<div class="tp-split" role="group" aria-label="${esc(sum)}">`
+    + row(bankedLabel, s.realized ? s.realized.total : null, banked, sleeves)
+    + row(marksLabel, s.marks, marks + ' ' + sum)
+    + (s.after_hours_applies ? row('After hours', s.after_hours, after + (s.after_hours == null && notes ? ' ' + notes : '')) : '')
+    + '</div>';
+}
+
 let _tpLastAccount = null;
 function renderTpSummary(a, positions){
   const el=document.getElementById('tpSummary'); if(!el) return;
@@ -10792,7 +10838,11 @@ function renderTpSummary(a, positions){
     // move = Day). The 2026-08-13 whole-lot Realized bug and the 2026-08-22
     // mislabeled-Unrealized bug were both attempts to force one basis on the
     // whole row — each broke a different tile.
-    realized: () => cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)),
+    // A journal the server could not count makes this unknown too: with M's journal gone, Wednesday 2026-11-04's
+    // tile read +$426 from the journals that were left, beside a day that banked -$154.
+    realized: () => _tpJournalsUnknown(a)
+      ? cell('Realized P&L', 'unknown', '', 'Unknown: a trade journal this figure needs could not be counted. See Banked, beside Day P&L.')
+      : cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)),
     // #3409: this tile ALWAYS shows since-entry unrealized — the number that
     // reconciles with the Unrealized column below it. #3380 briefly wired the
     // day-basis move here so the row summed (Realized+Unrealized=Day); the
@@ -10803,7 +10853,7 @@ function renderTpSummary(a, positions){
     unrealized: () => cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized),
       'Since entry — the sum of the Unrealized column in the table below (lifetime vs avg fill).' +
       (a.unrealized_today != null ? ` Today’s move on the open positions alone: ${(a.unrealized_today>=0?'+':'-')}$${fmt(Math.abs(a.unrealized_today),2)} — see Day P&L.` : '')),
-    day: () => cell(a.pnl_today_source === 'broker_reset' ? 'Day P&L (broker)' : 'Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)),
+    day: () => cell(a.pnl_today_source === 'broker_reset' ? 'Day P&L (broker)' : 'Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) + _tpDaySplit(a),
     bp: () => cell('Buying power', money(a.buying_power)),
     lev: () => cell('Leverage', eq > 0 ? fmt(gross / eq, 2) + 'x' : '—', '',
       'Gross exposure ÷ account value: each position’s market value times its fund multiplier (SOXL counts 3x), summed, over what the account is worth. Under 1x, part of the account is in cash.'),

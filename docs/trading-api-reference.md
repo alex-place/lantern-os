@@ -29,7 +29,7 @@ Kalshi endpoints that require credentials are gated behind API key presence; una
 | `POST` | `/api/trading/settings` | Update runtime trading settings |
 | `GET` | `/api/trading/market-status` | Market open/closed, session info |
 | `GET` | `/api/trading/zones` | Support/resistance zones for watchlist tickers |
-| `GET` | `/api/trading/positions` | Open positions across all brokers |
+| `GET` | `/api/trading/positions` | Open positions across all brokers. For the account the server's own journals describe, `account.day_split` splits the Day P&L into what is banked (`realized.total`, by journal), `marks`, and from the close `after_hours`; they add up to `day_pnl` to the cent, and null means unknown, never $0 (`lib/day-pnl-split.js`) |
 | `GET` | `/api/trading/import` | Can this reader import broker trades, and what has been imported already (#3557) |
 | `POST` | `/api/trading/import` | Read the reader's own broker fill history, reconstruct round trips, write them to the journal ledger. Idempotent on the closing order id — running it twice changes nothing |
 | `GET` | `/api/trading/watchlist` | Current watchlist tickers |
