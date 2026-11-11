@@ -1,2 +1,3 @@
 ### Changed
 - trading: `lib/auto-trader.js` slimmed with no behaviour change — the long dated history comments (153 blocks, ~1,500 lines) moved verbatim to `docs/auto-trader-history.md`; each rule keeps a short what/why comment in the code ending with its history id (`(H38)`). Verified token-identical (comments are the only change) and by the full trader test set.
+- trading: `_runAutoTradeInner` (1,790 lines) split into seven named phases moved verbatim beside it (`_trackHeldSnapshot`, `_externalCloseSweep`, `_reconcileExitFreezes`, `_reprotectStops`, `_entryPass`, `_logSlotUtil`, `_writeSessionRecord`); the spine is ~260 lines. No behaviour change: the armed-design replay reproduces master's trades and daily series byte-for-byte on two quarters.
