@@ -4069,7 +4069,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       // session's close, from this ledger's own session rows (lib/day-pnl prevSessionEquity). Recorded
       // next to day_pnl, never mixed into it: a sleeve's book is not the whole account.
       try {
-        const _prevEq = require('./day-pnl').prevSessionEquity(_ledger, now);
+        const _prevEq = require('./day-pnl').prevSessionEquity(_ledger, now, account);
         if (_prevEq && Number(account && account.equity) > 0) {
           _dp.account_day_pnl = Math.round((Number(account.equity) - _prevEq.equity) * 100) / 100;
           _dp.prev_equity = _prevEq.equity;

@@ -132,6 +132,11 @@ class TradingAPIBridge {
       buying_power: buyingPower != null ? buyingPower : 0,
       mode: status.mode,
       source: 'ibkr-cpapi',
+      // The currency these figures are in (lib/ibkr-cpapi.js THE REPORTING CURRENCY): USD, restated
+      // from the account's base when that differs. The session row records it so the next day's
+      // equity change compares like with like (lib/day-pnl.js prevSessionEquity).
+      ...(summary.currency ? { currency: summary.currency } : {}),
+      ...(summary.base_currency ? { base_currency: summary.base_currency, fx_usd_to_base: summary.fx_usd_to_base } : {}),
     };
   }
 
