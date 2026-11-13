@@ -233,10 +233,36 @@ test('a relaunch rebuilds the open plans and the alerts in force from the journa
 test('a journal that cannot be read is said once an hour, and the pass goes on', async () => {
   pw._reset();
   const said = [];
-  const run = (now) => pw.check({ now, positions: [], orders: [], journal: path.join(os.tmpdir(), 'plan-watch-missing', 'x.jsonl'), log: (r) => said.push(r), env: ENV });
-  assert.strictEqual(await run(at(DAY, 10)), null); assert.strictEqual(await run(at(DAY, 10, 30)), null);
-  assert.strictEqual(said.length, 1); assert.strictEqual(said[0].event, 'plan_watch_error');
-  await run(at(DAY, 11, 1)); assert.strictEqual(said.length, 2);
+  const bad = path.join(os.tmpdir(), 'plan-watch-unreadable', 'x.jsonl');
+  const realOpen = fs.promises.open;   // a journal the process may not read (the same on every platform): EACCES on open
+  fs.promises.open = async (p, ...a) => { if (p === bad) { const e = new Error(`EACCES: permission denied, open '${p}'`); e.code = 'EACCES'; throw e; } return realOpen.call(fs.promises, p, ...a); };
+  try {
+    const run = (now) => pw.check({ now, positions: [], orders: [], journal: bad, log: (r) => said.push(r), env: ENV });
+    assert.strictEqual(await run(at(DAY, 10)), null); assert.strictEqual(await run(at(DAY, 10, 30)), null);
+    assert.strictEqual(said.length, 1); assert.strictEqual(said[0].event, 'plan_watch_error');
+    await run(at(DAY, 11, 1)); assert.strictEqual(said.length, 2);
+  } finally { fs.promises.open = realOpen; }
+});
+
+test('a sleeve that has never written its journal is an empty one: no error, nothing said, and its first rows are read when they come', async () => {
+  pw._reset();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-watch-nojournal-'));
+  const file = path.join(dir, 'T.autopilot-trades.jsonl');   // not created: T had never traded when the watchdog first read it (2026-11-09)
+  const said = [];
+  const log = (r) => { const row = { ts: iso(now), user: 'trade-plan', ...r }; said.push(row); fs.appendFileSync(file, JSON.stringify(row) + '\n'); };
+  let now = at(DAY, 4, 0, 10);
+  const run = (n, positions = []) => { now = n; return pw.check({ now: n, positions, orders: [], journal: file, log, sleeve: 'T', env: ENV }); };
+  const r = await run(now);
+  assert.notStrictEqual(r, null, 'a missing journal is not a failed read');
+  assert.deepStrictEqual(said, [], 'nothing said, no plan_watch_error');
+  assert.ok(!fs.existsSync(file), 'the check creates no journal');
+  // the sleeve's first trade: the plan and the entry land, and the next pass reads them from the start of the new file
+  const e = at(DAY, 15, 55);
+  fs.appendFileSync(file, JSON.stringify(plan({ kind: 'T', symbol: 'TLT', entryAt: e, exitBy: at(NEXT, 15, 55), exits: [{ rule: 'calendar' }] })) + '\n');
+  fs.appendFileSync(file, JSON.stringify(entryRow('TLT', e + 4000)) + '\n');
+  const r2 = await run(e + 60000, [{ symbol: 'TLT', qty: 10 }]);
+  assert.strictEqual(r2.open, 1, 'the new plan is read');
+  assert.deepStrictEqual(said.filter((x) => x.event === 'plan_watch_error'), []);
 });
 
 test('the adherence read: the forward read\'s map, shared', () => {
