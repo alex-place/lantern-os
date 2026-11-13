@@ -396,7 +396,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             // THE ACCOUNT'S DAY IS ITS EQUITY CHANGE (2026-10-26, lib/day-pnl reconcileDayPnl): measured from
             // the previous session's close as the trader recorded it in its own session row. On 10-26 the
             // ledger alone read -$899 (it booked short-opening XLE sells as long exits) on a +$1,627 day.
-            const _prev = dayPnlLib.prevSessionEquity(_ledgerText, Date.now());
+            const _prev = dayPnlLib.prevSessionEquity(_ledgerText, Date.now(), ibkrAccount);
             const _d = dayPnlLib.reconcileDayPnl(_d0, { equity: ibkrAccount.equity, prevEquity: _prev && _prev.equity, prevSource: _prev ? `the trader's ${_prev.date} session close` : '' });
             ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
             ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
@@ -464,7 +464,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
               getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(require('../../lib/app-paths').dataPath('lantern-garage', 'trading', 'bars')),
             });
-            const _opPrev = require('../../lib/day-pnl').prevSessionEquity(_opLedger, Date.now());
+            const _opPrev = require('../../lib/day-pnl').prevSessionEquity(_opLedger, Date.now(), opAccount);
             const _d = require('../../lib/day-pnl').reconcileDayPnl(_d0, { equity: opAccount.equity, prevEquity: _opPrev && _opPrev.equity, prevSource: _opPrev ? `the trader's ${_opPrev.date} session close` : '' });
             opAccount.realized_today = _d.realized_today;
             opAccount.realized_booked = _d.realized_booked;

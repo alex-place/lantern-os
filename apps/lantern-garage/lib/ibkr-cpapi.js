@@ -119,18 +119,82 @@ function firstNum(...vals) {
   return null;
 }
 
-/** /portfolio/{acct}/summary → normalized account shape (defensive: keys vary by build). */
+/** The `currency` an amount field is stated in ({amount, currency} nesting), upper-cased, or null. */
+function pickCurrency(obj, keys) {
+  if (!obj || typeof obj !== 'object') return null;
+  const lower = {};
+  for (const k of Object.keys(obj)) lower[k.toLowerCase()] = obj[k];
+  for (const key of keys) {
+    const v = lower[String(key).toLowerCase()];
+    if (v && typeof v === 'object' && typeof v.currency === 'string' && v.currency.trim()) return v.currency.trim().toUpperCase();
+  }
+  return null;
+}
+
+const EQUITY_KEYS = ['netliquidation', 'netliquidationvalue', 'equitywithloanvalue', 'nlv'];
+const CASH_KEYS = ['totalcashvalue', 'availablefunds', 'settledcash', 'cashbalance'];
+
+/** /portfolio/{acct}/summary → normalized account shape (defensive: keys vary by build).
+ *  `currency` is the account's BASE currency as IBKR states the amounts (null when the build
+ *  sends bare numbers); getAccountSummary converts a non-USD base to USD. */
 function normalizeSummary(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const equity = pickAmount(raw, ['netliquidation', 'netliquidationvalue', 'equitywithloanvalue', 'nlv']);
-  const cash = pickAmount(raw, ['totalcashvalue', 'availablefunds', 'settledcash', 'cashbalance']);
+  const equity = pickAmount(raw, EQUITY_KEYS);
+  const cash = pickAmount(raw, CASH_KEYS);
   const buyingPower = pickAmount(raw, ['buyingpower']);
   const unrealizedPnl = pickAmount(raw, ['unrealizedpnl']);
   const realizedPnl = pickAmount(raw, ['realizedpnl']);
   const excessLiquidity = pickAmount(raw, ['excessliquidity']);
   // If none of the canonical keys were present the payload isn't a summary — say so.
   if (equity == null && cash == null && buyingPower == null) return null;
-  return { equity, cash, buyingPower, unrealizedPnl, realizedPnl, excessLiquidity };
+  const currency = pickCurrency(raw, [...EQUITY_KEYS, ...CASH_KEYS]);
+  return { equity, cash, buyingPower, unrealizedPnl, realizedPnl, excessLiquidity, currency };
+}
+
+// THE REPORTING CURRENCY (2026-11-11). IBKR states an account's summary and P&L amounts in the
+// account's BASE currency, while positions, marks and order notionals are in each instrument's
+// currency: USD for every name this app trades. Stable's paper account is IB-CAN, funded CA$1M, so
+// equity and cash arrived in CAD and were read as dollars beside USD positions. The session row's
+// equity - cash - holdings then ran (USDCAD - 1) x holdings (the close review's "$292k unaccounted"
+// on 2026-11-11), and every size taken as a percentage of equity ran about 1.42x. Amounts are now
+// restated in USD at the ledger's own rate; a USD-base account is untouched and costs no extra call.
+// IBKR_REPORT_CURRENCY=base keeps the broker's base currency (the behaviour before this change).
+const FX_FRESH_MS = 10 * 60 * 1000;          // re-read the rate at most every 10 minutes
+const FX_STALE_OK_MS = 72 * 3600 * 1000;     // a failed re-read may lean on a rate up to 72 h old
+const reportInBase = () => String(process.env.IBKR_REPORT_CURRENCY || '').trim().toLowerCase() === 'base';
+
+/** /portfolio/{acct}/ledger → base-currency units per 1 unit of `currency` (CAD per USD on an IB-CAN
+ *  account), or null. Each currency row's `exchangerate` converts that currency into the base. The
+ *  direction is CHECKED, not assumed: BASE.cashbalance must equal the sum of row.cashbalance x rate;
+ *  when it equals the sum of row.cashbalance / rate the build states it the other way round, and a
+ *  ledger that adds up neither way is unknown (null), never guessed. */
+function fxFromLedger(ledger, currency = 'USD') {
+  if (!ledger || typeof ledger !== 'object') return null;
+  const rows = {};
+  for (const [k, v] of Object.entries(ledger)) if (v && typeof v === 'object') rows[String(k).toUpperCase()] = v;
+  const row = rows[String(currency).toUpperCase()];
+  const rate = row ? firstNum(row.exchangerate) : null;
+  if (!(rate > 0)) return null;
+  const base = rows.BASE;
+  const baseCash = base ? firstNum(base.cashbalance) : null;
+  if (baseCash != null) {
+    let mul = 0, div = 0, gross = 0, n = 0;
+    for (const [k, v] of Object.entries(rows)) {
+      if (k === 'BASE') continue;
+      const cb = firstNum(v.cashbalance), x = firstNum(v.exchangerate);
+      if (cb == null || !(x > 0)) continue;
+      mul += cb * x; div += cb / x; gross += Math.max(Math.abs(cb * x), Math.abs(cb / x)); n++;
+    }
+    if (n >= 2) {
+      // 0.2 % of the balances' size, not of the net: a CA$970k / -US$680k pair nets to CA$1.7k, and a
+      // rate rounded to 4 places moves the sum by tens of dollars without making it ambiguous.
+      const tol = Math.max(1, gross * 0.002);
+      const okMul = Math.abs(mul - baseCash) <= tol, okDiv = Math.abs(div - baseCash) <= tol;
+      if (okDiv && !okMul) return 1 / rate;
+      if (!okMul && !okDiv) return null;
+    }
+  }
+  return rate;
 }
 
 /** position row → normalized position. */
@@ -178,6 +242,32 @@ class IbkrCpapi {
     this.oauth1 = opts.oauth1 || null;
     this._lst = null; // { token, expiresAt } — cached Live Session Token
     this._lstError = null; // last OAuth1 handshake failure reason (diagnostics)
+    this._fx = new Map();          // accountId -> { rate, at } (base units per 1 USD, from the ledger)
+    this._acctBase = new Map();    // accountId -> base currency the last summary was stated in
+  }
+
+  /** Base units per 1 USD for this account: the cached ledger rate while fresh, else a new ledger read,
+   *  else (the read failed) a cached rate up to 72 h old, else null. */
+  async _usdRate(id) {
+    const hit = this._fx.get(id);
+    if (hit && Date.now() - hit.at < FX_FRESH_MS) return hit.rate;
+    const r = await this._request('GET', `/portfolio/${encodeURIComponent(id)}/ledger`);
+    const rate = r && r.ok ? fxFromLedger(r.json, 'USD') : null;
+    if (rate > 0) { this._fx.set(id, { rate, at: Date.now() }); return rate; }
+    if (hit && Date.now() - hit.at < FX_STALE_OK_MS) return hit.rate;
+    return null;
+  }
+
+  /** Restate the named amount fields of `obj` from `base` into USD. Returns the converted copy, `obj`
+   *  itself when there is nothing to convert, or null when the rate is unknown: an account stated in
+   *  the wrong currency would size every order off a figure about 40 % off, so unknown beats wrong. */
+  async _toUsd(id, obj, fields, base) {
+    if (!obj || !base || base === 'USD' || reportInBase()) return obj;
+    const rate = await this._usdRate(id);
+    if (!(rate > 0)) return null;
+    const out = { ...obj, currency: 'USD', base_currency: base, fx_usd_to_base: rate };
+    for (const f of fields) if (typeof out[f] === 'number' && Number.isFinite(out[f])) out[f] = out[f] / rate;
+    return out;
   }
 
   _verifyTls(hostname) {
@@ -356,13 +446,18 @@ class IbkrCpapi {
     return id || null;
   }
 
-  /** GET /portfolio/{acct}/summary → normalized account, or null. */
+  /** GET /portfolio/{acct}/summary → normalized account, or null. Amounts are in USD: a non-USD base
+   *  account is restated at the ledger's rate (see THE REPORTING CURRENCY above), and stays null when
+   *  that rate cannot be read. */
   async getAccountSummary(accountId) {
     const id = accountId || (await this.resolveAccountId());
     if (!id) return null;
     const r = await this._request('GET', `/portfolio/${encodeURIComponent(id)}/summary`);
     if (!r.ok) return null;
-    return normalizeSummary(r.json);
+    const s = normalizeSummary(r.json);
+    if (!s) return null;
+    if (s.currency) this._acctBase.set(id, s.currency);
+    return this._toUsd(id, s, ['equity', 'cash', 'buyingPower', 'unrealizedPnl', 'realizedPnl', 'excessLiquidity'], s.currency);
   }
 
 
@@ -511,11 +606,16 @@ class IbkrCpapi {
       if (!row) row = v;                                 // else first PnL-shaped row
     }
     if (!row) return null;
-    return {
+    const out = {
       dailyPnl: firstNum(row.dpl),
       unrealizedPnl: firstNum(row.upl),
       realizedPnl: firstNum(row.rpl),
     };
+    // The partitioned P&L is in the account's base currency too: restate it with the summary's rate.
+    // A first call before any summary read learns the base from one (the breaker compares this figure
+    // with a percentage of the summary's equity, so both must be in the same currency).
+    if (!this._acctBase.has(id)) await this.getAccountSummary(id).catch(() => null);
+    return this._toUsd(id, out, ['dailyPnl', 'unrealizedPnl', 'realizedPnl'], this._acctBase.get(id) || null);
   }
 
   /**
@@ -859,6 +959,8 @@ module.exports.isBenignWarning = isBenignWarning;
 module.exports.BENIGN_WARNING_IDS = BENIGN_WARNING_IDS;
 module.exports.pickAmount = pickAmount;
 module.exports.normalizeSummary = normalizeSummary;
+module.exports.pickCurrency = pickCurrency;
+module.exports.fxFromLedger = fxFromLedger;
 module.exports.normalizePosition = normalizePosition;
 module.exports.inferMode = inferMode;
 module.exports.DEFAULT_BASE = DEFAULT_BASE;

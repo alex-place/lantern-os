@@ -448,9 +448,10 @@ function reconcileDayPnl(d, { equity, prevEquity, prevSource } = {}) {
  * The account's equity at the previous session's close, from the ledger's own `session` rows (the
  * trader writes one at every close, account equity included). Only the row of the trading day right
  * before `now` counts (lib/market-calendar.js): an older one would fold several days into "today".
- * Returns { date, ts, equity } or null.
+ * Pass the live `account` so the row is compared in the same currency (restateEquity below).
+ * Returns { date, ts, equity } (plus `currency` when the row recorded one) or null.
  */
-function prevSessionEquity(ledgerText, now = Date.now()) {
+function prevSessionEquity(ledgerText, now = Date.now(), account = null) {
   const want = require('./market-calendar').prevTradingDay(etDay(now));
   if (!want) return null;
   let best = null;
@@ -459,9 +460,28 @@ function prevSessionEquity(ledgerText, now = Date.now()) {
     let r; try { r = JSON.parse(line); } catch (_e) { continue; }
     if (!r || r.event !== 'session' || !(Number(r.equity) > 0)) continue;
     if ((r.date || etDay(r.ts)) !== want) continue;
-    if (!best || String(r.ts) > String(best.ts)) best = { date: want, ts: r.ts, equity: Number(r.equity) };
+    if (!best || String(r.ts) > String(best.ts)) best = { date: want, ts: r.ts, equity: Number(r.equity), ...(r.currency ? { currency: String(r.currency).toUpperCase() } : {}) };
   }
-  return best;
+  return restateEquity(best, account);
+}
+
+/**
+ * A session row's equity is in the currency the account reported that day. Rows written before
+ * 2026-11-11 carry no `currency`: on an IBKR account they hold the broker's BASE-currency figure
+ * (CAD on stable's IB-CAN account); rows since then are USD (lib/ibkr-cpapi.js THE REPORTING
+ * CURRENCY). Comparing the two would book the whole conversion as one day's loss (about -$293k on
+ * stable's first USD session), so a base-currency row is restated at today's rate when the live
+ * account says its figures were converted from that base. Anything else is returned as it was.
+ */
+function restateEquity(prev, account) {
+  if (!prev || !account) return prev;
+  const live = account.currency ? String(account.currency).toUpperCase() : null;
+  const base = account.base_currency ? String(account.base_currency).toUpperCase() : null;
+  const fx = Number(account.fx_usd_to_base);
+  if (live !== 'USD' || !base || base === 'USD' || !(fx > 0)) return prev;
+  const was = prev.currency || base;   // no currency recorded = the broker's base, as reported then
+  if (was !== base) return prev;
+  return { ...prev, equity: prev.equity / fx, currency: 'USD', restated_from: base, fx_usd_to_base: fx };
 }
 
 /**
@@ -564,4 +584,4 @@ function readTradesLedger(repoRootDataDir) {
   return primary + (primary && !primary.endsWith(NL) ? NL : '') + added.join(NL) + NL;
 }
 
-module.exports = { computeDayPnl, reconcileDayPnl, prevSessionEquity, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir, extraTradesLogs, tradesLedgerSources, readTradesLedger };
+module.exports = { computeDayPnl, reconcileDayPnl, prevSessionEquity, restateEquity, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory, resolveTradesLog, resolveBarsDir, extraTradesLogs, tradesLedgerSources, readTradesLedger };
