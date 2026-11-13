@@ -79,7 +79,11 @@ function stateOf(file) {
   return st;
 }
 async function readNew(file, st) {
-  const fh = await fs.promises.open(file, 'r');
+  let fh;
+  try { fh = await fs.promises.open(file, 'r'); } catch (e) {
+    if (e && e.code === 'ENOENT') return [];   // a sleeve that has never traded has no journal yet: nothing to watch, not an error
+    throw e;
+  }
   try {
     const { size } = await fh.stat();
     // a shorter file is a new one (rotated or rewritten): read it again from the start; the alerts in force come back with it
