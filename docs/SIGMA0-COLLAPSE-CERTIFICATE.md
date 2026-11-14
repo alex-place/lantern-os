@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-11-05
+updated: 2026-11-07
 ---
 
 # Σ — The Convergence Certificate
@@ -13,6 +13,15 @@ updated: 2026-11-05
 > **This is the condensed edition (2026-11-05).** Every standard result, method or framing that earlier versions restated is now one row of [Sources](#sources--what-this-rests-on), cited in the text as [1]–[26]. What remains is the project's own work: theorems about its engine, measurements on its systems, the items its prior-art audits left standing, and its corrections. Section numbers are unchanged, so `§1.2.3`, `§3`, `§8.4` and the rest still name the same topics. The maintenance log and the original router design sketch were provenance, not results, and are no longer in this file. The full previous text (2,923 lines) is at [commit 6a5f028c](https://github.com/alex-place/lantern-os/blob/6a5f028ced26be397a420bf1bb7dc09852cd9a03/docs/SIGMA0-COLLAPSE-CERTIFICATE.md). The cut changes no theorem, evidence class or measured number, which an independent comparison of the two versions checked, and the in-repo test counts were re-run for it.
 
 > **Correction — 2026-11-05 (read before citing anything below).** An engine-level audit, including an independent one (`lantern-os-research` PR #1), found several headline claims stronger than their evidence, and shipped code that violated some of the theorems. The code is fixed and pinned by tests; [Appendix C](#appendix-c--corrections-register-consolidated) lists every correction. In short: the "900/900 prevented" figure is **retired** (a placebo scored the same); C3 is about the gate, not the state; "no third fate" is false even in the linear regime (rotation); the small-gain "proven bound" bounded nothing; and the former acceptance proxy tracked the size of the hidden state rather than its dynamics. The companion proofs in the private research repo (`SIGMA0-C3-…`, `SIGMA0-T1-…`, `SIGMA0-L2-…`) still carry the older wording.
+
+> **Update — 2026-11-07 (pure math, all of it standard).** 306 theorems in 20 Lean files under `docs/formal/` settle questions this document had left open or stated wrongly. Every one was checked with only Lean's standard axioms. None of it is new mathematics: each result is standard or a corollary of one, and its source is cited. What changes:
+> - the Σ₀⁻¹ kick needs a measurement, and C3 covers one evaluation (§3.2);
+> - the flat leg cannot tell grounded from collapsed, and the canary reads only one tail (§2, §4);
+> - a loop's stop rule needs `(I − J)⁻¹`, `ρ(J) < 1` does not make a loop converge, and a global contraction caps useful depth (§1.2.4);
+> - hard top-k retrieval inside a loop can cycle forever, and a margin test keeps its exit from certifying a false rest (§1.2.4);
+> - R2's canary half is refuted at loop depth.
+>
+> Appendix C lists the corrections.
 
 **One object, two timescales.** Part I (§0–§7) concerns the fast state `x`, the hidden-state trajectory inside one forward pass, with the slow parameters `θ` held fixed; it is PROVEN where a status line says so. Part II (§8) concerns the slow weights `θ`, how the model changes across updates. It is a gate built on imported theorems, with no machine-checked theorem of its own, and must never be read with Part I's authority. Part III (§9) composes the two, as a target. Part IV (§10) is a design, below Part II in authority, with two measured datapoints and no proofs.
 
@@ -29,20 +38,25 @@ updated: 2026-11-05
 3. **Negative results.** Each correction in Appendix C was found by a falsification pass or an independent review, and the correction is what ships.
 4. **Candidate-novel items**, graded on the registry's ladder: `NOT-NOVEL` (imported, no claim) · `CANDIDATE ★` (possibly novel; a bounded prior-art search is owed) · `AUDITED-CANDIDATE ✓` (survived a recorded, bounded search). ✓ is the strongest status this document gives itself; "proven novel" needs outside review.
 
-**Evidence classes.** PROVEN: a proof, machine-checked as defined next. MEASURED: an empirical result with a run pointer. HEURISTIC: an operational design, not derived from a theorem. TARGET and DESIGN: stated, not shown. **"Machine-checked"** means closed-form algebra, numerical sweeps and `pytest`; only C3's abstract form is also checked in Lean (`docs/formal/C3EngineLift.lean`). PROVEN means proven *in-regime*: a local linear Jacobian under the stated hypotheses.
+**Evidence classes.** PROVEN: a proof, machine-checked as defined next, or a written proof where marked *(paper)*. MEASURED: an empirical result with a run pointer. HEURISTIC: an operational design, not derived from a theorem. TARGET and DESIGN: stated, not shown. **"Machine-checked"** means closed-form algebra, numerical sweeps and `pytest`. Three groups of results are also checked in Lean 4 with Mathlib: C3's abstract form (`docs/formal/C3EngineLift.lean`), the routed-loop theory (`docs/formal/TokenRouting.lean`), and the 2026-11-07 results on the Σ₀⁻¹ kick, loop exits, depth and retrieval (§1.2.4, §2, §3, R2; the files are listed in [How to audit](#how-to-audit-this-document)). PROVEN means proven *in-regime*: a local linear Jacobian under the stated hypotheses.
 
 **Process disclosure.** An early draft, written while the search backend was down, carried four fabricated arXiv IDs (2406.07284, 2402.07827, 2309.07864 and 2309.01219, none matching its claimed title). Source verification caught them on 2026-06-17 ([#660]). The record stays because it is the plainest evidence for this document's central claim: self-generated content is untrustworthy until something outside checks it.
 
 ## How to audit this document
 
-Every load-bearing claim maps to a runnable artifact. The pytest rows marked *here* were re-run on 2026-11-05: 980 tests, all passing. The Lean row and the placebo script were last run on 2026-11-05, by the changes that added them. Rows marked † run only in the private research repo, so a clone of this repo cannot check them; they were last run on the date given.
+Every load-bearing claim maps to a runnable artifact. The pytest rows marked *here* were re-run on 2026-11-05: 980 tests, all passing. The C3 Lean row and the placebo script were last run on 2026-11-05, by the changes that added them. The 2026-11-07 Lean rows were run that day, one file at a time, on Lean 4.27.0 with Mathlib v4.27.0, with no errors or warnings. Each printed only the standard axioms. The C3 engine row was re-run that day with its new test. Rows marked † run only in the private research repo, so a clone of this repo cannot check them; they were last run on the date given.
 
 | Claim | Class | Runs | Verify with |
 |---|---|---|---|
 | Theorem 1, spectral dichotomy, C3 anti-freeze, the σ-axis, §2 operator behaviour (§1–§3, §7.1) | PROVEN in-regime | here | `python -m pytest tests/test_cio_sde.py -q` → 54 passed |
-| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (the anisotropy and the C3 floor bit for bit alone or in any batch; whole runs bit for bit where the matrix products are exact, as at the tested inputs, and to rounding elsewhere), a non-finite row left alone and kept out of the surprise monitor's Cholesky, the placebo pin, the scope limit (§2–§3) | PROVEN in-regime + engine tests | here | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 94 passed |
+| C3 and S1 through the real engine, per trajectory: the cap, per-sample floors, every dimension, no consecutive gate for any row, `x*` and the kick on `null(A)`, mixed batches, per-row budgets and receipts, batch rows equal to lone runs (the anisotropy and the C3 floor bit for bit alone or in any batch; whole runs bit for bit where the matrix products are exact, as at the tested inputs, and to rounding elsewhere), a non-finite row left alone and kept out of the surprise monitor's Cholesky, the placebo pin, the scope limit, and the flat leg's return one evaluation after C3's (§2–§3.2) | PROVEN in-regime + engine tests | here (re-run 2026-11-07) | `python -m pytest tests/test_sigma0_c3_engine.py -q` → 99 passed |
 | C3 in abstract form: L2′ for any projector, scale invariance, the Popoviciu floor bound, the shipped constants (`1.02`, `ε_a = 1/20`, `ρ ≤ 9·10⁻⁴`, every `d ≥ 2`), rank feasibility, gate off (§3) | PROVEN, Lean 4 + Mathlib (standard axioms only; six false variants rejected) | here | `lake env lean docs/formal/C3EngineLift.lean` against Mathlib v4.27 (setup in the file header) |
 | The bridge from that proof to the engine (§3) | tested (spectral identities, not formalized) | here | `python -m pytest tests/test_sigma0_c3_formal_bridge.py -q` → 26 passed |
+| The Σ₀⁻¹ kick needs a measurement, and the flat leg comes back (§2, §3.2) | PROVEN, Lean 4 + Mathlib, scalar recursions (standard axioms only); the expectation steps *(paper)* | here | `lake env lean docs/formal/Sigma0KickMeasurement.lean` → 25 axiom lines |
+| Loop exits: the stop identity, the spectral-radius rule's failure, the averaged Jacobian, the ball certificate, the matrix-free limit, the randomized and dense certificates (§1.2.4) | PROVEN, Lean 4 + Mathlib (standard axioms only) | here | `lake env lean` on each of `docs/formal/LoopStopRule.lean` (13 axiom lines), `LoopStopRuleNonlinear.lean` (14), `LoopStopCertificate.lean` (6), `LoopStopMatrixFree.lean` (13), `LoopStopRandomized.lean` (20) and `LoopStopDense.lean` (6) |
+| Loop depth: the cap and its threshold, the cap from measured ratios, the counter that escapes it, and `ρ(J) < 1` without convergence (§1.2.3, §1.2.4) | PROVEN, Lean 4 + Mathlib (standard axioms only) | here | `docs/formal/LoopDepthCap.lean` (25), `LoopDepthCapThreshold.lean` (7), `LoopDepthCapMeasured.lean` (4) |
+| Retrieval inside the loop (§1.2.4) | PROVEN, Lean 4 + Mathlib (standard axioms only) | here | `docs/formal/LoopRetrieval.lean` (26), `HardRetrievalTransversality.lean` (10), `HardRetrievalLoop.lean` (20), `HardRetrievalCount.lean` (3), `HardRetrievalCutSet.lean` (2) |
+| R2: the finite-horizon Kreiss bound and its sharpness, the blind band, latency, and where the thresholds stop applying | PROVEN, Lean 4 + Mathlib (standard axioms only); the assembly *(paper)* | here | `docs/formal/KreissFiniteHorizon.lean` (9), `KreissSharpLowerBound.lean` (39), `KreissCanaryBlindBand.lean` (28), `KreissCanaryLatency.lean` (9), `KreissCanaryBoundary.lean` (27) |
 | Certificate fates against the actual flow, in any basis and next to large modes (§1) | tested | here | `python -m pytest tests/test_sigma0_certificate_fates.py -q` → 609 passed |
 | Non-normal stability gates: no false-positive certificate over 400 matrices; each bound checked against the matrix exponential (§1.2.1) | tested | here | `python -m pytest tests/test_stability_gates.py -q` → 14 passed |
 | Loop-contraction verdict on known contractions, non-finite iterates, saved Ouro residuals, and `generate()` on a stub backbone (§1.2.3) | MEASURED signal; no live model | here | `python -m pytest tests/test_sigma0_loop_contraction.py -q` → 171 passed |
@@ -82,7 +96,7 @@ If a *here* command fails on a fresh clone, the document has drifted from the co
 | — | [Plain-language summary](#plain-language-summary) | what is ours, and what is left |
 | — | [Sources](#sources--what-this-rests-on) | the prior art, one row per result |
 | — | [Formula registry](#the-mathematics--formula-registry) · [the loop, stage by stage](#the-loop-stage-by-stage) | epistemic and novelty status per formula |
-| **I** | Fast state `x`: [§1 fates](#1-the-collapse-guarantee-theorem) · [§1.2.3 loop verdict](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) · [§2 trigger](#2-the-collapse-trigger-σ₀) · [§3 operator, C3 and S1](#3-the-anti-collapse-operator-σ₀¹) · [§3.1 scheduled grounding](#31-design-implication-scheduled-grounding-from-certificate-quantities) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 basins](#5-global-structure-the-attractor-graph-g) · [§6 measured loops](#6-measured-loops-router-data-a-trained-reservoir-and-ouros-latent-loop) · [§7 grounding and honesty](#7-why-this-is-a-warning-against-asi) | PROVEN where marked |
+| **I** | Fast state `x`: [§1 fates](#1-the-collapse-guarantee-theorem) · [§1.2.3 loop verdict](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback) · [§1.2.4 exits, depth and retrieval](#124-exits-depth-and-retrieval-inside-a-loop-2026-11-07) · [§2 trigger](#2-the-collapse-trigger-σ₀) · [§3 operator, C3 and S1](#3-the-anti-collapse-operator-σ₀¹) · [§3.1 scheduled grounding](#31-design-implication-scheduled-grounding-from-certificate-quantities) · [§3.2 the kick needs a measurement](#32-the-kick-needs-a-measurement) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 basins](#5-global-structure-the-attractor-graph-g) · [§6 measured loops](#6-measured-loops-router-data-a-trained-reservoir-and-ouros-latent-loop) · [§7 grounding and honesty](#7-why-this-is-a-warning-against-asi) | PROVEN where marked |
 | **II** | [§8 slow weights: the Σ_θ gate](#8-the-model-update-acceptance-gate-σ_θ) | HEURISTIC + MEASURED (simulation) |
 | **III** | [§9 two-timescale composition](#9-composing-part-i-and-part-ii) | TARGET |
 | **IV** | [§10 the active face](#10-from-anti-collapse-to-ceiling-break) | DESIGN + two measurements |
@@ -94,6 +108,12 @@ If a *here* command fails on a fresh clone, the document has drifted from the co
 
 **Ours, by evidence class:**
 - **PROVEN about the shipped engine.** **C3:** when the operator acts on a trajectory, that trajectory's four-signal gate cannot be true on two consecutive steps, through the engine's own projection, for all `A` and every dimension `d ≥ 2` while `ρ = d·eps/σ_max ≤ 9·10⁻⁴` (the engine refuses to fire otherwise). **S1:** each firing moves the state out of the near-target ball with probability ≥ ½. The gate decides each trajectory of a batch on its own signals. C3 is checked in Lean, up to the spectral identities that connect it to the engine, which are tested, not formalized.
+- **PROVEN about loops, 2026-11-07.** Standard mathematics applied here, so `NOT-NOVEL`; checked in Lean except where marked.
+  - The Σ₀⁻¹ kick cannot make the state right; a measurement of every kicked direction can (§3.2).
+  - A loop's stop rule needs `‖(I − J̄)⁻¹‖`, not `ρ(J)`. Certifying it deterministically takes all `d` Jacobian-vector products (§1.2.4).
+  - `ρ(J) < 1` at every point does not make a loop converge, and a global contraction caps useful depth (§1.2.4).
+  - Kreiss-inflated canary thresholds cannot see slow growth within a loop's depth, and no robust norm threshold can (R2).
+  - With hard top-k retrieval inside the loop, a margin test keeps the exit from certifying a false rest at every contraction rate. Whether such loops generically end in cycles stays open in two or more dimensions (§1.2.4).
 - **MEASURED by this project** (simulations are marked).
   - Against a placebo, no trajectory's gate stays true for two steps under the operator; under the placebo it stays true for 60 (§3; simulation).
   - The early-warning canary fires under collapse (§4).
@@ -107,10 +127,14 @@ If a *here* command fails on a fresh clone, the document has drifted from the co
 **Part II in one line.** On the slow timescale, deciding whether a retrained model may replace the current one: **a system's self-checks can spot disasters, but only fresh outside tests can pick winners.** Reusing one test set lets lucky models win (§8.4). Self-measurements cannot substitute, because their errors stick to the checkpoint the same way (§8.4.1). A cheap self-check still earns its keep as an alarm for gross breakage when outside tests are scarce (measured on one real model, §8.6).
 
 **What's left.** The theorem-level questions about non-normal `A` are answered, but that is less than it sounds, because three things those answers do not cover are what matter next. A fourth asks whether Part I applies to real loops at all.
-1. **Transient amplification in the gates.** R2's Kreiss-inflated thresholds remain a conjecture. [#2789] and [#2854] were closed in a backlog prune on 2026-08-02, unsolved.
+1. **Transient amplification in the gates.** [#2789] and [#2854] were closed in a backlog prune on 2026-08-02, unsolved. Both were answered on 2026-11-07, the first against the conjecture.
+   - Kreiss inflation prevents false alarms, but it cannot detect slow growth within a loop's 4–12 steps, and no robust norm threshold can (R2).
+   - Ouro's measured Jacobians have an infinite Kreiss constant.
+   - Halting needs no Kreiss constant at all (§1.2.4).
+   - What is left is a canary that is not a norm threshold, for loops whose Jacobian changes from step to step.
 2. **Jacobians that change over time.** Everything in Part I is one fixed `A`. Passing at each step says nothing about the product: `[[0,2],[0,0]]` and `[[0,0],[2,0]]` both have ρ = 0, and their product has ρ = 4. The loop verdict (§1.2.3) measures this on real iterates; nothing proves it.
-3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves once. A lower bound on what the state retains (for example σ_min of the transition product) would be the real theorem. It does not exist, and C3 and S1 cannot imply it. With `A₁ = diag(0, −1/Δt)` and then `A₂ = diag(−1/Δt, 0)`, both Euler maps are non-expansive and their product is 0, so the next regime erases the kick exactly while the gate stays clear (`lantern-os-research` PR #14; through the real engine, `test_a_switching_jacobian_can_erase_the_kick`). Retention needs a lower bound on the switched product restricted to the kicked subspace, or a common invariant subspace. And a kick that survives adds randomness; it does not restore what the state had lost.
-4. **Whether Part I describes a real looped model.** Its fates are statements about `t → ∞` for one fixed `A`. Real loops stop at 2–4 steps, and their Jacobians vary widely from step to step. Saved Ouro runs read `ρ(J) ≈ 8–11` while the residual shrinks and then plateaus (§1.2.3). Mixture-of-Recursions reports hidden-state norms rising with depth while likelihood improves (its Figures 7a and 5c) [5]. At this depth the relevant object is finite-horizon amplification, and whether another step helps, which Part I does not address.
+3. **Anti-collapse as a statement about the state.** C3 and S1 say the gate clears and the state moves once. A lower bound on what the state retains (for example σ_min of the transition product) would be the real theorem. It does not exist, and C3 and S1 cannot imply it. With `A₁ = diag(0, −1/Δt)` and then `A₂ = diag(−1/Δt, 0)`, both Euler maps are non-expansive and their product is 0, so the next regime erases the kick exactly while the gate stays clear (`lantern-os-research` PR #14; through the real engine, `test_a_switching_jacobian_can_erase_the_kick`). Retention needs a lower bound on the switched product restricted to the kicked subspace, or a common invariant subspace. And a kick that survives adds randomness; it does not restore what the state had lost. The 2026-11-07 pass proves that last point and settles which theorem is possible at all. None can say the kick makes the state right: without a measurement, nothing beats the prior. A measurement of every kicked direction does make it right (§3.2).
+4. **Whether Part I describes a real looped model.** Its fates are statements about `t → ∞` for one fixed `A`. Real loops stop at 2–4 steps, and their Jacobians vary widely from step to step. Saved Ouro runs read `ρ(J) ≈ 8–11` while the residual shrinks and then plateaus (§1.2.3). Mixture-of-Recursions reports hidden-state norms rising with depth while likelihood improves (its Figures 7a and 5c) [5]. At this depth the relevant object is finite-horizon amplification, and whether another step helps, which Part I does not address. §1.2.4 (2026-11-07) answers the exit and depth questions in the abstract. A stop rule needs `‖(I − J̄)⁻¹‖`, not `ρ(J)`. A global contraction caps the useful depth, and only partial contraction escapes the cap. None of that has been measured on a real loop.
 
 ## Sources — what this rests on
 
@@ -144,6 +168,16 @@ Each row is an established result this document uses and does not claim. Full en
 | 24 | Registry imports: the EOQ model; KKT water-filling; anytime-valid e-processes; the martingale core of M1 and its diagnostic use; the nearest gate framework; Iterative Learning Control's contraction requirement; proper scoring | Harris 1913; Boyd & Vandenberghe 2004; SEA arXiv:2607.00871; SGM arXiv:2510.10232; Doob; Martingale Score arXiv:2512.02914; arXiv:2607.13070; US7345448B2, US8094405B1; the Kalai proper-scoring lineage | R2–R10 |
 | 25 | Neighbours of basin determinism | arXiv:2502.15208; arXiv:2304.12707; arXiv:2510.14242; arXiv:2602.11451; arXiv:2603.22871; arXiv:2410.23391; arXiv:2602.13165; arXiv:2408.04667; arXiv:2512.07795 | R9 |
 | 26 | The research base of each loop stage, as cited in the 2026-07-22 restructure | listed in [References](#references-lineage) | [the loop, stage by stage](#the-loop-stage-by-stage) |
+| 27 | Estimation with an uninformative channel (the posterior is the prior, the Bayes risk is `tr Σ₀`); data processing; the Lyapunov (Stein) equation; convergence of the Riccati recursion | Lehmann & Casella 1998; Cover & Thomas 2006; Anderson & Moore 1979; Chan, Goodwin & Sin 1984 | §2, §3.2 |
+| 28 | Banach's fixed-point theorem and its a-posteriori bound; stable recurrent models are approximated by truncated ones | Banach 1922; Miller & Hardt 2019 | §1.2.4 |
+| 29 | The circuit complexity of transformers, and of looped transformers | Merrill & Sabharwal 2023; Merrill & Sabharwal 2025 | §1.2.4 |
+| 30 | The discrete Markus–Yamabe problem: a polynomial counterexample in dimension 3 | Cima, van den Essen, Gasull, Hubbers & Mañosas 1997; Cima, Gasull & Mañosas 1999 | §1.2.4 |
+| 31 | Softmax is ½-Lipschitz, and ½ is sharp | Nair 2025; Gao & Pavel 2017 | §1.2.4 |
+| 32 | A-posteriori existence theorems for fixed points: the Kantorovich, Urabe and Krawczyk forms; verification methods | Kantorovich & Akilov; Ortega & Rheinboldt 1970; Urabe 1965; Krawczyk 1969; Rump 2010 | §1.2.4 |
+| 33 | Certifying the norm of an inverse: resisting-oracle lower bounds for matrix-vector queries; Gaussian-probe norm bounds; verified singular-value bounds and floating-point error analysis | Nemirovski & Yudin 1983; Traub, Wasilkowski & Woźniakowski 1988; Braverman et al. 2020; Dixon 1983; Woolfe et al. 2008; Halko, Martinsson & Tropp 2011; Rump 2011; Higham 2002 | §1.2.4 |
+| 34 | GMRES admits any non-increasing convergence curve; the Lipschitz constant of self-attention; monotone operator equilibrium networks | Greenbaum, Pták & Strakoš 1996; Kim, Papamakarios & Mnih 2021; Winston & Kolter 2020 | §1.2.4 |
+| 35 | The Kreiss matrix theorem's constants: the finite-horizon bound and its sharp constant, the linear factor in `n`; the numerical-radius power inequality and its extremal matrix | LeVeque & Trefethen 1984; Spijker 1991; Toh & Trefethen 1999; Nguyen-Cung & Nguyen 2026; Chalmoukis, Tsikalas & Yakubovich 2025; Pearcy 1966; Crabb 1971 | R2 |
+| 36 | Piecewise contractions: generic asymptotic periodicity in one and two dimensions, the criterion "an attractor away from the cuts is a finite union of cycles", genericity in the cut hyperplanes' offsets, and topological genericity | Bruin & Deane 2009; Nogueira & Pires 2015; Nogueira, Pires & Rosales 2014, 2018; Catsigeras, Guiraud, Meyroneinc & Ugalde 2016; Gaivão & Pires 2026; Jain & Liverani 2025 | §1.2.4 |
 
 ## The mathematics — formula registry
 
@@ -153,9 +187,28 @@ Every formula this program runs on, with two labels. The epistemic label is `PRO
 ![collapse guarantee](assets/cert/rho-gate.svg)
 A linear flow settles, diverges or rotates, by `A`'s spectrum and, on the boundary, its Jordan structure, for grounded and ungrounded systems alike. `NOT-NOVEL` [1, 2]; the certificate quantities and their tests are ours (§1). Corrected 2026-11-05: this entry used to read "no third fate", and the code counted rotation as collapse.
 
-### R2 · Kreiss-inflated canary thresholds (M4/L3) `CONJECTURE` · theorem imported [3] · ★ application
+### R2 · Kreiss-inflated canary thresholds (M4/L3) `REFUTED AT LOOP DEPTH → LEMMA` · theorems imported [3, 35] · `NOT-NOVEL`
 ![kreiss](assets/cert/kreiss.svg)
-Inflating the canary thresholds by the Kreiss constant 𝒦(A) would close the certificate's non-normal gap (§4, [#2789]). It is still a conjecture. That issue was closed in a backlog prune, unsolved; its ensemble check used n = 6 and T = 200, and "0 bound violations" only re-tests the Kreiss theorem. The threshold scales with dimension: at d = 2048, e·n·𝒦 ≥ 5,567, so a mode growing 20% per step needs 47 steps to trip it. Whether that catches anything at real loop depth is untested.
+**The conjecture** ([#2789]): inflate the canary thresholds by the Kreiss constant `𝒦` of the nominal model, and the certificate's non-normal gap closes (§4). The canary watches `x_{t+1} = Ax_t` and alarms when `‖x_t‖ > τ_t·‖x_0‖`. The issue was closed in a backlog prune, unsolved. Its ensemble check used `n = 6` and `T = 200`, and "0 bound violations" only re-tested the Kreiss theorem.
+
+**Settled 2026-11-07, both halves, with standard mathematics checked in Lean** (`docs/formal/KreissFiniteHorizon.lean`, `KreissSharpLowerBound.lean`, `KreissCanaryBlindBand.lean`, `KreissCanaryLatency.lean`, `KreissCanaryBoundary.lean`; the assembly is *(paper)*).
+- **The false-alarm half holds.** For every `t`, `‖Aᵗ‖ ≤ C_t·𝒦(A)` with `C_t = (t+1)^{t+1}/tᵗ < e(t+1)`, and no smaller constant works (`kreiss_finite_horizon`, `ratio_approaches_sharp`). Both halves are in the literature [35]. So the threshold `C_T·𝒦` never false-alarms over `T` steps on any map whose Kreiss constant is at most `𝒦`, in any dimension. Over an unbounded horizon `e·n·𝒦` suffices [3]; this entry used to say it is needed.
+- **The detection half fails at loop depth.** A threshold `τ` stays silent for `T` steps on every mode that grows by at most `τ^{1/T}` per step, and any faster mode fires by step `T` (`blind_band`, `blind_band_sharp`).
+  - At `T = 4`, `e(T+1)𝒦` is blind to modes growing up to 1.92× per step at `𝒦 = 1`, and up to 3.41× at `𝒦 = 10`.
+  - `e·n·𝒦` at `n = 2048` is blind up to 8.64× and 15.4×. So a mode growing as fast as Ouro's measured geometric-mean `ρ(J)` of 8.17 stays silent for four steps at `𝒦 = 1`.
+  - A mode growing 20% per step stays silent through step 47 and first trips at step 48, not 47, when `𝒦 = 1` (`r2_silent_through_47`, `r2_fires_at_48`). Under `e(t+1)𝒦` it trips at step 23.
+- **No threshold rule closes the gap.** The scaled nilpotent shift is healthy, yet forces every norm threshold that never false-alarms on `{𝒦 ≤ K}` to be high, at any dimension `n ≥ T + 1`, 2048 included (`unavoidable_blind_band_euclid`). Every such rule is therefore blind to some unstable modes.
+  - At `K = 10` and `T = 4` that band reaches 2.75× per step in Lean, and about 3.2× numerically. Kreiss inflation's 3.41× is close to the best possible.
+  - At `K = 1` the best possible band is `2^{1/T}`, 1.19× at `T = 4` *(paper: the Berger–Pearcy power inequality and Crabb's extremal matrix [35], checked numerically)*.
+- **Where the start sits costs more steps.** A mode with left eigenvector `w` fires once `|μ|ᵗ·cos θ > τ`, and that bound is attained (`fires_of_alignment`, `latency_attained`). From a random start at `n = 2048` the median `cos θ` is 0.015, which adds about 10 steps at `|μ| = 1.5` and 2 at `|μ| = 8.17`.
+- **The time-indexed variant L3′ is not robust** (#2789's third pass, `τ_t = 1.05·c·‖A_nomᵗ‖`). With `A_nom = ½I` it false-alarms on `A = 0.6·I` at every `c < 8/7`, although both maps have `𝒦 = 1` (`L3prime_contraction_false_alarm`). It is false-alarm-free exactly on the maps with `‖Aᵗ‖ ≤ 1.05·c·‖A_nomᵗ‖`.
+- **#2789's own kill criterion is met by the measurement already on file.**
+  - An eigenvalue outside the unit disk makes `𝒦` infinite (`not_rc_of_eigen_outside`), and so does a defective one on the circle (`not_rc_of_jordan_on_circle`).
+  - Every measured Ouro Jacobian has `ρ(J)` between 1.5 and 27.6 (§6), so a threshold computed from the real loop is infinite and never fires. Those Jacobians are local, at sampled points.
+  - Ouro's step-dependent maps also make the loop a product, and one map's `𝒦` says nothing about a product. Two maps with `𝒦 ≤ 1` reach norm 16 in four steps, above both fixed-map thresholds, the sharp `C₄ ≈ 12.2` and `e(T+1)𝒦 ≈ 13.6` (`switched_loop_false_alarm`).
+- **Why #2789 looked good:** its checks ran 150–200 steps, where the blind band of `e(T+1)𝒦` shrinks to 1.03–1.04× per step.
+
+**Left open:** the exact best threshold at practical `𝒦`, and a canary that is not a norm threshold, for loops whose Jacobian changes from step to step.
 
 ### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` · ✓ AUDITED-CANDIDATE
 ![no-free-confidence](assets/cert/m1-nofreeconf.svg)
@@ -203,7 +256,7 @@ The Act-stage verifier metric: net tests fixed, minus a regression penalty. It i
 |---|---|---|---|
 | Observe | the evidence input `u` in `ẋ = f(x,u,θ)`; R8 governs when observation may stop | verified-event miners (1,842 PR and ledger records) | [#2852] |
 | Remember | R4 | CSF memory with wired recall (+22 pp at 5); the canonical ledger, M1-clean; serve-from-ledger with the answer-stability canary (PR #2864) | [#2853]; [#2787], the ledger test |
-| Reason | R1, R2, R9 | the Ouro kernel's `converge`/`accel` exits are equilibrium halting; on-box probes decode truth linearly at 7B (factual 1.000, associative 0.924) | [#2854], Kreiss-safe halting; paraphrase-contraction training, R9's second-round risk ([#2861]) |
+| Reason | R1, R2, R9 | the Ouro kernel's `converge`/`accel` exits are equilibrium halting; on-box probes decode truth linearly at 7B (factual 1.000, associative 0.924) | certifying the stop factor `‖(I − J̄)⁻¹‖` on a real loop ([#2854]'s halting half is settled in principle, §1.2.4); paraphrase-contraction training, R9's second-round risk ([#2861]) |
 | Act | R6, R11 | the Spiral (ADR-0030): 18/18 MBPP at 6% escalation, and a strong cheap tier 8.3× cheaper (#2800); stop-on-stall, pass-terminates and bidirectional tiering (PR #2862) | [#2855], the allocator |
 | Verify | R3, R5, R7, R8; Part I | M1 as an enforced runtime gate (PR #2881); the white-box probe as a verifier, 0.92–1.00 on-box at 4-bit; the powered honesty eval (162 held-out negatives and a gates-off arm) | [#2856]; probe survival at 1.58-bit ([#2873], blocked until the ternary artifact exists) |
 | Converge | R10; Σ_θ (Part II); R9 as the product contract | the VTD dose-response (−6 → ±0; the crossover is pending scale). The V1 honest-teacher chain reached an honest negative ([#2850]): SFT *raised* confabulation from 0.136 to 0.389 (associative confabulation doubled), lowered golden by 0.096, and left over-abstention flat. The post-mortem lead is that the corpus was assembled at an anchor fraction of 0.31, against the ≥ 0.60 mandate; run 2 fixes the composition before the dose | [#2857], the unified control law; [#2847], the V2 dose-response kill-gate |
@@ -315,9 +368,99 @@ Acceptance runs four steps past the trained depth, and stops where half the toke
 - The linearization may not hold at this amplitude.
 - Ouro feeds the step index (`current_ut`) into every step, so consecutive steps are not one map: `eₖ₊₁ ≈ J·eₖ + (bₖ₊₁ − bₖ)`. A step-dependent offset can shrink the residual while `J` expands, and `J = 2I` with such offsets passes this statistic.
 
-**JSRR, adopted and then demoted.** Until 2026-11-05, `loop_lm.generate()` accepted iff `ρ(A) < 1 − margin` (`SIGMA0_JSRR_MARGIN`, default 0). That adopted STARS' discrete criterion and its single-step surrogate `‖Av‖₂²` [5]. CART found that trained gates settle at `ρ ∈ [0.79, 0.83]`, and it reports a null quality result [5]. `jsrr_certificate` remains as telemetry and fallback, now on a scale-invariant least-squares token-transition operator (exact DMD [5]). Its radius is a Ritz estimate, which tends to read low when `T < d`. The verdict computation is machine-checked (`tests/test_sigma0_jsrr_gate.py`). This is adoption, not novelty.
+**JSRR, adopted and then demoted.** Until 2026-11-05, `loop_lm.generate()` accepted iff `ρ(A) < 1 − margin` (`SIGMA0_JSRR_MARGIN`, default 0). That adopted STARS' discrete criterion and its single-step surrogate `‖Av‖₂²` [5]. CART found that trained gates settle at `ρ ∈ [0.79, 0.83]`, and it reports a null quality result [5]. `jsrr_certificate` remains as telemetry and fallback, now on a scale-invariant least-squares token-transition operator (exact DMD [5]). Its radius is a Ritz estimate, which tends to read low when `T < d`. The verdict computation is machine-checked (`tests/test_sigma0_jsrr_gate.py`). This is adoption, not novelty. And the criterion's premise is false beyond one point: `ρ(J) < 1` at every state does not make a loop converge, and even at a fixed point `ρ(J)` does not bound the distance to it (2026-11-07, §1.2.4).
+
+**What an accept can certify** (2026-11-07, `docs/formal/LoopDepthCapMeasured.lean`). Suppose the residual ratios stay at or below `q < 1` at *every* later step. Then the run converges to a fixed point of a continuous core, and `hᵏ` is within `‖eₖ‖/(1 − q)` of it (`ratio_certificate` applied from step `k`; `measured_ratio_cap` turns this into a depth cap). A finite run observes only its own steps, so an accept checks that hypothesis on those steps and on nothing after them.
 
 **Open: the honesty leg ([#2236]).** A loop-stability signal becomes a *factuality* signal only once an external grounding signal is supplied. That study is not done, and nothing about honesty AUROC is claimed.
+
+#### 1.2.4 Exits, depth and retrieval inside a loop (2026-11-07)
+
+**Status: PROVEN, checked in Lean except where marked *(paper)*. `NOT-NOVEL` throughout: each result is standard or a corollary of standard results [6, 28–34, 36], applied to this project's loops.** The files are in `docs/formal/`: `LoopStopRule`, `LoopStopRuleNonlinear`, `LoopStopCertificate`, `LoopStopMatrixFree`, `LoopStopRandomized` and `LoopStopDense` for exits; `LoopDepthCap`, `LoopDepthCapThreshold` and `LoopDepthCapMeasured` for depth; and `LoopRetrieval`, `HardRetrievalTransversality`, `HardRetrievalLoop`, `HardRetrievalCount` and `HardRetrievalCutSet` for retrieval, each `.lean`. They answer four questions that a looped model's design rests on: when it may stop, how deep it can usefully go, whether `ρ(J) < 1` certifies it, and what retrieval inside the loop does to all three. `TokenRouting.lean` (2026-11-05) covers the neighbouring questions for routed experts: per-token receipts, the capacity cost of contraction, and a sound step-ratio alarm.
+
+**The stop rule needs `(I − J)⁻¹`, not the spectral radius.**
+- For an affine loop `F(h) = Jh + c`, `h − h* = −(I − J)⁻¹·Δh` holds for every state, with `Δh = F(h) − h` (`error_identity`).
+  - So `‖h − h*‖ ≤ ‖(I − J)⁻¹‖·‖Δh‖`, with no dimension factor and no Kreiss constant, and the factor is attained (`error_bound`, `error_bound_attained`).
+  - `‖(I − J)⁻¹‖⁻¹` is `σ_min(I − J)` (`inv_norm_inverse_isLeast`).
+- **The rule `‖Δh‖/(1 − ρ(J))` holds for normal `J` only.**
+  - For `J = [[½, 10], [0, ½]]`, the state `(−40, −2)` has `‖Δh‖ = 1` and error `√1604 > 40`, while the rule certifies 2.
+  - The exact factor there is `20 + 2√101 ≈ 40.1` (`rho_rule_fails`, `demo_sharp_bound`, `demo_sharp_attained`).
+  - Ouro's measured `‖J‖₂/ρ(J)` is 15.6 (§6).
+- **A nonlinear loop obeys the same identity, with the Jacobian averaged along the segment from `h*` to `h`** (`nonlinear_error_identity`).
+  - Reading that factor pointwise is wrong *(paper)*. In a rotation example every pointwise factor is 1, yet the averaged `I − J̄` is 0 and a second fixed point exists.
+  - Take a reference `A` with `‖(I − A)⁻¹‖ ≤ M`, and suppose every Jacobian on the segment is within `η` of `A`. Then `‖h − h*‖ ≤ M·‖Δh‖/(1 − Mη)` (`nonlinear_certified_bound`).
+- **A certificate needs no known fixed point** (`LoopStopCertificate.lean`; the chord form of the Kantorovich–Urabe–Krawczyk theorems [32]). Take the current iterate `h` and a reference `A`, such as a computed Jacobian, with `‖(I − A)⁻¹‖ ≤ M`. Let `‖F′(x) − A‖ ≤ η` on the ball `B̄(h, R)`, with `Mη < 1` and `M‖Δh‖ ≤ (1 − Mη)R`.
+  - Then the ball holds exactly one fixed point, and `‖h − h*‖ ≤ M‖Δh‖/(1 − Mη)` (`ball_certificate_Meta`; general form `ball_certificate`).
+  - `F` need not be a contraction: `ρ(F′) > 1` is allowed.
+  - With an `L`-Lipschitz Jacobian, the radius `2M‖Δh‖/(1 − Mη₀)` works once `4M²L‖Δh‖ ≤ (1 − Mη₀)²` (`kantorovich_type`). That constant is not the sharp Newton–Kantorovich one.
+- **A deterministic check needs all `d` products** (`LoopStopMatrixFree.lean`, adaptive queries included; the resisting-oracle argument [33]).
+  - Suppose an algorithm sees `J` only through `k < d` forward and adjoint products, and is sound on `{‖J‖ ≤ L}`. Then it certifies at most `max(0, 1 − L)` for `σ_min(I − J)`, even at `J = 0` (`no_query_certificate_norm_class`, `apriori_bound_sound`).
+  - Sound on `{‖J‖ < 1}`, it certifies nothing positive (`no_query_certificate_contractive`).
+  - So at Ouro's `‖J‖₂ ≈ 127`, fewer than 2048 products cannot even certify that `I − J` is invertible. `d` products suffice, so `d` is the exact threshold.
+- **A randomized certificate escapes that bound** (`LoopStopRandomized.lean`, with the Gaussian step proved too; Halko, Martinsson & Tropp's Lemma 4.1 applied to the inverse [33]).
+  - Fix `t` and `m` in advance. Draw `m` standard Gaussian probes `gᵢ` independently of `J`, and solve `(I − J)xᵢ ≈ gᵢ` by any method.
+  - If every true residual has `‖rᵢ‖ < t`, then `‖(I − J)⁻¹‖ ≤ maxᵢ ‖xᵢ‖/(t − ‖rᵢ‖)`, except with probability at most `(t·√(2/π))ᵐ`. This holds in every dimension (`randomized_certificate_Rd`). One power step per probe tightens it (`randomized_power_certificate_Rd`).
+  - Dropping a probe whose solve failed is not covered, since a solver can fail exactly on the informative probes.
+  - At failure probability 10⁻³, ten probes give `t = 0.628`. With exact solves, the bound overstates `‖(I − J)⁻¹‖` by 2.9× when one direction dominates and by up to 74× when the singular values are flat. A power step brings that to 1.7–8.6× (synthetic Monte Carlo).
+- **A dense certificate needs the whole Jacobian** (`LoopStopDense.lean`). With all `d` products and any approximate inverse `X`, `‖I − X(I − J)‖ ≤ θ < 1` proves `I − J` invertible, with `‖(I − J)⁻¹‖ ≤ ‖X‖/(1 − θ)` (`approx_inverse_certificate`). `frobenius_bound` and `schur_bound` give cheap rigorous norms.
+  - Rounding is *(paper)* [33]. In binary64 at `d = 2048` it adds a term of order `γ₂₀₄₉ ≈ 2.3·10⁻¹³`. Binary32 is useless once `‖|X||I − J|‖ ≳ 10⁴`.
+- **Each certificate costs far more than the loop it certifies** *(paper; synthetic numerics, not Ouro)*. Per token, Ouro's loop is 4 block passes.
+  - The dense certificate takes 2048 Jacobian-vector products, about 500–1,500 loops' worth, plus about 3·10¹⁰ flops.
+  - The randomized one takes ten solves, at as many products each as GMRES needs. In synthetic spectra like Ouro's that was 21 to over 500, and on one strongly non-normal case GMRES did not converge. In all, about 50 to 5,000 loops' worth.
+  - `ρ(J)` and `‖J‖` bound nothing about GMRES's step count [34].
+- **The remaining gap is `η`, and data cannot close it** *(paper)*. A bump added to `F` away from every point evaluated changes no value and no product, yet changes how much `F′` varies on the ball.
+  - So `η` needs an a-priori bound. For attention with normalization one exists only on bounded sets [34], and it is loose across 24 layers.
+  - The clean route is the architecture: a loop built with a known contraction or monotone-equilibrium constant `q` [34] gets `‖h − h*‖ ≤ ‖Δh‖/(1 − q)` at no cost.
+- **What an exit rule can certify per token:**
+  - free: `‖Δh‖`, and bounds from constants fixed in advance;
+  - at hundreds of loops' cost: `‖(I − J̃)⁻¹‖` for a computed Jacobian `J̃`, deterministically or with confidence `1 − 10⁻³`;
+  - never: the distance to the nonlinear fixed point without `η`, or anything from fewer than 2048 deterministic products.
+  - And at `ρ(J) > 1`, as at every measured Ouro point, a fixed point with a nearby Jacobian repels the plain loop.
+
+**A global contraction caps useful depth, and partial contraction escapes the cap.**
+- Let `F` be an `L`-contraction with `L < 1`, started at distance `D` from its fixed point, with a read-out that is constant within `γ` of it.
+  - Every pass from `⌊log(D/γ)/log(1/L)⌋ + 1` on gives the same output, and no earlier pass is guaranteed to (`cap_log_form`, `corrected_threshold_least`). The ceiling form of that threshold is off by one (`ceiling_threshold_fails`).
+  - With error `δ` per step, the distance stays within `Lᵏ·D + δ/(1 − L)` (`tracking`).
+  - `‖Δh‖ + δ < (1 − L)·γ` certifies that the output is final (`certified_exit`).
+- So a 32nd pass can change the output only if `L ≥ (γ/D)^{1/31}`: 0.928 at `D/γ = 10`, 0.862 at 10², 0.800 at 10³ and 0.640 at 10⁶.
+- *(paper)* With constant `L`, `D ≤ poly(n)`, `γ ≥ n^{−c}` and `δ ≤ (1 − L)γ/2`, `O(log n)` passes suffice (`log_depth_suffices`).
+  - So the loop computes within FO-uniform TC¹ [29], and solves no P-complete problem unless NC = P.
+  - With a constant margin it stays in TC⁰.
+  - Without a margin, or with `1 − L = 1/poly(n)`, contracting loops can solve P-complete problems.
+- **A loop that contracts on part of its state and carries a neutral direction**, such as a counter, is not a contraction, and it escapes the cap (`Fc_not_contraction`, `counter_escapes_cap`). `TokenRouting.lean`'s shift register is the same escape (`receipt_costs_no_capacity`).
+- This is Miller & Hardt's truncation argument [28], run over depth instead of time.
+
+**`ρ(J) < 1` at every state does not make a loop converge.**
+- The polynomial map `(x, y, z) ↦ (x/2 + z·u², y/2 − u², z/2)`, with `u = x + yz`, has Jacobian `½I + N` with `N` nilpotent at every point, so `ρ(J) = ½` everywhere.
+- Yet the orbit of `(147/32, −63/32, 1)` is `((147/32)·2ᵏ, (−63/32)·4ᵏ, 2⁻ᵏ)`, and it diverges (`MY_jacobian_charpoly`, `MY_orbit`, `MY_not_contraction`).
+- This is the discrete Markus–Yamabe phenomenon [30].
+- So penalizing `ρ(J)` along the trajectory, as JSRR does [5], certifies a local condition only, even when the radius is exact.
+
+**Retrieval inside the loop.** Retrieving from a memory inside the loop makes it piecewise, as routing does (§1.2.2).
+- **Hard retrieval can leave no resting point.** Take `f(x) = x/2 + 1` for `x < 1` and `x/2 − 1` for `x ≥ 1`.
+  - It has no fixed point. Every orbit locks onto the 3-cycle `{−2/7, 6/7, 10/7}`: after finitely many steps it shadows the cycle, and the gap halves at every step. That cycle is the only periodic orbit (`orbit_locks_onto_cycle`, `periodic_points_in_cycle`).
+  - `|f(x) − x| > ½` everywhere, so a small-step exit never fires (`residual_gt_half`).
+  - In general, a hard-retrieval loop's resting points are exactly its cells' own fixed points that lie in their own cell, from none to one per cell (`piecewise_rest_point_iff`).
+  - Orbits can also converge to a cell boundary. There the residual goes to 0, and a small-step exit would certify a point that is not a fixed point.
+- **Whether hard top-k loops generically end in cycles is open in two or more dimensions** (`HardRetrievalTransversality.lean`, `HardRetrievalLoop.lean`, `HardRetrievalCount.lean`, `HardRetrievalCutSet.lean`).
+  - The setting is `f(x) = Ax + c + (1/k)·Σ_{j ∈ top-k(x)} v_j`, with `‖A‖ = λ < 1`.
+  - No published theorem covers this family [36]. Bruin & Deane assume independent offsets per piece, but the top-k offsets are tied: for `K = 4` and `k = 2`, `b₁₂ + b₃₄ = b₁₃ + b₂₄` (`tied_offsets_K4`). Gaivão & Pires vary the cut hyperplanes, not the values.
+  - *(paper, by the Bruin–Deane scheme)* It holds when `λ·m* < 1`, where `m*` is the largest number of top-k cells that meet at one point: 3 in the plane with keys in general position, and at most `min(K, d+1)` for top-1. Then for almost every choice of values, every orbit converges to one of finitely many cycles, each at positive distance from the cuts.
+  - The Lean parts of that proof:
+    - moving every value by the same `w` moves every image, by at least `(1 − λ)/(1 + λ)·‖w‖`, for every `λ < 1` (`common_shift_transversal`);
+    - near any point, few cells meet, and that holds on a whole compact set at once (`uniform_local_multiplicity`);
+    - an attractor at positive distance from the cuts is a finite union of attracting cycles (`lock_onto_cycle`, `periodic_points_finite`).
+  - In one dimension it holds for every `λ < 1`, by Nogueira, Pires & Rosales [36], up to the convention for ties. Top-1 in the plane with a conformal `A` is Bruin & Deane's theorem.
+- **A margin test keeps the exit rule from certifying a false rest, at every `λ < 1`** (Lean). Fire only when `M·‖f(x) − x‖` is below the margin of the current cell's own fixed point `p`, with `M = ‖(I − A)⁻¹‖`. The margin is a lower bound on `p`'s distance to the nearest cut, computed from the scores.
+  - Then `p` is a genuine resting point inside `x`'s cell, and `‖x − p‖ ≤ M·‖f(x) − x‖` (`stop_rule_sound_local`).
+  - Along any orbit that does not converge to a resting point, the residual stays above a positive bound (`residual_ge_off_rest`, `residual_bounded_below`).
+  - That margin is positive except for values on a finite union of hyperplanes, which put some cell's fixed point on a cut (`fixed_point_shift`).
+  - In simulation, 1,600 orbits of planar top-2 loops all locked onto cycles, with no false firings. On a one-dimensional boundary example, a plain small-step exit falsely certified 40 orbits of 40, and the margin test none.
+- **Soft retrieval keeps the contraction above a temperature.** Use a full softmax over a fixed memory, with values `V`, keys `K`, query map `W_q`, and a loop that is `L`-Lipschitz in its state and `L_o`-Lipschitz in what it retrieves.
+  - The loop contracts once `τ > L_o‖V‖‖KW_q‖/(2(1 − L))`, because the softmax Jacobian has norm at most ½ (`soft_retrieval_contracting`, `softmax_jacobian_sq_le`).
+  - ½ is attained, so the constant is sharp (`softmax_bound_attained`; [31]). The step from that Jacobian bound to a Lipschitz bound is *(paper)*.
+  - Any top-k shortlist puts the loop back in the hard case.
+- **Stable, sharp and influential: at most two.** A `q`-Lipschitz loop that retrieves item 1 sharply at `x` and item 2 at `y` has `‖G₁x − G₂x‖ ≤ 2ε + (q + L)·‖x − y‖` (`blur_band`, `blur_band_width`). So "stable or sharp, not both" is false as stated: a loop can be both when what it retrieves moves it little.
 
 ### 1.3 What the test actually checks
 
@@ -352,11 +495,16 @@ When triggered, Σ₀ projects the state onto `null(A)`: `x* = P x`, with `P = V
 
 Caveats: the synthetic systems use `B = 0`, so the control signal is trivially satisfied and this calibrates only the grad ∧ rank ∧ flat sub-gate; and the clean collapse regime is the `ν = 0` case. A soundness profile does not make *trigger ⇒ α < 0* a theorem. The calibration predates the two corrections above and the per-trajectory gate. To re-run it, the script must first score each row: on the per-trajectory gate it stops with a `ValueError` at `int(conds[c])` (checked 2026-11-05). One sub-statement is provable by construction: a collapse manifold exists iff `A` is near-singular, and otherwise `_collapse_state` returns the semantic-null branch.
 
+**What the flat leg cannot see** (PROVEN 2026-11-07; `docs/formal/Sigma0KickMeasurement.lean`, with the last step *(paper)*).
+- No function of `Σ` separates a state settled by evidence from a collapsed or self-referential one. `Σ`'s recursion never reads the data, and `a(Σ)` ignores scale (`cv_smul`). Isotropic evidence returns any bumped `Σ` to flat (§3.2).
+- In the engine, `Σ` follows the Kalman–Bucy Riccati equation with `C = I` (`engine.py:148`), as if the state were measured with noise `r` on every step. But the state update `x_next = x + dx + dW` (`engine.py:516`) takes no measurement. So `Σ` settles to the filter's fixed point whether or not evidence reached `x`, and the flat leg reports the filter's design, not grounding.
+- The innovations can tell the cases apart, with a test on both tails (§4).
+
 **At decode time ([#766]).** `loop_lm.generate()` folds per-token self-repeat, n-gram echo and the argmax margin into `sigma0_proximity`, and adapts the repetition penalty as collapse nears. That closes the loop from instrument to actuator; it is a control heuristic, not a theorem.
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: C3 PROVEN in-regime, per trajectory, checked in Lean, with engine-level tests; S1 PROVEN in-regime. The operator beats a placebo on the signals a placebo can fail (MEASURED). No state-level anti-collapse theorem exists. The mechanism is `NOT-NOVEL` [7]; the 2026-07-17 corner audit found no located counterpart for C3, which carries no novelty grade.**
+**Status: C3 PROVEN in-regime, per trajectory, checked in Lean, with engine-level tests; S1 PROVEN in-regime. The operator beats a placebo on the signals a placebo can fail (MEASURED). No theorem says the kick makes the state right, and none can: what makes it right is a measurement of every kicked direction (PROVEN 2026-11-07, [§3.2](#32-the-kick-needs-a-measurement)). The mechanism is `NOT-NOVEL` [7]; the 2026-07-17 corner audit found no located counterpart for C3, which carries no novelty grade.**
 
 Where Σ₀ projects onto the null subspace, Σ₀⁻¹ injects along it, one trajectory at a time (`AntiCollapseOperator.excite`, `src/cio_sde/collapse.py`):
 
@@ -490,6 +638,36 @@ so any `B < B*_∞` stops working after the deadline `n*(B) = 2·ln[√V₀/(√
 
 **Limits.** The additive-anchor model is a simplification, since real grounding enters as tokens through attention. And "early intervention beats late; models commit" is itself published [9].
 
+### 3.2 The kick needs a measurement
+
+**Status: PROVEN 2026-11-07, `NOT-NOVEL`: textbook estimation and filtering [27], applied to this operator.** The deterministic recursions are checked in Lean for the scalar case (`docs/formal/Sigma0KickMeasurement.lean`). The expectation steps and the matrix case are *(paper)*.
+
+The model:
+- the truth is `x*`;
+- the kick is `x ↦ x + κξ`;
+- a measurement is `o = Hx* + v`, with noise covariance `R ≻ 0`;
+- the update is `x ← x + K(o − Hx)`.
+
+**Without a measurement, nothing improves the state.**
+- Suppose `x*` is independent of all of the loop's randomness *jointly*. Then no statistic of the trajectory has a lower mean squared error than the prior mean, whose risk is `tr Σ₀`.
+- Suppose each kick is independent of the start, the truth and the earlier kicks. Then the expected squared error grows by exactly `κ²m` per pass.
+- Both need the joint hypotheses. With independence only pair by pair, a statistic reaches MSE `1 − 2/π` against a prior risk of 1, and the growth formula is off by `2κm`.
+
+**A measurement of every kicked direction makes the state right.**
+- Each pass multiplies the mean error by `I − KH`. That contracts only if `ρ(I − KH) < 1`, which forces `rank H = m`: a kicked direction that nothing measures never contracts.
+- The error covariance then settles to a Lyapunov floor, and with the Kalman gain to the Riccati fixed point (`lyap_tendsto`, `ric_tendsto`, `sfix_fixed`).
+- The kick only raises that floor (`floor_mono_kick`), possibly above the prior's own risk.
+- The covariance bump helps only a filter that is overconfident, as RLS covariance resetting does [7] (`bump_hurts_calibrated`). Overconfidence shows in the innovations (§4), not in `Σ`.
+- So a state-level theorem exists, and it is a grounding theorem: the measurement makes the state right. A theorem that the kick makes the state right is impossible.
+
+**C3 covers one evaluation, and no more.** Checked in Lean (`flat_again`, `flat_again_engine`) and through the real engine (`test_c3_covers_one_evaluation_and_the_flat_leg_comes_back`).
+- Isotropic evidence returns any bumped `Σ` to flat. A single update can undo a bump exactly (`one_update_restores`).
+- The engine's own covariance step does the same. On directions where `A = 0`, with isotropic noise and fixed point `s = √(q·r)`, the bump shrinks by at least the factor `1 − 2·dt·s/r` per step: 0.9 at `dt = 0.05` and `q = r = 1`.
+- With a bump at the C3 floor, the flat leg is true again at the second evaluation after the firing from `d = 16` on. At `d = 2`, where the floor overshoots its target, it is true again at the fifth.
+- C3 is not contradicted, since it says only that the next evaluation is off. The gate can fire again two steps later, once its other three legs hold, and §2's flat leg cannot tell why `Σ` is flat.
+
+**In the engine, the bump and the kick are set apart** (`excite`, `src/cio_sde/collapse.py`). `Σ` is bumped by `b·P`, with `b = max(Δ, strength·p)`, while the state's spread grows by `κ²` along the same subspace. So after a firing, `Σ` describes the kicked state only when `b = κ²`.
+
 ## 4. The early-warning scalar (the "canary")
 
 **Status: MEASURED that it fires under collapse (`test_surprise_monitor_integration`); its thresholds are control-design heuristics. The signal itself is standard [10]; ours is the wiring.** The early warning is the Kalman normalized innovation squared, `νᵀS⁻¹ν`, with `ν = y − Cx̂` and `S = CΣCᵀ + R` (`src/cio_sde/surprise.py`). `NIS ≈ m` means model and reality agree. `NIS ≫ m` means the model is overconfident, and has drifted without knowing it.
@@ -497,6 +675,8 @@ so any `B < B*_∞` stops working after the deadline `n*(B) = 2·ln[√V₀/(√
 Wiring it in was ours ([#657], 2026-06-19). With an identity observation the innovation vanished during collapse, so the canary risked staying silent on exactly the trajectory it should catch. `forward_step` now runs a Kalman predict-and-update with process noise `Q = (g·dilation)²·dt`. Smooth exploration stays consistent, while the collapse snap or a Σ₀⁻¹ kick spikes NIS (`test_surprise_monitor_integration`).
 
 `experiments/sigma0_horse_blinders.py`† shows the regime an eigenvalue readout cannot: an observer that is calm while wrong (low NIS, growing error) until an unobserved disturbance reaches a visible dimension. The earlier eigenvalue readouts, `p_unbounded` and `p_gate` (critical slowing down [10]), were never implemented, and are retired ([#659]). The driver of Σ₀⁻¹ is §2's `proximity()`. The canary is kept apart from that proximity, and so are the freeze and blow-up fates.
+
+**The spook reads one tail; the self-referential case shows in the other** (2026-11-07, *(paper)*, standard [10]). `surprise.py:145–147` spooks when `NIS > m + 3√(2m)`, which flags an overconfident filter. Suppose the "evidence" is the model's own prediction, `o = Hx̂ + v`. Then the innovation is `v`, with covariance `R` rather than `S`, so `E[NIS] = tr(S⁻¹R) = m − tr(S⁻¹HΣHᵀ) < m`. NIS is too *small*, and only a test on the lower tail sees it. The standard consistency test is two-sided [10]. The engine's test is not, so it cannot flag the regime that §2's flat leg cannot see either.
 
 ## 5. Global structure: the attractor graph G
 
@@ -868,6 +1048,16 @@ Grouped by [Sources](#sources--what-this-rests-on) row. The four fabricated IDs 
   - **Verify:** hidden-state probing [arXiv:2606.02628](https://arxiv.org/abs/2606.02628) and its scope limit [arXiv:2510.09033](https://arxiv.org/abs/2510.09033); agent drift [arXiv:2601.04170](https://arxiv.org/abs/2601.04170); gates-off snapshot testing (the Opus 4.6 system card).
   - **Converge:** Qwen3 strong-to-weak distillation; DeepSeek-V4's expert-then-consolidate assembly; model merging [arXiv:2511.21437](https://arxiv.org/abs/2511.21437).
   - **Also:** J. Wolfers & E. Zitzewitz, "Prediction Markets", *J. Economic Perspectives* 18(2):107–126 (2004), on markets as an external grounding signal.
+- **27** E. L. Lehmann & G. Casella, *Theory of Point Estimation*, 2nd ed., Springer (1998), for the Bayes estimator and its risk. T. M. Cover & J. A. Thomas, *Elements of Information Theory*, 2nd ed., Wiley (2006), §2.8, the data-processing inequality. B. D. O. Anderson & J. B. Moore, *Optimal Filtering*, Prentice-Hall (1979), ch. 4. S. W. Chan, G. C. Goodwin & K. S. Sin, "Convergence properties of the Riccati difference equation in optimal filtering of nonstabilizable systems", *IEEE Trans. Automatic Control* 29(2):110–118 (1984).
+- **28** S. Banach, "Sur les opérations dans les ensembles abstraits et leur application aux équations intégrales", *Fundamenta Mathematicae* 3:133–181 (1922). J. Miller & M. Hardt, *Stable Recurrent Models*, ICLR 2019, [arXiv:1805.10369](https://arxiv.org/abs/1805.10369).
+- **29** W. Merrill & A. Sabharwal, *The Parallelism Tradeoff: Limitations of Log-Precision Transformers*, TACL (2023), [arXiv:2207.00729](https://arxiv.org/abs/2207.00729). W. Merrill & A. Sabharwal, *Exact Expressive Power of Transformers with Padding*, NeurIPS 2025, [arXiv:2505.18948](https://arxiv.org/abs/2505.18948): averaging-hard-attention, masked-pre-norm transformers with polynomial padding, looped `O(logᵈ n)` times, recognize exactly FO-uniform TCᵈ.
+- **30** A. Cima, A. van den Essen, A. Gasull, E. Hubbers & F. Mañosas, "A polynomial counterexample to the Markus–Yamabe conjecture", *Advances in Mathematics* 131(2):453–457 (1997). A. Cima, A. Gasull & F. Mañosas, "The discrete Markus–Yamabe problem", *Nonlinear Analysis* 35(3):343–354 (1999).
+- **31** B. Gao & L. Pavel, *On the Properties of the Softmax Function with Application in Game Theory and Reinforcement Learning*, [arXiv:1704.00805](https://arxiv.org/abs/1704.00805) (2017), with the constant 1. P. Nair, *Softmax is 1/2-Lipschitz: A tight bound across all ℓp norms*, [arXiv:2510.23012](https://arxiv.org/abs/2510.23012) (2025, under review). The arXiv entries in rows 28, 29 and 31, and the three journal papers by Chan et al. and Cima et al., were checked against arXiv and Crossref on 2026-11-07. The books, and Banach 1922, are standard references, named but not separately checked.
+- **32** L. V. Kantorovich & G. P. Akilov, *Functional Analysis*, ch. XVIII (the modified Newton method). J. M. Ortega & W. C. Rheinboldt, *Iterative Solution of Nonlinear Equations in Several Variables*, Academic Press (1970), §§10.1 and 12.6. M. Urabe, "Galerkin's procedure for nonlinear periodic systems", *Arch. Rational Mech. Anal.* 20:120–152 (1965). R. Krawczyk, "Newton-Algorithmen zur Bestimmung von Nullstellen mit Fehlerschranken", *Computing* 4:187–201 (1969). S. M. Rump, "Verification methods: rigorous results using floating-point arithmetic", *Acta Numerica* 19:287–449 (2010).
+- **33** A. S. Nemirovski & D. B. Yudin, *Problem Complexity and Method Efficiency in Optimization*, Wiley (1983). J. F. Traub, G. W. Wasilkowski & H. Woźniakowski, *Information-Based Complexity*, Academic Press (1988). M. Braverman, E. Hazan, M. Simchowitz & B. Woodworth, *The gradient complexity of linear regression*, COLT 2020, [arXiv:1911.02212](https://arxiv.org/abs/1911.02212). J. D. Dixon, "Estimating extremal eigenvalues and condition numbers of matrices", *SIAM J. Numer. Anal.* 20(4):812–814 (1983). F. Woolfe, E. Liberty, V. Rokhlin & M. Tygert, "A fast randomized algorithm for the approximation of matrices", *Appl. Comput. Harmon. Anal.* 25(3):335–366 (2008). N. Halko, P.-G. Martinsson & J. A. Tropp, *Finding structure with randomness*, *SIAM Review* 53(2):217–288 (2011), [arXiv:0909.4061](https://arxiv.org/abs/0909.4061), Lemma 4.1. S. M. Rump, "Verified bounds for singular values, in particular for the spectral norm of a matrix and its inverse", *BIT Numer. Math.* 51:367–384 (2011). N. J. Higham, *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM (2002).
+- **34** A. Greenbaum, V. Pták & Z. Strakoš, "Any nonincreasing convergence curve is possible for GMRES", *SIAM J. Matrix Anal. Appl.* 17(3):465–469 (1996). H. Kim, G. Papamakarios & A. Mnih, *The Lipschitz Constant of Self-Attention*, ICML 2021, [arXiv:2006.04710](https://arxiv.org/abs/2006.04710). E. Winston & J. Z. Kolter, *Monotone operator equilibrium networks*, NeurIPS 2020, [arXiv:2006.08591](https://arxiv.org/abs/2006.08591). Checked on 2026-11-07: the four arXiv IDs against arXiv, and Dixon, Rump 2011 and Greenbaum et al. against Crossref.
+- **35** R. J. LeVeque & L. N. Trefethen, "On the resolvent condition in the Kreiss matrix theorem", *BIT* 24:584–591 (1984). M. N. Spijker, "On a conjecture by LeVeque and Trefethen related to the Kreiss matrix theorem", *BIT* 31:551–555 (1991). K.-C. Toh & L. N. Trefethen, "The Kreiss matrix theorem on a general complex domain", *SIAM J. Matrix Anal. Appl.* 21:145–165 (1999). T. Nguyen-Cung & B. T. Nguyen, *Inertia-Sensitive Kreiss Bounds for J-Selfadjoint Matrices*, [arXiv:2608.29823](https://arxiv.org/abs/2608.29823) (2026): Lemma 4.1 is the finite-horizon bound with the constant `C_t`, credited to Toh & Trefethen, and Thm 5.1 the Kreiss constant of a scaled shift. N. Chalmoukis, G. Tsikalas & D. Yakubovich, *Operators with small Kreiss constants*, [arXiv:2512.10025](https://arxiv.org/abs/2512.10025) (2025). C. Pearcy, "An elementary proof of the power inequality for the numerical radius", *Michigan Math. J.* 13:289–291 (1966). M. J. Crabb, "The powers of an operator of numerical radius one", *Michigan Math. J.* 18:253–256 (1971). All checked against arXiv or Crossref on 2026-11-07.
+- **36** H. Bruin & J. H. B. Deane, "Piecewise contractions are asymptotically periodic", *Proc. Amer. Math. Soc.* 137:1389–1395 (2009). A. Nogueira & B. Pires, *Dynamics of piecewise contractions of the interval*, ETDS 35 (2015), [arXiv:1206.5676](https://arxiv.org/abs/1206.5676). A. Nogueira, B. Pires & R. A. Rosales, *Asymptotically periodic piecewise contractions of the interval*, Nonlinearity 27 (2014), [arXiv:1310.5784](https://arxiv.org/abs/1310.5784), and *Topological dynamics of piecewise λ-affine maps*, ETDS 38 (2018), [arXiv:1605.03470](https://arxiv.org/abs/1605.03470). E. Catsigeras, P. Guiraud, A. Meyroneinc & E. Ugalde, *On the asymptotic properties of piecewise contracting maps*, Dyn. Syst. 31 (2016), [arXiv:1108.1501](https://arxiv.org/abs/1108.1501), Thm 3.1. J. P. Gaivão & B. Pires, *Multi-dimensional piecewise contractions are asymptotically periodic*, ETDS (2026), [arXiv:2405.08444](https://arxiv.org/abs/2405.08444). S. Jain & C. Liverani, *Piecewise Contractions*, ETDS 45 (2025), [arXiv:2404.02371](https://arxiv.org/abs/2404.02371). Titles and authors were checked against arXiv and Crossref on 2026-11-07. The venues are as the proof pass reported them.
 
 *Verification.* Web citations were verified against arXiv on 2026-06-17 ([#660]); later arXiv additions carry the verified-on dates above. The 2026-11-05 condensation added one arXiv ID, SGM's 2510.10232, checked by web search that day. It also gave full entries to classics the earlier text named, and added new ones:
 - **Checked by web search on 2026-11-05:** Kelley 1995, T. W. Anderson 1955, Popoviciu 1935 (the venue), Lumer & Phillips 1961, Crouzeix & Palencia 2017, Borkar 1997 and Tu et al. 2014.
@@ -891,6 +1081,12 @@ The original router-demonstration design sketch, with its hand-entered "parrot a
 
 | Date | What was claimed | What survived (the correction) | Where |
 |---|---|---|---|
+| 2026-11-07 | §3: "No state-level anti-collapse theorem exists" | **sharpened**. A state-level *grounding* theorem exists: a measurement of every kicked direction makes the state right, and the kick only raises its error floor. A theorem that the kick makes the state right is impossible: without a measurement, no statistic beats the prior. Both halves need the truth independent of the loop's randomness jointly, not pair by pair. Lean for the scalar recursions; the expectation steps are paper proofs | [§3.2](#32-the-kick-needs-a-measurement) |
+| 2026-11-07 | §2's flat leg as a sign of degeneracy | it cannot separate a state settled by evidence from a collapsed one. `Σ`'s recursion never reads the data, and in the engine `Σ` takes a `C = I` Riccati step on every step while the state takes no measurement | [§2](#2-the-collapse-trigger-σ₀) |
+| 2026-11-07 | §4: "`NIS ≫ m` means the model is overconfident, and has drifted without knowing it" | true, and one-sided. A model fed its own predictions drifts with NIS *below* `m`, which the engine's one-sided spook test cannot flag | [§4](#4-the-early-warning-scalar-the-canary) |
+| 2026-11-07 | R2: Kreiss-inflated thresholds "would close the non-normal gap"; the threshold "needs" `e·n·𝒦`; a 20%-per-step mode "needs 47 steps" | **refuted at loop depth**. Inflation prevents false alarms, with the sharp finite-horizon constant `(t+1)^{t+1}/tᵗ`, but every norm threshold that never false-alarms on a Kreiss class is blind to slow growth within `T` steps, and Ouro's measured Jacobians have `𝒦 = ∞`. `e·n·𝒦` suffices; it is not needed. The 20% mode trips at step 48 | [R2](#r2--kreiss-inflated-canary-thresholds-m4l3-refuted-at-loop-depth--lemma--theorems-imported-3-35--not-novel) |
+| 2026-11-07 | Halting "with thresholds inflated by the Kreiss constant" ([#2854]) | halting needs the resolvent at `z = 1` only: `‖h − h*‖ ≤ ‖(I − J)⁻¹‖·‖Δh‖`, exact and attained, with no Kreiss constant and no dimension factor. Certifying that factor needs all `d` Jacobian-vector products, or a randomized certificate, or a constant built into the architecture | [§1.2.4](#124-exits-depth-and-retrieval-inside-a-loop-2026-11-07) |
+| 2026-11-07 | JSRR's criterion `ρ(J) < 1` as a stability certificate (§1.2.3) | `ρ(J) < 1` at every state does not make a loop converge: a polynomial map with `ρ ≡ ½` diverges. And at a fixed point, `ρ(J)` does not bound the distance to it when `J` is non-normal: the exact factor is `‖(I − J)⁻¹‖`, 40.1 where `‖Δh‖/(1 − ρ)` gives 2 | [§1.2.3](#123-the-acceptance-verdict-measured-loop-contraction-with-jsrr-ρ--1-as-fallback), [§1.2.4](#124-exits-depth-and-retrieval-inside-a-loop-2026-11-07) |
 | 2026-11-05 | "900/900 forced-collapse runs prevented" | **retired**: the metric could not fail (the engine skips the overwrite whenever the operator fires) and a do-nothing placebo matched it; all collapse-prone trials were `ν=0`; the script no longer reproduces under the observe-only default. Replaced by a placebo-controlled measurement | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | C3: "PROVEN for all `A`", "`P(permanent freeze) = 0`" | the lemma holds; the engine violated it (σ_max cap, batch floor, clipped `a`, `d > 400`). Fixed, and restated as a gate statement. It does not mean the state keeps moving | [§3](#3-the-anti-collapse-operator-σ₀¹) |
 | 2026-11-05 | C3 "for every dimension `d ≥ 2`", with `ρ ≤ 9·10⁻⁴` only stated | the hypothesis was not enforced (at the defaults it allows `d ≤ 9000`). The engine now refuses to fire outside it | [§3](#3-the-anti-collapse-operator-σ₀¹) |
@@ -936,4 +1132,4 @@ The fate-parity check under `e^{A·dt}` is still a test (`test_discrete_dichotom
 
 ---
 
-*Source of record: `src/cio_sde/collapse.py` (the certificates, Σ₀ and Σ₀⁻¹), `src/cio_sde/engine.py`, `src/cio_sde/surprise.py`, `src/sigma0/loop_lm.py` (the loop verdict) and `docs/formal/C3EngineLift.lean`. The LaTeX framework, `docs/sigma0-collapse-certificate.tex`, was not edited in this condensation.*
+*Source of record: `src/cio_sde/collapse.py` (the certificates, Σ₀ and Σ₀⁻¹), `src/cio_sde/engine.py`, `src/cio_sde/surprise.py`, `src/sigma0/loop_lm.py` (the loop verdict), `docs/formal/C3EngineLift.lean`, and the 2026-11-07 files in `docs/formal/` (§1.2.4, §3.2, R2). The LaTeX framework, `docs/sigma0-collapse-certificate.tex`, was not edited in this condensation.*

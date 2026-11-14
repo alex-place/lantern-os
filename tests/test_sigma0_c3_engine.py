@@ -381,6 +381,33 @@ def test_a_switching_jacobian_can_erase_the_kick():
     assert float(x2.norm()) < 1e-5 * float(x1.norm())                  # and the kick is gone
 
 
+@pytest.mark.parametrize("d, m, flat_at", [(2, 1, 5), (4, 1, 3), (16, 1, 2), (16, 4, 2), (64, 1, 2)])
+def test_c3_covers_one_evaluation_and_the_flat_leg_comes_back(d, m, flat_at):
+    """C3 holds for one evaluation and no more (docs/formal/Sigma0KickMeasurement.lean,
+    `flat_again_engine`). The covariance step never reads the state. On directions where A = 0, with
+    isotropic noise, the engine's own step (C = I) pulls a bump back toward its Riccati fixed point
+    however the state moved, so the flat leg holds again soon after the firing. With a bump at the C3
+    floor, dt = 0.05 and q = r = 1, that is the second evaluation from d = 16 on, and the fifth at
+    d = 2, where the floor overshoots its target."""
+    dt = 0.05
+    op = AntiCollapseOperator(strength=0.5)
+    det = op.detector
+    cov = CovarianceField(dim=d, r=1.0)
+    A = torch.zeros(1, d, d, dtype=torch.float64)
+    q = torch.ones(1, d, dtype=torch.float64)                    # diffusion gain 1, so Q = I
+    sigma = torch.eye(d, dtype=torch.float64).unsqueeze(0)       # the Riccati fixed point √(q·r) = 1
+    assert torch.allclose(cov.step(sigma, A, q, dt), sigma, atol=1e-12)
+    P = torch.zeros(1, d, d, dtype=torch.float64)
+    P[0, :m, :m] = torch.eye(m, dtype=torch.float64)
+    sigma = sigma + op._cov_floor(sigma, d, m).view(-1, 1, 1) * P
+    reads = [float(_per_sample_a(det, sigma))]                   # what the next evaluation reads
+    while reads[-1] >= det.anisotropy_eps and len(reads) < 50:
+        sigma = cov.step(sigma, A, q, dt)
+        reads.append(float(_per_sample_a(det, sigma)))
+    assert reads[0] >= det.anisotropy_eps                         # C3: that evaluation is not flat
+    assert len(reads) == flat_at, reads                           # flat again at evaluation `flat_at`
+
+
 # ── S1's hypothesis, enforced (lantern-os-research PR #14) ───────────────────────────────────────
 
 def test_s1_fails_without_its_hypothesis():
