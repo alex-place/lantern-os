@@ -124,11 +124,53 @@ async function _persist(basePath, record) {
   return record;
 }
 
+// ── Provenance: who produced a memory ─────────────────────────────────────────
+// A belief is only as trustworthy as the number of INDEPENDENT sources behind it, and the
+// system's own earlier output is not an independent source: recalled as evidence, it is an
+// echo that inflates confidence without adding information. So every record says who
+// produced it, in the schema's existing fields (MemoryRecord.from_dict() takes exactly the
+// dataclass fields, so no new top-level key):
+//   actor_type          "user" | "agent" | "system"   (MemoryRecord's own vocabulary)
+//   actor_id            which agent/system; for a user only a server-resolved id (fact.userId),
+//                       never a client-supplied name. The chat callers don't pass one yet, so
+//                       life facts carry actor_id "".
+//   metadata.provenance "user"   — said by the user
+//                       "self"   — produced by unisona itself (the council's answer, an agent's signal)
+//                       "system" — a system event (an order recorded by the trading store)
+const PROVENANCE = Object.freeze({ USER: "user", SELF: "self", SYSTEM: "system" });
+
+// Roles that mark text unisona itself produced. "lantern" is the assistant's message role in
+// the conversation store; "convergance" and "agent" are this writer's own self-produced roles.
+const SELF_ROLES = new Set(["lantern", "assistant", "convergance", "agent", "council"]);
+
+/** True when a conversation-turn role is the assistant's own voice. */
+function isSelfTurnRole(role) {
+  return SELF_ROLES.has(String(role || "").toLowerCase());
+}
+
+/**
+ * True when a CSF memory record holds unisona's own output rather than outside evidence.
+ * Reads the provenance stamped at write time (this writer and trading-memory.js). For records
+ * without it (written before provenance existed, or by a writer that doesn't stamp it) it falls
+ * back to the shapes unisona's own output has always had: a self role in content.role, or a
+ * trading signal (tags "trading" + "signal"), which trading-memory.js used to write as
+ * actor_type "system" with no role.
+ */
+function isSelfAuthoredRecord(record) {
+  if (!record || typeof record !== "object") return false;
+  const prov = record.metadata && record.metadata.provenance;
+  if (prov) return prov === PROVENANCE.SELF;
+  if (record.actor_type === "agent") return true;
+  if (isSelfTurnRole(record.content && record.content.role)) return true;
+  const tags = Array.isArray(record.tags) ? record.tags : [];
+  return tags.includes("trading") && tags.includes("signal");
+}
+
 /**
  * Build + persist a Tier.TRACE record (mirrors MemoryRecord.to_dict()'s
  * field set, with cube_partition="raw", privacy_scope="internal").
  */
-async function _writeTrace({ content, tags, keywords, entities, confidence, sourceSurface }, opts = {}) {
+async function _writeTrace({ content, tags, keywords, entities, confidence, sourceSurface, actorType, actorId, provenance }, opts = {}) {
   const now = _nowIso();
   const record = {
     memory_id: _genMemoryId("trace"),
@@ -148,9 +190,9 @@ async function _writeTrace({ content, tags, keywords, entities, confidence, sour
     vector_embedding: null,
     keywords,
     entities,
-    metadata: {},
-    actor_id: "",
-    actor_type: "system",
+    metadata: provenance ? { provenance } : {},
+    actor_id: actorId ? String(actorId) : "",
+    actor_type: actorType || "system",
     confidence_reasoning: "",
     staleness_signals: [],
   };
@@ -187,7 +229,10 @@ async function recordOrder(order, opts = {}) {
     ...order,
   };
 
-  return _writeTrace({ content, tags, keywords, entities, confidence: 1.0, sourceSurface: "trading" }, opts);
+  return _writeTrace({
+    content, tags, keywords, entities, confidence: 1.0, sourceSurface: "trading",
+    actorType: "system", actorId: "trading-store", provenance: PROVENANCE.SYSTEM,
+  }, opts);
 }
 
 /** Write a single agent-log/signal entry as a CSF trace record. */
@@ -215,7 +260,10 @@ async function recordSignal(entry, opts = {}) {
     ...entry,
   };
 
-  return _writeTrace({ content, tags, keywords, entities, confidence: 0.6, sourceSurface: "trading" }, opts);
+  return _writeTrace({
+    content, tags, keywords, entities, confidence: 0.6, sourceSurface: "trading",
+    actorType: "agent", actorId: agent || "trading-agent", provenance: PROVENANCE.SELF,
+  }, opts);
 }
 
 // Lowercased non-stopword tokens for keyword extraction from a question.
@@ -294,8 +342,12 @@ async function recordConvergance(interaction, opts = {}) {
     convergence_record_id: interaction.recordId || null,
   };
 
+  // The converged answer is unisona's own claim, not outside evidence (see PROVENANCE).
   return _writeTrace(
-    { content, tags, keywords, entities, confidence, sourceSurface: surface },
+    {
+      content, tags, keywords, entities, confidence, sourceSurface: surface,
+      actorType: "agent", actorId: interaction.synthesizer || "council", provenance: PROVENANCE.SELF,
+    },
     opts,
   );
 }
@@ -349,7 +401,10 @@ async function recordLifeFact(fact, opts = {}) {
   };
 
   return _writeTrace(
-    { content, tags, keywords: Array.isArray(fact.keywords) ? fact.keywords : [], entities: [], confidence: 1.0, sourceSurface: surface },
+    {
+      content, tags, keywords: Array.isArray(fact.keywords) ? fact.keywords : [], entities: [], confidence: 1.0, sourceSurface: surface,
+      actorType: "user", actorId: fact.userId || "", provenance: PROVENANCE.USER,
+    },
     opts,
   );
 }
@@ -392,6 +447,9 @@ module.exports = {
   recordLifeFact,
   queryRecent,
   verifyRecord,
+  PROVENANCE,
+  isSelfTurnRole,
+  isSelfAuthoredRecord,
   // Shared canonical-checksum primitives. trading-memory.js / trading-news.js
   // import these so every JS writer stamps records with the SAME recursive
   // canonical-JSON + SHA-256 scheme (see _canonicalJson). Do NOT reintroduce a
