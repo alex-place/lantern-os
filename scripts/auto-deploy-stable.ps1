@@ -24,6 +24,7 @@
 # - Restart ONLY when server-side code changed; doc/data/static served fresh, no restart.
 # - Health-check + automatic rollback to the previous commit on a failed boot.
 # - Log rotation; -DryRun to validate without restarting.
+# - MARKET-HOURS HOLD: a deploy that restarts the armed server waits for 16:05 ET on weekdays.
 #
 # ASCII-only on purpose (Windows PowerShell 5.1 reads scripts as cp1252).
 param([switch]$Force, [switch]$DryRun)
@@ -106,7 +107,13 @@ function StopServer {
   # freshly-started server, and a zombie still holding $PORT made the next boot EADDRINUSE
   # straight out (server.js exits on EADDRINUSE -- there is no port fallback). 2026-06-27.
   $targets = StableServerPids
-  foreach ($p in $targets) { Log "stopping stable server tree PID $p"; & taskkill /PID $p /T /F 2>&1 | Out-Null }
+  foreach ($p in $targets) {
+    Log "stopping stable server tree PID $p"; & taskkill /PID $p /T /F 2>&1 | Out-Null
+    # 2026-09-18: a killed server leaves its per-account lock (C:\dev\trader-locks\<acct>.lock.json)
+    # holding its pid; the relaunch then idles up to DEFAULT_STALE_MS (5 min, lib/account-lock.js)
+    # before taking over -- three RTH deploys on 09-18 cost ~15 unmanaged minutes. Clear it here.
+    Get-ChildItem 'C:\dev\trader-locks\*.lock.json' -ErrorAction SilentlyContinue | ForEach-Object { try { $lj = Get-Content $_.FullName -Raw | ConvertFrom-Json; if (-not (Get-Process -Id ([int]$lj.pid) -ErrorAction SilentlyContinue)) { Remove-Item $_.FullName -Force; Log ("cleared stale lock {0} (dead pid {1})" -f $_.Name, $lj.pid) } } catch {} }
+  }
   if (@($targets).Count -gt 0) { Start-Sleep -Seconds 2 }
 }
 # Reap leaked zombies WITHOUT touching the live $PORT owner -- used on the healthy
@@ -159,7 +166,9 @@ function StartServer {
   # Launch with the ABSOLUTE entry path (not relative) so StopServer/ReapZombies can
   # identify this instance later. WorkingDirectory stays $STABLE, so __dirname and
   # process.cwd() are unchanged -- behaviour is identical to the relative invocation.
-  Start-Process -FilePath 'node' -ArgumentList $ENTRY -WorkingDirectory $STABLE -WindowStyle Hidden
+  $p = Start-Process -FilePath 'node' -ArgumentList $ENTRY -WorkingDirectory $STABLE -WindowStyle Hidden -PassThru
+  # 2026-09-14: trader loops out-rank test harnesses on this PC (see race-watchdog.ps1). Reversible.
+  try { $p.PriorityClass = 'AboveNormal' } catch {}
 }
 function HealthOk {
   for ($i = 0; $i -lt 25; $i++) {
@@ -201,6 +210,29 @@ function CiState($sha) {
     return 'success'
   } catch { return 'unknown' }
 }
+
+# --- MARKET-HOURS HOLD (2026-09-29) ---
+# The stable server runs the ARMED paper trader, and a restart in the middle of the session is
+# not free: on 2026-09-29 four merges to master rolled it three times in twenty minutes (13:56,
+# 14:06, 14:16 ET) and the fresh process bought inside an hour bar the entry cadence had already
+# spent. While the regular session is open (weekdays 09:25-16:05 ET) a deploy that needs a
+# RESTART waits; the first run after 16:05 ET ships everything that accumulated. Changes that
+# need no restart (docs, static, data) still go out, and a server that is DOWN is always
+# started. Market holidays are not known here: on one the hold applies and costs nothing.
+#   override, one shot : create C:\dev\deploy-now.flag (consumed by the next run), or run -Force
+#   switch the hold off: set KEYSTONE_DEPLOY_MARKET_HOLD=0
+$NOWFLAG = 'C:\dev\deploy-now.flag'
+function EtNow([datetime]$utc) {
+  return [System.TimeZoneInfo]::ConvertTimeFromUtc([datetime]::SpecifyKind($utc, [System.DateTimeKind]::Utc), [System.TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time'))
+}
+function InMarketSession([datetime]$utc) {
+  try {
+    $et = EtNow $utc
+    if ($et.DayOfWeek -eq [System.DayOfWeek]::Saturday -or $et.DayOfWeek -eq [System.DayOfWeek]::Sunday) { return $false }
+    return (($et.TimeOfDay -ge [TimeSpan]'09:25:00') -and ($et.TimeOfDay -lt [TimeSpan]'16:05:00'))
+  } catch { return $false }   # a clock that cannot be read never blocks a deploy: behave as before the hold
+}
+function EtClock([datetime]$utc) { try { return (EtNow $utc).ToString('ddd HH:mm') } catch { return '?' } }
 
 # =================== main ===================
 if (-not (AcquireLock)) { exit 0 }
@@ -248,6 +280,16 @@ try {
   $codeRe  = '^(apps/lantern-garage/server(-dev)?\.js|apps/lantern-garage/(lib|routes)/|.*package(-lock)?\.json$)'
   $needRestart = @($changed | Where-Object { $_ -match $codeRe }).Count -gt 0
   $depsChanged = @($changed | Where-Object { $_ -match 'package(-lock)?\.json$' }).Count -gt 0
+
+  # --- market-hours hold: a restart of the armed server waits for the close (see InMarketSession) ---
+  $nowUtc = [datetime]::UtcNow
+  $holdOn = ($env:KEYSTONE_DEPLOY_MARKET_HOLD -ne '0')
+  $flag   = Test-Path $NOWFLAG
+  if ($holdOn -and $needRestart -and (InMarketSession $nowUtc) -and (ServerPid) -and -not $Force -and -not $flag) {
+    Log ("market hours ({0} ET): deploy {1} -> {2} needs a restart -> HELD until 16:05 ET (override: create {3}, or run -Force)" -f (EtClock $nowUtc), $local.Substring(0,8), $remote.Substring(0,8), $NOWFLAG)
+    exit 0
+  }
+  if ($flag) { Remove-Item $NOWFLAG -Force -ErrorAction SilentlyContinue; Log "deploy-now flag consumed -> deploying without the market-hours hold" }
 
   # --- update the worktree to master (robust: reset --hard, cannot wedge) ---
   # `merge --ff-only` STALLS whenever the live server has dirtied a TRACKED file (data/
