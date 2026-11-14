@@ -3,7 +3,7 @@
 The long comments that used to sit inside `apps/lantern-garage/lib/auto-trader.js`, moved here verbatim
 (2026-11-11) so the code stays readable. Each rule's comment in the code now ends with its id, e.g. `(H38)`;
 the entry below with that id holds the full story: the incident that caused it, the dates, the measurements and
-the ledger rows. Line references are to the code as it was when the comments moved (master 5efd83686).
+the ledger rows. Line references are to the code as it was when the comments moved (master 5efd83686; H153 from cf5ec98a4).
 
 When you change a rule, put the short what/why in the code and add the history here under its id (or a new id).
 
@@ -354,7 +354,7 @@ Above `async function _sellGate(bridge, userId) {`
 
 ## H25
 
-Above `for (let attempt = 0; canceled.length && attempt < 3; attempt++) {`
+Above `const watch = settleMs > 0`
 
     SETTLE BEFORE SELLING (#3407). A cancel is not instantaneous: Alpaca holds
     the order in pending_cancel while the shares stay reserved, so a market
@@ -363,6 +363,13 @@ Above `for (let attempt = 0; canceled.length && attempt < 3; attempt++) {`
     and carried a 3x position into a weekend (and how the operator's manual
     champion flatten bounced on 08-20). Wait — bounded — until the canceled
     ids leave the working book; IBKR usually settles on the first check.
+
+    WITH settleMs (the exit path under TRADER_EXIT_CANCEL_SETTLE_MS, 2026-11-14 — see
+    _sellAfterCancel): keep checking past the three tries, for up to that many ms, and
+    also watch a stop whose cancel was asked for EARLIER and has not finished. That one
+    reads pending-cancel, which the loop above skips as terminal, so a second call had
+    nothing to wait on. settleMs 0 — the default, and every other caller — is the loop
+    exactly as it was.
 
 ## H26
 
@@ -1761,7 +1768,7 @@ Above `if (c.ibsExit > 0) {`
 
 ## H119
 
-Above `const { r, retries, reserved } = await _sellAfterCancel(bridge, userId, sym, exOrder);`
+Above `const { r, retries, reserved, settleMs: _settleMs } = await _sellAfterCancel(bridge, userId, sym, ex`
 
     #3660 A: CANCEL FIRST, SELL SECOND. cancelRestingStops already settles -- it
     waits (bounded, #3407) until the canceled stop leaves the working book, i.e.
@@ -2280,3 +2287,20 @@ Above `const _ev = {};`
     Found on the feature's first live day: the ledger rows were still bare.
     The whitelist stays (a skip row must not balloon), but the evidence keys
     are part of it now.
+
+## H153
+
+Above `const _exitSettle = { spent: 0 };   // ms THIS scan has spent waiting on stop cancels`
+
+    THE STOP'S CANCEL IS WAITED FOR, WITHIN A BUDGET (2026-11-14; off until TRADER_EXIT_CANCEL_SETTLE_MS is set).
+    The retries below still lose near the close. Engine, Alpaca paper, 10-26..11-13: of 15 clock-time exits
+    that needed a retry, 6 stayed refused through all three and sold on the next scan 65-76 s later (the leg's
+    15:55 de-carry on 11-02, 11-09 and 11-13; close-IBS max-hold on 11-03 twice and 11-04). The broker's own
+    order history shows why: at 15:50-15:55 it took 4-17 s to finish cancelling the resting stop, the stop
+    that the next scan placed and cancelled was gone in under a second, and the patience here (three 700 ms
+    checks, then three retries a second apart) ends after about seven. On the retries the stop reads
+    pending-cancel, which cancelRestingStops skips as terminal, so nothing was waited on at all.
+    With the switch set, one scan may spend up to that many ms IN TOTAL -- all of its exits together -- waiting
+    for cancelled stops to leave the working book before it sells; the sale then goes out in the same scan.
+    Once the budget is used up, or with the switch unset, every exit behaves exactly as before. What is sold,
+    and when a rule fires, do not change. TRADER_EXIT_CANCEL_POLL_MS (700) is how often the stop is re-read.

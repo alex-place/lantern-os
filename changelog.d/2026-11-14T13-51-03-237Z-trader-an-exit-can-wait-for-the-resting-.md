@@ -1,0 +1,3 @@
+### Fixed
+
+- Trader: an exit can wait for the resting stop's cancel to finish before it sells, so the sale goes out in the same scan (off until TRADER_EXIT_CANCEL_SETTLE_MS is set; the value is the most one scan may spend waiting, all of its exits together; TRADER_EXIT_CANCEL_POLL_MS, 700, is how often the stop is re-read). On Alpaca near the close the cancel took 4-17 s while the exit path gave up after about 7, so 6 of 15 clock-time exits 10-26..11-13 stayed refused ("insufficient qty available") through every retry and sold a scan later, 65-76 s on. A stop already pending-cancel is now waited on too. Unset, every exit behaves as before; what is sold and when a rule fires do not change.

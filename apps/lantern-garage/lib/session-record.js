@@ -161,6 +161,12 @@ function buildSessionRecord({ ledgerText = '', now = Date.now(), account = {}, p
     // ── the account, so equity(today) − equity(yesterday) is answerable later
     equity: round(account.equity),
     cash: round(account.cash),
+    // The currency of equity and cash (2026-11-11): USD, restated from the IBKR account's base currency
+    // when that differs (lib/ibkr-cpapi.js). Earlier rows carry none; on IBKR they hold the broker's
+    // base-currency figure, which lib/day-pnl.js prevSessionEquity restates before comparing.
+    ...(account && account.currency ? { currency: String(account.currency).toUpperCase() } : {}),
+    ...(account && account.base_currency && Number(account.fx_usd_to_base) > 0
+      ? { base_currency: String(account.base_currency).toUpperCase(), fx_usd_to_base: Number(account.fx_usd_to_base) } : {}),
     // ── P&L exactly as the panel reported it
     day_pnl: num(dayPnl.pnl_today),
     // The ACCOUNT's day beside this book's (2026-10-26): equity change since the previous session's
