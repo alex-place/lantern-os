@@ -127,10 +127,10 @@ test('the exemption touches the CADENCE only — every other gate is still in th
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'auto-trader.js'), 'utf8');
   // the guards that must still run after the cadence block
   for (const guard of [
-    'post-stop cooldown',            // stopped out -> no same-day re-buy
+    'be_ratchet session bar',        // breakeven exit -> no same-session re-buy
     'concurrent cap',                // slot ceiling
     "why: 'cooldown'",               // the 45-minute per-symbol cooldown
-    'falling_knife',                 // momentum still cratering
+    'entry_confirm',                 // the turn must be confirmed
   ]) {
     assert.ok(src.includes(guard), `${guard} must still be present in the entry path`);
   }

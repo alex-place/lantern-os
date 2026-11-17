@@ -45,8 +45,7 @@ const reset = () => {
 };
 
 test('the deferrable set is gain protection — never the disaster brake', () => {
-  for (const r of ['trailing_stop (−3.3% from peak +2.0%, trig 2.5%)', 'take_profit_R (+3.0% ≈ 1R)',
-    'take_profit (+5.0%)', 'peak_giveback', 'r2_trail', 'zone_floor']) {
+  for (const r of ['trailing_stop (−3.3% from peak +2.0%, trig 2.5%)']) {
     assert.strictEqual(at._isDeferrableExit(r), true, `${r} should defer`);
   }
   for (const r of ['max_loss (−10.0% ≤ -10%)', 'signal_exit', 'momentum_died (MACD hist<0)',

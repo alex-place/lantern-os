@@ -57,14 +57,13 @@ async function stopFillsAt(fillPx, stopId) {   // a distinct stop id per case: t
   return readRows().filter((r) => r.event === 'exit');
 }
 
-test('a stop that fills BELOW entry with a stale ratchet entry is a real stop-out: no be_ratchet, breaker fed, map cleared', async () => {
+test('a stop that fills BELOW entry with a stale ratchet entry is a real stop-out: no be_ratchet, no session bar, map cleared', async () => {
   const exits = await stopFillsAt(97.02, 'S9');
   assert.strictEqual(exits.length, 1);
   assert.strictEqual(exits[0].be_ratchet, undefined, 'not a round trip');
   assert.ok(!/be_ratchet/.test(exits[0].reason));
   const st = readState();
-  assert.strictEqual((st.stopFills && st.stopFills.count) || 0, 1, 'the daily breaker counts a real failure');
-  assert.ok(st.stopCooldownThrough && st.stopCooldownThrough.LNG > new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }), 'the N-day cooldown is armed');
+  assert.ok(!(st.stopCooldownThrough && st.stopCooldownThrough.LNG), 'a real stop-out sets no breakeven session bar');
   assert.ok(!(st.beStopAt && st.beStopAt.LNG), 'the stale ratchet entry is gone');
 });
 

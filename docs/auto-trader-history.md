@@ -7,6 +7,36 @@ the ledger rows. Line references are to the code as it was when the comments mov
 
 When you change a rule, put the short what/why in the code and add the history here under its id (or a new id).
 
+## Removed rules (2026-11-17)
+
+These rules were OFF in every place this file runs — the five engine sleeves (their env: `C:devlantern-race.env.local`
+under each sleeve's map in `two-sleeve-armed/config.json`), the stable box (`lantern-os-stable/.env.local`), and the
+replay's frozen knobs + variants (`stable_trader_knobs_frozen_20261028.env`, `variants_tm3.json`) — and their ledger
+rows were closed (REVERSED, unwound, or dialled to 0). The code was removed; the replay reproduced master
+byte-for-byte without it. **The last commit that still has every one of them is `613cf9369`** — to re-test one,
+restore its hunk from there (`git show 613cf9369:apps/lantern-garage/lib/auto-trader.js`) into a lab tree.
+
+| Flag(s) | Rule | Ids |
+|---|---|---|
+| `TRADER_ZONE_EXIT`, `_SYMBOLS`, `TRADER_R2_TRAIL`, `_PCT`, `TRADER_LADDER_VOL_MULT` | zone ladder exit (R1/R2, peak give-back, R2 trail) + its arming | H6 H19 H20 H72 H141 |
+| `TRADER_TAKE_PROFIT_R`, `TRADER_TAKE_PROFIT_PCT` | R-multiple / fixed % take-profit | H5 |
+| `TRADER_MOMENTUM_EXIT`, `TRADER_MOMENTUM_MIN_R` | momentum-death exit (`TRADER_MOMENTUM_TF` stays: the entry confirmation reads it) | H21 H69 |
+| `TRADER_EXIT_MIN_PWIN` | "bearish enough" gate on the signal exit; with the four above, the exit-authority warning | H75 |
+| `TRADER_ENTRY_KNIFE_FILTER` | falling-knife entry veto (`knifeReading` / `isFallingKnife` stay exported: experiments/ import them) | H60 H122 |
+| `TRADER_SUP_ENTRY`, `_ATR`, `_SYMBOLS` | support-entry gate + structural stop | H18 H124 H126 |
+| `TRADER_ROOM_TIER`, `TRADER_ROOM_MIN_R`, `_B_MULT`, `TRADER_VOL_APLUS`, `TRADER_APLUS_MULT` | room / A+ tiers (the entry row's constant `tier` / `room_r` went with them) | H8 H9 |
+| `TRADER_MIN_ENTRY_RR` | minimum entry RR | H128 |
+| `TRADER_REGIME_SIZE_MULT`, `TRADER_REGIME_R30_MAX` | regime (first-30m) sizing | H16 H76 |
+| `TRADER_STOP_BREAKER` | daily stop circuit breaker | H30 H130 |
+| `TRADER_STOP_COOLDOWN_DAYS` | N-day post-stop cooldown (the breakeven-ratchet session bar that shared its map stays) | H29 H132 |
+| `TRADER_MAX_DAILY_LOSS_PCT` | daily-loss entry halt (ledger tier1-daily-loss-halt-stable: REVERSED) + its per-scan day-P&L read | H114 |
+| `TRADER_ALLOW_SHORTS` | read into cfg() but used nowhere | — |
+| `TRADER_RATCHET_EXTENDED` | the opt-out restoring pre-market stop raises | — |
+
+Kept on purpose although off everywhere: `TRADER_MAX_LOSS_RTH_ONLY` (operator HOLD 11-05, ledger row
+live-engine-max-loss-rth-only-2026-11 OPEN), `TRADER_GAP_STOP_TO_OPEN` (built 10-15, recent execution research), and
+`TRADER_STRESS_MULT` / `_VIX` / `_SPY_IBS` (stress sizing, ledger INCONCLUSIVE).
+
 ## H0
 
 Above `const TRADES_LOG = process.env.TRADER_TRADES_LOG`
