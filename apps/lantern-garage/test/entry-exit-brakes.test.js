@@ -92,32 +92,6 @@ test('the placed broker stop is the DERIVED stop that sized the position, not th
   assert.ok(buys[0].qty * 100 < 12000, `sizing must use the derived stop too (notional $${buys[0].qty * 100})`);
 });
 
-test('daily-loss breaker arms on the {dailyPnl} object shape (Alpaca/house/demo)', async () => {
-  at._resetCooldowns();
-  const { out, buys } = await run({
-    bridgeOpts: { dayPnl: { dailyPnl: -5000, unrealizedPnl: -5000, realizedPnl: 0 } },
-    signals: [bull('GLD', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }])],
-  });
-  assert.strictEqual(buys.length, 0, 'a -5% day on a 2% limit must halt entries');
-  assert.ok(out.circuit_breaker, 'circuit breaker must be reported');
-  assert.ok(out.skipped.some((s) => /daily-loss/.test(s.why)), 'skip reason must say daily-loss');
-});
-
-test('daily-loss breaker still arms on the bare-number shape (IBKR), and a profitable object does not halt', async () => {
-  at._resetCooldowns();
-  const a = await run({
-    bridgeOpts: { dayPnl: -5000 },
-    signals: [bull('GLD', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }])],
-  });
-  assert.strictEqual(a.buys.length, 0, 'numeric day P&L must still halt');
-  at._resetCooldowns();
-  const b = await run({
-    bridgeOpts: { dayPnl: { dailyPnl: 500 } },
-    signals: [bull('TLT', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }])],
-  });
-  assert.strictEqual(b.buys.length, 1, 'a profitable day must not halt');
-});
-
 test('two same-scan entries cannot stack past the gross cap', async () => {
   at._resetCooldowns();
   // $60k held on $100k equity, cap 80% → $80k budget. Each entry sizes to $14k
@@ -167,14 +141,3 @@ test('an in-flight exit whose order died at the broker un-freezes after two orde
   assert.ok(/exit_unfrozen/.test(log), 'the release is narrated in the ledger');
 });
 
-test('TRADER_MAX_DAILY_LOSS_PCT=0 disables the daily-loss halt (2026-08-23) — before, 0 made the limit 0 and any red day halted entries', async () => {
-  at._resetCooldowns();
-  const { out, buys } = await run({
-    bridgeOpts: { dayPnl: -5000 },
-    signals: [bull('GLD', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }])],
-    env: { TRADER_MAX_DAILY_LOSS_PCT: '0' },
-  });
-  assert.ok(!out.circuit_breaker, 'halt disabled: no circuit breaker reported');
-  assert.ok(!out.skipped.some((s) => /daily-loss/.test(s.why)), 'no daily-loss skip');
-  assert.strictEqual(buys.length, 1, 'the entry places on a red day when the halt is off');
-});

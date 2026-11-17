@@ -102,7 +102,7 @@ const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
     assert.ok(/ARMING:/.test(r.result));
     assert.ok(/DRY RUN|ARMED \(TRADER_LIVE=1\)/.test(r.result), "must state whether real-money orders are armed");
     assert.ok(/SIZING:.*per position/s.test(r.result), "must state the position caps");
-    assert.ok(/BRAKES:.*day P&L/s.test(r.result), "must state the daily-loss breaker");
+    assert.ok(/BRAKES:.*re-entry cooldown/s.test(r.result), "must state the re-entry brakes");
   });
 
   await check("trader_journal keeps its honesty furniture (risk-exit rate, structural flag, disclosures)", async () => {

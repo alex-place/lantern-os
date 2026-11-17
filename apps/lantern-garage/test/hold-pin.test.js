@@ -64,7 +64,7 @@ test('TRADER_PIN=GLD suppresses the signal exit with an honest skip row', async 
     const out = await scan();
     assert.ok(!(out.executed||[]).some(x=>x.symbol==='GLD'), 'no exit for a pinned symbol');
     assert.match(skipWhy(out), /pinned/, 'the suppression is narrated, never silent');
-    assert.match(skipWhy(out), /stop\/ladder still protect/);
+    assert.match(skipWhy(out), /the stop still protects/);
   } finally { delete process.env.TRADER_PIN; }
 });
 

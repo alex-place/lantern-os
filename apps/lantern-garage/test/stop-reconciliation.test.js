@@ -6,9 +6,8 @@
  * The real case, 2026-08-19: SMH's ladder stop — a GTC placed 08-18 — filled at
  * 10:12 for -$3,170. The orders feed never listed the fill (prior-session GTC),
  * so the reconciler saw nothing and the sweep booked `closed_externally`,
- * mark-priced and `estimated`. Three subsystems then disagreed about one event:
- * the exit row said "external", the session said stops_fired 0, and the
- * post-stop cooldown armed anyway. The reviewer flagged the contradiction.
+ * mark-priced and `estimated`. Two subsystems then disagreed about one event:
+ * the exit row said "external" and the session said stops_fired 0.
  *
  * The fix: the engine REMEMBERS the order id of every protective stop it
  * places (persisted — a GTC outlives the process by design), and when a
@@ -39,7 +38,7 @@ const ANCHOR = { symbol: 'ANCH', qty: 10, avg_entry_price: 50, current_price: 50
 /** The SMH shape: engine state says we hold it + we placed stop id S1; the
  *  broker book no longer shows it; the orders FEED is silent (prior-session
  *  GTC); only the per-order status endpoint knows the truth. */
-function seedSmh({ stopOrders }) {
+function seedSmh({ stopOrders, beStopAt }) {
   at._resetCooldowns();
   if (fs.existsSync(LOG)) fs.unlinkSync(LOG);
   fs.writeFileSync(STATE, JSON.stringify({
@@ -49,6 +48,7 @@ function seedSmh({ stopOrders }) {
     },
     stopDistPct: { SMH: 3 },
     ...(stopOrders ? { stopOrders } : {}),
+    ...(beStopAt ? { beStopAt } : {}),
   }));
   at._loadState();
 }
@@ -85,10 +85,7 @@ test('THE SMH CASE: a feed-invisible GTC stop fill books as a real stop exit, pr
   assert.strictEqual(e.estimated, false, 'a fill price is not an estimate');
   assert.strictEqual(bridge.statusCalls.length, 1, 'one lookup, on the booking scan only');
 
-  // the whole accounting chain agrees now: cooldown armed AND breaker ticked
   const st = readState();
-  assert.ok(st.stopCooldownThrough && st.stopCooldownThrough.SMH, 'post-stop cooldown armed');
-  assert.strictEqual(st.stopFills.count, 1, 'the daily breaker counted the stop');
   assert.ok(!(st.stopOrders && st.stopOrders.SMH), 'the consumed registry entry is gone');
 });
 
@@ -214,11 +211,11 @@ test('seeding is conservative: terminal, non-stop, unheld, and already-registere
   assert.ok(!at._stopOrders.has('ZZZZ'), 'orders on unheld symbols are not adopted');
 });
 
-test('BROKER CASING (#3407): a lowercase Alpaca stop fill arms the cooldown like an IBKR one', async () => {
+test('BROKER CASING (#3407): a lowercase Alpaca stop fill is a stop fill like an IBKR one', async () => {
   // The real 2026-08-21 race row: order_type "stop", reason "broker fill" —
-  // the exact-case compare missed it, no cooldown armed, SOXL re-entered the
-  // same minute. The classification must be case-insensitive.
-  seedSmh({ stopOrders: null });
+  // the exact-case compare missed it. The classification must be case-insensitive:
+  // a stop fill ends the breakeven ratchet, so the ratchet entry must be gone.
+  seedSmh({ stopOrders: null, beStopAt: { SMH: 575 } });
   const bridge = bridgeWith({
     orderStatus: () => null,
     orders: [{ orderId: 'alp-1', symbol: 'SMH', side: 'SELL', orderType: 'stop', status: 'filled',
@@ -226,9 +223,7 @@ test('BROKER CASING (#3407): a lowercase Alpaca stop fill arms the cooldown like
   });
   await at.runAutoTrade({ signals: [] }, { bridge, userId: 't' });
   const st = readState();
-  assert.ok(st.stopCooldownThrough && st.stopCooldownThrough.SMH,
-    'lowercase "stop" must arm the post-stop cooldown');
-  assert.strictEqual(st.stopFills.count, 1, 'and tick the daily breaker');
+  assert.ok(!(st.beStopAt && st.beStopAt.SMH), 'lowercase "stop" is classified as a stop fill (the ratchet ends)');
 });
 
 test('CANCEL SETTLE (#3407): the sell waits for the canceled stop to leave the book', async () => {
