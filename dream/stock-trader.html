@@ -17,6 +17,7 @@
 </script>
 <script src="/js/signal-palette.js"></script>
 <script src="/js/chart-settings.js"></script>
+<script src="/js/trade-marks.js"></script>
 <!-- Shared global header styling (#1579). Loaded BEFORE the trader <style> so the
      trader's own rules still win on any conflict. -->
 <link rel="stylesheet" href="/css/site.css">
@@ -3370,6 +3371,17 @@ function _fillsFor(ticker){
   }
   return out;
 }
+/* Trading › trade marks (/js/trade-marks.js): the trader's entries and exits, from its
+   journal. Whether the account still holds a name is the broker's answer when there is
+   one (null until then): a position line is only drawn for a position that exists. */
+function _tradeHeld(ticker){
+  try{ return _brokerOk === true ? (_lastPositions || []).some(p=> p && p.symbol === ticker && Number(p.qty) !== 0) : null; }catch(_e){ return null; }
+}
+const _tradeMarkBg = ()=> { const m = _cs('canvas.bgMode'); return ((m === 'solid' || m === 'gradient') && _cs('canvas.bgColor')) || chartVar('--bg0', '#0b0d12'); };
+async function loadTradeMarks(){
+  if(window.GUEST || !window.TradeMarks || _cs('trading.tradeMarks') === false) return;   // the journal is trade-gated
+  if(await TradeMarks.load()) _indRerender();
+}
 /* Sounds: a short tone from WebAudio, no asset to load. One for a fill, two for an alert. */
 let _audioCtx = null;
 function _tone(freqs, volPct){
@@ -3435,6 +3447,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   ctx.clearRect(0,0,w,h);
   if(rMax<=rMin) return;
   _crossData[canvas.id] = { bars, rMin, rMax, panes: [] };   // for the hover crosshair readout; the panes add their scales below
+  if(window.TradeMarks) TradeMarks.remember(canvas.id, []);  // the trade marks painted below are the only ones to point at
 
   const pw  = Math.max(0, w - AXIS_W);
   const ph  = Math.max(0, h - AXIS_H);
@@ -3755,6 +3768,16 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           }
         }
         ctx.restore();
+      }
+    }
+    // Trading › trade marks: where the trader got in and out, from its own journal. The
+    // placing, the painting and the card are /js/trade-marks.js; this hands it the scale.
+    if(_cs('trading.tradeMarks') !== false && window.TradeMarks){
+      const _tmTk = _canvasTicker(canvas), _tmTrades = TradeMarks.forSymbol(_tmTk);
+      if(_tmTrades.length){
+        const _tmHeld = _tradeHeld(_tmTk);
+        TradeMarks.remember(canvas.id, TradeMarks.draw(ctx, { trades:_tmTrades, bars, tf:timeframe, slotW, pw, priceH, y, held:_tmHeld,
+          colors:{ entry: chartVar('--accent', '#4a9eff'), win: CHART_CANDLE_UP(), loss: CHART_CANDLE_DOWN(), flat: _axisColour(), bg: _tradeMarkBg() } }), _tmHeld);
       }
     }
     // The painter, the list and the ts->x map are shared with the pane loop below, which
@@ -8109,6 +8132,7 @@ function _ensureXh(ladder){
   return xh;
 }
 function _hideXh(ladder){
+  if(window.TradeMarks) TradeMarks.unhover(ladder);
   const xh = ladder && ladder._xh; if(!xh) return;
   for(const el of [xh.v, xh.h, xh.dot, xh.price, xh.time]) el.style.display='none';
   // Back to the last bar's values once the cursor leaves.
@@ -8134,6 +8158,7 @@ function _updateXh(ladder, canvasId, x, y, w, h){
   // Below the price pane the readout is the indicator's own value, in its pane's scale.
   const _pn = (data && y > ph) ? _paneMapper(data, null, y) : null;
   if(!data || x < 0 || x > pw || y < 0 || (y > ph && !_pn)){ _hideXh(ladder); return; }
+  if(window.TradeMarks) TradeMarks.hover(ladder, canvasId, x, y, { touch: isNarrowTrader() });   // a trade mark under the pointer says its exact time
   const xh = _ensureXh(ladder);
   const n = (data.bars || []).length;
   // Mobile: a phone-style scrubber — vertical line SNAPPED to the nearest bar, a dot
@@ -11555,10 +11580,12 @@ function startDashboard(){
   fullRefresh();
   loadBars();
   loadOrders();
+  loadTradeMarks();
   setInterval(fullRefresh,         30000);
   setInterval(loadWatchlistPrices,  3000);   // #1627: tighter so the tick-flash is responsive
   setInterval(loadBars,            15000);
   setInterval(loadOrders,          60000);
+  setInterval(loadTradeMarks,      30000);
 }
 // ⏰ Pre-market / after-hours trading now lives in Settings → Connections, beside the
 // other two account-wide switches (which broker executes, and whether the autopilot
