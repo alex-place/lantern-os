@@ -102,6 +102,8 @@
   check('trading.rejectionsOnly', false);
   select('trading.pnl', 'percent', [{ v: 'percent', l: 'Percent' }, { v: 'money', l: 'Money' }, { v: 'hidden', l: 'Hidden' }]);
   check('trading.executionMarks', false); check('trading.executionLabels', false);
+  // On by default: where the trader got in and out is the first thing its chart is asked.
+  check('trading.tradeMarks', true);
   select('trading.labelSide', 'left', [{ v: 'left', l: 'Left' }, { v: 'right', l: 'Right' }]);
   // Alerts
   check('alerts.lines', false); color('alerts.lineColor'); check('alerts.onlyActive', true);
@@ -202,6 +204,7 @@
         { row: 'external', k: 'levels', label: 'Positions and orders', hint: 'Entry, stop and target lines for an open position.' },
         { row: 'external', k: 'zones', label: 'Support and resistance zones' },
         { row: 'select', k: 'trading.pnl', label: 'Profit and loss value' },
+        { row: 'check', k: 'trading.tradeMarks', label: 'AI trader entries and exits', hint: 'Where the trader got in and out, from its journal. Point at a mark for the exact New York time, the price and the result.' },
         { row: 'check', k: 'trading.executionMarks', label: 'Execution marks', hint: 'Where your orders filled, on the bar they filled on.' },
         { row: 'check', k: 'trading.executionLabels', label: 'Execution labels' },
         { row: 'select', k: 'trading.labelSide', label: 'Order and position label side' },

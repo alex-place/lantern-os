@@ -561,7 +561,7 @@ function skipBreakdownFromRows(skips) {
 }
 
 module.exports = {
-  computeScorecard, readExits, readEvents, scorecard, breakdown, breakdownFromRows,
+  computeScorecard, readExits, readEvents, readRows, scorecard, breakdown, breakdownFromRows,
   reasonFamily, preparedRows, etParts, slimStats, forUser, rowUser,
   CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG, HOUSE_USER, extraLogsFor,
   rBasisOf, rOf, rHistogram, rDistribution,
