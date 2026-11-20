@@ -541,6 +541,7 @@ const scorecardRoutes = require('./trading/scorecard');
 const transparencyRoutes = require('./trading/transparency');   // #3598 glass-factory feed
 const importRoutes = require('./trading/import');   // broker fill import (#3557)
 const tradesRoutes = require('./trading/trades');   // the trade log (#3558)
+const chartTradesRoutes = require('./trading/chart-trades');   // entries and exits for the ticker charts
 const trackRecordRoutes = require('./trading/track-record');
 const alertsRoutes = require('./trading/alerts');
 const championRoutes = require('./trading/champion');
@@ -602,6 +603,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await transparencyRoutes(req, res, url, ctx)) return true;
   if (await importRoutes(req, res, url, ctx)) return true;
   if (await tradesRoutes(req, res, url, ctx)) return true;
+  if (await chartTradesRoutes(req, res, url, ctx)) return true;
   if (await trackRecordRoutes(req, res, url, ctx)) return true;
   if (await alertsRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
