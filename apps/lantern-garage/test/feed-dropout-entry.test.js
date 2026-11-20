@@ -79,7 +79,9 @@ function reset() {
   _resetCooldowns();
   if (fs.existsSync(LOG)) fs.unlinkSync(LOG);
 }
-const scan = () => runAutoTrade({ signals: [SIGNAL], spy_1d: 0.6 }, { bridge, userId: 't', now: Date.now() });
+// A scan's clock is the `now` it is handed. A test that measures a time window passes it
+// explicitly: two Date.now() readings a line apart can be the same millisecond.
+const scan = (now = Date.now()) => runAutoTrade({ signals: [SIGNAL], spy_1d: 0.6 }, { bridge, userId: 't', now });
 
 test('the 2026-08-13 sequence: a vanished-then-returned SOXS is NOT re-entered', async () => {
   reset();
@@ -129,14 +131,18 @@ test('a RECONSTRUCTED exit does NOT clear the veto — an estimate cannot corrob
 });
 
 test('the veto EXPIRES — stale state can never bar a symbol forever', async () => {
+  // The clock is pinned on both scans. This test used to set a 1 ms window and trust the
+  // wall clock to have moved on by the next scan; the veto holds while (now - confirmed) is
+  // at most the window, so two scans inside 1 ms kept it and the test failed (CI, 2026-11-20).
   reset();
+  const t0 = Date.now();
   book = [pos('SOXS', 1490, 38.92), pos('SPXS', 2467, 23.53)];
-  await scan();                                   // confirm the holding
+  await scan(t0);                                 // confirm the holding
 
   book = [pos('SPXS', 2467, 23.53)];              // vanishes, unexplained
-  process.env.TRADER_FLAT_CONFIRM_SEC = '0.001';  // 1ms window: already expired
+  process.env.TRADER_FLAT_CONFIRM_SEC = '60';     // a one-minute window ...
   try {
-    await scan();
+    await scan(t0 + 61 * 1000);                   // ... read one second after it closed
     const why = skipsFor('SOXS').map((s) => s.reason).join(' | ');
     assert.doesNotMatch(why, /feed dropout/, 'past the window, the flat reading is accepted');
   } finally {
