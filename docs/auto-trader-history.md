@@ -2334,3 +2334,45 @@ Above `const _exitSettle = { spent: 0 };   // ms THIS scan has spent waiting on 
     for cancelled stops to leave the working book before it sells; the sale then goes out in the same scan.
     Once the budget is used up, or with the switch unset, every exit behaves exactly as before. What is sold,
     and when a rule fires, do not change. TRADER_EXIT_CANCEL_POLL_MS (700) is how often the stop is re-read.
+
+## H154
+
+Above `const _soldGuard = new Map();`
+
+    THE SOLD-RECENTLY GUARD (2026-11-23). Stable (IBKR paper) went SHORT twice in one week because the positions
+    read kept showing a long this engine had already sold, for longer than one scan:
+    - XOP 2026-11-17. The stepped stop (451 @ 182.38, mark 182.45) filled at 09:46:23 ET. The 09:47:42 scan booked
+      the fill and the same-scan guard (H88) held. At 09:47:51 the still-shown shares were adopted as a new holding
+      (max_hold_clock_adopted). The 09:49:02 scan read 451 shares again, the mark unchanged to eight decimals
+      (182.45378115: a cached read), saw no working stop, and the ratchet plus re-protect placed another stop at
+      182.38 with the price at 182.25: it sold at 09:49:03. Short 451.
+    - JNUG 2026-11-18. The pre-market max-loss exit (817, limit) was accepted at 07:43:14 and filled at 07:43:16.
+      Its stop had been cancelled for the sale. The orders feed did not show the fill until 07:47:24. The scan in
+      between still read 817 shares, _reconcileExitFreezes cleared the terminal exit status, and re-protect put a
+      fresh stop under a falling pre-market price: it sold at 07:44:38. Short 817.
+    Both second sales were journaled as exits of the long. The shorts (about $134k, 19.5 % of the account) stood
+    for three sessions before the Saturday review found them in the session rows (carried_out, negative qty);
+    the engine only logs `already short` and never covers. The account showed +0.27 % on the week with +$21.8k of
+    unrealized gain on the two shorts in it: about -2.9 % on its own trades.
+    H88 could not stop either one: it skips a symbol only in the scan whose orders read shows the fill. Here the
+    read was stale for 80 to 160 s, two or more scans. A third route exists in the same state and is closed by
+    the same guard: past the exit-reattempt debounce (8 min) the price-only tick re-fires the exit itself.
+    THE RULE. A sale of ours is remembered per symbol: a sell fill booked by _reconcileFills (certain), or an exit
+    order the broker accepted (`placed`) in closeLong or the signal exit. While the positions read still shows
+    more than what should be left (size before the sale minus what was sold; the size before is the larger of the
+    last snapshot and the registered stop the fill belongs to, so a partial fill is not mistaken for a full one),
+    the symbol is skipped by every pass that sends a SELL (stop size, ratchet, gap auction, re-protect,
+    manageHeldExits in the scan and in the fast tick, the signal exit), is not tracked as a holding, and does not
+    refresh the feed-dropout clock. The guard is released when the read reflects the sale; when the exit order
+    shows cancelled / rejected / expired / inactive with nothing filled (the sale did not happen: the long is real
+    and gets its protection back in that same scan); when this engine opens the symbol again; or after
+    TRADER_SOLD_HOLD_SEC (default 600 s; 0 switches the guard off) for a sale known only as an accepted order,
+    three times that (30 min) once the fill itself is booked: a booked fill is certain, an accepted order is not,
+    and a long that is real must not sit without a stop for longer than the exit path would wait anyway. A lapse
+    is journaled (`sold_guard_expired`), since it means the read was stale that long or the shares are real; the
+    first blocked scan journals `sold_guard` once. The price-only tick reads the guard and never releases it. A release through the read is an explained absence for the external-close sweep, so no
+    reconstructed second exit row is written. The guard is persisted: a restart inside the window must not re-stop
+    sold shares. On a broker whose positions read is immediate (Alpaca) the guard is released at the next scan and
+    changes nothing. Test: test/stale-position-double-sale.test.js (fails on the code before this change with the
+    same orders the account saw: a second stop of the full size; a re-protect stop after the accepted exit; a
+    second market sell from the fast tick).
