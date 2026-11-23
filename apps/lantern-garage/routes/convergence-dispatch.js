@@ -1286,9 +1286,15 @@ module.exports = async (req, res, url, deps) => {
         const verifyLine = `_verified: ${verified}_ (tests ${ranTests ? (testsPassed ? "passed" : "failed") : "not run"})`;
         // Surface the Σ₀ council verdict so a `seam_open` (contested, unverified) change is
         // visibly flagged for review rather than reading as a clean auto-run.
+        // Under COUNCIL_STRICT_GROUNDING a seam_open can be UNcontested: the run made claims and
+        // nothing but agreement backed them. Say that, rather than "contested".
         const councilLine = council
           ? `_council: **${council.verdict}**_ (Δ=${council.delta}, grounded-by: ${council.groundedBy})` +
-            (council.verdict === "seam_open" ? " — ⚠️ contested + no passing execution check; review before merge" : "")
+            (council.verdict === "seam_open"
+              ? (council.agreementOnly && council.strictGrounding
+                ? " — ⚠️ unverified: claims backed only by agreement, no passing execution check; review before merge"
+                : " — ⚠️ contested + no passing execution check; review before merge")
+              : "")
           : "";
         const prUrl = openDraftPr(workRoot, branchName, commitTitle,
           `Fixes #${issueNumber}\n\n${verifyLine}${councilLine ? "\n" + councilLine : ""}\n\n${issueDetails.body}`);
@@ -1430,6 +1436,7 @@ module.exports = async (req, res, url, deps) => {
           ...receipt,
           councilVerdict: council ? council.verdict : null,
           councilDelta: council ? council.delta : null,
+          councilAgreementOnly: council ? !!(council.agreementOnly && council.strictGrounding) : false,
           convergence: {
             hypothesis: convergenceRecord.hypothesis,
             confidence: {
@@ -1458,6 +1465,7 @@ module.exports = async (req, res, url, deps) => {
           prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}`,
           councilVerdict: council ? council.verdict : null,
           councilDelta: council ? council.delta : null,
+          councilAgreementOnly: council ? !!(council.agreementOnly && council.strictGrounding) : false,
           testsPassed: receipt.testsPassed,
           convergence: convergenceSummary,
         });

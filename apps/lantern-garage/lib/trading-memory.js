@@ -82,7 +82,11 @@ function _narrateSignal(signal) {
   return text;
 }
 
-function _csfRecord(tier, content, tags, keywords, memoryId) {
+// Provenance (see csf-memory-writer.js PROVENANCE): a signal is unisona's own agents' output
+// ("self"), an order is a system event recorded from the broker ("system"). Without it every
+// record here read as actor_type "system", so the system's own signals could not be told
+// apart from outside evidence when recalled.
+function _csfRecord(tier, content, tags, keywords, memoryId, who = {}) {
   const now = _now();
   const base = {
     memory_id: memoryId,
@@ -102,9 +106,9 @@ function _csfRecord(tier, content, tags, keywords, memoryId) {
     vector_embedding: null,
     keywords: keywords.filter(Boolean),
     entities: [],
-    metadata: {},
-    actor_id: "trading-system",
-    actor_type: "system",
+    metadata: who.provenance ? { provenance: who.provenance } : {},
+    actor_id: who.actorId ? String(who.actorId) : "trading-system",
+    actor_type: who.actorType || "system",
     confidence_reasoning: "",
     staleness_signals: [],
   };
@@ -155,6 +159,7 @@ async function recordOrder(order) {
     ["trading", "order", String(order.symbol || ""), String(order.side || ""), String(order.status || "")],
     [String(order.symbol || ""), "order"],
     memId,
+    { actorType: "system", actorId: "trading-system", provenance: csfWriter.PROVENANCE.SYSTEM },
   );
   await appendJsonlQueued(_registryPath(), rec);
   return order;
@@ -186,6 +191,11 @@ async function recordSignal(signal) {
     ["trading", "signal", String(signal.agent || signal.agent_type || signal.type || ""), String(signal.symbol || "")],
     [String(signal.symbol || ""), "signal", String(signal.agent || "")],
     memId,
+    {
+      actorType: "agent",
+      actorId: signal.agent || signal.agent_type || signal.type || "trading-agent",
+      provenance: csfWriter.PROVENANCE.SELF,
+    },
   );
   await appendJsonlQueued(_registryPath(), rec);
   return signal;

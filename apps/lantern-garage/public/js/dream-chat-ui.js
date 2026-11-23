@@ -742,7 +742,11 @@ function renderConvergenceSummary(fin, d) {
 // states where a one-click merge silently launders unverified work.
 function awApproveWarnReason(d) {
   if (!d) return null;
-  if (d.councilVerdict === 'seam_open') return 'Σ₀ council: seam_open — contested, no passing execution check';
+  if (d.councilVerdict === 'seam_open') {
+    return d.councilAgreementOnly
+      ? 'Σ₀ council: unverified — claims backed only by agreement, no passing execution check'
+      : 'Σ₀ council: seam_open — contested, no passing execution check';
+  }
   if (d.testsPassed === false) return 'tests failed on this change';
   const cf = d.convergence && d.convergence.confidence;
   if (d.testsPassed == null && cf && typeof cf.testsPassed === 'number' && cf.testsPassed <= 0) return 'tests were not run on this change';
