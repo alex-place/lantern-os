@@ -68,10 +68,10 @@
     "google-auth-library": "^11.1.0",
     "lantern-os": "file:../..",
     "mammoth": "^1.12.3",
-    "nodemailer": "^10.0.12",
+    "nodemailer": "^10.1.4",
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
